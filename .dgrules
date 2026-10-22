@@ -1,0 +1,6 @@
+# Regras do sistema (DG Editor)
+# Instrucoes permanentes deste projeto. A analise e o chat SEMPRE respeitam estas regras.
+# Escreva uma regra por linha. Exemplos:
+# - Nunca alterar arquivos da pasta producao/
+# - Padrao de nomes: camelCase em JS, snake_case em PHP
+# - Idioma dos commits: portugues

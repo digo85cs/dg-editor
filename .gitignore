@@ -1,0 +1,15 @@
+node_modules/
+out/
+resources/
+*.ico
+dg-config.json
+*.local
+.env
+dist/
+fase0-snapshot.txt
+tmp-*.cjs
+package.json.bak
+repair-mojibake.cjs
+check-acentos.cjs
+gen-css.cjs
+fix64.cjs

@@ -1,0 +1,171 @@
+// DG Editor Fase 0 validation tests
+// Run: node test/validator.cjs
+// Uses esbuild (already installed) to transpile TS source on the fly.
+const path = require('path')
+const fs = require('fs')
+const os = require('os')
+const esbuild = require('esbuild')
+
+const ROOT = path.join(__dirname, '..')
+const SRC = path.join(ROOT, 'src')
+
+function loadModule(relPath) {
+  const abs = path.join(SRC, relPath)
+  const ts = fs.readFileSync(abs, 'utf-8')
+  const result = esbuild.transformSync(ts, {
+    loader: 'ts',
+    target: 'node20',
+    format: 'cjs',
+    sourcemap: false
+  })
+  const moduleObj = { exports: {} }
+  const requireMock = (spec) => {
+    if (spec === 'electron') {
+      return {
+        app: {
+          getPath: (name) => name === 'userData' ? (process.env.DG_TEST_USERDATA || os.tmpdir()) : os.tmpdir(),
+          getVersion: () => '0.1.0-test',
+          on: () => {},
+          whenReady: () => Promise.resolve(),
+          quit: () => {}
+        },
+        BrowserWindow: class { constructor() {} on() {} webContents = { setWindowOpenHandler() {} } },
+        ipcMain: { on() {}, handle() {} },
+        dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
+        shell: { openExternal() {} }
+      }
+    }
+    if (spec.startsWith('@shared/')) {
+      return loadModule('shared/' + spec.slice('@shared/'.length))
+    }
+    if (spec.startsWith('@main/')) {
+      return loadModule('main/' + spec.slice('@main/'.length))
+    }
+    if (spec.startsWith('./')) {
+      const dir = path.dirname(relPath)
+      return loadModule(path.join(dir, spec.slice(2)))
+    }
+    return require(spec)
+  }
+  const fn = new Function('module', 'require', result.code + '\nreturn module.exports')
+  return fn(moduleObj, requireMock)
+}
+
+let passed = 0
+let failed = 0
+const failures = []
+
+function assert(name, cond, detail) {
+  if (cond) { passed++; console.log('  PASS: ' + name) }
+  else { failed++; failures.push(name); console.log('  FAIL: ' + name + (detail ? ' - ' + detail : '')) }
+}
+
+function section(t) { console.log('\n== ' + t + ' ==') }
+
+async function main() {
+  // ---------- 1. Auth: device-token identity ----------
+  section('1. Auth: device-token identity')
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-auth-'))
+  process.env.DG_TEST_USERDATA = tmpDir
+  const authMod = loadModule('main/auth/index.ts')
+  const { getAuthStore, __resetAuthStoreForTests } = authMod
+  __resetAuthStoreForTests()
+
+  const store = getAuthStore()
+  let state = store.getState()
+  assert('initial state not authenticated', state.authenticated === false)
+
+  const session = store.ensureDeviceIdentity()
+  assert('ensureDeviceIdentity ok', session.authenticated === true)
+  assert('session has token', typeof session.token === 'string' && session.token.length > 0)
+  assert('session user is owner', session.user.username === 'owner')
+
+  const state2 = store.getState()
+  assert('state after identity authenticated', state2.authenticated === true)
+  assert('state token matches', state2.session && state2.session.token === session.token)
+
+  const session2 = store.ensureDeviceIdentity()
+  assert('ensureDeviceIdentity returns same token', session2.token === session.token)
+
+  __resetAuthStoreForTests()
+  const storeRestarted = getAuthStore()
+  const stateRestarted = storeRestarted.getState()
+  assert('restarted state authenticated', stateRestarted.authenticated === true, JSON.stringify(stateRestarted))
+  assert('restarted token matches', stateRestarted.session && stateRestarted.session.token === session.token)
+
+  store.logout()
+  const stateAfterLogout = store.getState()
+  assert('after logout not authenticated', stateAfterLogout.authenticated === false)
+
+  const session3 = store.ensureDeviceIdentity()
+  assert('re-boot recreates identity', session3.authenticated === true)
+  assert('re-boot new token', session3.token !== session.token)
+
+  const valid = store.validateSession(session3.token)
+  assert('validateSession authenticated', valid.authenticated === true)
+  const invalid = store.validateSession('badtoken')
+  assert('validateSession invalid', invalid.authenticated === false)
+
+  // ---------- 3. Folder scan ignores node_modules/.git/etc ----------
+  section('3. Folder scan ignores node_modules/.git/etc')
+  const scanMod = loadModule('main/scanner.ts')
+  const { scanFolder } = scanMod
+
+  const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-scan-'))
+  fs.writeFileSync(path.join(testRoot, 'a.ts'), 'a')
+  fs.writeFileSync(path.join(testRoot, 'b.js'), 'b')
+  fs.writeFileSync(path.join(testRoot, 'README.md'), 'r')
+  fs.mkdirSync(path.join(testRoot, 'node_modules'), { recursive: true })
+  fs.writeFileSync(path.join(testRoot, 'node_modules', 'dep.js'), 'dep')
+  fs.mkdirSync(path.join(testRoot, '.git'), { recursive: true })
+  fs.writeFileSync(path.join(testRoot, '.git', 'config'), 'git')
+  fs.mkdirSync(path.join(testRoot, 'vendor'), { recursive: true })
+  fs.writeFileSync(path.join(testRoot, 'vendor', 'x.php'), 'x')
+  fs.mkdirSync(path.join(testRoot, 'dist'), { recursive: true })
+  fs.writeFileSync(path.join(testRoot, 'dist', 'bundle.js'), 'b')
+  fs.mkdirSync(path.join(testRoot, 'src'), { recursive: true })
+  fs.writeFileSync(path.join(testRoot, 'src', 'c.ts'), 'c')
+
+  const result = scanFolder(testRoot)
+  assert('scan totalFiles == 4', result.totalFiles === 4, 'got ' + result.totalFiles)
+  assert('scan has .ts', result.extensions['.ts'] === 2, JSON.stringify(result.extensions))
+  assert('scan has .js', result.extensions['.js'] === 1)
+  assert('scan has .md', result.extensions['.md'] === 1)
+  assert('scan skippedDirs >= 4', result.skippedDirs >= 4, 'got ' + result.skippedDirs)
+
+  // ---------- 4. System profile ----------
+  section('4. System profile')
+  const profileMod = loadModule('main/profile.ts')
+  const { getSystemProfile, profileStrength } = profileMod
+  const profile = getSystemProfile()
+  assert('profile platform', typeof profile.platform === 'string')
+  assert('profile arch', typeof profile.arch === 'string')
+  assert('profile totalMemory > 0', profile.totalMemory > 0)
+  assert('profile cpus length > 0', profile.cpus.length > 0)
+  const strength = profileStrength(profile)
+  assert('profile strength valid', ['light', 'medium', 'strong'].includes(strength))
+
+  // ---------- 5. Brain providers ----------
+  section('5. Brain providers')
+  const brainMod = loadModule('main/brain/index.ts')
+  const { getProviders, ApiProvider } = brainMod
+  const providers = getProviders()
+  assert('providers has 3', providers.length === 3)
+  assert('provider names', providers.map(p => p.name).sort().join(',') === 'api,maestro,ollama')
+  const api = new ApiProvider()
+  const avail = await api.isAvailable()
+  assert('api available without key returns boolean', typeof avail === 'boolean')
+
+  // ---------- Summary ----------
+  console.log('\n==============================')
+  console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
+  if (failed > 0) {
+    console.log('Failures: ' + failures.join(', '))
+    process.exit(1)
+  } else {
+    console.log('ALL TESTS PASSED')
+    process.exit(0)
+  }
+}
+
+main().catch((e) => { console.error(e); process.exit(1) })

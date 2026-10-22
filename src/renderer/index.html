@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>DG Studio</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- SIDEBAR: pastas de trabalho -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <span class="logo">DG Studio</span>
+        <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">+</button>
+      </div>
+      <div id="folder-list" class="folder-list"></div>
+      <div class="sidebar-footer">
+        <button id="btn-config" class="btn-ghost" title="Configurações">Configurações</button>
+      </div>
+    </aside>
+
+    <!-- CENTRO: chat -->
+    <main id="chat-panel">
+      <header id="chat-header">
+        <span id="chat-title">Nenhuma pasta aberta</span>
+        <span id="chat-provider" class="provider-badge"></span>
+      </header>
+      <div id="chat-messages" class="chat-messages">
+        <div class="empty-state" id="empty-state">
+          <h2>Bem-vindo ao DG Studio</h2>
+          <p>Abra uma pasta de trabalho para começar. O sistema analisa sozinho e mostra o que tem lá.</p>
+          <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
+        </div>
+      </div>
+      <div id="whereis-bar" class="whereis-bar hidden">
+        <span class="whereis-label">Onde está?</span>
+        <input id="whereis-input" type="text" placeholder="o que voce procura no sistema?" />
+        <button id="whereis-btn" class="btn-small">Buscar</button>
+      </div>
+      <footer id="chat-input-bar">
+        <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
+        <button id="chat-send" class="btn-primary" disabled>Enviar</button>
+      </footer>
+    </main>
+
+    <!-- DIREITA: análise + execução -->
+    <section id="exec-panel">
+      <header class="exec-header">
+        <span>Análise do sistema</span>
+        <button id="btn-reanalyze" class="btn-small hidden" title="Forçar nova análise">Analisar de novo</button>
+      </header>
+      <div id="analysis-content" class="analysis-content">
+        <p class="muted">A análise aparece aqui quando você abrir uma pasta.</p>
+      </div>
+      <div id="analysis-progress" class="analysis-progress hidden">
+        <span class="spinner"></span> <span id="progress-text">Analisando...</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal de configurações -->
+  <div id="modal-config" class="modal hidden">
+    <div class="modal-box">
+      <h3>Configurações</h3>
+      <div id="config-profile" class="config-section"></div>
+      <div id="config-ollama" class="config-section"></div>
+      <button id="btn-config-close" class="btn-primary">Fechar</button>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
