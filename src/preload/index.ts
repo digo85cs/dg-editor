@@ -8,7 +8,9 @@ const invokeChannels = [
   'analysis:run', 'analysis:cached',
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template',
-  'chat:load', 'chat:send', 'chat:clear'
+  'chat:load', 'chat:send', 'chat:clear',
+  'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
+  'tema:get', 'tema:set'
 ]
 
 const sendChannels = ['app:quit']
