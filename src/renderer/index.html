@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
-  <title>DG Studio</title>
+  <title>DG Editor</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -12,12 +12,14 @@
     <!-- SIDEBAR: pastas de trabalho -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <span class="logo">DG Studio</span>
+        <span class="logo">DG Editor</span>
         <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">+</button>
       </div>
       <div id="folder-list" class="folder-list"></div>
       <div class="sidebar-footer">
-        <button id="btn-config" class="btn-ghost" title="Configurações">Configurações</button>
+        <button id="btn-palette" class="btn-ghost" title="Paleta de comandos (Ctrl+P)">&#8984; Ctrl+P</button>
+        <button id="btn-contas" class="btn-ghost" title="Contas e sa&#250;de do sistema">Contas</button>
+        <button id="btn-config" class="btn-ghost" title="Configura&#231;&#245;es">Configura&#231;&#245;es</button>
       </div>
     </aside>
 
@@ -26,16 +28,17 @@
       <header id="chat-header">
         <span id="chat-title">Nenhuma pasta aberta</span>
         <span id="chat-provider" class="provider-badge"></span>
+        <button id="btn-tema" class="btn-small" title="Alternar tema claro/escuro">&#9789;</button>
       </header>
       <div id="chat-messages" class="chat-messages">
         <div class="empty-state" id="empty-state">
-          <h2>Bem-vindo ao DG Studio</h2>
-          <p>Abra uma pasta de trabalho para começar. O sistema analisa sozinho e mostra o que tem lá.</p>
+          <h2>Bem-vindo ao DG Editor</h2>
+          <p>Abra uma pasta de trabalho para come&#231;ar. O sistema analisa sozinho e mostra o que tem l&#225;.</p>
           <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
         </div>
       </div>
       <div id="whereis-bar" class="whereis-bar hidden">
-        <span class="whereis-label">Onde está?</span>
+        <span class="whereis-label">Onde est&#225;?</span>
         <input id="whereis-input" type="text" placeholder="o que voce procura no sistema?" />
         <button id="whereis-btn" class="btn-small">Buscar</button>
       </div>
@@ -48,25 +51,48 @@
     <!-- DIREITA: análise + execução -->
     <section id="exec-panel">
       <header class="exec-header">
-        <span>Análise do sistema</span>
-        <button id="btn-reanalyze" class="btn-small hidden" title="Forçar nova análise">Analisar de novo</button>
+        <span>An&#225;lise do sistema</span>
+        <button id="btn-reanalyze" class="btn-small hidden" title="For&#231;ar nova an&#225;lise">Analisar de novo</button>
       </header>
       <div id="analysis-content" class="analysis-content">
-        <p class="muted">A análise aparece aqui quando você abrir uma pasta.</p>
+        <p class="muted">A an&#225;lise aparece aqui quando voc&#234; abrir uma pasta.</p>
       </div>
       <div id="analysis-progress" class="analysis-progress hidden">
         <span class="spinner"></span> <span id="progress-text">Analisando...</span>
       </div>
+      <div id="guardian-bar" class="guardian-bar" title="Guardi&#227;o de recursos (regra 9)">
+        <span id="guardian-text">Guardi&#227;o: medindo...</span>
+      </div>
     </section>
+  </div>
+
+  <!-- Paleta de comandos (Ctrl+P) -->
+  <div id="palette" class="modal hidden">
+    <div class="palette-box">
+      <input id="palette-input" type="text" placeholder="Digite um comando..." autocomplete="off" />
+      <div id="palette-list" class="palette-list"></div>
+    </div>
   </div>
 
   <!-- Modal de configurações -->
   <div id="modal-config" class="modal hidden">
     <div class="modal-box">
-      <h3>Configurações</h3>
+      <h3>Configura&#231;&#245;es</h3>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
       <button id="btn-config-close" class="btn-primary">Fechar</button>
+    </div>
+  </div>
+
+  <!-- Modal de Contas (Fase 2) -->
+  <div id="modal-contas" class="modal hidden">
+    <div class="modal-box">
+      <h3>Contas e sa&#250;de do sistema</h3>
+      <div id="contas-identidade" class="config-section"></div>
+      <div id="contas-maquina" class="config-section"></div>
+      <div id="contas-ia" class="config-section"></div>
+      <div id="contas-guardian" class="config-section"></div>
+      <button id="btn-contas-close" class="btn-primary">Fechar</button>
     </div>
   </div>
 

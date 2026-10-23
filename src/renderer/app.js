@@ -1,4 +1,4 @@
-// DG Studio - renderer (Fase 1)
+// DG Editor - renderer (Fase 2)
 const $ = (id) => document.getElementById(id)
 
 let pastaAtual = null
@@ -42,7 +42,7 @@ function carregarPastas() {
   }
 }
 
-// ---------- Selecionar pasta: carrega chat + cache + dispara analise ----------
+// ---------- Selecionar pasta ----------
 async function selecionarPasta(path) {
   pastaAtual = path
   $('chat-title').textContent = path.split('\\').pop() || path
@@ -52,11 +52,9 @@ async function selecionarPasta(path) {
   $('btn-reanalyze').classList.remove('hidden')
   renderizarPastas()
 
-  // chat persistido da pasta
   const msgs = await window.api.invoke('chat:load', path)
   renderizarChat(msgs)
 
-  // cache da analise (MOSTRA se existir; NUNCA analisa sozinho - botao)
   const cached = await window.api.invoke('analysis:cached', path)
   if (cached) {
     renderizarAnalise(cached, true)
@@ -64,7 +62,6 @@ async function selecionarPasta(path) {
     $('analysis-content').innerHTML = '<p class="muted">Pasta aberta. Clique em <strong>Analisar agora</strong> (canto superior do painel) quando quiser a analise.</p>'
   }
 
-  // regras: cria template se nao existir
   const temRegras = await window.api.invoke('rules:exists', path)
   if (!temRegras) await window.api.invoke('rules:create-template', path)
 }
@@ -197,22 +194,181 @@ async function abrirConfig() {
       : 'Nao instalado. Baixe em ollama.com')
 }
 
+// ---------- Contas (Fase 2) ----------
+async function abrirContas() {
+  $('modal-contas').classList.remove('hidden')
+  $('contas-identidade').innerHTML = '<h4>Identidade</h4>Carregando...'
+  $('contas-maquina').innerHTML = '<h4>Maquina</h4>Carregando...'
+  $('contas-ia').innerHTML = '<h4>IA</h4>Carregando...'
+  $('contas-guardian').innerHTML = '<h4>Guardiao de recursos</h4>Carregando...'
+  try {
+    const s = await window.api.invoke('accounts:get-state')
+    $('contas-identidade').innerHTML =
+      '<h4>Identidade</h4>' +
+      'Usuario: <strong>owner</strong> (device-token)<br>' +
+      'Token: <code>' + escapar(s.identidade.tokenPrefix) + '...</code><br>' +
+      'Desde: ' + (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : '—')
+    $('contas-maquina').innerHTML =
+      '<h4>Maquina</h4>' +
+      escapar(s.maquina.hostname) + ' — ' + escapar(s.maquina.plataforma) + '<br>' +
+      s.maquina.cpus + ' nucleos — ' + escapar(s.maquina.ramGB) + ' GB RAM<br>' +
+      'Forca: <strong>' + escapar(s.maquina.forca) + '</strong>'
+    const provs = s.ia.provedores.map((p) => p.name + ': ' + (p.available ? 'OK (' + p.models + ')' : 'off')).join('<br>')
+    $('contas-ia').innerHTML =
+      '<h4>IA</h4>' +
+      'Ollama: ' + (s.ia.ollamaInstalado ? (s.ia.ollamaRodando ? 'rodando' : 'instalado, parado') : 'nao instalado') + '<br>' +
+      'Modelos: ' + escapar(s.ia.modelos.join(', ') || 'nenhum') + '<br>' +
+      'Provedores: <br>' + provs
+    $('contas-guardian').innerHTML =
+      '<h4>Guardiao de recursos</h4>' +
+      'RAM livre: ' + Math.round(s.guardian.freeMemory / 1048576) + ' MB (' + s.guardian.freePct + '%)<br>' +
+      'CPU: ' + s.guardian.cpuPercent + '%<br>' +
+      'Operacoes pesadas: ' + (s.guardian.ramOk ? 'LIBERADAS' : 'PAUSADAS (RAM baixa)')
+  } catch (err) {
+    $('contas-ia').innerHTML = '<h4>Erro</h4>' + escapar(String(err))
+  }
+}
+
+// ---------- Tema (Fase 2) ----------
+async function alternarTema() {
+  const atual = document.body.classList.contains('tema-claro') ? 'claro' : 'escuro'
+  const novo = atual === 'claro' ? 'escuro' : 'claro'
+  await window.api.invoke('tema:set', novo)
+  aplicarTema(novo)
+}
+
+function aplicarTema(tema) {
+  document.body.classList.toggle('tema-claro', tema === 'claro')
+  $('btn-tema').textContent = tema === 'claro' ? '\u2600' : '\u263D'
+  localStorage.setItem('dg-tema', tema)
+}
+
+async function carregarTema() {
+  try {
+    const tema = await window.api.invoke('tema:get')
+    aplicarTema(tema)
+  } catch {
+    aplicarTema(localStorage.getItem('dg-tema') === 'claro' ? 'claro' : 'escuro')
+  }
+}
+
+// ---------- Paleta de comandos (Ctrl+P, Fase 2) ----------
+const COMANDOS = [
+  { id: 'abrir-pasta', label: 'Abrir pasta de trabalho', hint: 'Ctrl+O' },
+  { id: 'analisar', label: 'Analisar sistema aberto', hint: 'IA' },
+  { id: 'reanalisar', label: 'Analisar de novo (forcar)', hint: 'IA' },
+  { id: 'onde-esta', label: 'Onde esta? (focar busca)', hint: 'busca textual' },
+  { id: 'limpar-chat', label: 'Limpar chat desta pasta', hint: 'chat' },
+  { id: 'contas', label: 'Abrir Contas e saude do sistema', hint: 'Fase 2' },
+  { id: 'config', label: 'Abrir Configuracoes', hint: 'sistema' },
+  { id: 'tema', label: 'Alternar tema claro/escuro', hint: 'visual' },
+  { id: 'guardian', label: 'Ver guardiao de recursos', hint: 'RAM/CPU' }
+]
+
+function abrirPaleta() {
+  $('palette').classList.remove('hidden')
+  $('palette-input').value = ''
+  renderizarPaleta('')
+  $('palette-input').focus()
+}
+
+function fecharPaleta() {
+  $('palette').classList.add('hidden')
+}
+
+function renderizarPaleta(filtro) {
+  const lista = $('palette-list')
+  lista.innerHTML = ''
+  const f = filtro.toLowerCase().trim()
+  const cmds = COMANDOS.filter((c) => !f || c.label.toLowerCase().includes(f))
+  for (const c of cmds) {
+    const div = document.createElement('div')
+    div.className = 'palette-item'
+    div.innerHTML = '<span class="palette-label">' + escapar(c.label) + '</span>' +
+      (c.hint ? '<span class="palette-hint">' + escapar(c.hint) + '</span>' : '')
+    div.addEventListener('click', () => { fecharPaleta(); executarComando(c.id) })
+    lista.appendChild(div)
+  }
+  if (cmds.length === 0) {
+    lista.innerHTML = '<div class="palette-item muted">Nenhum comando</div>'
+  }
+}
+
+let paletaSel = 0
+
+function executarComando(id) {
+  if (id === 'abrir-pasta') abrirPasta()
+  else if (id === 'analisar') { if (pastaAtual) rodarAnalise(pastaAtual, false) }
+  else if (id === 'reanalisar') { if (pastaAtual) rodarAnalise(pastaAtual, true) }
+  else if (id === 'onde-esta') { $('whereis-bar').classList.remove('hidden'); $('whereis-input').focus() }
+  else if (id === 'limpar-chat') { if (pastaAtual) window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([])) }
+  else if (id === 'contas') abrirContas()
+  else if (id === 'config') abrirConfig()
+  else if (id === 'tema') alternarTema()
+  else if (id === 'guardian') abrirContas()
+}
+
+// ---------- Guardiao (Fase 2, regra 9) ----------
+async function atualizarGuardiao() {
+  try {
+    const s = await window.api.invoke('guardian:snapshot')
+    const mb = Math.round(s.freeMemory / 1048576)
+    $('guardian-text').textContent = 'Guardiao: RAM ' + mb + ' MB (' + s.freePct + '%) - CPU ' + s.cpuPercent + '%' + (s.ramOk ? '' : ' - PAUSADO')
+    $('guardian-bar').classList.toggle('guardian-alerta', !s.ramOk)
+  } catch { /* ignora */ }
+}
+
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
 $('btn-empty-open').addEventListener('click', abrirPasta)
 $('btn-reanalyze').addEventListener('click', () => pastaAtual && rodarAnalise(pastaAtual, true))
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
+$('btn-contas').addEventListener('click', abrirContas)
+$('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
+$('btn-tema').addEventListener('click', alternarTema)
+$('btn-palette').addEventListener('click', abrirPaleta)
 $('chat-send').addEventListener('click', enviarMensagem)
 $('chat-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem() }
 })
 $('whereis-btn').addEventListener('click', buscarOndeEsta)
 $('whereis-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') buscarOndeEsta() })
+$('palette-input').addEventListener('input', (e) => renderizarPaleta(e.target.value))
+$('palette-input').addEventListener('keydown', (e) => {
+  const itens = document.querySelectorAll('.palette-item')
+  if (e.key === 'Escape') fecharPaleta()
+  else if (e.key === 'ArrowDown') { paletaSel = Math.min(paletaSel + 1, itens.length - 1); destacarPaleta(itens) }
+  else if (e.key === 'ArrowUp') { paletaSel = Math.max(paletaSel - 1, 0); destacarPaleta(itens) }
+  else if (e.key === 'Enter') { const alvo = itens[paletaSel]; if (alvo) alvo.click() }
+})
+
+function destacarPaleta(itens) {
+  itens.forEach((el, i) => el.classList.toggle('selecionado', i === paletaSel))
+}
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+    e.preventDefault()
+    abrirPaleta()
+  }
+  if (e.key === 'Escape') {
+    fecharPaleta()
+    $('modal-config').classList.add('hidden')
+    $('modal-contas').classList.add('hidden')
+  }
+})
+
+$('palette').addEventListener('click', (e) => { if (e.target === $('palette')) fecharPaleta() })
+$('modal-config').addEventListener('click', (e) => { if (e.target === $('modal-config')) $('modal-config').classList.add('hidden') })
+$('modal-contas').addEventListener('click', (e) => { if (e.target === $('modal-contas')) $('modal-contas').classList.add('hidden') })
 
 // ---------- Boot ----------
 carregarPastas()
 renderizarPastas()
+carregarTema()
+atualizarGuardiao()
+setInterval(atualizarGuardiao, 5000)
 window.api.invoke('brain:providers').then((ps) => {
   const ativo = ps.find((p) => p.available)
   if (ativo) $('chat-provider').textContent = 'IA: ' + ativo.name

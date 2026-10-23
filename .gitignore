@@ -13,3 +13,4 @@ repair-mojibake.cjs
 check-acentos.cjs
 gen-css.cjs
 fix64.cjs
+logs/

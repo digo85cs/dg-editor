@@ -1,2 +1,2 @@
-# dg-studio
-DG Studio - assistente IA de trabalho do Rodrigo (Electron + TypeScript + Ollama local)
+# dg-editor
+DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)

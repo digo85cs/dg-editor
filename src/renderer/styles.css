@@ -60,8 +60,8 @@ body {
   background: var(--accent-soft); color: var(--text); font-weight: 600;
   border: 1px solid rgba(10, 132, 255, 0.3);
 }
-.sidebar-footer { padding: 12px 14px; border-top: 1px solid var(--glass-border); }
-.btn-ghost { background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 6px 0; }
+.sidebar-footer { padding: 12px 14px; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 2px; }
+.btn-ghost { background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 6px 0; text-align: left; }
 .btn-ghost:hover { color: var(--text); }
 
 /* ---------- CHAT (glass) ---------- */
@@ -74,7 +74,7 @@ body {
   border-bottom: 1px solid var(--glass-border);
   display: flex; align-items: center; gap: 10px;
 }
-#chat-title { font-weight: 600; font-size: 14px; }
+#chat-title { font-weight: 600; font-size: 14px; flex: 1; }
 .provider-badge {
   font-size: 11px; background: var(--accent-soft); color: var(--accent);
   padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(10, 132, 255, 0.3);
@@ -231,3 +231,51 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* ---------- FASE 2: paleta, contas, guardiao, tema claro ---------- */
+.palette-box {
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px; padding: 14px; width: 520px; max-width: 90vw;
+  box-shadow: var(--shadow);
+}
+.palette-box input {
+  width: 100%; background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 10px; color: var(--text); padding: 12px 16px; font-size: 14px;
+  margin-bottom: 10px;
+}
+.palette-box input:focus { outline: none; border-color: var(--accent); }
+.palette-list { max-height: 320px; overflow-y: auto; }
+.palette-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  color: var(--text-muted);
+}
+.palette-item:hover, .palette-item.selecionado { background: var(--accent-soft); color: var(--text); }
+.palette-label { color: inherit; }
+.palette-hint { font-size: 11px; color: var(--text-muted); }
+.guardian-bar {
+  padding: 8px 18px; border-top: 1px solid var(--glass-border);
+  font-size: 11px; color: var(--text-muted);
+  background: var(--glass);
+}
+.guardian-bar.guardian-alerta { color: var(--warn); font-weight: 600; }
+
+/* Tema claro (Fase 2) */
+body.tema-claro {
+  --bg-grad-1: #f5f5f7;
+  --bg-grad-2: #e8e8ed;
+  --glass: rgba(0, 0, 0, 0.04);
+  --glass-strong: rgba(0, 0, 0, 0.07);
+  --glass-border: rgba(0, 0, 0, 0.12);
+  --text: #1d1d1f;
+  --text-muted: rgba(29, 29, 31, 0.55);
+  --accent-soft: rgba(10, 132, 255, 0.12);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, var(--bg-grad-1) 0%, var(--bg-grad-2) 50%, #dde3f0 100%);
+}
+body.tema-claro .msg.user { background: linear-gradient(135deg, #0a84ff, #0066cc); color: white; }
+body.tema-claro .msg.assistant { background: var(--glass-strong); border: 1px solid var(--glass-border); }
+body.tema-claro ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); }

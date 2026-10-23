@@ -100,13 +100,13 @@ export class OllamaProvider implements BrainProvider {
     dglog('[brain] ask: modelos encontrados: ' + models.length)
     if (models.length === 0) throw new Error('Ollama sem modelos disponiveis')
     const model = pickBestModel(models.map((m) => m.name))
-      dglog('[brain] modelo escolhido: ' + model)
+    dglog('[brain] modelo escolhido: ' + model)
     const { status, body } = await new Promise<{ status: number; body: string }>((resolve) => {
       const data = JSON.stringify({
-        options: { num_thread: 2, num_ctx: 4096 },
         model,
+        options: { num_thread: 2, num_ctx: 4096 },
         messages: [
-          { role: 'system', content: 'Voce e o DG Studio, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.' },
+          { role: 'system', content: 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.' },
           { role: 'user', content: `Contexto:\n${context}\n\nPedido: ${prompt}` }
         ],
         stream: false,
