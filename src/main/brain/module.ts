@@ -1,4 +1,4 @@
-import { getProviders, OllamaProvider, ApiProvider, MaestroProvider } from './index'
+import { OllamaProvider, ApiProvider, MaestroProvider } from './index'
 import type { BrainProvider, BrainResponse, OllamaStatus } from '@shared/types'
 
 export interface BrainModule {
@@ -45,11 +45,9 @@ class BrainModuleImpl implements BrainModule {
     throw new Error('Nenhum provedor de IA disponivel')
   }
   getActiveProvider(): string {
-    for (const p of this.providers) {
-      // Synchronous hint based on env/config only
-      if (p.name === 'ollama' && (process.env.DG_DEFAULT_PROVIDER === 'ollama')) return 'ollama'
-      if (p.name === 'api') return null /* DG-EDITOR: offline-only, nunca escolher api */
-    }
+    // DG-EDITOR offline-only: 'api' e 'maestro' nunca sao promovidos.
+    // Apenas 'ollama' pode ser ativo; caso contrario, 'none'.
+    if (process.env.DG_DEFAULT_PROVIDER === 'ollama') return 'ollama'
     return 'none'
   }
 

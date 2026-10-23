@@ -53,7 +53,7 @@ export async function rotear(pedido: string, contexto: string): Promise<BrainRes
   const plano = await planejar(pedido)
   dglog('[router] tarefa=' + plano.tarefa + ' | provedor=' + plano.decisao.provedor + ' | ' + plano.decisao.motivo)
   const brain = getBrain()
-  const fila: Provedor[] = [plano.decisao.provedor, 'ollama', 'api']  // maestro é stub: fora da fila
+  const fila: Provedor[] = [plano.decisao.provedor, 'ollama']  // DG-EDITOR: offline-only, sem 'api'
   const tentados = new Set<Provedor>()
   let ultimoErro: unknown
 
