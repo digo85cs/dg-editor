@@ -16,6 +16,12 @@ import { whereIs, formatWhereIs } from './whereis'
 import { readRules, rulesExist, createRulesTemplate } from './dgrules'
 import { loadChat, appendChat, clearChat } from './chatstore'
 
+// Fase 2
+import { getAccountsState } from './accounts'
+import { guardianSnapshot, guardianResumo } from './guardian'
+import { bootSaudeIAs } from './boot-saude'
+import { lerTema, salvarTema } from './tema'
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 function resolvePreload(): string {
@@ -39,7 +45,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'DG Studio',
+    title: 'DG Editor',
     icon: join(app.getAppPath(), 'resources', 'dg-studio.ico'),
     webPreferences: {
       preload: resolvePreload(),
@@ -68,11 +74,10 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   installPtBrMenu()
-  ensureOllama().then((ok) => console.log('[boot] Ollama garantido:', ok))
-  ensureOllama().then((ok) => console.log('[guardiao] Ollama no boot:', ok))
+  bootSaudeIAs()
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
-  console.log(`[auth] Device identity ready (token ${session.token.slice(0, 8)}...)`)
+  dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -210,6 +215,28 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
 ipcMain.handle('chat:clear', (_e, root: string) => {
   clearChat(root)
   return { ok: true }
+})
+
+// ---------- Fase 2: contas, guardiao, tema ----------
+ipcMain.handle('accounts:get-state', async () => {
+  return getAccountsState()
+})
+
+ipcMain.handle('guardian:snapshot', () => {
+  return guardianSnapshot()
+})
+
+ipcMain.handle('guardian:resumo', () => {
+  return guardianResumo()
+})
+
+ipcMain.handle('tema:get', () => {
+  return lerTema()
+})
+
+ipcMain.handle('tema:set', (_e, tema: 'escuro' | 'claro') => {
+  salvarTema(tema === 'claro' ? 'claro' : 'escuro')
+  return { ok: true, tema: lerTema() }
 })
 
 // ---------- App ----------

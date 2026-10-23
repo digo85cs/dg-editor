@@ -1,23 +1,22 @@
 {
-    "name":  "dg-studio",
-    "version":  "0.1.0",
-    "description":  "DG Studio - Desktop app for workspace analysis and conversation",
-    "main":  "out/main/index.js",
-    "scripts":  {
-                    "dev":  "electron-vite preview",
-                    "build":  "electron-vite build",
-                    "preview":  "electron-vite preview",
-                    "start":  "electron-vite preview",
-                    "test":  "node out/test/validator.cjs",
-                    "typecheck":  "tsc --noEmit"
-                },
-    "dependencies":  {
-
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^20.11.0",
-                            "electron":  "^28.2.0",
-                            "electron-vite":  "^2.1.0",
-                            "typescript":  "^5.3.3"
-                        }
+    "name": "dg-editor",
+    "version": "0.2.0",
+    "description": "DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)",
+    "main": "out/main/index.js",
+    "scripts": {
+        "dev": "electron-vite preview",
+        "build": "electron-vite build",
+        "preview": "electron-vite preview",
+        "start": "electron-vite preview",
+        "test": "node test/validator.cjs",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "electron": "^28.2.0",
+        "electron-vite": "^2.1.0",
+        "esbuild": "^0.20.0",
+        "typescript": "^5.3.3"
+    }
 }

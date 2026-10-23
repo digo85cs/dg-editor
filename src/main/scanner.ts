@@ -97,5 +97,5 @@ export function formatScanSummary(result: FolderScanResult): string {
     .slice(0, 6)
     .map(([ext, count]) => `${ext} (${count})`)
     .join(', ')
-  return `AnÃ¡lise: ${result.totalFiles} arquivos em ${result.totalDirs} diretÃ³rios. Tipos: ${top || 'nenhum'}.`
+  return `Análise: ${result.totalFiles} arquivos em ${result.totalDirs} diretórios. Tipos: ${top || 'nenhum'}.`
 }

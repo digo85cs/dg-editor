@@ -111,3 +111,29 @@ export interface ChatMessage {
   at: number
   provider?: string
 }
+
+// ---------- Fase 2: guardião, contas, tema, paleta ----------
+
+export interface GuardianSnapshot {
+  freeMemory: number
+  totalMemory: number
+  freePct: number
+  cpuPercent: number
+  ramOk: boolean
+  at: number
+}
+
+export interface AccountsState {
+  identidade: { tokenPrefix: string; criadoEm: number }
+  maquina: { hostname: string; plataforma: string; cpus: number; ramGB: string; forca: string }
+  ia: { ollamaInstalado: boolean; ollamaRodando: boolean; modelos: string[]; provedores: { name: string; available: boolean; models: number }[] }
+  guardian: GuardianSnapshot
+}
+
+export type Tema = 'escuro' | 'claro'
+
+export interface PaletteCommand {
+  id: string
+  label: string
+  hint?: string
+}

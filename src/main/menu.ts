@@ -29,8 +29,13 @@ export function installPtBrMenu(): void {
       { type: 'separator' },
       { label: 'Tela cheia', role: 'togglefullscreen' }
     ]},
+    { label: 'Sistemas', submenu: [
+      { label: 'Paleta de comandos', accelerator: 'CmdOrCtrl+P', click: () => { /* renderer intercepta Ctrl+P */ } },
+      { label: 'Contas e saude', click: () => { /* renderer abre modal */ } },
+      { label: 'Analise do sistema', click: () => { /* renderer executa */ } }
+    ]},
     { label: 'Ajuda', submenu: [
-      { label: 'Sobre o DG Studio', click: () => { app.showAboutPanel?.() } }
+      { label: 'Sobre o DG Editor', click: () => { app.showAboutPanel?.() } }
     ]}
   ]
 
