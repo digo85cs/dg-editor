@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
@@ -20,6 +20,8 @@ import { loadChat, appendChat, clearChat } from './chatstore'
 import { getAccountsState } from './accounts'
 import { guardianSnapshot, guardianResumo } from './guardian'
 import { bootSaudeIAs } from './boot-saude'
+import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
+import { planejar, rotear } from './brain/router'
 import { lerTema, salvarTema } from './tema'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -201,13 +203,15 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
 
   try {
     await ensureOllama()
-    const response = await getBrain().ask(content, context)
+    const response = await rotear(content, context)
     const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
     appendChat(root, assistantMsg)
+    gravarDossie(loadChat(root), { root }).catch(() => {})
     return { ok: true, message: assistantMsg }
   } catch (err) {
     const fallback = { role: 'assistant' as const, content: `Nao consegui responder agora: ${err instanceof Error ? err.message : String(err)}`, at: Date.now(), provider: 'erro' }
     appendChat(root, fallback)
+    gravarDossie(loadChat(root), { root }).catch(() => {})
     return { ok: false, message: fallback }
   }
 })
@@ -237,6 +241,26 @@ ipcMain.handle('tema:get', () => {
 ipcMain.handle('tema:set', (_e, tema: 'escuro' | 'claro') => {
   salvarTema(tema === 'claro' ? 'claro' : 'escuro')
   return { ok: true, tema: lerTema() }
+})
+
+// ---------- Fase 3: roteador ----------
+ipcMain.handle('roteador:planejar', async (_e, pedido: string) => {
+  return planejar(pedido)
+})
+
+// ---------- Fase 3: dossie automatico ----------
+ipcMain.handle('dossie:ler', async () => {
+  return lerDossie()
+})
+ipcMain.handle('dossie:gravar', async (_e, root: string) => {
+  const destino = await gravarDossie(loadChat(root), { root })
+  return { ok: true, caminho: destino }
+})
+ipcMain.handle('dossie:snapshot', async () => {
+  return dossieSnapshot()
+})
+ipcMain.handle('dossie:caminho', () => {
+  return caminhoDossie()
 })
 
 // ---------- App ----------

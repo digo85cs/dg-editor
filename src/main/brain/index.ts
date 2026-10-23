@@ -1,4 +1,4 @@
-import { execSync } from 'child_process'
+﻿import { execSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { request } from 'http'

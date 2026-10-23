@@ -14,3 +14,7 @@ check-acentos.cjs
 gen-css.cjs
 fix64.cjs
 logs/
+
+# Fase 3: dossie local do projeto
+.dg-editor/dossie.txt
+.dg-editor/backup/

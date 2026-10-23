@@ -1,4 +1,4 @@
-// DG Editor - renderer (Fase 2)
+﻿// DG Editor - renderer (Fase 2)
 const $ = (id) => document.getElementById(id)
 
 let pastaAtual = null
@@ -149,6 +149,7 @@ async function enviarMensagem() {
   try {
     const r = await window.api.invoke('chat:send', pastaAtual, texto)
     adicionarBolha(r.message.role, r.message.content, r.message.provider)
+    if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
   } catch (err) {
     adicionarBolha('assistant', 'Erro ao enviar: ' + String(err), 'erro')
   } finally {
@@ -373,3 +374,103 @@ window.api.invoke('brain:providers').then((ps) => {
   const ativo = ps.find((p) => p.available)
   if (ativo) $('chat-provider').textContent = 'IA: ' + ativo.name
 })
+
+// ---------- Fase 3: roteador + dossie na UI ----------
+function atualizarBadgeProvedor(nome) {
+  const alvo = document.getElementById('chat-provider')
+  if (alvo) alvo.textContent = 'IA: ' + nome
+}
+
+async function mostrarInfoDossie() {
+  try {
+    const snap = await window.api.invoke('dossie:snapshot')
+    const alvo = document.getElementById('dossie-info')
+    if (!alvo) return
+    if (!snap) { alvo.textContent = 'Dossie: ainda nao gerado'; return }
+    const dt = snap.atualizadoEm ? new Date(snap.atualizadoEm).toLocaleString('pt-BR') : 'n/d'
+    alvo.textContent = 'Dossie: ' + snap.totalMensagens + ' msgs - ' + dt
+  } catch { /* silencioso */ }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  try { mostrarInfoDossie() } catch { /* silencioso */ }
+})
+// ---------- Fase 3: painel clicavel de escolhas (padrao Adapta) ----------
+// Uso: await perguntarEscolha('Titulo', ['Opcao A','Opcao B'], { multiplo: false })
+function perguntarEscolha(titulo, opcoes, config) {
+  const multiplo = !!(config && config.multiplo)
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.className = 'escolha-overlay'
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;'
+
+    const caixa = document.createElement('div')
+    caixa.className = 'escolha-caixa'
+    caixa.style.cssText = 'background:var(--bg, #1e1e1e);color:var(--fg, #eee);border:1px solid #444;border-radius:10px;padding:18px;min-width:320px;max-width:520px;box-shadow:0 12px 40px rgba(0,0,0,.5);'
+
+    const h = document.createElement('h3')
+    h.textContent = titulo
+    h.style.cssText = 'margin:0 0 12px;font-size:15px;'
+    caixa.appendChild(h)
+
+    const selecionadas = new Set()
+
+    opcoes.forEach((op, idx) => {
+      const btn = document.createElement('button')
+      btn.textContent = op
+      btn.dataset.idx = String(idx)
+      btn.style.cssText = 'display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;background:#2a2a2a;color:#eee;border:1px solid #3a3a3a;border-radius:6px;cursor:pointer;font:inherit;'
+
+      if (multiplo) {
+        btn.addEventListener('click', () => {
+          if (selecionadas.has(op)) {
+            selecionadas.delete(op)
+            btn.style.background = '#2a2a2a'
+            btn.style.borderColor = '#3a3a3a'
+          } else {
+            selecionadas.add(op)
+            btn.style.background = '#1f4a8a'
+            btn.style.borderColor = '#2d6fd6'
+          }
+        })
+      } else {
+        btn.addEventListener('click', () => {
+          overlay.remove()
+          resolve([op])
+        })
+      }
+      caixa.appendChild(btn)
+    })
+
+    if (multiplo) {
+      const ok = document.createElement('button')
+      ok.textContent = 'Confirmar'
+      ok.style.cssText = 'margin-top:12px;padding:9px 16px;background:#2d6fd6;color:#fff;border:none;border-radius:6px;cursor:pointer;font:inherit;width:100%;'
+      ok.addEventListener('click', () => {
+        overlay.remove()
+        resolve(Array.from(selecionadas))
+      })
+      caixa.appendChild(ok)
+    }
+
+    const cancelar = document.createElement('button')
+    cancelar.textContent = 'Cancelar'
+    cancelar.style.cssText = 'margin-top:6px;padding:7px 12px;background:transparent;color:#999;border:1px solid #444;border-radius:6px;cursor:pointer;font:inherit;width:100%;'
+    cancelar.addEventListener('click', () => {
+      overlay.remove()
+      resolve(null)
+    })
+    caixa.appendChild(cancelar)
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) { overlay.remove(); resolve(null) }
+    })
+
+    overlay.appendChild(caixa)
+    document.body.appendChild(overlay)
+  })
+}
+
+// atalho global para testes manuais no console:
+// await perguntarEscolha('Qual IA deve assumir?', ['Ollama','Maestro','API'])
+window.perguntarEscolha = perguntarEscolha
