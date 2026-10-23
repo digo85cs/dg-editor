@@ -2,6 +2,7 @@ import { execSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { request } from 'http'
+import { dglog } from '../dglog'
 import type { BrainProvider, BrainResponse, OllamaStatus } from '@shared/types'
 
 const OLLAMA_BASE = 'http://127.0.0.1:11434'
@@ -64,13 +65,13 @@ export class OllamaProvider implements BrainProvider {
 
   async isAvailable(): Promise<boolean> {
     const ok = await this.ping()
-    console.log('[brain] isAvailable(ollama):', ok)
+    dglog('[brain] isAvailable(ollama): ' + ok)
     return ok
   }
 
   async ping(): Promise<boolean> {
     const { status } = await httpGet('/api/tags', 5000)
-    console.log('[brain] ping status:', status)
+    dglog('[brain] ping status: ' + status)
     return status === 200
   }
 
@@ -96,11 +97,13 @@ export class OllamaProvider implements BrainProvider {
 
   async ask(prompt: string, context: string): Promise<BrainResponse> {
     const models = await this.listModels()
-    console.log('[brain] ask: modelos encontrados:', models.length)
+    dglog('[brain] ask: modelos encontrados: ' + models.length)
     if (models.length === 0) throw new Error('Ollama sem modelos disponiveis')
     const model = pickBestModel(models.map((m) => m.name))
+      dglog('[brain] modelo escolhido: ' + model)
     const { status, body } = await new Promise<{ status: number; body: string }>((resolve) => {
       const data = JSON.stringify({
+        options: { num_thread: 2, num_ctx: 4096 },
         model,
         messages: [
           { role: 'system', content: 'Voce e o DG Studio, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.' },

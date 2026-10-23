@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import { request } from 'http'
+import { dglog } from './dglog'
 
 const OLLAMA_URL = 'http://127.0.0.1:11434'
 
@@ -18,18 +19,18 @@ let keeperProc: ReturnType<typeof spawn> | null = null
 
 export async function ensureOllama(): Promise<boolean> {
   if (await ollamaAlive()) return true
-  console.log('[keeper] Ollama morto - subindo oculto e persistente...')
+  dglog('[keeper] Ollama morto - subindo oculto e persistente...')
   const exe = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
-  keeperProc = spawn(exe, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true })
+  keeperProc = spawn(exe, ['serve'], { env: Object.assign({}, process.env, { OLLAMA_NUM_PARALLEL: '1', OLLAMA_MAX_LOADED_MODELS: '1', OLLAMA_KEEP_ALIVE: '5m' }), detached: true, stdio: 'ignore', windowsHide: true })
   keeperProc.unref()
   // espera subir (ate 10s)
   for (let i = 0; i < 10; i++) {
     await new Promise((r) => setTimeout(r, 1000))
     if (await ollamaAlive()) {
-      console.log('[keeper] Ollama no ar')
+      dglog('[keeper] Ollama no ar')
       return true
     }
   }
-  console.log('[keeper] Ollama nao subiu')
+  dglog('[keeper] Ollama nao subiu')
   return false
 }

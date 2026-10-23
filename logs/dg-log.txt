@@ -1,0 +1,7 @@
+[22/10/2026, 09:31:49] [brain] ping status: 200
+[22/10/2026, 09:31:49] [brain] isAvailable(ollama): true
+[22/10/2026, 09:31:52] [analysis] handler acionado
+[22/10/2026, 09:31:52] [brain] ping status: 200
+[22/10/2026, 09:31:52] [brain] isAvailable(ollama): true
+[22/10/2026, 09:31:52] [brain] ask: modelos encontrados: 6
+[22/10/2026, 09:31:52] [brain] modelo escolhido: qwen2.5-coder:1.5b

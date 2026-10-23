@@ -9,7 +9,7 @@ import type { AnalysisReport, AnalysisCache, AnalysisRunResult, FolderScanResult
 const CACHE_DIR = '.dg-editor'
 const CACHE_FILE = 'analise.json'
 const MAX_KEY_FILES = 8
-const MAX_FILE_READ = 8 * 1024
+const MAX_FILE_READ = 4 * 1024
 
 const KEY_FILE_PATTERNS = [
   'README.md', 'readme.md', 'README.txt',

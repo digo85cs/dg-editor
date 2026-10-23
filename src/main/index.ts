@@ -8,6 +8,7 @@ import { getSystemProfile, formatBytes, profileStrength } from './profile'
 import { scanFolder, formatScanSummary } from './scanner'
 import { getBrain } from './brain/module'
 import { ensureOllama } from './ollama-keeper'
+import { dglog } from './dglog'
 import { installPtBrMenu } from './menu'
 
 import { runAnalysis, getCachedAnalysis } from './analyzer'
@@ -146,6 +147,7 @@ ipcMain.handle('brain:models', async () => {
 
 // ---------- Fase 1: analise, onde-esta, regras, chat ----------
 ipcMain.handle('analysis:run', async (_e, root: string, force: boolean) => {
+  dglog('[analysis] handler acionado')
   await ensureOllama()
   return runAnalysis(root, force === true)
 })
