@@ -10,7 +10,7 @@
  */
 
 export type TipoTarefa = 'codigo' | 'analise' | 'pesquisa' | 'formatacao' | 'estrategia' | 'simples'
-export type Provedor = 'ollama' | 'api' | 'maestro'
+export type Provedor = 'ollama' | 'maestro' /* DG-EDITOR: 'api' removido - offline-only */
 
 export interface ContextoDecisao {
   tarefa: TipoTarefa

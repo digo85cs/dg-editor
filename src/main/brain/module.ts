@@ -48,7 +48,7 @@ class BrainModuleImpl implements BrainModule {
     for (const p of this.providers) {
       // Synchronous hint based on env/config only
       if (p.name === 'ollama' && (process.env.DG_DEFAULT_PROVIDER === 'ollama')) return 'ollama'
-      if (p.name === 'api' && !!process.env.LLM_API_KEY) return 'api'
+      if (p.name === 'api') return null /* DG-EDITOR: offline-only, nunca escolher api */
     }
     return 'none'
   }
