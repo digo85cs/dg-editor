@@ -45,6 +45,9 @@ function loadModule(relPath) {
       const dir = path.dirname(relPath)
       return loadModule(path.join(dir, spec.slice(2)))
     }
+    if (spec.startsWith('../')) {
+      return loadModule('main/' + spec.slice(3) + '.ts')
+    }
     return require(spec)
   }
   const fn = new Function('module', 'require', result.code + '\nreturn module.exports')
