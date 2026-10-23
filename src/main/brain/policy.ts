@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Politica de prioridade do roteador (Fase 3).
  * Decisao por tipo de tarefa + disponibilidade + gatilhos.
  *
@@ -27,13 +27,13 @@ export interface DecisaoRoteador {
 
 /** Ordem base de preferencia por tipo de tarefa. */
 const ORDEM_POR_TAREFA: Record<TipoTarefa, Provedor[]> = {
-  codigo: ['ollama', 'maestro', 'api'],
-  analise: ['ollama', 'maestro', 'api'],
-  pesquisa: ['ollama', 'maestro', 'api'],
-  formatacao: ['ollama', 'maestro', 'api'],
-  simples: ['ollama', 'maestro', 'api'],
-  // estrategia nao roda "dentro" do DG Editor: vira dossie para a Adapta
-  estrategia: []
+  // Maestro e stub no momento: fora da fila ate implementar de verdade.
+  codigo: ['ollama'],
+  analise: ['ollama'],
+  pesquisa: ['ollama'],
+  formatacao: ['ollama'],
+  simples: ['ollama'],
+  estrategia: ['ollama']
 }
 
 /**
@@ -43,21 +43,25 @@ const ORDEM_POR_TAREFA: Record<TipoTarefa, Provedor[]> = {
 export function decidir(ctx: ContextoDecisao): DecisaoRoteador {
   // 1. Estrategia sempre vira dossie/handoff para a Adapta (Maestro)
   if (ctx.tarefa === 'estrategia') {
-    const maestroOk = ctx.disponiveis.maestro === true && ctx.saldoMaestroOk !== false
+    // Maestro ainda e stub (nao responde). Estrategia roda no Ollama com o
+    // modelo mais forte do perfil, e o dossie fica pronto para handoff futuro.
+    const ollamaOk = ctx.disponiveis.ollama === true
     return {
-      provedor: maestroOk ? 'maestro' : 'ollama',
-      motivo: maestroOk
-        ? 'tarefa estrategica: handoff para Adapta/Maestro'
-        : 'estrategia sem Maestro: Ollama assume local e dossie fica pronto para Adapta',
+      provedor: 'ollama',
+      motivo: ollamaOk
+        ? 'estrategia: Ollama local com modelo forte; dossie pronto para handoff'
+        : 'estrategia sem Ollama: API assume',
       usarDossie: true
     }
   }
 
   // 2. Carga da maquina: se RAM nao esta OK, evitar modelo local pesado
-  if (ctx.ramOk === false && ctx.disponiveis.maestro === true && ctx.saldoMaestroOk !== false) {
+  if (ctx.ramOk === false) {
+    // RAM baixa nao e mais motivo para desviar de provedor:
+    // o OllamaProvider escolhe um modelo menor pelo perfil + RAM livre.
     return {
-      provedor: 'maestro',
-      motivo: 'RAM baixa (guardiao): desviando carga do Ollama para Maestro',
+      provedor: 'ollama',
+      motivo: 'RAM baixa (guardiao): modelo local menor sera escolhido pelo perfil',
       usarDossie: false
     }
   }
@@ -91,4 +95,9 @@ export function classificarTarefa(texto: string): TipoTarefa {
   if (/(format|organiz|limp|renomei|indent|estil)/.test(t)) return 'formatacao'
   if (/(cri|escrev|implement|c[oó]digo|fun[cç][aã]o|classe|arquivo)/.test(t)) return 'codigo'
   return 'simples'
+}
+
+/** Converte o tipo de tarefa da policy para o perfil de modelo do provider. */
+export function exportarPerfil(t: TipoTarefa): 'codigo' | 'analise' | 'pesquisa' | 'formatacao' | 'estrategia' | 'simples' {
+  return t
 }

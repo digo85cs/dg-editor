@@ -8,6 +8,17 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <!-- BARRA DE TITULO PROPRIA (substitui a moldura do Electron) -->
+  <header id="titlebar">
+    <div class="tb-drag">
+      <span class="tb-marca">DG<span class="tb-marca-acento">Editor</span></span>
+    </div>
+    <div class="tb-controles">
+      <button id="tb-min" class="tb-btn" title="Minimizar"><svg viewBox="0 0 10 10"><path d="M2 5h6"/></svg></button>
+      <button id="tb-max" class="tb-btn" title="Maximizar"><svg viewBox="0 0 10 10"><rect x="2" y="2" width="6" height="6"/></svg></button>
+      <button id="tb-close" class="tb-btn tb-close" title="Fechar"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2l-6 6"/></svg></button>
+    </div>
+  </header>
   <div id="app">
     <!-- SIDEBAR: pastas de trabalho -->
     <aside id="sidebar">
@@ -15,9 +26,11 @@
         <span class="logo">DG Editor</span>
         <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">+</button>
       </div>
-      <div id="folder-list" class="folder-list"></div>
+      <div class="sidebar-section">
+        <div class="section-label">PROJETOS</div>
+        <div id="folder-list" class="folder-list"></div>
+      </div>
       <div class="sidebar-footer">
-        <button id="btn-palette" class="btn-ghost" title="Paleta de comandos (Ctrl+P)">&#8984; Ctrl+P</button>
         <button id="btn-contas" class="btn-ghost" title="Contas e sa&#250;de do sistema">Contas</button>
         <button id="btn-config" class="btn-ghost" title="Configura&#231;&#245;es">Configura&#231;&#245;es</button>
       </div>
@@ -29,6 +42,8 @@
         <span id="chat-title">Nenhuma pasta aberta</span>
         <span id="chat-provider" class="provider-badge"></span>
         <button id="btn-tema" class="btn-small" title="Alternar tema claro/escuro">&#9789;</button>
+        <button id="btn-painel" class="btn-small" title="Painel de analise">Painel</button>
+      <button id="btn-auditar" class="btn-ghost" title="Auto auditoria do sistema">Auditar</button>
       </header>
       <div id="chat-messages" class="chat-messages">
         <div class="empty-state" id="empty-state">
@@ -36,11 +51,6 @@
           <p>Abra uma pasta de trabalho para come&#231;ar. O sistema analisa sozinho e mostra o que tem l&#225;.</p>
           <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
         </div>
-      </div>
-      <div id="whereis-bar" class="whereis-bar hidden">
-        <span class="whereis-label">Onde est&#225;?</span>
-        <input id="whereis-input" type="text" placeholder="o que voce procura no sistema?" />
-        <button id="whereis-btn" class="btn-small">Buscar</button>
       </div>
       <footer id="chat-input-bar">
         <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
@@ -92,10 +102,26 @@
       <div id="contas-maquina" class="config-section"></div>
       <div id="contas-ia" class="config-section"></div>
       <div id="contas-guardian" class="config-section"></div>
-      <button id="btn-contas-close" class="btn-primary">Fechar</button>
+      <div id="contas-diagnostico" class="config-section"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="btn-diag" class="btn-small">Rodar diagnostico</button>
+        <button id="btn-contas-close" class="btn-primary">Fechar</button>
+      </div>
     </div>
   </div>
 
+
+  <!-- Modal de confirmacao de reinicio -->
+  <div id="modal-reinicio" class="modal hidden">
+    <div class="modal-box">
+      <h3>Reiniciar o DG Editor?</h3>
+      <p id="reinicio-motivo">Algumas altera&#231;&#245;es precisam de rein&#237;cio para serem aplicadas.</p>
+      <div class="reinicio-acoes">
+        <button id="btn-reinicio-depois" class="btn-ghost">Reiniciar depois</button>
+        <button id="btn-reinicio-agora" class="btn-primary">Reiniciar agora</button>
+      </div>
+    </div>
+  </div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

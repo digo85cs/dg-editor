@@ -1,8 +1,9 @@
-import { createHash } from 'crypto'
+﻿import { createHash } from 'crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { scanFolder } from './scanner'
 import { readRules } from './dgrules'
+import { dglog } from './dglog'
 import { getBrain } from './brain/module'
 import type { AnalysisReport, AnalysisCache, AnalysisRunResult, FolderScanResult } from '@shared/types'
 
@@ -39,8 +40,15 @@ function hashFile(path: string): string {
 export function computeFileHashes(root: string, scan: FolderScanResult): Record<string, string> {
   const hashes: Record<string, string> = {}
   hashes['__scan__'] = `${scan.totalFiles}:${scan.totalDirs}`
-  for (const f of scan.topFiles.slice(0, 50)) {
-    hashes[f.path] = hashFile(f.path)
+  const lista = Array.isArray(scan && scan.topFiles)
+    ? scan.topFiles.filter((f) => !!f && typeof f.path === 'string' && f.path.length > 0)
+    : []
+  for (const f of lista.slice(0, 50)) {
+    try {
+      hashes[f.path] = hashFile(f.path)
+    } catch (e) {
+      dglog('[analysis] hash ignorado: ' + f.path + ' -> ' + String(e))
+    }
   }
   return hashes
 }
@@ -134,6 +142,10 @@ function saveCache(root: string, cache: AnalysisCache): void {
 
 export async function runAnalysis(root: string, force = false): Promise<AnalysisRunResult> {
   const scan = scanFolder(root)
+  if (!scan || !Array.isArray(scan.topFiles)) {
+    throw new Error('scanFolder retornou varredura invalida para: ' + root)
+  }
+  dglog('[analysis] scan: ' + scan.totalFiles + ' arquivos, ' + scan.totalDirs + ' pastas, ' + scan.topFiles.length + ' na lista top')
   const hashes = computeFileHashes(root, scan)
 
   if (!force) {

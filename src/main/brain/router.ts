@@ -1,4 +1,5 @@
-﻿/**
+import { dglog } from '../dglog'
+/**
  * Roteador organico do DG Editor (Fase 3).
  * Consulta disponibilidade real, guardiao e politica para escolher o provedor.
  */
@@ -50,8 +51,9 @@ export async function planejar(pedido: string): Promise<RoteadorStatus> {
 /** Roteia e executa: tenta a decisao e cai para o proximo disponivel em caso de falha. */
 export async function rotear(pedido: string, contexto: string): Promise<BrainResponse> {
   const plano = await planejar(pedido)
+  dglog('[router] tarefa=' + plano.tarefa + ' | provedor=' + plano.decisao.provedor + ' | ' + plano.decisao.motivo)
   const brain = getBrain()
-  const fila: Provedor[] = [plano.decisao.provedor, 'ollama', 'maestro', 'api']
+  const fila: Provedor[] = [plano.decisao.provedor, 'ollama', 'api']  // maestro é stub: fora da fila
   const tentados = new Set<Provedor>()
   let ultimoErro: unknown
 
@@ -60,7 +62,7 @@ export async function rotear(pedido: string, contexto: string): Promise<BrainRes
     tentados.add(prov)
     if (plano.disponibilidade[prov] === false && prov !== plano.decisao.provedor) continue
     try {
-      const resp = await brain.ask(pedido, contexto, prov)
+      const resp = await brain.ask(pedido, contexto, prov, plano.tarefa)
       return resp
     } catch (e) {
       ultimoErro = e

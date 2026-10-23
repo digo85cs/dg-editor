@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
@@ -21,6 +21,8 @@ import { getAccountsState } from './accounts'
 import { guardianSnapshot, guardianResumo } from './guardian'
 import { bootSaudeIAs } from './boot-saude'
 import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
+import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
+import { diagnosticoCompleto } from './diagnostico'
 import { planejar, rotear } from './brain/router'
 import { lerTema, salvarTema } from './tema'
 
@@ -48,6 +50,9 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     title: 'DG Editor',
+    frame: false,
+    backgroundColor: '#141414',
+    show: false,
     icon: join(app.getAppPath(), 'resources', 'dg-studio.ico'),
     webPreferences: {
       preload: resolvePreload(),
@@ -62,6 +67,7 @@ function createWindow(): void {
     mainWindow.loadURL(rendererUrl)
   } else {
     mainWindow.loadFile(join(__dirname, '..', 'renderer', 'index.html'))
+    mainWindow.once('ready-to-show', () => { mainWindow?.show() })
   }
 
   mainWindow.on('closed', () => {
@@ -206,12 +212,14 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
     const response = await rotear(content, context)
     const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
     appendChat(root, assistantMsg)
-    gravarDossie(loadChat(root), { root }).catch(() => {})
+    await gravarDossie(loadChat(root), { root })
+    gerarContinuidade(dossieDirDoApp())
     return { ok: true, message: assistantMsg }
   } catch (err) {
     const fallback = { role: 'assistant' as const, content: `Nao consegui responder agora: ${err instanceof Error ? err.message : String(err)}`, at: Date.now(), provider: 'erro' }
     appendChat(root, fallback)
-    gravarDossie(loadChat(root), { root }).catch(() => {})
+    await gravarDossie(loadChat(root), { root })
+    gerarContinuidade(dossieDirDoApp())
     return { ok: false, message: fallback }
   }
 })
@@ -263,11 +271,64 @@ ipcMain.handle('dossie:caminho', () => {
   return caminhoDossie()
 })
 
+// ---------- Diagnostico ao vivo ----------
+ipcMain.handle('diagnostico:rodar', async (_e, root: string | null) => {
+  return diagnosticoCompleto(root)
+})
+
 // ---------- App ----------
 ipcMain.on('app:get-version', (e) => {
   e.reply('app:version', app.getVersion())
 })
 
+
+// ---------- Controles da barra de titulo propria ----------
+ipcMain.handle('janela:minimizar', () => { mainWindow?.minimize() })
+ipcMain.handle('janela:maximizar', () => {
+  if (!mainWindow) return false
+  if (mainWindow.isMaximized()) { mainWindow.unmaximize() } else { mainWindow.maximize() }
+  return mainWindow.isMaximized()
+})
+ipcMain.handle('janela:fechar', () => { mainWindow?.close() })
+ipcMain.handle('janela:estado', () => ({ maximizado: !!mainWindow?.isMaximized() }))
+
 ipcMain.on('app:quit', () => {
   app.quit()
 })
+
+// ---------- Auto auditoria ----------
+ipcMain.handle('auditoria:rodar', async (_e, opcoes?: any) => {
+  try {
+    const mod = await import('./auto-auditoria')
+    return await mod.rodarAuditoria({
+      autoAtualizar: !!opcoes?.autoAtualizar,
+      reiniciarAoFim: opcoes?.reiniciarAoFim !== false
+    })
+  } catch (e: any) {
+    return { erro: String(e?.message || e) }
+  }
+})
+ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
+  try {
+    const mod = await import('./auto-auditoria')
+    if (ativar) { mod.iniciarAuditoriaPeriodica() } else { mod.pararAuditoriaPeriodica() }
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, erro: String(e?.message || e) }
+  }
+})
+
+
+// ---------- Auto auditoria no boot + periodica ----------
+setTimeout(async () => {
+  try {
+    const mod = await import('./auto-auditoria')
+    const r = await mod.rodarAuditoria({ autoAtualizar: false })
+    console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
+    mod.iniciarAuditoriaPeriodica(1800000)
+    console.log('[auditoria:boot] periodica ativa (30 min)')
+  } catch (e: any) {
+    console.warn('[auditoria:boot] falhou:', String(e?.message || e))
+  }
+}, 4000)
+

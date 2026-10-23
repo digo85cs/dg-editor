@@ -1,4 +1,4 @@
-﻿// DG Editor - renderer (Fase 2)
+// DG Editor - renderer (Fase 2)
 const $ = (id) => document.getElementById(id)
 
 let pastaAtual = null
@@ -31,6 +31,7 @@ function renderizarPastas() {
   }
 }
 
+
 function salvarPastas() {
   localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
 }
@@ -47,7 +48,6 @@ async function selecionarPasta(path) {
   pastaAtual = path
   $('chat-title').textContent = path.split('\\').pop() || path
   $('empty-state')?.remove()
-  $('whereis-bar').classList.remove('hidden')
   $('chat-send').disabled = false
   $('btn-reanalyze').classList.remove('hidden')
   renderizarPastas()
@@ -86,14 +86,14 @@ async function rodarAnalise(root, force) {
 function renderizarAnalise(report, fromCache) {
   const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
   let html = ''
-  html += secao('O que é', report.oQueE || '—')
-  html += secao('Stack', report.stack || '—')
-  html += secao('Estrutura', report.estrutura || '—')
+  html += secao('O que é', report.oQueE || '—”')
+  html += secao('Stack', report.stack || '—”')
+  html += secao('Estrutura', report.estrutura || '—”')
   html += secaoLista('Pontos de atenção', report.pontosAtencao)
   html += secaoLista('Sugestões', report.sugestoes)
   if (report.provider) {
     html += '<p class="muted">Analisado por: ' + escapar(report.provider) +
-      (report.model ? ' (' + escapar(report.model) + ')' : '') + ' — ' +
+      (report.model ? ' (' + escapar(report.model) + ')' : '') + ' —” ' +
       new Date(report.analyzedAt).toLocaleString('pt-BR') + badge + '</p>'
   }
   $('analysis-content').innerHTML = html
@@ -104,7 +104,7 @@ function secao(titulo, texto) {
 }
 
 function secaoLista(titulo, itens) {
-  if (!itens || itens.length === 0) return secao(titulo, '—')
+  if (!itens || itens.length === 0) return secao(titulo, '—”')
   return '<div class="analysis-section"><h4>' + titulo + '</h4><ul>' +
     itens.map((i) => '<li>' + escapar(i) + '</li>').join('') + '</ul></div>'
 }
@@ -121,13 +121,17 @@ function renderizarChat(msgs) {
   area.innerHTML = ''
   for (const m of msgs) adicionarBolha(m.role, m.content, m.provider)
   area.scrollTop = area.scrollHeight
+  return div
 }
 
 function adicionarBolha(role, content, provider) {
   const area = $('chat-messages')
   const div = document.createElement('div')
   div.className = 'msg ' + role
-  div.textContent = content
+  const span = document.createElement('span')
+  span.className = 'msg-text'
+  span.textContent = content
+  div.appendChild(span)
   if (provider) {
     const tag = document.createElement('span')
     tag.className = 'msg-provider'
@@ -136,6 +140,7 @@ function adicionarBolha(role, content, provider) {
   }
   area.appendChild(div)
   area.scrollTop = area.scrollHeight
+  return div
 }
 
 async function enviarMensagem() {
@@ -146,9 +151,10 @@ async function enviarMensagem() {
   input.value = ''
   adicionarBolha('user', texto)
   $('chat-send').disabled = true
+  const bolhaProc = adicionarBolha('assistant', 'bolando a resposta—¦')
   try {
     const r = await window.api.invoke('chat:send', pastaAtual, texto)
-    adicionarBolha(r.message.role, r.message.content, r.message.provider)
+    bolhaProc.querySelector('.msg-text').textContent = r.message.content
     if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
   } catch (err) {
     adicionarBolha('assistant', 'Erro ao enviar: ' + String(err), 'erro')
@@ -158,21 +164,6 @@ async function enviarMensagem() {
   }
 }
 
-// ---------- Onde esta? ----------
-async function buscarOndeEsta() {
-  if (!pastaAtual) return
-  const q = $('whereis-input').value.trim()
-  if (!q) return
-  let box = document.querySelector('.whereis-result')
-  if (!box) {
-    box = document.createElement('div')
-    box.className = 'whereis-result'
-    $('whereis-bar').after(box)
-  }
-  box.textContent = 'Buscando "' + q + '"...'
-  const r = await window.api.invoke('whereis:ask', pastaAtual, q)
-  box.textContent = r.formatted
-}
 
 // ---------- Configuracoes ----------
 async function abrirConfig() {
@@ -182,15 +173,15 @@ async function abrirConfig() {
   const gb = (b) => (b / 1024 / 1024 / 1024).toFixed(1) + ' GB'
   $('config-profile').innerHTML =
     '<h4>Maquina</h4>' +
-    escapar(p.hostname) + ' — ' + escapar(p.platform) + ' ' + escapar(p.arch) + '<br>' +
-    (p.cpus ? p.cpus.length : '?') + ' nucleos — ' + gb(p.totalMemory) + ' RAM<br>' +
+    escapar(p.hostname) + ' —” ' + escapar(p.platform) + ' ' + escapar(p.arch) + '<br>' +
+    (p.cpus ? p.cpus.length : '?') + ' nucleos —” ' + gb(p.totalMemory) + ' RAM<br>' +
     'Forca: <strong>' + escapar(forca) + '</strong>'
   const o = await window.api.invoke('brain:ollama-status')
   $('config-ollama').innerHTML =
     '<h4>Ollama (IA local)</h4>' +
     (o.installed
       ? (o.reachable
-        ? 'Instalado e rodando — ' + o.models.length + ' modelo(s): ' + escapar(o.models.map((m) => m.name).join(', ') || '—')
+        ? 'Instalado e rodando —” ' + o.models.length + ' modelo(s): ' + escapar(o.models.map((m) => m.name).join(', ') || '—”')
         : 'Instalado, mas parado. Rode: ollama serve')
       : 'Nao instalado. Baixe em ollama.com')
 }
@@ -208,11 +199,11 @@ async function abrirContas() {
       '<h4>Identidade</h4>' +
       'Usuario: <strong>owner</strong> (device-token)<br>' +
       'Token: <code>' + escapar(s.identidade.tokenPrefix) + '...</code><br>' +
-      'Desde: ' + (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : '—')
+      'Desde: ' + (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : '—”')
     $('contas-maquina').innerHTML =
       '<h4>Maquina</h4>' +
-      escapar(s.maquina.hostname) + ' — ' + escapar(s.maquina.plataforma) + '<br>' +
-      s.maquina.cpus + ' nucleos — ' + escapar(s.maquina.ramGB) + ' GB RAM<br>' +
+      escapar(s.maquina.hostname) + ' —” ' + escapar(s.maquina.plataforma) + '<br>' +
+      s.maquina.cpus + ' nucleos —” ' + escapar(s.maquina.ramGB) + ' GB RAM<br>' +
       'Forca: <strong>' + escapar(s.maquina.forca) + '</strong>'
     const provs = s.ia.provedores.map((p) => p.name + ': ' + (p.available ? 'OK (' + p.models + ')' : 'off')).join('<br>')
     $('contas-ia').innerHTML =
@@ -230,18 +221,42 @@ async function abrirContas() {
   }
 }
 
+
+// ---------- Diagnostico ao vivo ----------
+async function rodarDiagnostico() {
+  const alvo = $('contas-diagnostico')
+  alvo.innerHTML = '<h4>Diagnostico ao vivo</h4>Rodando 8 testes...'
+  const t0 = Date.now()
+  try {
+    const r = await window.api.invoke('diagnostico:rodar', pastaAtual || null)
+    const total = Date.now() - t0
+    let html = '<h4>Diagnostico ao vivo - ' + r.ok + '/' + r.total + ' OK (' + total + ' ms)</h4>'
+    for (const m of r.modulos) {
+      const icone = m.ok ? '\u2713' : '\u2717'
+      const cor = m.ok ? '#3fb950' : '#f85149'
+      html += '<div style="margin:4px 0"><span style="color:' + cor + ';font-weight:bold">' + icone + '</span> ' +
+        '<strong>' + escapar(m.nome) + '</strong> <span class="muted">(' + m.ms + ' ms)</span><br>' +
+        '<span style="margin-left:18px;font-size:12px">' + escapar(m.detalhe) + '</span></div>'
+    }
+    alvo.innerHTML = html
+  } catch (err) {
+    alvo.innerHTML = '<h4>Diagnostico</h4><span style="color:#f85149">' + escapar(String(err)) + '</span>'
+  }
+}
 // ---------- Tema (Fase 2) ----------
 async function alternarTema() {
-  const atual = document.body.classList.contains('tema-claro') ? 'claro' : 'escuro'
+  const atual = document.body.classList.contains('tema-escuro') ? 'escuro' : 'claro'
   const novo = atual === 'claro' ? 'escuro' : 'claro'
-  await window.api.invoke('tema:set', novo)
+  try { await window.api.invoke('tema:set', novo) } catch (e) { console.warn('[tema] set:', e) }
   aplicarTema(novo)
 }
 
 function aplicarTema(tema) {
-  document.body.classList.toggle('tema-claro', tema === 'claro')
-  $('btn-tema').textContent = tema === 'claro' ? '\u2600' : '\u263D'
-  localStorage.setItem('dg-tema', tema)
+  document.body.classList.toggle('tema-escuro', tema === 'escuro')
+  document.body.classList.toggle('tema-claro', tema !== 'escuro')
+  const b = document.getElementById('btn-tema')
+  if (b) b.textContent = tema === 'escuro' ? '\u2600' : '\u263D'
+  try { localStorage.setItem('dg-tema', tema) } catch {}
 }
 
 async function carregarTema() {
@@ -258,7 +273,6 @@ const COMANDOS = [
   { id: 'abrir-pasta', label: 'Abrir pasta de trabalho', hint: 'Ctrl+O' },
   { id: 'analisar', label: 'Analisar sistema aberto', hint: 'IA' },
   { id: 'reanalisar', label: 'Analisar de novo (forcar)', hint: 'IA' },
-  { id: 'onde-esta', label: 'Onde esta? (focar busca)', hint: 'busca textual' },
   { id: 'limpar-chat', label: 'Limpar chat desta pasta', hint: 'chat' },
   { id: 'contas', label: 'Abrir Contas e saude do sistema', hint: 'Fase 2' },
   { id: 'config', label: 'Abrir Configuracoes', hint: 'sistema' },
@@ -301,7 +315,6 @@ function executarComando(id) {
   if (id === 'abrir-pasta') abrirPasta()
   else if (id === 'analisar') { if (pastaAtual) rodarAnalise(pastaAtual, false) }
   else if (id === 'reanalisar') { if (pastaAtual) rodarAnalise(pastaAtual, true) }
-  else if (id === 'onde-esta') { $('whereis-bar').classList.remove('hidden'); $('whereis-input').focus() }
   else if (id === 'limpar-chat') { if (pastaAtual) window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([])) }
   else if (id === 'contas') abrirContas()
   else if (id === 'config') abrirConfig()
@@ -326,15 +339,13 @@ $('btn-reanalyze').addEventListener('click', () => pastaAtual && rodarAnalise(pa
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
 $('btn-contas').addEventListener('click', abrirContas)
+$('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
 $('btn-tema').addEventListener('click', alternarTema)
-$('btn-palette').addEventListener('click', abrirPaleta)
 $('chat-send').addEventListener('click', enviarMensagem)
 $('chat-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagem() }
 })
-$('whereis-btn').addEventListener('click', buscarOndeEsta)
-$('whereis-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') buscarOndeEsta() })
 $('palette-input').addEventListener('input', (e) => renderizarPaleta(e.target.value))
 $('palette-input').addEventListener('keydown', (e) => {
   const itens = document.querySelectorAll('.palette-item')
@@ -474,3 +485,90 @@ function perguntarEscolha(titulo, opcoes, config) {
 // atalho global para testes manuais no console:
 // await perguntarEscolha('Qual IA deve assumir?', ['Ollama','Maestro','API'])
 window.perguntarEscolha = perguntarEscolha
+
+
+// ---------- Toggle painel de analise ----------
+function alternarPainel() {
+  $('exec-panel')?.classList.toggle('aberto')
+}
+$('btn-painel')?.addEventListener('click', alternarPainel)
+
+// ---------- Auto auditoria ----------
+async function rodarAutoAuditoria() {
+  const btn = document.getElementById('btn-auditar')
+  if (btn) { btn.disabled = true; btn.textContent = 'Auditando...' }
+  try {
+    const r = await window.api.invoke('auditoria:rodar', { autoAtualizar: true, reiniciarAoFim: false })
+    if (!r || r.erro) {
+      console.warn('[auditoria] erro:', r && r.erro)
+    } else {
+      const falhas = r.achados.filter(function (a) { return a.status === 'falhou' })
+      var msg = 'Auditoria concluida\n' +
+        'OK: ' + r.resumo.ok + ' | Avisos: ' + r.resumo.warn + ' | Erros: ' + r.resumo.erro + '\n' +
+        'Corrigidos: ' + r.resumo.corrigidos + ' | Falhas: ' + r.resumo.falhas
+      if (falhas.length) { msg += '\n\nFalhas:\n' + falhas.map(function (a) { return '- ' + a.titulo }).join('\n') }
+      if (!r.reiniciarPendente) { alert(msg) }
+      if (r.reiniciarPendente) { abrirModalReinicio(r.motivoReinicio) }
+    }
+  } catch (e) {
+    console.warn('[auditoria] excecao:', e)
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Auditar' }
+  }
+}
+document.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('btn-auditar')
+  if (btn) btn.addEventListener('click', rodarAutoAuditoria)
+})
+
+
+// ---------- Barra de titulo propria ----------
+document.addEventListener('DOMContentLoaded', function () {
+  var bMin = document.getElementById('tb-min')
+  var bMax = document.getElementById('tb-max')
+  var bClose = document.getElementById('tb-close')
+  if (bMin) bMin.addEventListener('click', function () { window.api.invoke('janela:minimizar') })
+  if (bMax) bMax.addEventListener('click', async function () {
+    try { await window.api.invoke('janela:maximizar') } catch (e) { console.warn('[janela] maximizar:', e) }
+  })
+  if (bClose) bClose.addEventListener('click', function () { window.api.invoke('janela:fechar') })
+})
+
+// ---------- Modal de reinicio ----------
+function abrirModalReinicio(motivo) {
+  var m = document.getElementById('modal-reinicio')
+  if (!m) return
+  var p = document.getElementById('reinicio-motivo')
+  if (p) p.textContent = (motivo || 'Algumas alteracoes precisam de reinicio para serem aplicadas') + '. Deseja reiniciar agora?'
+  m.classList.remove('hidden')
+}
+function fecharModalReinicio() {
+  var m = document.getElementById('modal-reinicio')
+  if (m) m.classList.add('hidden')
+}
+document.addEventListener('DOMContentLoaded', function () {
+  var bAgora = document.getElementById('btn-reinicio-agora')
+  var bDepois = document.getElementById('btn-reinicio-depois')
+  if (bDepois) bDepois.addEventListener('click', fecharModalReinicio)
+  if (bAgora) bAgora.addEventListener('click', function () {
+    fecharModalReinicio()
+    window.api.invoke('auditoria:rodar', { autoAtualizar: false, reiniciarAoFim: true })
+  })
+})
+
+
+// ---------- Estado da janela (icone maximizar/restaurar) ----------
+async function atualizarIconeMax() {
+  try {
+    const st = await window.api.invoke('janela:estado')
+    const b = document.getElementById('tb-max')
+    if (!b) return
+    b.title = st && st.maximizado ? 'Restaurar' : 'Maximizar'
+  } catch {}
+}
+document.addEventListener('DOMContentLoaded', function () {
+  var bMax = document.getElementById('tb-max')
+  if (bMax) bMax.addEventListener('click', function () { setTimeout(atualizarIconeMax, 120) })
+  atualizarIconeMax()
+})
+

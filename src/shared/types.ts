@@ -60,7 +60,7 @@ export interface BrainProvider {
   isAvailable(): Promise<boolean>
   listModels(): Promise<{ name: string }[]>
   ping(): Promise<boolean>
-  ask(prompt: string, context: string): Promise<BrainResponse>
+    ask(prompt: string, context: string, tarefa?: string): Promise<BrainResponse>
 }
 
 // ---------- Fase 1: análise, cache, onde-está, chat, regras ----------
@@ -136,4 +136,20 @@ export interface PaletteCommand {
   id: string
   label: string
   hint?: string
+}
+
+// ---------- Diagnostico ao vivo ----------
+export interface DiagnosticoModulo {
+  id: string
+  nome: string
+  ok: boolean
+  detalhe: string
+  ms: number
+}
+
+export interface DiagnosticoResultado {
+  modulos: DiagnosticoModulo[]
+  ok: number
+  total: number
+  at: number
 }

@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
@@ -12,7 +12,10 @@ const invokeChannels = [
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
-  'roteador:planejar'
+  'roteador:planejar',
+  'diagnostico:rodar',
+  'auditoria:rodar', 'auditoria:periodica',
+  'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado'
 ]
 
 const sendChannels = ['app:quit']

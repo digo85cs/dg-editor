@@ -1,4 +1,4 @@
-import { readdirSync, lstatSync } from 'fs'
+﻿import { readdirSync, lstatSync } from 'fs'
 import { join, extname, basename } from 'path'
 import type { FolderScanResult } from '@shared/types'
 
@@ -62,7 +62,9 @@ export function scanFolder(root: string, options: ScanOptions = {}): FolderScanR
         totalFiles++
         const ext = extname(full).toLowerCase()
         if (ext) extensions[ext] = (extensions[ext] || 0) + 1
-        topFiles.push({ path: full, size: st.size })
+        if (full && typeof st.size === 'number' && !Number.isNaN(st.size)) {
+          topFiles.push({ path: full, size: st.size })
+        }
         if (topFiles.length > MAX_TOP_FILES * 4) {
           topFiles.sort((a, b) => b.size - a.size)
           topFiles.length = MAX_TOP_FILES

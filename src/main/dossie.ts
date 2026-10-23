@@ -1,6 +1,7 @@
-﻿import { promises as fs } from 'node:fs'
+import { promises as fs } from 'node:fs'
 import { join, dirname } from 'node:path'
 import type { ChatMessage } from '../shared/types'
+import { dossieDir } from './paths'
 
 /**
  * Dossie automatico do DG Editor.
@@ -16,9 +17,6 @@ export interface DossieSnapshot {
   resumo: string
 }
 
-function dossieDir(): string {
-  return join(process.cwd(), '.dg-editor')
-}
 
 export function caminhoDossie(): string {
   return join(dossieDir(), 'dossie.txt')
@@ -40,7 +38,7 @@ export function montarDossie(
   const corpo: string[] = []
   corpo.push('=== DOSSIE DG EDITOR ===')
   corpo.push(`Atualizado em: ${agora.toISOString()}`)
-  corpo.push(`Raiz: ${extra?.root ?? process.cwd()}`)
+  corpo.push(`Raiz: ${extra?.root ?? 'n/a'}${''}`)
   corpo.push(`Total de mensagens no chat: ${historico.length}`)
   corpo.push(`Provedor mais recente: ${provedorRecente}`)
   corpo.push(`Contagem por provedor: ${JSON.stringify(porProvedor)}`)

@@ -1,6 +1,15 @@
-# Regras do sistema (DG Editor)
+﻿# Regras do sistema (DG Editor)
 # Instrucoes permanentes deste projeto. A analise e o chat SEMPRE respeitam estas regras.
-# Escreva uma regra por linha. Exemplos:
-# - Nunca alterar arquivos da pasta producao/
-# - Padrao de nomes: camelCase em JS, snake_case em PHP
-# - Idioma dos commits: portugues
+# Escreva uma regra por linha.
+#
+# === EXECUCAO (o DG Editor age, nao apenas responde) ===
+- Preferir EXECUTAR acoes no sistema via automação (ferramentas de execução) a responder apenas com código para copiar e colar.
+- Quando o usuário pedir para criar, alterar ou executar algo, procurar a ação concreta e realizá-la, não oferecer um bloco de código pronto.
+- Nunca pedir ao usuário para "rodar este comando" quando existir forma de executar nossa automação diretamente.
+# === PRECISAO DE CONTEXTO (nao inventar sobre o projeto) ===
+- NUNCA afirmar a stack, tecnologias, arquitetura ou estrutura de um projeto sem antes consultar os arquivos reais (package.json, src/, README, .dgrules).
+- Se não confirmou a tecnologia, diga explicitamente "não verifiquei a stack deste projeto" em vez de assumir React, Node, MongoDB, etc.
+- Responder sobre o projeto apenas com base no que foi lido/verificado; se não houver informação, dizer que não sabe.
+# === QUALIDADE DO CHAT ===
+- Responder na língua do usuário.
+- Respostas diretas e acionáveis, em bloco único pronto para uso.

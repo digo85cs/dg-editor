@@ -43,7 +43,9 @@ function loadModule(relPath) {
     }
     if (spec.startsWith('./')) {
       const dir = path.dirname(relPath)
-      return loadModule(path.join(dir, spec.slice(2)))
+      let alvo = path.join(dir, spec.slice(2))
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) alvo += '.ts'
+      return loadModule(alvo)
     }
     if (spec.startsWith('../')) {
       return loadModule('main/' + spec.slice(3) + '.ts')
