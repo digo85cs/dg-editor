@@ -83,16 +83,77 @@ function limparTemporarios(): Achado[] {
   const out: Achado[] = []
   for (const dir of [DIR_TMP, path.join(app.getPath('temp'), 'dg-editor')]) {
     try {
-      if (!fs.existsSync(dir) || ehProtegido(dir)) continue
+      if (!fs.existsSync(dir)) {
+        out.push({
+          id: 'tmp:' + path.basename(dir),
+          area: 'limpeza',
+          titulo: 'Pasta tmp ausente (nada a limpar)',
+          severidade: 'ok',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+        continue
+      }
+      if (ehProtegido(dir)) continue
       let removidos = 0
       let bytes = 0
+      const falhas: string[] = []
       for (const nome of fs.readdirSync(dir)) {
         const alvo = path.join(dir, nome)
         if (ehProtegido(alvo)) continue
-        try { bytes += fs.statSync(alvo).size; fs.rmSync(alvo, { recursive: true, force: true }); removidos++ } catch {}
+        try {
+          bytes += fs.statSync(alvo).size
+          fs.rmSync(alvo, { recursive: true, force: true })
+          removidos++
+        } catch (e: any) {
+          falhas.push(nome + ': ' + String(e?.message || e))
+        }
       }
-      out.push({ id: 'tmp:' + path.basename(dir), area: 'limpeza', titulo: removidos + ' temporario(s) removido(s)', detalhe: (bytes / 1048576).toFixed(1) + ' MB liberados', severidade: 'warn', corrigivel: true, status: removidos ? 'corrigido' : 'nao-aplicavel', acao: 'rm tmp' })
-    } catch {}
+      if (falhas.length > 0) {
+        out.push({
+          id: 'tmp:' + path.basename(dir),
+          area: 'limpeza',
+          titulo: 'Limpeza parcial (' + removidos + ' ok, ' + falhas.length + ' falha)',
+          detalhe: falhas.slice(0, 3).join(' | '),
+          severidade: 'warn',
+          corrigivel: true,
+          status: 'falhou',
+          acao: 'rm tmp',
+          erro: falhas[0]
+        })
+      } else if (removidos > 0) {
+        out.push({
+          id: 'tmp:' + path.basename(dir),
+          area: 'limpeza',
+          titulo: removidos + ' temporario(s) removido(s)',
+          detalhe: (bytes / 1048576).toFixed(1) + ' MB liberados',
+          severidade: 'ok',
+          corrigivel: true,
+          status: 'corrigido',
+          acao: 'rm tmp'
+        })
+      } else {
+        out.push({
+          id: 'tmp:' + path.basename(dir),
+          area: 'limpeza',
+          titulo: 'Limpeza: pasta ja vazia',
+          detalhe: '0.0 MB',
+          severidade: 'ok',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
+    } catch (e: any) {
+      out.push({
+        id: 'tmp:' + path.basename(dir),
+        area: 'limpeza',
+        titulo: 'Falha ao limpar temporarios',
+        severidade: 'warn',
+        corrigivel: true,
+        status: 'falhou',
+        erro: String(e?.message || e)
+      })
+    }
   }
   return out
 }
@@ -194,10 +255,8 @@ async function autoAtualizar(): Promise<Achado> {
   }
 }
 
-export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reiniciarAoFim?: boolean } = {}): Promise<RelatorioAuditoria> {
-  const t0 = Date.now()
+async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{ achados: Achado[]; reiniciarPendente: boolean; motivoReinicio?: string }> {
   const achados: Achado[] = []
-
   achados.push(garantirPasta(DIR_DADOS))
   achados.push(garantirPasta(DIR_LOGS))
   achados.push(garantirPasta(DIR_TMP))
@@ -217,30 +276,90 @@ export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reinicia
       motivoReinicio = 'Dependencias atualizadas - reinicio recomendado para aplicar'
     }
   }
+  return { achados, reiniciarPendente, motivoReinicio }
+}
 
-  const resumo = {
+function resumir(achados: Achado[]) {
+  return {
     ok: achados.filter((a) => a.severidade === 'ok').length,
     warn: achados.filter((a) => a.severidade === 'warn').length,
     erro: achados.filter((a) => a.severidade === 'erro').length,
     corrigidos: achados.filter((a) => a.status === 'corrigido').length,
-    falhas: achados.filter((a) => a.status === 'falhou').length,
+    falhas: achados.filter((a) => a.status === 'falhou').length
+  }
+}
+
+export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reiniciarAoFim?: boolean } = {}): Promise<RelatorioAuditoria> {
+  const t0 = Date.now()
+
+  // Passo 1: detectar (+ corrigir inline onde ja existe)
+  let { achados, reiniciarPendente, motivoReinicio } = await executarChecagens(opcoes)
+
+  const problemasIniciais = achados.filter((a) => a.severidade !== 'ok')
+  if (problemasIniciais.length) {
+    console.log('[auditoria] detectados ' + problemasIniciais.length + ' achado(s) nao-ok:')
+    for (const a of problemasIniciais) {
+      console.log(
+        '  id=' + a.id +
+        ' sev=' + a.severidade +
+        ' status=' + a.status +
+        ' area=' + a.area +
+        ' | ' + a.titulo +
+        (a.detalhe ? ' | ' + a.detalhe : '') +
+        (a.acao ? ' | acao=' + a.acao : '') +
+        (a.erro ? ' | erro=' + a.erro : '')
+      )
+    }
   }
 
-  const relatorio: RelatorioAuditoria = { inicio: new Date().toISOString(), duracaoMs: Date.now() - t0, achados, resumo, reiniciarPendente, motivoReinicio }
+  // Passo 2: se houve correcao, re-verificar
+  const houveCorrecao = achados.some((a) => a.status === 'corrigido')
+  if (houveCorrecao) {
+    console.log('[auditoria] re-verificando apos correcoes...')
+    const segunda = await executarChecagens({ autoAtualizar: false })
+    const aindaRuim = segunda.achados.filter((a) => a.severidade !== 'ok')
+    if (aindaRuim.length === 0) {
+      console.log('[auditoria] re-verificacao: todos ok')
+    } else {
+      console.log('[auditoria] re-verificacao ainda com problemas:')
+      for (const a of aindaRuim) {
+        console.log('  ESCALAR id=' + a.id + ' | ' + a.titulo + (a.erro ? ' | ' + a.erro : ''))
+      }
+    }
+    // Relatorio final reflete o estado POS re-verificacao
+    achados = segunda.achados
+    reiniciarPendente = reiniciarPendente || segunda.reiniciarPendente
+    motivoReinicio = motivoReinicio || segunda.motivoReinicio
+  }
+
+  const resumo = resumir(achados)
+  const relatorio: RelatorioAuditoria = {
+    inicio: new Date().toISOString(),
+    duracaoMs: Date.now() - t0,
+    achados,
+    resumo,
+    reiniciarPendente,
+    motivoReinicio
+  }
 
   try {
     fs.mkdirSync(DIR_LOGS, { recursive: true })
     fs.appendFileSync(path.join(DIR_LOGS, 'auto-auditoria.log'), JSON.stringify(relatorio) + '\n', 'utf8')
   } catch {}
 
-  // Log detalhado: mostra CADA achado nao-ok para diagnostico rapido
-  const problemas = achados.filter((a) => a.severidade !== 'ok')
-  if (problemas.length) {
-    console.log('[auditoria] ' + problemas.length + ' achado(s) nao-ok:')
-    for (const a of problemas) {
+  console.log(
+    '[auditoria:boot] ok=' + resumo.ok +
+    ' warn=' + resumo.warn +
+    ' erro=' + resumo.erro +
+    ' corrigidos=' + resumo.corrigidos
+  )
+
+  if (resumo.warn > 0 || resumo.erro > 0) {
+    const restantes = achados.filter((a) => a.severidade !== 'ok')
+    console.log('[auditoria] ' + restantes.length + ' achado(s) nao-ok apos ciclo:')
+    for (const a of restantes) {
       const marca = a.severidade === 'erro' ? 'ERRO' : 'WARN'
-      const st = a.status === 'corrigido' ? ' [corrigido]' : a.status === 'falhou' ? ' [falhou]' : ''
-      console.log('  ' + marca + st + ' [' + a.area + '] ' + a.titulo + (a.detalhe ? ' | ' + a.detalhe : '') + (a.erro ? ' | ' + a.erro : ''))
+      console.log('  ' + marca + ' [' + a.area + '] ' + a.titulo + (a.detalhe ? ' | ' + a.detalhe : ''))
     }
   }
 
@@ -251,6 +370,7 @@ let timer: NodeJS.Timeout | null = null
 
 export function iniciarAuditoriaPeriodica(intervaloMs = 1800000) {
   if (timer) clearInterval(timer)
+  // Periodica: detectar -> corrigir -> re-verificar -> logar
   timer = setInterval(() => { void rodarAuditoria({ autoAtualizar: false }) }, intervaloMs)
   if (timer.unref) timer.unref()
 }
