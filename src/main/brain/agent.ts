@@ -1,9 +1,9 @@
-import { request } from 'http'
 import { chamarTool, listarTools, type McpTool } from '../mcp/client'
 import { montarContexto, blocoMemoria } from '../memory/hybrid'
 import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
 import { loadChat, appendChat } from '../chatstore'
+import { OLLAMA_URL, escolherModelo, ollamaHttpJson } from './ollama'
 
 /**
  * Agente do DG Editor: modelo local (Ollama) + tools do MCP interno.
@@ -11,7 +11,6 @@ import { loadChat, appendChat } from '../chatstore'
  * Sem chamada externa: tudo em 127.0.0.1.
  */
 
-const OLLAMA = 'http://127.0.0.1:11434'
 const MAX_ITER = 6
 
 export interface PassoAgente {
@@ -28,73 +27,7 @@ export interface RespostaAgente {
   passos: PassoAgente[]
 }
 
-function httpJson(url: string, corpo: unknown, timeout = 180000): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const dados = Buffer.from(JSON.stringify(corpo), 'utf8')
-    const req = request(
-      url,
-      {
-        method: 'POST',
-        timeout,
-        headers: { 'Content-Type': 'application/json', 'Content-Length': dados.length }
-      },
-      (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (c: Buffer) => chunks.push(c))
-        res.on('end', () => {
-          const txt = Buffer.concat(chunks).toString('utf8')
-          if (res.statusCode && res.statusCode >= 400) {
-            reject(new Error('HTTP ' + res.statusCode + ': ' + txt.slice(0, 300)))
-            return
-          }
-          try { resolve(JSON.parse(txt)) } catch (e) { reject(e) }
-        })
-      }
-    )
-    req.on('error', reject)
-    req.on('timeout', () => { req.destroy(new Error('timeout agente')) })
-    req.write(dados)
-    req.end()
-  })
-}
-
-/**
- * Escolhe o modelo considerando o hardware real.
- * Sem GPU (CPU-only) tool-calling com 14b/7b fica lento demais - prioriza 3b.
- * Com GPU, escala pelo RAM livre.
- */
-export async function detectarGpu(): Promise<boolean> {
-  try {
-    const r = (await httpJson(OLLAMA + '/api/ps', {}).catch(() => null)) as
-      | { models?: Array<{ size_vram?: number }> }
-      | null
-    if (r && r.models && r.models.length > 0) {
-      const vram = r.models.reduce((s, m) => s + (m.size_vram || 0), 0) / 1024 / 1024 / 1024
-      return vram > 0.5
-    }
-  } catch { /* sem modelo carregado: assume CPU */ }
-  return false
-}
-
-export async function escolherModelo(): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const os = require('os') as { freemem(): number }
-  const livresGB = os.freemem() / 1024 / 1024 / 1024
-  const gpu = await detectarGpu()
-
-  if (!gpu) {
-    // CPU-only: modelos pequenos respondem e chamam tools em tempo aceitavel
-    if (livresGB >= 6) return 'qwen2.5-coder:3b'
-    if (livresGB >= 3) return 'qwen2.5-coder:1.5b'
-    return 'qwen2.5-coder:1.5b'
-  }
-
-  // Com GPU: escala normal
-  if (livresGB >= 12) return 'qwen2.5-coder:14b'
-  if (livresGB >= 6) return 'qwen2.5-coder:7b'
-  if (livresGB >= 2.5) return 'qwen2.5-coder:3b'
-  return 'qwen2.5-coder:1.5b'
-}
+export { escolherModelo, detectarGpu } from './ollama'
 
 interface MensagemOllama {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -353,7 +286,7 @@ export async function executarAgente(
   pergunta: string,
   modeloForcado?: string
 ): Promise<RespostaAgente> {
-  const modelo = modeloForcado || (await escolherModelo())
+  const modelo = modeloForcado || (await escolherModelo('codigo'))
   dglog('[agente] modelo=' + modelo)
 
   const ctx = await montarContexto(raiz, pergunta)
@@ -394,7 +327,7 @@ export async function executarAgente(
       pediuResumo = true
     }
 
-    const r = (await httpJson(OLLAMA + '/api/chat', corpo)) as {
+    const r = (await ollamaHttpJson(OLLAMA_URL + '/api/chat', corpo, 'POST', 180000)) as {
       message?: MensagemOllama
       done?: boolean
     }

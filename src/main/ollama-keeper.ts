@@ -1,8 +1,7 @@
 import { spawn } from 'child_process'
 import { request } from 'http'
 import { dglog } from './dglog'
-
-const OLLAMA_URL = 'http://127.0.0.1:11434'
+import { OLLAMA_URL } from './brain/ollama'
 
 export function ollamaAlive(): Promise<boolean> {
   return new Promise((resolve) => {

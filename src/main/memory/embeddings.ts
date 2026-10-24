@@ -2,14 +2,14 @@ import { request } from 'http'
 import fs from 'fs'
 import path from 'path'
 import { dglog } from '../dglog'
+import { OLLAMA_URL } from '../brain/ollama'
 
 /**
  * Memoria semantica local do DG Editor.
- * Embeddings via nomic-embed-text no Ollama (127.0.0.1) - zero dependencia externa.
+ * Embeddings via nomic-embed-text no Ollama local - zero dependencia externa.
  * Indice em disco: JSON com vetores por turno de conversa.
  */
 
-const OLLAMA = 'http://127.0.0.1:11434'
 const MODELO_EMB = 'nomic-embed-text'
 
 export interface EntradaMemoria {
@@ -62,7 +62,7 @@ function httpJson(url: string, corpo: unknown, timeout = 30000): Promise<unknown
 
 export async function gerarEmbedding(texto: string): Promise<number[] | null> {
   try {
-    const r = (await httpJson(OLLAMA + '/api/embeddings', { model: MODELO_EMB, prompt: texto })) as { embedding?: number[] }
+    const r = (await httpJson(OLLAMA_URL + '/api/embeddings', { model: MODELO_EMB, prompt: texto })) as { embedding?: number[] }
     if (!r || !Array.isArray(r.embedding) || r.embedding.length === 0) return null
     return r.embedding
   } catch (e) {

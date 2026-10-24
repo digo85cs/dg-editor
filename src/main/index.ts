@@ -26,7 +26,7 @@ import { bootSaudeIAs } from './boot-saude'
 import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
 import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
-import { planejar, rotear } from './brain/router'
+import { askOllama } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -212,7 +212,7 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
 
   try {
     await ensureOllama()
-    const response = await rotear(content, context)
+    const response = await askOllama(content, context, 'chat')
     const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
     appendChat(root, assistantMsg)
     await gravarDossie(loadChat(root), { root })
@@ -255,8 +255,12 @@ ipcMain.handle('tema:set', (_e, tema: 'escuro' | 'claro') => {
 })
 
 // ---------- Fase 3: roteador ----------
-ipcMain.handle('roteador:planejar', async (_e, pedido: string) => {
-  return planejar(pedido)
+ipcMain.handle('roteador:planejar', async (_e, _pedido: string) => {
+  return {
+    tarefa: 'codigo',
+    disponibilidade: { ollama: true },
+    decisao: { provedor: 'ollama', motivo: 'unico provedor local (brain unificado)', usarDossie: false }
+  }
 })
 
 // ---------- Fase 3: dossie automatico ----------
