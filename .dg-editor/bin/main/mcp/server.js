@@ -12,6 +12,7 @@ const zod_1 = require("zod");
 const dossie_1 = require("../dossie");
 const paths_1 = require("../paths");
 const chatstore_1 = require("../chatstore");
+const indice_1 = require("../brain/indice");
 const RAIZ = process.env.DG_ROOT || process.cwd();
 const VAULT = (0, paths_1.projectStateDir)(RAIZ);
 function dentroDoVault(p) {
@@ -84,6 +85,33 @@ const TOOLS = [
                 filtro: { type: 'string', description: 'Substring no nome do arquivo' }
             },
             required: []
+        }
+    },
+    {
+        name: 'codigo_buscar',
+        description: 'Busca simbolos no indice de codigo (funcao/classe/tipo). Aceita sinonimos (pick->escolher, get->ler).',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                termo: { type: 'string', description: 'Substring ou sinonimo do nome do simbolo' },
+                tipo: {
+                    type: 'string',
+                    description: 'funcao | classe | tipo | todos',
+                    enum: ['funcao', 'classe', 'tipo', 'todos']
+                }
+            },
+            required: ['termo']
+        }
+    },
+    {
+        name: 'codigo_ler',
+        description: 'Le o corpo de UMA funcao/simbolo pelo nome (nunca o arquivo inteiro).',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                nome: { type: 'string', description: 'Nome exato do simbolo (ex: escolherModelo)' }
+            },
+            required: ['nome']
         }
     }
 ];
@@ -174,6 +202,22 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (req) => {
             }
             await walk(RAIZ, 0);
             return { content: [{ type: 'text', text: linhas.join('\n') || '(vazio)' }] };
+        }
+        if (name === 'codigo_buscar') {
+            const parsed = zod_1.z.object({
+                termo: zod_1.z.string(),
+                tipo: zod_1.z.enum(['funcao', 'classe', 'tipo', 'todos']).optional()
+            }).parse(args);
+            const hits = (0, indice_1.buscarSimbolos)(RAIZ, parsed.termo, parsed.tipo || 'todos');
+            return { content: [{ type: 'text', text: JSON.stringify(hits, null, 2) }] };
+        }
+        if (name === 'codigo_ler') {
+            const parsed = zod_1.z.object({ nome: zod_1.z.string() }).parse(args);
+            const hit = (0, indice_1.lerSimbolo)(RAIZ, parsed.nome);
+            if (!hit) {
+                return { content: [{ type: 'text', text: 'simbolo nao encontrado: ' + parsed.nome }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(hit, null, 2) }] };
         }
         throw new Error('tool desconhecida: ' + name);
     }

@@ -12,5 +12,13 @@
     "paths": { "@shared/*": ["../shared/*"] },
     "types": ["node"]
   },
-  "include": ["server.ts", "../dossie.ts", "../paths.ts", "../chatstore.ts", "../dglog.ts", "../shared/types.ts"]
+  "include": [
+    "server.ts",
+    "../dossie.ts",
+    "../paths.ts",
+    "../chatstore.ts",
+    "../dglog.ts",
+    "../shared/types.ts",
+    "../brain/indice.ts"
+  ]
 }

@@ -8,9 +8,10 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { promises as fs } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { z } from 'zod'
-import { caminhoDossie, gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
+import { gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
 import { projectStateDir } from '../paths'
 import { loadChat } from '../chatstore'
+import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 
 const RAIZ = process.env.DG_ROOT || process.cwd()
 const VAULT = projectStateDir(RAIZ)
@@ -86,6 +87,33 @@ const TOOLS = [
         filtro: { type: 'string', description: 'Substring no nome do arquivo' }
       },
       required: []
+    }
+  },
+  {
+    name: 'codigo_buscar',
+    description: 'Busca simbolos no indice de codigo (funcao/classe/tipo). Aceita sinonimos (pick->escolher, get->ler).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        termo: { type: 'string', description: 'Substring ou sinonimo do nome do simbolo' },
+        tipo: {
+          type: 'string',
+          description: 'funcao | classe | tipo | todos',
+          enum: ['funcao', 'classe', 'tipo', 'todos']
+        }
+      },
+      required: ['termo']
+    }
+  },
+  {
+    name: 'codigo_ler',
+    description: 'Le o corpo de UMA funcao/simbolo pelo nome (nunca o arquivo inteiro).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        nome: { type: 'string', description: 'Nome exato do simbolo (ex: escolherModelo)' }
+      },
+      required: ['nome']
     }
   }
 ]
@@ -177,6 +205,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
       await walk(RAIZ, 0)
       return { content: [{ type: 'text', text: linhas.join('\n') || '(vazio)' }] }
+    }
+
+    if (name === 'codigo_buscar') {
+      const parsed = z.object({
+        termo: z.string(),
+        tipo: z.enum(['funcao', 'classe', 'tipo', 'todos']).optional()
+      }).parse(args)
+      const hits = buscarSimbolos(RAIZ, parsed.termo, parsed.tipo || 'todos')
+      return { content: [{ type: 'text', text: JSON.stringify(hits, null, 2) }] }
+    }
+
+    if (name === 'codigo_ler') {
+      const parsed = z.object({ nome: z.string() }).parse(args)
+      const hit = lerSimbolo(RAIZ, parsed.nome)
+      if (!hit) {
+        return { content: [{ type: 'text', text: 'simbolo nao encontrado: ' + parsed.nome }], isError: true }
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(hit, null, 2) }] }
     }
 
     throw new Error('tool desconhecida: ' + name)
