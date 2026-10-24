@@ -12,6 +12,7 @@ import { gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
 import { projectStateDir } from '../paths'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
+import { editarPorAncora } from '../brain/editar'
 
 const RAIZ = process.env.DG_ROOT || process.cwd()
 const VAULT = projectStateDir(RAIZ)
@@ -114,6 +115,20 @@ const TOOLS = [
         nome: { type: 'string', description: 'Nome exato do simbolo (ex: escolherModelo)' }
       },
       required: ['nome']
+    }
+  },
+  {
+    name: 'codigo_editar',
+    description: 'Substitui uma ancora unica num arquivo. Se verificar=true (default), roda tsc e reverte se falhar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        arquivo: { type: 'string', description: 'Caminho relativo a raiz do projeto' },
+        ancora: { type: 'string', description: 'Trecho existente que deve aparecer exatamente 1 vez' },
+        novo: { type: 'string', description: 'Texto que substitui a ancora' },
+        verificar: { type: 'boolean', description: 'Rodar typecheck apos editar (default true)' }
+      },
+      required: ['arquivo', 'ancora', 'novo']
     }
   }
 ]
@@ -223,6 +238,26 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return { content: [{ type: 'text', text: 'simbolo nao encontrado: ' + parsed.nome }], isError: true }
       }
       return { content: [{ type: 'text', text: JSON.stringify(hit, null, 2) }] }
+    }
+
+    if (name === 'codigo_editar') {
+      const parsed = z.object({
+        arquivo: z.string(),
+        ancora: z.string(),
+        novo: z.string(),
+        verificar: z.boolean().optional()
+      }).parse(args)
+      const res = editarPorAncora(
+        RAIZ,
+        parsed.arquivo,
+        parsed.ancora,
+        parsed.novo,
+        parsed.verificar !== false
+      )
+      return {
+        content: [{ type: 'text', text: JSON.stringify(res, null, 2) }],
+        isError: !res.ok
+      }
     }
 
     throw new Error('tool desconhecida: ' + name)

@@ -19,6 +19,7 @@
     "../chatstore.ts",
     "../dglog.ts",
     "../shared/types.ts",
-    "../brain/indice.ts"
+    "../brain/indice.ts",
+    "../brain/editar.ts"
   ]
 }
