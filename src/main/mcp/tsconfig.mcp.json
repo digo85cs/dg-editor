@@ -20,6 +20,12 @@
     "../dglog.ts",
     "../shared/types.ts",
     "../brain/indice.ts",
-    "../brain/editar.ts"
+    "../brain/editar.ts",
+    "../brain/skills.ts",
+    "../brain/agentes.ts",
+    "../brain/registry.ts",
+    "../brain/ollama.ts",
+    "../brain/module.ts",
+    "../dglog.ts"
   ]
 }

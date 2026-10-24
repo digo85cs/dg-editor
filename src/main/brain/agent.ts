@@ -4,6 +4,8 @@ import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
 import { loadChat, appendChat } from '../chatstore'
 import { OLLAMA_URL, escolherModelo, ollamaHttpJson } from './ollama'
+import { garantirSkillsPadrao, skillsRelevantes } from './skills'
+import { garantirAgentesPadrao } from './agentes'
 
 /**
  * Agente do DG Editor: modelo local (Ollama) + tools do MCP interno.
@@ -289,8 +291,15 @@ export async function executarAgente(
   const modelo = modeloForcado || (await escolherModelo('codigo'))
   dglog('[agente] modelo=' + modelo)
 
+  garantirSkillsPadrao(raiz)
+  garantirAgentesPadrao(raiz)
+
   const ctx = await montarContexto(raiz, pergunta)
   const memoria = blocoMemoria(ctx)
+  const skills = skillsRelevantes(raiz, pergunta)
+  const blocoSkills = skills.length
+    ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
+    : ''
 
   let tools: McpTool[] = []
   try {
@@ -301,7 +310,7 @@ export async function executarAgente(
   }
 
   const mensagens: MensagemOllama[] = [
-    { role: 'system', content: SYSTEM + (memoria ? '\n\n' + memoria : '') },
+    { role: 'system', content: SYSTEM + (memoria ? '\n\n' + memoria : '') + blocoSkills },
     { role: 'user', content: pergunta }
   ]
 

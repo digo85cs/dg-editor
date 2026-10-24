@@ -14,8 +14,12 @@ const paths_1 = require("../paths");
 const chatstore_1 = require("../chatstore");
 const indice_1 = require("../brain/indice");
 const editar_1 = require("../brain/editar");
+const skills_1 = require("../brain/skills");
+const agentes_1 = require("../brain/agentes");
 const RAIZ = process.env.DG_ROOT || process.cwd();
 const VAULT = (0, paths_1.projectStateDir)(RAIZ);
+(0, skills_1.garantirSkillsPadrao)(RAIZ);
+(0, agentes_1.garantirAgentesPadrao)(RAIZ);
 function dentroDoVault(p) {
     const abs = (0, node_path_1.resolve)(p);
     const rel = (0, node_path_1.relative)(VAULT, abs);
@@ -127,6 +131,38 @@ const TOOLS = [
                 verificar: { type: 'boolean', description: 'Rodar typecheck apos editar (default true)' }
             },
             required: ['arquivo', 'ancora', 'novo']
+        }
+    },
+    {
+        name: 'skill_listar',
+        description: 'Lista skills locais em .dg-editor/skills',
+        inputSchema: { type: 'object', properties: {}, required: [] }
+    },
+    {
+        name: 'skill_ler',
+        description: 'Le uma skill pelo id (nome do arquivo sem .md)',
+        inputSchema: {
+            type: 'object',
+            properties: { id: { type: 'string' } },
+            required: ['id']
+        }
+    },
+    {
+        name: 'agente_listar',
+        description: 'Lista agentes especializados em .dg-editor/agentes',
+        inputSchema: { type: 'object', properties: {}, required: [] }
+    },
+    {
+        name: 'agente_invocar',
+        description: 'Invoca um agente especializado com contexto e pedido',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                id: { type: 'string' },
+                contexto: { type: 'string' },
+                pedido: { type: 'string' }
+            },
+            required: ['id', 'pedido']
         }
     }
 ];
@@ -246,6 +282,30 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (req) => {
                 content: [{ type: 'text', text: JSON.stringify(res, null, 2) }],
                 isError: !res.ok
             };
+        }
+        if (name === 'skill_listar') {
+            const lista = (0, skills_1.listarSkills)(RAIZ).map((s) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }));
+            return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] };
+        }
+        if (name === 'skill_ler') {
+            const parsed = zod_1.z.object({ id: zod_1.z.string() }).parse(args);
+            const s = (0, skills_1.lerSkill)(RAIZ, parsed.id);
+            if (!s)
+                return { content: [{ type: 'text', text: 'skill nao encontrada' }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(s, null, 2) }] };
+        }
+        if (name === 'agente_listar') {
+            const lista = (0, agentes_1.listarAgentes)(RAIZ).map((a) => ({ id: a.id, nome: a.nome, especialidade: a.especialidade }));
+            return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] };
+        }
+        if (name === 'agente_invocar') {
+            const parsed = zod_1.z.object({
+                id: zod_1.z.string(),
+                contexto: zod_1.z.string().optional(),
+                pedido: zod_1.z.string()
+            }).parse(args);
+            const r = await (0, agentes_1.invocarAgente)(RAIZ, parsed.id, parsed.contexto || '', parsed.pedido);
+            return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok };
         }
         throw new Error('tool desconhecida: ' + name);
     }

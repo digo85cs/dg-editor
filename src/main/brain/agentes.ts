@@ -1,0 +1,90 @@
+/**
+ * Agentes especializados em .dg-editor/agentes/*.md
+ */
+import fs from 'fs'
+import path from 'path'
+import { askOllama } from './ollama'
+
+export interface AgenteDef {
+  id: string
+  nome: string
+  especialidade: string
+  system: string
+  arquivo: string
+}
+
+function dirAgentes(raiz: string): string {
+  return path.join(raiz, '.dg-editor', 'agentes')
+}
+
+function parseAgente(arquivo: string, bruto: string): AgenteDef {
+  const id = path.basename(arquivo, '.md')
+  let nome = id
+  let especialidade = id
+  let system = bruto
+  const fm = bruto.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (fm) {
+    const meta = fm[1]
+    system = fm[2].trim()
+    const n = meta.match(/nome:\s*(.+)/i)
+    const e = meta.match(/especialidade:\s*(.+)/i)
+    if (n) nome = n[1].trim()
+    if (e) especialidade = e[1].trim()
+  }
+  return { id, nome, especialidade, system, arquivo }
+}
+
+export function listarAgentes(raiz: string): AgenteDef[] {
+  const dir = dirAgentes(raiz)
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => parseAgente(f, fs.readFileSync(path.join(dir, f), 'utf8')))
+}
+
+export function lerAgente(raiz: string, id: string): AgenteDef | null {
+  return listarAgentes(raiz).find((a) => a.id === id || a.nome === id) || null
+}
+
+export async function invocarAgente(
+  raiz: string,
+  id: string,
+  contexto: string,
+  pedido: string
+): Promise<{ ok: boolean; agente: string; texto: string; modelo?: string }> {
+  const ag = lerAgente(raiz, id)
+  if (!ag) return { ok: false, agente: id, texto: 'agente nao encontrado: ' + id }
+  const prompt = pedido
+  const ctx = (ag.system ? ag.system + '\n\n' : '') + (contexto || '')
+  const r = await askOllama(prompt, ctx, ag.especialidade.includes('racioc') ? 'raciocinio' : 'codigo')
+  return { ok: true, agente: ag.nome, texto: r.text, modelo: r.model }
+}
+
+export function garantirAgentesPadrao(raiz: string): void {
+  const dir = dirAgentes(raiz)
+  fs.mkdirSync(dir, { recursive: true })
+  const padroes = [
+    {
+      nome: 'revisor.md',
+      conteudo: `---
+nome: Revisor
+especialidade: codigo
+---
+Voce e o agente Revisor do DG Editor. Revise codigo com foco em bugs, tipos e clareza.
+Responda em portugues do Brasil, curto e tecnico.`
+    },
+    {
+      nome: 'arquiteto.md',
+      conteudo: `---
+nome: Arquiteto
+especialidade: raciocinio
+---
+Voce e o agente Arquiteto do DG Editor. Pense em estrutura, fronteiras de modulo e riscos.
+Responda em portugues do Brasil.`
+    }
+  ]
+  for (const p of padroes) {
+    const dest = path.join(dir, p.nome)
+    if (!fs.existsSync(dest)) fs.writeFileSync(dest, p.conteudo, 'utf8')
+  }
+}

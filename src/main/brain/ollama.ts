@@ -85,35 +85,24 @@ export async function detectarGpu(): Promise<boolean> {
 
 /**
  * Unica funcao de escolha de modelo do DG Editor.
+ * Delegada ao registry (local + online declarado).
  * tarefa: chat | codigo | raciocinio | (legado: simples/analise/...)
  */
 export async function escolherModelo(tarefa: string = 'codigo'): Promise<string> {
+  const { escolherModeloPorTarefa } = await import('./registry')
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const os = require('os') as { freemem(): number }
   const livresGB = os.freemem() / 1024 / 1024 / 1024
   const gpu = await detectarGpu()
-  const t = (tarefa || 'codigo').toLowerCase()
+  let escolhido = await escolherModeloPorTarefa(tarefa)
 
-  if (!gpu) {
-    if (t === 'chat' || t === 'simples') return livresGB >= 3 ? 'qwen2.5-coder:1.5b' : 'qwen2.5-coder:1.5b'
-    if (livresGB >= 6) return 'qwen2.5-coder:3b'
-    return 'qwen2.5-coder:1.5b'
+  // Ajuste por hardware: sem GPU evita 7b/14b
+  if (!gpu && /:(7b|14b)/.test(escolhido)) {
+    escolhido = livresGB >= 6 ? 'qwen2.5-coder:3b' : 'qwen2.5-coder:1.5b'
+  } else if (gpu && livresGB < 6 && /:(7b|14b)/.test(escolhido)) {
+    escolhido = 'qwen2.5-coder:3b'
   }
-
-  if (t === 'raciocinio' || t === 'estrategia') {
-    if (livresGB >= 12) return 'qwen2.5-coder:14b'
-    if (livresGB >= 6) return 'qwen2.5-coder:7b'
-    return 'qwen2.5-coder:3b'
-  }
-  if (t === 'chat' || t === 'simples') {
-    if (livresGB >= 6) return 'qwen2.5-coder:3b'
-    return 'qwen2.5-coder:1.5b'
-  }
-  // codigo / analise / default
-  if (livresGB >= 12) return 'qwen2.5-coder:14b'
-  if (livresGB >= 6) return 'qwen2.5-coder:7b'
-  if (livresGB >= 2.5) return 'qwen2.5-coder:3b'
-  return 'qwen2.5-coder:1.5b'
+  return escolhido
 }
 
 function ollamaInstalado(): boolean {
