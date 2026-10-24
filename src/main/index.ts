@@ -7,6 +7,9 @@ import { getAuthStore } from './auth'
 import { getSystemProfile, formatBytes, profileStrength } from './profile'
 import { scanFolder, formatScanSummary } from './scanner'
 import { getBrain } from './brain/module'
+import { executarAgente, escolherModelo, historico } from './brain/agent'
+import { listarTools, desconectarMcp, mcpAtivo } from './mcp/client'
+import { carregarIndice, indexarTurno } from './memory/embeddings'
 import { ensureOllama } from './ollama-keeper'
 import { dglog } from './dglog'
 import { installPtBrMenu } from './menu'
@@ -319,6 +322,53 @@ ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
 })
 
 
+// ---------- Agente com MCP + memoria generativa ----------
+ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, modelo?: string) => {
+  try {
+    const r = await executarAgente(root, pergunta, modelo)
+    return { ok: true, texto: r.texto, modelo: r.modelo, passos: r.passos }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    dglog('[agente:executar] falhou: ' + msg)
+    return { ok: false, erro: msg }
+  }
+})
+
+ipcMain.handle('agente:modelo', async () => {
+  try { return { ok: true, modelo: await escolherModelo() } }
+  catch (e: unknown) { return { ok: false, erro: String(e) } }
+})
+
+ipcMain.handle('agente:historico', async (_e, root: string) => {
+  try { return { ok: true, mensagens: await historico(root) } }
+  catch (e: unknown) { return { ok: false, erro: String(e) } }
+})
+
+ipcMain.handle('mcp:tools', async () => {
+  try {
+    const tools = await listarTools()
+    return { ok: true, tools: tools.map((t) => ({ name: t.name, description: t.description })) }
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('mcp:status', () => ({ ok: true, ativo: mcpAtivo() }))
+
+ipcMain.handle('memoria:status', (_e, root: string) => {
+  try {
+    const idx = carregarIndice(root)
+    return { ok: true, turnos: idx.entradas.length, modelo: idx.modelo }
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) }
+  }
+})
+
+ipcMain.handle('memoria:indexar', async (_e, root: string, role: 'user' | 'assistant', texto: string) => {
+  try { await indexarTurno(root, role, texto); return { ok: true } }
+  catch (e: unknown) { return { ok: false, erro: String(e) } }
+})
+
 // ---------- Auto auditoria no boot + periodica ----------
 setTimeout(async () => {
   try {
@@ -331,4 +381,3 @@ setTimeout(async () => {
     console.warn('[auditoria:boot] falhou:', String(e?.message || e))
   }
 }, 4000)
-
