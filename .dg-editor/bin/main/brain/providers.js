@@ -110,6 +110,12 @@ function httpJsonUrl(urlStr, corpo, method, timeoutMs, headers, signal) {
     });
 }
 function classificarHttp(status, body, providerId) {
+    const b = (body || '').toLowerCase();
+    const modeloMorto = status === 410 ||
+        (status === 404 && /model/.test(b) && /not found|no longer available|does not exist|unavailable/.test(b));
+    if (modeloMorto) {
+        return new ErroProvider('modelo_morto', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status);
+    }
     if (status === 429)
         return new ErroProvider('rate_limit', 'HTTP 429: ' + body.slice(0, 200), providerId, status);
     if (status === 401 || status === 403)

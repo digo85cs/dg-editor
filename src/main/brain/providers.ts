@@ -46,7 +46,14 @@ export interface ToolDef {
   inputSchema?: unknown
 }
 
-export type ErroProviderKind = 'rate_limit' | 'auth' | 'server' | 'timeout' | 'rede' | 'outro'
+export type ErroProviderKind =
+  | 'rate_limit'
+  | 'auth'
+  | 'server'
+  | 'timeout'
+  | 'rede'
+  | 'modelo_morto'
+  | 'outro'
 
 export class ErroProvider extends Error {
   kind: ErroProviderKind
@@ -147,6 +154,13 @@ function httpJsonUrl(
 }
 
 export function classificarHttp(status: number, body: string, providerId: string): ErroProvider {
+  const b = (body || '').toLowerCase()
+  const modeloMorto =
+    status === 410 ||
+    (status === 404 && /model/.test(b) && /not found|no longer available|does not exist|unavailable/.test(b))
+  if (modeloMorto) {
+    return new ErroProvider('modelo_morto', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
+  }
   if (status === 429) return new ErroProvider('rate_limit', 'HTTP 429: ' + body.slice(0, 200), providerId, status)
   if (status === 401 || status === 403) return new ErroProvider('auth', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
   if (status >= 500) return new ErroProvider('server', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)

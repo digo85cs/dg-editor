@@ -89,3 +89,18 @@ Ver secao H2 acima para estado atual.
 ## Historico recente
 
 - 2026-10-26 failover H5.7: openrouter 401 → cursor-cli ok (43725 ms)
+- 2026-10-26T17:54:54.309Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 3341ms
+- 2026-10-26T17:55:34.119Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 7018ms
+- 2026-10-26T17:55:58.804Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 20803ms
+- 2026-10-26T17:56:12.033Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 8209ms
+- 2026-10-26T17:56:23.881Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 7861ms
+- 2026-10-26T17:56:42.222Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 13742ms
+
+## Fix modelos mortos + disponivel honesto (2026-10-26)
+
+- deepseek/deepseek-chat ? deepseek/deepseek-v3.2 (codigo/chat/revisao)
+- qwen/qwen-2.5-coder-32b-instruct: ainda valido (HTTP 200)
+- disponivel() agora retorna ok|sem-chave|modelo-invalido|indisponivel + catalogo OpenRouter TTL 10min
+- failover modelo_morto (404/410) avanca na fila (max 5 saltos)
+- Custo estimado OpenRouter (/1M tokens): deepseek-v3.2 prompt~$0.28 completion~$0.42; qwen-2.5-coder-32b prompt~$0.66 completion~$1.00 (valores da API pricing; podem mudar)
+

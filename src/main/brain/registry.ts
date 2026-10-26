@@ -1,14 +1,16 @@
 /**
  * Fila de providers por tarefa (online → local fallback).
- * Entradas online sem chave ficam na fila com disponivel=false.
+ * disponivel() retorna status honesto (ok | sem-chave | modelo-invalido | indisponivel).
  */
 import { listModelos } from './ollama'
 import { dglog } from '../dglog'
 import fs from 'fs'
 import path from 'path'
+import { spawnSync } from 'child_process'
 import {
   type ProviderConfig,
-  disponivel as providerDisponivel
+  cursorCliAprovadoNaSessao,
+  resolverBinarioCursorAgent
 } from './providers'
 
 export type TipoModelo = 'local' | 'online'
@@ -83,8 +85,84 @@ function cfgCursorCli(): ProviderConfig {
   })
 }
 
-export function disponivel(cfg: ProviderConfig): boolean {
-  return providerDisponivel(cfg)
+export type StatusDisponivel = 'ok' | 'sem-chave' | 'modelo-invalido' | 'indisponivel'
+
+const CATALOG_TTL_MS = 10 * 60 * 1000
+let catalogOpenRouter: { ids: Set<string>; at: number; erro?: string } | null = null
+
+function logStderr(msg: string): void {
+  try { process.stderr.write(msg + '\n') } catch { dglog(msg) }
+}
+
+/** Busca catálogo OpenRouter (sync via subprocess) com TTL 10 min. */
+export function garantirCatalogoOpenRouterSync(): void {
+  if (catalogOpenRouter && Date.now() - catalogOpenRouter.at < CATALOG_TTL_MS) return
+  const key = process.env.OPENROUTER_API_KEY || ''
+  if (!key.trim()) {
+    catalogOpenRouter = { ids: new Set(), at: Date.now(), erro: 'sem-chave' }
+    return
+  }
+  const script =
+    "fetch('https://openrouter.ai/api/v1/models',{headers:{Authorization:'Bearer '+process.env.OPENROUTER_API_KEY}})" +
+    ".then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
+    ".then(j=>{const ids=(j.data||[]).map(x=>x.id);process.stdout.write(JSON.stringify(ids))})" +
+    ".catch(e=>{process.stderr.write(String(e.message||e));process.exit(2)})"
+  const r = spawnSync(process.execPath, ['-e', script], {
+    encoding: 'utf8',
+    timeout: 45000,
+    windowsHide: true,
+    env: process.env
+  })
+  if (r.status === 0 && r.stdout) {
+    try {
+      const ids = JSON.parse(r.stdout) as string[]
+      catalogOpenRouter = { ids: new Set(ids), at: Date.now() }
+      return
+    } catch { /* fallthrough */ }
+  }
+  catalogOpenRouter = {
+    ids: new Set(),
+    at: Date.now(),
+    erro: (r.stderr || r.stdout || 'falha catalogo').toString().slice(0, 160)
+  }
+}
+
+export async function garantirCatalogoOpenRouter(): Promise<void> {
+  garantirCatalogoOpenRouterSync()
+}
+
+/**
+ * Status honesto do provider.
+ * OpenRouter: exige chave + modelo presente no catálogo (cache 10 min).
+ */
+export function disponivel(cfg: ProviderConfig): StatusDisponivel {
+  if (cfg.formato === 'cursor-cli' || cfg.tipo === 'cli') {
+    const bin = cfg.binario || resolverBinarioCursorAgent()
+    if (!bin) return 'indisponivel'
+    if (!cursorCliAprovadoNaSessao() && process.env.DG_CURSOR_CLI_OK !== '1') return 'indisponivel'
+    return 'ok'
+  }
+  if (cfg.tipo === 'local') return 'ok'
+
+  // online
+  if (!cfg.apiKeyEnv || !String(process.env[cfg.apiKeyEnv] || '').trim()) {
+    return 'sem-chave'
+  }
+  if (cfg.formato === 'openai' && (cfg.baseUrl || '').includes('openrouter.ai')) {
+    garantirCatalogoOpenRouterSync()
+    if (catalogOpenRouter?.erro === 'sem-chave') return 'sem-chave'
+    if (!catalogOpenRouter || catalogOpenRouter.ids.size === 0) {
+      // falha de rede no catalogo: nao bloqueia (failover em modelo_morto cobre 404)
+      return 'ok'
+    }
+    if (!catalogOpenRouter.ids.has(cfg.modelo)) return 'modelo-invalido'
+  }
+  return 'ok'
+}
+
+/** true só quando status === 'ok' (compat boolean em callers antigos). */
+export function disponivelOk(cfg: ProviderConfig): boolean {
+  return disponivel(cfg) === 'ok'
 }
 
 function cfg(
@@ -122,10 +200,10 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
         timeoutMs: 120_000
       }),
       cfg({
-        id: 'openrouter:deepseek-chat',
+        id: 'openrouter:deepseek-v3.2',
         tipo: 'online',
         formato: 'openai',
-        modelo: 'deepseek/deepseek-chat',
+        modelo: 'deepseek/deepseek-v3.2',
         baseUrl: OPENROUTER_BASE,
         apiKeyEnv: KEY_ENV,
         numPredict: 512,
@@ -171,10 +249,10 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
   if (t === 'revisao') {
     return [
       cfg({
-        id: 'openrouter:deepseek-chat',
+        id: 'openrouter:deepseek-v3.2',
         tipo: 'online',
         formato: 'openai',
-        modelo: 'deepseek/deepseek-chat',
+        modelo: 'deepseek/deepseek-v3.2',
         baseUrl: OPENROUTER_BASE,
         apiKeyEnv: KEY_ENV,
         numPredict: 1024,
@@ -196,10 +274,10 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
   // codigo: openrouter → openrouter → cursor-cli → ollama → ollama
   return [
     cfg({
-      id: 'openrouter:deepseek-chat',
+      id: 'openrouter:deepseek-v3.2',
       tipo: 'online',
       formato: 'openai',
-      modelo: 'deepseek/deepseek-chat',
+      modelo: 'deepseek/deepseek-v3.2',
       baseUrl: OPENROUTER_BASE,
       apiKeyEnv: KEY_ENV,
       numPredict: 1024,
@@ -235,6 +313,31 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
       timeoutMs: 180_000
     })
   ]
+}
+
+/**
+ * Filtra a fila para status === 'ok', loga pulos, e falha se nada sobrar.
+ */
+export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): ProviderConfig[] {
+  const t = normalizarTarefa(String(tarefa))
+  const bruta = filaDeModelos(t, opcoes)
+  const ok: ProviderConfig[] = []
+  const motivos: string[] = []
+  for (const p of bruta) {
+    const st = disponivel(p)
+    if (st === 'ok') {
+      ok.push(p)
+    } else {
+      logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=' + st)
+      motivos.push(p.id + '=' + st)
+    }
+  }
+  if (ok.length === 0) {
+    throw new Error(
+      'Nenhum modelo disponivel para a tarefa ' + t + ': ' + (motivos.join('; ') || '(fila vazia)')
+    )
+  }
+  return ok
 }
 
 export function limitesPorTarefa(tarefa: string): { num_predict: number; timeoutMs: number } {
@@ -325,8 +428,9 @@ export async function escolherModeloPorTarefa(
   const origem = opts.origem || 'pipeline'
 
   for (const p of fila) {
-    if (!disponivel(p)) {
-      dglog('[registry] pula ' + p.id + ' (chave ausente)')
+    const st = disponivel(p)
+    if (st !== 'ok') {
+      logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=' + st)
       continue
     }
     if (p.tipo === 'local') {

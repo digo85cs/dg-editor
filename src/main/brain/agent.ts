@@ -5,9 +5,10 @@ import { dglog } from '../dglog'
 import { loadChat, appendChat } from '../chatstore'
 import { escolherModelo } from './ollama'
 import {
-  filaDeModelos,
+  filaPronta,
   disponivel,
   appendFailoverLog,
+  garantirCatalogoOpenRouter,
   type Tarefa
 } from './registry'
 import {
@@ -475,7 +476,14 @@ export async function executarAgente(
       dglog('[agente] MCP indisponivel: ' + String(e))
     }
 
-    let fila: ProviderConfig[] = filaDeModelos(tarefa, { pedido: pergunta })
+    await garantirCatalogoOpenRouter()
+
+    let fila: ProviderConfig[]
+    try {
+      fila = filaPronta(tarefa, { pedido: pergunta })
+    } catch (e) {
+      throw e
+    }
     if (modeloForcado) {
       fila = [
         {
@@ -492,14 +500,22 @@ export async function executarAgente(
     }
 
     const maxTentativas = fila.length
+    let saltos = 0
+    const MAX_SALTOS = 5
 
     for (let pi = 0; pi < maxTentativas; pi++) {
       const cfg = fila[pi]
-      if (!disponivel(cfg)) {
-        const motivo = 'chave ausente (' + (cfg.apiKeyEnv || 'n/a') + ')'
-        dglog('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=falhou')
+      const st = disponivel(cfg)
+      if (st !== 'ok') {
+        const motivo = st
+        try {
+          process.stderr.write('[dg-fila] pulando ' + cfg.id + '/' + cfg.modelo + ' motivo=' + motivo + '\n')
+        } catch { /* */ }
+        dglog('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=pulado')
         appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'pulado' })
         tentativasOut.push({ provider: cfg.id, resultado: 'pulado: ' + motivo })
+        saltos++
+        if (saltos >= MAX_SALTOS) break
         continue
       }
 
@@ -545,7 +561,21 @@ export async function executarAgente(
           appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou', ms })
           tentativasOut.push({ provider: cfg.id, resultado: 'falhou: ' + motivo })
 
+          if (kind === 'modelo_morto') {
+            try {
+              process.stderr.write(
+                '[dg-failover] ' + cfg.id + '/' + cfg.modelo + ' morto, tentando proximo\n'
+              )
+            } catch { /* */ }
+            saltos++
+            if (saltos >= MAX_SALTOS) {
+              break
+            }
+            break // proximo da fila
+          }
           if (kind === 'rate_limit' || kind === 'auth' || kind === 'timeout') {
+            saltos++
+            if (saltos >= MAX_SALTOS) break
             break
           }
           if (kind === 'server' || kind === 'rede') {
@@ -554,11 +584,16 @@ export async function executarAgente(
               dglog('[provider] retentativa no mesmo provider ' + cfg.id)
               continue
             }
+            saltos++
+            if (saltos >= MAX_SALTOS) break
             break
           }
+          saltos++
+          if (saltos >= MAX_SALTOS) break
           break
         }
       }
+      if (saltos >= MAX_SALTOS) break
     }
 
     const lista = tentativasOut.map((t) => t.provider + ' (' + t.resultado + ')').join('; ')

@@ -414,7 +414,14 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
         catch (e) {
             (0, dglog_1.dglog)('[agente] MCP indisponivel: ' + String(e));
         }
-        let fila = (0, registry_1.filaDeModelos)(tarefa, { pedido: pergunta });
+        await (0, registry_1.garantirCatalogoOpenRouter)();
+        let fila;
+        try {
+            fila = (0, registry_1.filaPronta)(tarefa, { pedido: pergunta });
+        }
+        catch (e) {
+            throw e;
+        }
         if (modeloForcado) {
             fila = [
                 {
@@ -430,13 +437,23 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
             ];
         }
         const maxTentativas = fila.length;
+        let saltos = 0;
+        const MAX_SALTOS = 5;
         for (let pi = 0; pi < maxTentativas; pi++) {
             const cfg = fila[pi];
-            if (!(0, registry_1.disponivel)(cfg)) {
-                const motivo = 'chave ausente (' + (cfg.apiKeyEnv || 'n/a') + ')';
-                (0, dglog_1.dglog)('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=falhou');
+            const st = (0, registry_1.disponivel)(cfg);
+            if (st !== 'ok') {
+                const motivo = st;
+                try {
+                    process.stderr.write('[dg-fila] pulando ' + cfg.id + '/' + cfg.modelo + ' motivo=' + motivo + '\n');
+                }
+                catch { /* */ }
+                (0, dglog_1.dglog)('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=pulado');
                 (0, registry_1.appendFailoverLog)(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'pulado' });
                 tentativasOut.push({ provider: cfg.id, resultado: 'pulado: ' + motivo });
+                saltos++;
+                if (saltos >= MAX_SALTOS)
+                    break;
                 continue;
             }
             let retriesServer = 0;
@@ -475,7 +492,21 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
                         ' motivo=' + motivo + ' resultado=falhou');
                     (0, registry_1.appendFailoverLog)(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou', ms });
                     tentativasOut.push({ provider: cfg.id, resultado: 'falhou: ' + motivo });
+                    if (kind === 'modelo_morto') {
+                        try {
+                            process.stderr.write('[dg-failover] ' + cfg.id + '/' + cfg.modelo + ' morto, tentando proximo\n');
+                        }
+                        catch { /* */ }
+                        saltos++;
+                        if (saltos >= MAX_SALTOS) {
+                            break;
+                        }
+                        break; // proximo da fila
+                    }
                     if (kind === 'rate_limit' || kind === 'auth' || kind === 'timeout') {
+                        saltos++;
+                        if (saltos >= MAX_SALTOS)
+                            break;
                         break;
                     }
                     if (kind === 'server' || kind === 'rede') {
@@ -484,11 +515,19 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
                             (0, dglog_1.dglog)('[provider] retentativa no mesmo provider ' + cfg.id);
                             continue;
                         }
+                        saltos++;
+                        if (saltos >= MAX_SALTOS)
+                            break;
                         break;
                     }
+                    saltos++;
+                    if (saltos >= MAX_SALTOS)
+                        break;
                     break;
                 }
             }
+            if (saltos >= MAX_SALTOS)
+                break;
         }
         const lista = tentativasOut.map((t) => t.provider + ' (' + t.resultado + ')').join('; ');
         throw new Error('Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)'));
