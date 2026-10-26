@@ -41,7 +41,8 @@ dossie-tecnico.md
 
 .dg-root
 .dg-editor/cursor-cli-status.json
-
+.dg-editor/nav-token
+.dg-editor/downloads/
 
 # Build do servidor MCP (gerado por build:mcp)
 .dg-editor/bin/
