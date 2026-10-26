@@ -434,6 +434,472 @@ async function checarProviders(): Promise<Achado[]> {
   return out
 }
 
+function checarSkills(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  try {
+    const { listarSkills } = require('./brain/skills') as typeof import('./brain/skills')
+    const skills = listarSkills(raiz)
+    out.push({
+      id: 'skills:count',
+      area: 'skills',
+      titulo: skills.length + ' skill(s) em disco',
+      detalhe: skills.map((s) => s.id).join(', '),
+      severidade: skills.length >= 8 ? 'ok' : 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    for (const s of skills) {
+      const sp = path.isAbsolute(s.arquivo)
+        ? s.arquivo
+        : path.join(raiz, '.dg-editor', 'skills', path.basename(s.arquivo))
+      const bruto = fs.readFileSync(sp, 'utf8')
+      const len = bruto.length
+      const temGatilho = !!(s.gatilho && s.gatilho.trim())
+      const temProc = /procedimento|passos|1\./i.test(s.instrucao)
+      const tamOk = len >= 900 && len <= 1400
+      const ok = temGatilho && temProc && tamOk
+      out.push({
+        id: 'skills:' + s.id,
+        area: 'skills',
+        titulo: s.id + (ok ? ' OK' : ' incompleta'),
+        detalhe: 'chars=' + len + ' gatilho=' + temGatilho + ' procedimento=' + temProc,
+        severidade: ok ? 'ok' : (tamOk ? 'warn' : 'erro'),
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'skills:falha',
+      area: 'skills',
+      titulo: 'Falha ao checar skills',
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+function checarAgentesArea(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  try {
+    const { listarAgentes } = require('./brain/agentes') as typeof import('./brain/agentes')
+    const { listarSkills } = require('./brain/skills') as typeof import('./brain/skills')
+    const agentes = listarAgentes(raiz)
+    const skillIds = new Set(listarSkills(raiz).map((s) => s.id))
+    out.push({
+      id: 'agentes:count',
+      area: 'agentes',
+      titulo: agentes.length + ' agente(s) em disco',
+      detalhe: agentes.map((a) => a.id).join(', '),
+      severidade: agentes.length >= 4 ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    for (const a of agentes) {
+      const temEsp = !!(a.especialidade && a.especialidade.trim())
+      const temSys = !!(a.system && a.system.trim().length > 40)
+      const skillsOk = (a.skills || []).every((id) => skillIds.has(id))
+      const faltando = (a.skills || []).filter((id) => !skillIds.has(id))
+      const ok = temEsp && temSys && skillsOk
+      out.push({
+        id: 'agentes:' + a.id,
+        area: 'agentes',
+        titulo: a.id + (ok ? ' OK' : ' incompleto'),
+        detalhe:
+          'especialidade=' + temEsp + ' system=' + temSys +
+          ' skills=' + (a.skills || []).join(',') +
+          (faltando.length ? ' FALTANDO=' + faltando.join(',') : ''),
+        severidade: ok ? 'ok' : 'erro',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'agentes:falha',
+      area: 'agentes',
+      titulo: 'Falha ao checar agentes',
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+function checarMcp(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  try {
+    const serverSrc = path.join(raiz, 'src', 'main', 'mcp', 'server.ts')
+    const txt = fs.readFileSync(serverSrc, 'utf8')
+    const nomes = [...txt.matchAll(/name:\s*'([a-z0-9_]+)'/g)].map((m) => m[1])
+    const unicos = [...new Set(nomes)]
+    const esperadas = [
+      'dossie_read', 'dossie_write', 'dossie_snapshot',
+      'vault_list', 'vault_read', 'vault_write',
+      'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
+      'skill_listar', 'skill_ler', 'agente_listar', 'agente_invocar', 'agente_executar'
+    ]
+    const faltando = esperadas.filter((n) => !unicos.includes(n))
+    out.push({
+      id: 'mcp:tools-count',
+      area: 'mcp',
+      titulo: unicos.length + ' tool name(s) no server.ts',
+      detalhe: unicos.join(', '),
+      severidade: faltando.length === 0 && unicos.length >= 15 ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    if (faltando.length) {
+      out.push({
+        id: 'mcp:faltando',
+        area: 'mcp',
+        titulo: 'Tools faltando: ' + faltando.join(', '),
+        severidade: 'erro',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      out.push({
+        id: 'mcp:15-ok',
+        area: 'mcp',
+        titulo: '15 tools esperadas presentes (incl. agente_executar)',
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+    const schemaOk = /inputSchema/.test(txt) && /agente_executar/.test(txt)
+    out.push({
+      id: 'mcp:schema',
+      area: 'mcp',
+      titulo: schemaOk ? 'Schemas presentes no TOOLS' : 'Schema incompleto',
+      severidade: schemaOk ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } catch (e: any) {
+    out.push({
+      id: 'mcp:falha',
+      area: 'mcp',
+      titulo: 'Falha ao checar MCP',
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+function checarPipeline(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  try {
+    const agentSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'brain', 'agent.ts'), 'utf8')
+    const serverSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'mcp', 'server.ts'), 'utf8')
+    const temExec = /export async function executarAgente/.test(agentSrc)
+    const temMcp = /name:\s*'agente_executar'/.test(serverSrc)
+    const antiRec =
+      /profundidadeAgente|profundidadeExecucaoAgente|Recursao bloqueada/.test(agentSrc) &&
+      /Recursao bloqueada|profundidadeExecucaoAgente/.test(serverSrc)
+    const filtra = /agente_executar/.test(agentSrc) && /filter/.test(agentSrc)
+    out.push({
+      id: 'pipeline:executarAgente',
+      area: 'pipeline',
+      titulo: temExec ? 'executarAgente exportado' : 'executarAgente ausente',
+      severidade: temExec ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    out.push({
+      id: 'pipeline:agente_executar',
+      area: 'pipeline',
+      titulo: temMcp ? 'agente_executar no MCP' : 'agente_executar ausente no MCP',
+      severidade: temMcp ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    out.push({
+      id: 'pipeline:anti-recursao',
+      area: 'pipeline',
+      titulo: antiRec && filtra
+        ? 'Anti-recursao presente (profundidade + filtro tool)'
+        : 'Anti-recursao incompleta',
+      severidade: antiRec && filtra ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } catch (e: any) {
+    out.push({
+      id: 'pipeline:falha',
+      area: 'pipeline',
+      titulo: 'Falha ao checar pipeline',
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+function checarBuild(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  const alvos = [
+    { id: 'build:main', rel: path.join('out', 'main', 'index.js') },
+    { id: 'build:mcp', rel: path.join('.dg-editor', 'bin', 'main', 'mcp', 'server.js') }
+  ]
+  for (const a of alvos) {
+    const p = path.join(raiz, a.rel)
+    if (!fs.existsSync(p)) {
+      out.push({
+        id: a.id,
+        area: 'build',
+        titulo: a.rel + ' ausente',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'falhou',
+        acao: a.id === 'build:mcp' ? 'npm run build:mcp' : 'npm run build'
+      })
+      continue
+    }
+    const st = fs.statSync(p)
+    const crypto = require('crypto') as typeof import('crypto')
+    const hash = crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex')
+    const recente = Date.now() - st.mtimeMs < 7 * 24 * 3600 * 1000
+    out.push({
+      id: a.id,
+      area: 'build',
+      titulo: a.rel + ' atualizado',
+      detalhe: 'md5=' + hash + ' mtime=' + st.mtime.toISOString(),
+      severidade: recente ? 'ok' : 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  }
+  return out
+}
+
+function checarIntegridadeCompleta(): Achado[] {
+  const out: Achado[] = []
+  const raiz = resolverRaizProjeto()
+  try {
+    const indicePath = path.join(raiz, '.dg-editor', 'indice-codigo.json')
+    if (fs.existsSync(indicePath)) {
+      const idx = JSON.parse(fs.readFileSync(indicePath, 'utf8'))
+      const n = Array.isArray(idx.simbolos) ? idx.simbolos.length : 0
+      out.push({
+        id: 'integridade:indice',
+        area: 'integridade',
+        titulo: 'Indice de simbolos presente (' + n + ' simbolos)',
+        severidade: n > 0 ? 'ok' : 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      out.push({
+        id: 'integridade:indice',
+        area: 'integridade',
+        titulo: 'Indice de simbolos ausente',
+        detalhe: 'rode npm run indice',
+        severidade: 'warn',
+        corrigivel: true,
+        status: 'nao-aplicavel',
+        acao: 'npm run indice'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'integridade:indice',
+      area: 'integridade',
+      titulo: 'Indice divergente/corrompido',
+      severidade: 'erro',
+      corrigivel: true,
+      status: 'falhou',
+      erro: String(e?.message || e),
+      acao: 'npm run indice'
+    })
+  }
+
+  try {
+    const dossieCand = [
+      path.join(raiz, '.dg-editor', 'dossie.txt'),
+      path.join(DIR_DADOS, 'dossie', 'dossie.txt')
+    ]
+    const dossie = dossieCand.find((p) => fs.existsSync(p))
+    if (dossie) {
+      const crypto = require('crypto') as typeof import('crypto')
+      const hash = crypto.createHash('sha256').update(fs.readFileSync(dossie)).digest('hex').slice(0, 16)
+      out.push({
+        id: 'integridade:dossie',
+        area: 'integridade',
+        titulo: 'Dossie presente',
+        detalhe: 'sha25616=' + hash + ' path=' + dossie,
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      out.push({
+        id: 'integridade:dossie',
+        area: 'integridade',
+        titulo: 'Dossie ausente (nao bloqueante)',
+        severidade: 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'integridade:dossie',
+      area: 'integridade',
+      titulo: 'Falha ao ler dossie',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+
+  try {
+    const { execFileSync } = require('child_process') as typeof import('child_process')
+    const st = execFileSync('git', ['status', '--porcelain'], {
+      cwd: raiz,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15000
+    }).trim()
+    out.push({
+      id: 'integridade:git',
+      area: 'integridade',
+      titulo: st ? 'git sujo (' + st.split(/\r?\n/).length + ' entradas)' : 'git limpo',
+      detalhe: st ? st.split(/\r?\n/).slice(0, 8).join(' | ') : '',
+      severidade: st ? 'warn' : 'ok',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } catch (e: any) {
+    out.push({
+      id: 'integridade:git',
+      area: 'integridade',
+      titulo: 'Falha ao checar git status',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+export interface AreaAuditoria {
+  area: string
+  ok: number
+  warn: number
+  erro: number
+  detalhes: string[]
+}
+
+export interface RelatorioConsolidado {
+  data: string
+  hashes: Record<string, string>
+  areas: AreaAuditoria[]
+  resumo: { ok: number; warn: number; erro: number }
+}
+
+function agruparAreas(achados: Achado[], areasOrdem: string[]): AreaAuditoria[] {
+  return areasOrdem.map((area) => {
+    const subset = achados.filter((a) => a.area === area)
+    return {
+      area,
+      ok: subset.filter((a) => a.severidade === 'ok').length,
+      warn: subset.filter((a) => a.severidade === 'warn').length,
+      erro: subset.filter((a) => a.severidade === 'erro').length,
+      detalhes: subset.map((a) => a.titulo + (a.detalhe ? ' | ' + a.detalhe : ''))
+    }
+  })
+}
+
+export async function rodarAuditoriaConsolidada(): Promise<RelatorioConsolidado> {
+  const raiz = resolverRaizProjeto()
+  const achados: Achado[] = []
+  achados.push(...(await checarModelos()))
+  achados.push(...(await checarProviders()))
+  achados.push(...checarSkills())
+  achados.push(...checarAgentesArea())
+  achados.push(...checarMcp())
+  achados.push(...checarPipeline())
+  achados.push(...checarBuild())
+  achados.push(...checarIntegridadeCompleta())
+
+  const areasOrdem = [
+    'modelos', 'providers', 'skills', 'agentes', 'mcp', 'pipeline', 'build', 'integridade'
+  ]
+  const areas = agruparAreas(achados, areasOrdem)
+  const resumo = {
+    ok: areas.reduce((s, a) => s + a.ok, 0),
+    warn: areas.reduce((s, a) => s + a.warn, 0),
+    erro: areas.reduce((s, a) => s + a.erro, 0)
+  }
+
+  const crypto = require('crypto') as typeof import('crypto')
+  const hashes: Record<string, string> = {}
+  for (const rel of ['out/main/index.js', '.dg-editor/bin/main/mcp/server.js']) {
+    const p = path.join(raiz, rel)
+    if (fs.existsSync(p)) {
+      hashes[rel] = crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex')
+    }
+  }
+
+  const rel: RelatorioConsolidado = {
+    data: new Date().toISOString(),
+    hashes,
+    areas,
+    resumo
+  }
+
+  const mdPath = path.join(raiz, '.dg-editor', 'auditoria-completa.md')
+  const linhas = [
+    '# Auditoria completa consolidada',
+    '',
+    '**Data:** ' + rel.data,
+    '',
+    '## Hashes',
+    ...Object.entries(hashes).map(([k, v]) => '- `' + k + '`: `' + v + '`'),
+    '',
+    '## Resumo global',
+    '',
+    '| ok | warn | erro |',
+    '|---:|---:|---:|',
+    '| ' + resumo.ok + ' | ' + resumo.warn + ' | ' + resumo.erro + ' |',
+    '',
+    '## 8 areas',
+    '',
+    '| area | ok | warn | erro |',
+    '|---|---:|---:|---:|',
+    ...areas.map((a) => '| ' + a.area + ' | ' + a.ok + ' | ' + a.warn + ' | ' + a.erro + ' |'),
+    '',
+    '## Detalhes',
+    ''
+  ]
+  for (const a of areas) {
+    linhas.push('### ' + a.area)
+    for (const d of a.detalhes) linhas.push('- ' + d)
+    linhas.push('')
+  }
+  fs.writeFileSync(mdPath, linhas.join('\n'), 'utf8')
+  return rel
+}
+
 async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{ achados: Achado[]; reiniciarPendente: boolean; motivoReinicio?: string }> {
   const achados: Achado[] = []
   achados.push(garantirPasta(DIR_DADOS))
@@ -446,6 +912,12 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
   achados.push(...(await checarOllama()))
   achados.push(...(await checarModelos()))
   achados.push(...(await checarProviders()))
+  achados.push(...checarSkills())
+  achados.push(...checarAgentesArea())
+  achados.push(...checarMcp())
+  achados.push(...checarPipeline())
+  achados.push(...checarBuild())
+  achados.push(...checarIntegridadeCompleta())
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined

@@ -18,13 +18,20 @@ import {
   type ToolDef
 } from './providers'
 import { garantirSkillsPadrao, skillsRelevantes } from './skills'
-import { garantirAgentesPadrao } from './agentes'
+import { garantirAgentesPadrao, lerAgente } from './agentes'
 
 /**
  * Agente do DG Editor: fila hibrida (OpenRouter → Ollama) com failover.
  */
 
 const MAX_ITER = 6
+
+/** Profundidade de executarAgente — bloqueia agente_executar recursivo. */
+let profundidadeAgente = 0
+
+export function profundidadeExecucaoAgente(): number {
+  return profundidadeAgente
+}
 
 export interface PassoAgente {
   tipo: 'tool' | 'texto'
@@ -34,10 +41,24 @@ export interface PassoAgente {
   texto?: string
 }
 
+export interface TentativaProvider {
+  provider: string
+  resultado: string
+}
+
 export interface RespostaAgente {
   texto: string
   modelo: string
   passos: PassoAgente[]
+  tentativas?: TentativaProvider[]
+  duracaoMs?: number
+  ok?: boolean
+}
+
+export interface OpcoesExecutarAgente {
+  modeloForcado?: string
+  agente?: string
+  tarefa?: Tarefa
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
@@ -405,113 +426,148 @@ async function rodarLoopComProvider(
 export async function executarAgente(
   raiz: string,
   pergunta: string,
-  modeloForcado?: string
+  modeloForcadoOuOpcoes?: string | OpcoesExecutarAgente
 ): Promise<RespostaAgente> {
-  const tarefa: Tarefa = 'codigo'
-  garantirSkillsPadrao(raiz)
-  garantirAgentesPadrao(raiz)
+  const opcoes: OpcoesExecutarAgente =
+    typeof modeloForcadoOuOpcoes === 'string'
+      ? { modeloForcado: modeloForcadoOuOpcoes }
+      : modeloForcadoOuOpcoes || {}
 
-  const ctx = await montarContexto(raiz, pergunta)
-  const memoria = blocoMemoria(ctx)
-  const skills = skillsRelevantes(raiz, pergunta)
-  const blocoSkills = skills.length
-    ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
-    : ''
-  const systemExtra = (memoria ? '\n\n' + memoria : '') + blocoSkills
+  if (profundidadeAgente > 0) {
+    throw new Error(
+      'Recursao bloqueada: agente_executar/executarAgente nao pode ser chamado de dentro de outro executarAgente'
+    )
+  }
 
-  let tools: McpTool[] = []
+  profundidadeAgente++
+  const tInicio = Date.now()
+  const tentativasOut: TentativaProvider[] = []
+
   try {
-    tools = await listarTools()
-    dglog('[agente] ' + tools.length + ' tools disponiveis')
-  } catch (e) {
-    dglog('[agente] MCP indisponivel: ' + String(e))
-  }
+    const tarefa: Tarefa = opcoes.tarefa || 'codigo'
+    const modeloForcado = opcoes.modeloForcado
+    garantirSkillsPadrao(raiz)
+    garantirAgentesPadrao(raiz)
 
-  let fila: ProviderConfig[] = filaDeModelos(tarefa, { pedido: pergunta })
-  if (modeloForcado) {
-    fila = [
-      {
-        id: 'forcado:' + modeloForcado,
-        tipo: 'local',
-        formato: 'ollama',
-        modelo: modeloForcado,
-        baseUrl: 'http://127.0.0.1:11434',
-        numPredict: 1024,
-        timeoutMs: 300_000
-      },
-      ...fila.filter((p) => p.modelo !== modeloForcado)
-    ]
-  }
+    const agenteId = opcoes.agente || 'revisor'
+    const ag = lerAgente(raiz, agenteId)
+    const blocoAgente = ag
+      ? '\n\n### AGENTE ATIVO: ' + ag.nome + '\nEspecialidade: ' + ag.especialidade +
+        (ag.skills.length ? '\nSkills: ' + ag.skills.join(', ') : '') +
+        '\n\n' + ag.system
+      : ''
 
-  const tentativas: Array<{ id: string; motivo: string }> = []
-  const maxTentativas = fila.length
+    const ctx = await montarContexto(raiz, pergunta)
+    const memoria = blocoMemoria(ctx)
+    const skills = skillsRelevantes(raiz, pergunta)
+    const blocoSkills = skills.length
+      ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
+      : ''
+    const systemExtra = blocoAgente + (memoria ? '\n\n' + memoria : '') + blocoSkills
 
-  for (let pi = 0; pi < maxTentativas; pi++) {
-    const cfg = fila[pi]
-    if (!disponivel(cfg)) {
-      const motivo = 'chave ausente (' + (cfg.apiKeyEnv || 'n/a') + ')'
-      dglog('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=falhou')
-      appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'pulado' })
-      tentativas.push({ id: cfg.id, motivo })
-      continue
+    let tools: McpTool[] = []
+    try {
+      tools = await listarTools()
+      // Anti-recursao: nunca expor agente_executar ao loop interno
+      tools = tools.filter((t) => t.name !== 'agente_executar')
+      dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
+    } catch (e) {
+      dglog('[agente] MCP indisponivel: ' + String(e))
     }
 
-    let retriesServer = 0
-    while (retriesServer < 2) {
-      const t0 = Date.now()
-      try {
-        dglog(
-          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
-          ' motivo=tentativa resultado=...'
-        )
-        const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra)
-        const ms = Date.now() - t0
-        dglog(
-          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
-          ' motivo=ok resultado=ok'
-        )
-        appendFailoverLog(raiz, {
-          tarefa,
-          tentou: cfg.id,
-          motivo: 'ok modelo=' + resp.modelo,
-          resultado: 'ok',
-          ms
-        })
-        return resp
-      } catch (e) {
-        const ms = Date.now() - t0
-        const err = e instanceof ErroProvider
-          ? e
-          : new ErroProvider('outro', String(e), cfg.id)
-        const kind = err.kind
-        const motivo = kind + ': ' + err.message.slice(0, 160)
-        dglog(
-          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
-          ' motivo=' + motivo + ' resultado=falhou'
-        )
-        appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou', ms })
-        tentativas.push({ id: cfg.id, motivo })
+    let fila: ProviderConfig[] = filaDeModelos(tarefa, { pedido: pergunta })
+    if (modeloForcado) {
+      fila = [
+        {
+          id: 'forcado:' + modeloForcado,
+          tipo: 'local',
+          formato: 'ollama',
+          modelo: modeloForcado,
+          baseUrl: 'http://127.0.0.1:11434',
+          numPredict: 1024,
+          timeoutMs: 300_000
+        },
+        ...fila.filter((p) => p.modelo !== modeloForcado)
+      ]
+    }
 
-        if (kind === 'rate_limit' || kind === 'auth' || kind === 'timeout') {
-          break // pula para proximo da fila
-        }
-        if (kind === 'server' || kind === 'rede') {
-          retriesServer++
-          if (retriesServer < 2) {
-            dglog('[provider] retentativa no mesmo provider ' + cfg.id)
-            continue
+    const maxTentativas = fila.length
+
+    for (let pi = 0; pi < maxTentativas; pi++) {
+      const cfg = fila[pi]
+      if (!disponivel(cfg)) {
+        const motivo = 'chave ausente (' + (cfg.apiKeyEnv || 'n/a') + ')'
+        dglog('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=falhou')
+        appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'pulado' })
+        tentativasOut.push({ provider: cfg.id, resultado: 'pulado: ' + motivo })
+        continue
+      }
+
+      let retriesServer = 0
+      while (retriesServer < 2) {
+        const t0 = Date.now()
+        try {
+          dglog(
+            '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+            ' motivo=tentativa resultado=...'
+          )
+          const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra)
+          const ms = Date.now() - t0
+          dglog(
+            '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+            ' motivo=ok resultado=ok'
+          )
+          appendFailoverLog(raiz, {
+            tarefa,
+            tentou: cfg.id,
+            motivo: 'ok modelo=' + resp.modelo,
+            resultado: 'ok',
+            ms
+          })
+          tentativasOut.push({ provider: cfg.id, resultado: 'ok' })
+          return {
+            ...resp,
+            ok: true,
+            tentativas: tentativasOut,
+            duracaoMs: Date.now() - tInicio
+          }
+        } catch (e) {
+          const ms = Date.now() - t0
+          const err = e instanceof ErroProvider
+            ? e
+            : new ErroProvider('outro', String(e), cfg.id)
+          const kind = err.kind
+          const motivo = kind + ': ' + err.message.slice(0, 160)
+          dglog(
+            '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+            ' motivo=' + motivo + ' resultado=falhou'
+          )
+          appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou', ms })
+          tentativasOut.push({ provider: cfg.id, resultado: 'falhou: ' + motivo })
+
+          if (kind === 'rate_limit' || kind === 'auth' || kind === 'timeout') {
+            break
+          }
+          if (kind === 'server' || kind === 'rede') {
+            retriesServer++
+            if (retriesServer < 2) {
+              dglog('[provider] retentativa no mesmo provider ' + cfg.id)
+              continue
+            }
+            break
           }
           break
         }
-        break
       }
     }
-  }
 
-  const lista = tentativas.map((t) => t.id + ' (' + t.motivo + ')').join('; ')
-  throw new Error(
-    'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')
-  )
+    const lista = tentativasOut.map((t) => t.provider + ' (' + t.resultado + ')').join('; ')
+    throw new Error(
+      'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')
+    )
+  } finally {
+    profundidadeAgente--
+  }
 }
 
 export async function historico(raiz: string) {

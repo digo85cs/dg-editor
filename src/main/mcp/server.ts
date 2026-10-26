@@ -15,6 +15,10 @@ import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 import { editarPorAncora } from '../brain/editar'
 import { garantirSkillsPadrao, listarSkills, lerSkill } from '../brain/skills'
 import { garantirAgentesPadrao, listarAgentes, invocarAgente } from '../brain/agentes'
+import {
+  executarAgente,
+  profundidadeExecucaoAgente
+} from '../brain/agent'
 
 const RAIZ = process.env.DG_ROOT || process.cwd()
 const VAULT = projectStateDir(RAIZ)
@@ -165,6 +169,23 @@ const TOOLS = [
         pedido: { type: 'string' }
       },
       required: ['id', 'pedido']
+    }
+  },
+  {
+    name: 'agente_executar',
+    description: 'Executa o pipeline completo do agente com tools, skills e fallback de provider',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mensagem: { type: 'string', description: 'Pedido em linguagem natural' },
+        agente: { type: 'string', description: "Id do agente (padrao 'revisor')" },
+        tarefa: {
+          type: 'string',
+          description: "chat | codigo | raciocinio (padrao 'codigo')",
+          enum: ['chat', 'codigo', 'raciocinio']
+        }
+      },
+      required: ['mensagem']
     }
   }
 ]
@@ -321,6 +342,53 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }).parse(args)
       const r = await invocarAgente(RAIZ, parsed.id, parsed.contexto || '', parsed.pedido)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'agente_executar') {
+      if (profundidadeExecucaoAgente() > 0) {
+        const err = {
+          ok: false,
+          erro: 'Recursao bloqueada: agente_executar nao pode ser chamado de dentro de executarAgente'
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(err) }], isError: true }
+      }
+      const parsed = z.object({
+        mensagem: z.string(),
+        agente: z.string().optional(),
+        tarefa: z.enum(['chat', 'codigo', 'raciocinio']).optional()
+      }).parse(args)
+
+      const TIMEOUT_MS = 600_000
+      const trabalho = executarAgente(RAIZ, parsed.mensagem, {
+        agente: parsed.agente || 'revisor',
+        tarefa: parsed.tarefa || 'codigo'
+      })
+      const timeout = new Promise<never>((_, rej) => {
+        setTimeout(() => rej(new Error('agente_executar timeout apos 600s')), TIMEOUT_MS)
+      })
+
+      try {
+        const r = await Promise.race([trabalho, timeout])
+        const out = {
+          ok: true,
+          texto: r.texto,
+          modeloUsado: r.modelo,
+          tentativas: r.tentativas || [],
+          duracaoMs: r.duracaoMs ?? 0
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] }
+      } catch (e) {
+        const msg = (e as Error).message || String(e)
+        const out = {
+          ok: false,
+          texto: '',
+          modeloUsado: '',
+          tentativas: [],
+          duracaoMs: 0,
+          erro: msg
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true }
+      }
     }
 
     throw new Error('tool desconhecida: ' + name)

@@ -1,0 +1,18 @@
+{
+  "selecionados": {
+    "qwen2.5-coder:1.5b": 1,
+    "qwen2.5-coder:7b": 7,
+    "llama3.2:latest": 1,
+    "qwen2.5-coder:14b": 2,
+    "deepseek/deepseek-chat": 4
+  },
+  "selecionadosPipeline": {},
+  "ultimo": {
+    "chat": "qwen2.5-coder:1.5b",
+    "motivo": "fila→openrouter:deepseek-chat",
+    "em": "2026-10-26T14:42:13.439Z",
+    "codigo": "deepseek/deepseek-chat",
+    "raciocinio": "qwen2.5-coder:14b",
+    "origem": "auditoria"
+  }
+}

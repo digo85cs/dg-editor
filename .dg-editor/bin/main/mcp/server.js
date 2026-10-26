@@ -16,6 +16,7 @@ const indice_1 = require("../brain/indice");
 const editar_1 = require("../brain/editar");
 const skills_1 = require("../brain/skills");
 const agentes_1 = require("../brain/agentes");
+const agent_1 = require("../brain/agent");
 const RAIZ = process.env.DG_ROOT || process.cwd();
 const VAULT = (0, paths_1.projectStateDir)(RAIZ);
 (0, skills_1.garantirSkillsPadrao)(RAIZ);
@@ -164,6 +165,23 @@ const TOOLS = [
             },
             required: ['id', 'pedido']
         }
+    },
+    {
+        name: 'agente_executar',
+        description: 'Executa o pipeline completo do agente com tools, skills e fallback de provider',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                mensagem: { type: 'string', description: 'Pedido em linguagem natural' },
+                agente: { type: 'string', description: "Id do agente (padrao 'revisor')" },
+                tarefa: {
+                    type: 'string',
+                    description: "chat | codigo | raciocinio (padrao 'codigo')",
+                    enum: ['chat', 'codigo', 'raciocinio']
+                }
+            },
+            required: ['mensagem']
+        }
     }
 ];
 const server = new index_js_1.Server({ name: 'dg-editor-vault', version: '1.0.0' }, { capabilities: { tools: {} } });
@@ -306,6 +324,51 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (req) => {
             }).parse(args);
             const r = await (0, agentes_1.invocarAgente)(RAIZ, parsed.id, parsed.contexto || '', parsed.pedido);
             return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok };
+        }
+        if (name === 'agente_executar') {
+            if ((0, agent_1.profundidadeExecucaoAgente)() > 0) {
+                const err = {
+                    ok: false,
+                    erro: 'Recursao bloqueada: agente_executar nao pode ser chamado de dentro de executarAgente'
+                };
+                return { content: [{ type: 'text', text: JSON.stringify(err) }], isError: true };
+            }
+            const parsed = zod_1.z.object({
+                mensagem: zod_1.z.string(),
+                agente: zod_1.z.string().optional(),
+                tarefa: zod_1.z.enum(['chat', 'codigo', 'raciocinio']).optional()
+            }).parse(args);
+            const TIMEOUT_MS = 600_000;
+            const trabalho = (0, agent_1.executarAgente)(RAIZ, parsed.mensagem, {
+                agente: parsed.agente || 'revisor',
+                tarefa: parsed.tarefa || 'codigo'
+            });
+            const timeout = new Promise((_, rej) => {
+                setTimeout(() => rej(new Error('agente_executar timeout apos 600s')), TIMEOUT_MS);
+            });
+            try {
+                const r = await Promise.race([trabalho, timeout]);
+                const out = {
+                    ok: true,
+                    texto: r.texto,
+                    modeloUsado: r.modelo,
+                    tentativas: r.tentativas || [],
+                    duracaoMs: r.duracaoMs ?? 0
+                };
+                return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+            }
+            catch (e) {
+                const msg = e.message || String(e);
+                const out = {
+                    ok: false,
+                    texto: '',
+                    modeloUsado: '',
+                    tentativas: [],
+                    duracaoMs: 0,
+                    erro: msg
+                };
+                return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true };
+            }
         }
         throw new Error('tool desconhecida: ' + name);
     }

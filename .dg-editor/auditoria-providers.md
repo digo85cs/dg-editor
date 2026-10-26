@@ -66,3 +66,7 @@ Chave: apenas `OPENROUTER_API_KEY` em variavel de ambiente do usuario.
 | Local (Fase A) | qwen2.5-coder:7b | 214.6 s |
 | Online (Fase C) | deepseek/deepseek-chat | 15.6 s |
 | Failover auth | 7b local apos 401 | 112.7 s |
+- 2026-10-26T14:38:09.274Z | tarefa=chat | tentou=openrouter:gemini-flash-1.5 | motivo=outro: HTTP 404: {"error":{"message":"google/gemini-flash-1.5 is no longer available on OpenRouter: no provider serves this model anymore. See available models at http | resultado=falhou | 366ms
+- 2026-10-26T14:38:38.364Z | tarefa=chat | tentou=ollama:qwen2.5-coder:1.5b | motivo=ok modelo=qwen2.5-coder:1.5b | resultado=ok | 29083ms
+- 2026-10-26T14:38:41.259Z | tarefa=chat | tentou=openrouter:gemini-flash-1.5 | motivo=outro: HTTP 404: {"error":{"message":"google/gemini-flash-1.5 is no longer available on OpenRouter: no provider serves this model anymore. See available models at http | resultado=falhou | 125ms
+- 2026-10-26T14:40:36.167Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 18678ms

@@ -39,7 +39,12 @@ export function listarSkills(raiz: string): Skill[] {
   if (!fs.existsSync(dir)) return []
   return fs.readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
-    .map((f) => parseMd(f, fs.readFileSync(path.join(dir, f), 'utf8')))
+    .map((f) => {
+      const abs = path.join(dir, f)
+      const s = parseMd(f, fs.readFileSync(abs, 'utf8'))
+      s.arquivo = abs
+      return s
+    })
 }
 
 export function lerSkill(raiz: string, id: string): Skill | null {

@@ -61,10 +61,10 @@ function filaDeModelos(tarefa, _opcoes) {
     if (t === 'chat') {
         return [
             cfg({
-                id: 'openrouter:gemini-flash-1.5',
+                id: 'openrouter:gpt-4o-mini',
                 tipo: 'online',
                 formato: 'openai',
-                modelo: 'google/gemini-flash-1.5',
+                modelo: 'openai/gpt-4o-mini',
                 baseUrl: OPENROUTER_BASE,
                 apiKeyEnv: KEY_ENV,
                 numPredict: 512,

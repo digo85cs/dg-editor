@@ -14,6 +14,7 @@
   },
   "include": [
     "server.ts",
+    "client.ts",
     "../dossie.ts",
     "../paths.ts",
     "../chatstore.ts",
@@ -23,10 +24,13 @@
     "../brain/editar.ts",
     "../brain/skills.ts",
     "../brain/agentes.ts",
+    "../brain/agent.ts",
     "../brain/registry.ts",
     "../brain/ollama.ts",
     "../brain/providers.ts",
     "../brain/module.ts",
+    "../memory/hybrid.ts",
+    "../memory/embeddings.ts",
     "../dglog.ts"
   ]
 }

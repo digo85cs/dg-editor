@@ -40,7 +40,12 @@ function listarSkills(raiz) {
         return [];
     return fs_1.default.readdirSync(dir)
         .filter((f) => f.endsWith('.md'))
-        .map((f) => parseMd(f, fs_1.default.readFileSync(path_1.default.join(dir, f), 'utf8')));
+        .map((f) => {
+        const abs = path_1.default.join(dir, f);
+        const s = parseMd(f, fs_1.default.readFileSync(abs, 'utf8'));
+        s.arquivo = abs;
+        return s;
+    });
 }
 function lerSkill(raiz, id) {
     return listarSkills(raiz).find((s) => s.id === id || s.titulo === id) || null;
