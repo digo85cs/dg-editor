@@ -28,7 +28,11 @@ import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
 import { askOllama } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
-import { criarJanelaNavegador, fecharJanelaNavegador } from './navegador/janela'
+import {
+  criarJanelaNavegador,
+  fecharJanelaNavegador,
+  lerUltimaUrlNavegador
+} from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -88,7 +92,9 @@ function createWindow(): void {
 app.whenReady().then(() => {
   installPtBrMenu({
     onAbrirNavegador: () => {
-      criarJanelaNavegador('https://example.com')
+      const url = lerUltimaUrlNavegador() || 'about:blank'
+      dglog('[navegador] menu abrir url=' + url)
+      criarJanelaNavegador(url, { mostrar: true })
     }
   })
   bootSaudeIAs()
@@ -114,7 +120,10 @@ app.on('window-all-closed', () => {
 })
 
 ipcMain.handle('navegador:abrir', (_e, url?: string) => {
-  criarJanelaNavegador(url || 'https://example.com')
+  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
+  dglog('[navegador] ipc abrir url=' + dest)
+  // singleton: criarJanelaNavegador não cria segunda instância
+  criarJanelaNavegador(dest, { mostrar: true })
   return { ok: true }
 })
 

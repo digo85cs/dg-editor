@@ -383,7 +383,7 @@ async function despachar(req: IncomingMessage, res: ServerResponse): Promise<voi
       send(res, 400, { erro: 'url obrigatoria' })
       return
     }
-    if (!aberto) criarJanelaNavegador('about:blank')
+    if (!aberto) criarJanelaNavegador('about:blank', { mostrar: false })
     const r = await navegarPara(dest, 30_000)
     send(res, r.ok ? 200 : 504, r)
     return

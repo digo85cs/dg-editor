@@ -10,12 +10,63 @@ import {
   ipcMain,
   type WebContents
 } from 'electron'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { dglog } from '../dglog'
+import { projectStateDir, resolverRaizProjeto } from '../paths'
 
 const PARTITION = 'persist:dgnav'
 const CHROME_H = 52
+
+export type OpcoesJanelaNavegador = {
+  /** true = show+focus; false/ausente = permanece oculta (MCP/smoke) */
+  mostrar?: boolean
+}
+
+let chamadasCriacao = 0
+const timestampsCriacao: number[] = []
+
+function registrarChamadaCriacao(): void {
+  chamadasCriacao += 1
+  const agora = Date.now()
+  timestampsCriacao.push(agora)
+  while (timestampsCriacao.length && agora - timestampsCriacao[0] > 5000) {
+    timestampsCriacao.shift()
+  }
+  dglog(`[navegador] criarJanelaNavegador #${chamadasCriacao} (em5s=${timestampsCriacao.length})`)
+  if (timestampsCriacao.length > 20) {
+    dglog(
+      `[navegador] AVISO: criarJanelaNavegador chamada ${timestampsCriacao.length}x em 5s — possível loop`
+    )
+  }
+}
+
+function caminhoUltimaUrl(): string {
+  return join(projectStateDir(resolverRaizProjeto()), 'nav-ultima-url')
+}
+
+export function lerUltimaUrlNavegador(): string {
+  try {
+    const p = caminhoUltimaUrl()
+    if (!existsSync(p)) return 'about:blank'
+    const u = readFileSync(p, 'utf8').trim()
+    if (!u || u === 'about:blank' || u.startsWith('data:')) return 'about:blank'
+    return u
+  } catch {
+    return 'about:blank'
+  }
+}
+
+function salvarUltimaUrl(url: string): void {
+  try {
+    if (!url || url === 'about:blank' || url.startsWith('data:')) return
+    const p = caminhoUltimaUrl()
+    mkdirSync(join(p, '..'), { recursive: true })
+    writeFileSync(p, url, 'utf8')
+  } catch {
+    /* best-effort */
+  }
+}
 
 const CHROME_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -281,10 +332,27 @@ export async function navegarPara(url: string, timeoutMs = 30_000): Promise<{ ok
   })
 }
 
-export function criarJanelaNavegador(urlInicial = 'https://example.com'): BaseWindow {
+export function criarJanelaNavegador(
+  urlInicial?: string,
+  opts?: OpcoesJanelaNavegador
+): BaseWindow {
+  registrarChamadaCriacao()
+  const mostrar = opts?.mostrar === true
+  const destino =
+    urlInicial && urlInicial !== 'about:blank' ? urlInicial : urlInicial === 'about:blank' ? 'about:blank' : undefined
+
+  // Singleton: nunca criar segunda BaseWindow
   if (janela && !janela.isDestroyed()) {
-    focarJanela()
-    if (urlInicial) void navegarPara(urlInicial)
+    if (destino && destino !== 'about:blank') {
+      void contentView?.webContents.loadURL(destino)
+    } else if (destino === 'about:blank') {
+      void contentView?.webContents.loadURL('about:blank')
+    }
+    if (mostrar) {
+      if (!janela.isVisible()) janela.show()
+      janela.focus()
+    }
+    dglog(`[navegador] singleton reutilizado mostrar=${mostrar} url=${destino || '(mantém)'}`)
     return janela
   }
 
@@ -351,10 +419,12 @@ export function criarJanelaNavegador(urlInicial = 'https://example.com'): BaseWi
     emitirEstadoChrome()
   })
   wc.on('did-navigate', (_e, url) => {
+    salvarUltimaUrl(url)
     listeners.onNavigate?.(url)
     emitirEstadoChrome()
   })
   wc.on('did-navigate-in-page', (_e, url) => {
+    salvarUltimaUrl(url)
     listeners.onNavigate?.(url)
     emitirEstadoChrome()
   })
@@ -374,12 +444,19 @@ export function criarJanelaNavegador(urlInicial = 'https://example.com'): BaseWi
     chromeView = null
     contentView = null
     carregando = false
-    dglog('[navegador] painel fechado')
+    dglog('[navegador] painel fechado (refs null)')
   })
 
-  void wc.loadURL(urlInicial)
-  janela.show()
-  dglog('[navegador] painel aberto partition=' + PARTITION)
+  const urlLoad = destino || 'about:blank'
+  void wc.loadURL(urlLoad)
+  // NÃO chamar show() aqui — só se opts.mostrar === true
+  if (mostrar) {
+    janela.show()
+    janela.focus()
+  }
+  dglog(
+    `[navegador] painel criado partition=${PARTITION} mostrar=${mostrar} url=${urlLoad}`
+  )
   return janela
 }
 

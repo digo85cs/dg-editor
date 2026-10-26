@@ -71,9 +71,16 @@ Cap 30. Classes `css-<hash>` (build React) filtradas.
 #9  /screenshot PNG base64               PASS
 #10 /ler seletor inexistente → candidatos PASS
 #11 /clicar seletor+texto → candidatos   PASS
+#12 singleton: 2× criar = 1 BaseWindow, isVisible=false PASS
 ```
 
-`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **11/11** PASS.
+`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **12/12** PASS.
+
+### Singleton / show (fix 995ca02+)
+
+- `criarJanelaNavegador(url?, { mostrar? })` — uma só `BaseWindow`; `closed` zera refs.
+- Menu/IPC: `{ mostrar: true }` + última URL em `.dg-editor/nav-ultima-url`.
+- MCP/controle/smoke: `{ mostrar: false }` (navega sem aparecer).
 
 ## Como usar
 

@@ -32,8 +32,8 @@ export async function rodarSmokeESair(): Promise<void> {
   dglog(`[nav-smoke] token prefix=${prefixoTokenControle()}…`)
 
   try {
-    // 1+2: abrir example.com e status
-    criarJanelaNavegador('https://example.com')
+    // 1+2: abrir example.com e status (headless)
+    criarJanelaNavegador('https://example.com', { mostrar: false })
     await new Promise((r) => setTimeout(r, 2500))
     const st = await req('GET', '/status', undefined, token)
     const ok2 =
@@ -95,7 +95,7 @@ export async function rodarSmokeESair(): Promise<void> {
     })
 
     // 8: persistência de cookie (partition persist:dgnav)
-    criarJanelaNavegador('https://example.com')
+    criarJanelaNavegador('https://example.com', { mostrar: false })
     await new Promise((r) => setTimeout(r, 2000))
     const { session } = await import('electron')
     const sess = session.fromPartition('persist:dgnav')
@@ -178,6 +178,20 @@ export async function rodarSmokeESair(): Promise<void> {
       detalhe: JSON.stringify({
         seletor: { n: cand1.length, pedido: clicSel.json.seletorPedido },
         texto: { n: cand2.length, pedido: clicTxt.json.seletorPedido }
+      })
+    })
+
+    // 12: singleton — duas chamadas = mesma instância, sem show
+    const a = criarJanelaNavegador('about:blank', { mostrar: false })
+    const b = criarJanelaNavegador('https://example.com', { mostrar: false })
+    const ok12 = a === b && a.isVisible() === false && !a.isDestroyed()
+    resultados.push({
+      id: 12,
+      ok: ok12,
+      detalhe: JSON.stringify({
+        mesmaInstancia: a === b,
+        visible: a.isVisible(),
+        destroyed: a.isDestroyed()
       })
     })
   } catch (e) {
