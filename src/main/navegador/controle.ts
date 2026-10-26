@@ -126,20 +126,54 @@ async function handleLer(body: Json): Promise<Json> {
   if (!wc) return { erro: 'navegador fechado' }
   const modo = String(body.modo || 'texto')
   const seletor = body.seletor ? String(body.seletor) : null
+  const offsetRaw = body.offset != null ? Number(body.offset) : 0
+  const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : 0
+  const limitRaw = body.limit != null ? Number(body.limit) : null
 
   const script = `(() => {
     const modo = ${JSON.stringify(modo)};
     const seletor = ${JSON.stringify(seletor)};
     const CAP = ${CAP};
+    const offset = ${offset};
+    const limitIn = ${limitRaw === null ? 'null' : limitRaw};
     const root = seletor ? document.querySelector(seletor) : document.body;
     if (!root) return { ok: false, motivo: 'elemento nao encontrado', seletorPedido: seletor };
+
     if (modo === 'texto') {
-      const t = (root.innerText || '').slice(0, CAP);
-      return { ok: true, modo, texto: t, chars: t.length };
+      const full = (root.innerText || '').slice(0, CAP);
+      const lim = Math.min(limitIn == null ? 50000 : Math.max(0, Math.floor(limitIn)), CAP);
+      const slice = full.slice(offset, offset + lim);
+      const fim = offset + slice.length;
+      const truncado = fim < full.length;
+      return {
+        ok: true,
+        modo,
+        texto: slice,
+        chars: slice.length,
+        totalChars: full.length,
+        offset,
+        limit: lim,
+        truncado,
+        proximoOffset: truncado ? fim : null
+      };
     }
     if (modo === 'html') {
-      const h = (root.outerHTML || '').slice(0, CAP);
-      return { ok: true, modo, html: h, chars: h.length };
+      const full = (root.outerHTML || '').slice(0, CAP);
+      const lim = Math.min(limitIn == null ? 50000 : Math.max(0, Math.floor(limitIn)), CAP);
+      const slice = full.slice(offset, offset + lim);
+      const fim = offset + slice.length;
+      const truncado = fim < full.length;
+      return {
+        ok: true,
+        modo,
+        html: slice,
+        chars: slice.length,
+        totalChars: full.length,
+        offset,
+        limit: lim,
+        truncado,
+        proximoOffset: truncado ? fim : null
+      };
     }
     if (modo === 'links') {
       const links = [];
@@ -148,10 +182,27 @@ async function handleLer(body: Json): Promise<Json> {
         if (r.width === 0 && r.height === 0) return;
         links.push({ texto: (a.innerText || a.textContent || '').trim().slice(0, 200), href: a.href });
       });
-      return { ok: true, modo, links };
+      const lim = limitIn == null ? links.length : Math.max(0, Math.floor(limitIn));
+      const page = links.slice(offset, offset + lim);
+      const fim = offset + page.length;
+      const truncado = fim < links.length;
+      return {
+        ok: true,
+        modo,
+        links: page,
+        total: links.length,
+        offset,
+        limit: lim,
+        truncado,
+        proximoOffset: truncado ? fim : null
+      };
     }
     if (modo === 'tabela') {
+      const lim = Math.min(limitIn == null ? 500 : Math.max(0, Math.floor(limitIn)), 5000);
       const tabelas = [];
+      let maiorTotal = 0;
+      let algumTruncado = false;
+      let proxGlobal = null;
       (root.querySelectorAll ? root : document).querySelectorAll('table').forEach(table => {
         const rows = [];
         table.querySelectorAll('tr').forEach(tr => {
@@ -159,17 +210,41 @@ async function handleLer(body: Json): Promise<Json> {
           tr.querySelectorAll('th,td').forEach(td => cells.push((td.innerText || '').trim()));
           if (cells.length) rows.push(cells);
         });
-        if (rows.length) tabelas.push(rows);
+        if (!rows.length) return;
+        const totalLinhas = rows.length;
+        maiorTotal = Math.max(maiorTotal, totalLinhas);
+        const linhas = rows.slice(offset, offset + lim);
+        const fim = offset + linhas.length;
+        const truncado = fim < totalLinhas;
+        if (truncado) {
+          algumTruncado = true;
+          if (proxGlobal == null) proxGlobal = fim;
+        }
+        tabelas.push({ totalLinhas, offset, limit: lim, linhas });
       });
-      return { ok: true, modo, tabelas };
+      return {
+        ok: true,
+        modo,
+        tabelas,
+        totalLinhas: maiorTotal,
+        offset,
+        limit: lim,
+        truncado: algumTruncado,
+        proximoOffset: algumTruncado ? proxGlobal : null
+      };
     }
-    return { ok: false, motivo: 'modo invalido: ' + modo };
+    return { ok: false, motivo: 'modo invalido: ' + modo, truncado: false, proximoOffset: null };
   })()`
 
   const r = (await wc.executeJavaScript(script, true)) as Json
   if (r && r.ok === false && String(r.motivo || '').includes('elemento nao encontrado')) {
     const candidatos = await extrairCandidatos()
     return erroElementoNaoEncontrado(seletor || String(r.seletorPedido || ''), candidatos)
+  }
+  // garantir campos de paginação
+  if (r && r.ok === true) {
+    if (r.truncado === undefined) r.truncado = false
+    if (r.proximoOffset === undefined) r.proximoOffset = null
   }
   return r
 }

@@ -1,89 +1,53 @@
 # Navegador embutido — relatório
 
 **Branch:** `feat/navegador-embutido`  
-**Electron:** 33.2.1 (`BaseWindow` + `WebContentsView`; 28 não tinha a API)
+**Electron:** 33.2.1 (`BaseWindow` + `WebContentsView`)
 
-## O que foi criado
+## Peças
 
 | peça | caminho |
 |---|---|
-| Janela + WebContentsView | `src/main/navegador/janela.ts` |
-| Token local | `src/main/navegador/token.ts` → `.dg-editor/nav-token` |
-| Servidor de controle | `src/main/navegador/controle.ts` → `127.0.0.1:47821` |
-| Smoke | `src/main/navegador/smoke.ts` (`DG_NAV_SMOKE=1`) |
-| Cliente MCP | `src/main/mcp/navegador-client.ts` |
-| Tools MCP | `navegador_abrir/ler/clicar/preencher/baixar` em `server.ts` |
-| Menu | Arquivo / Sistemas → **Navegador** (`Ctrl+Shift+N`) |
-| Skill | `navegador-embutido.md` |
+| Janela singleton | `src/main/navegador/janela.ts` |
+| Controle HTTP | `127.0.0.1:47821` + `X-DG-Token` |
+| Downloads | sempre `.dg-editor/downloads/<timestamp>-<nome>` |
+| Tools MCP | `navegador_abrir/ler/clicar/preencher/baixar` |
 
-## Endpoints (POST JSON, exceto GET `/status`)
+## `/ler` com paginação
 
-Auth obrigatória: header `X-DG-Token` = conteúdo de `.dg-editor/nav-token`.
+Body: `{ modo, seletor?, offset?, limit? }`
 
-| método | path | função |
+| modo | offset/limit | default limit |
 |---|---|---|
-| GET | `/status` | `{ aberto, url, titulo, carregando, logado }` |
-| POST | `/abrir` | `{ url }` — navega (abre painel se preciso) |
-| POST | `/ler` | `{ modo, seletor? }` texto\|tabela\|links\|html (cap 200k) |
-| POST | `/clicar` | `{ seletor? , texto? }` |
-| POST | `/preencher` | `{ seletor, valor }` (setter nativo + events) |
-| POST | `/baixar` | `{ url? , seletor? }` → `.dg-editor/downloads/` |
-| POST | `/screenshot` | PNG base64 |
+| `texto` / `html` | caracteres | 50000 |
+| `tabela` | linhas | 500 |
+| `links` | itens | todos |
 
-Bind **somente** `127.0.0.1` (abort se for outro host).
-
-## Tools MCP
-
-Chamam o controle via HTTP local; se o app estiver fechado:  
-*"navegador do DG Editor não está aberto — abra o painel Navegador no app"*.
-
-## Partition
-
-`persist:dgnav` — cookies/localStorage em disco. Login é **manual** pelo usuário na view.
-
-## Fallback de seletores (`/clicar`, `/ler`)
-
-Quando seletor/texto não encontra elemento:
-
-```json
-{
-  "ok": false,
-  "motivo": "elemento nao encontrado",
-  "seletorPedido": "#nao-existe-xyz",
-  "candidatos": [{ "tipo": "interativo|estrutural", "tag": "a", "texto": "...", "seletor": "#id" }],
-  "dica": "reescolha o seletor a partir de candidatos[]"
-}
-```
-
-Cap 30. Classes `css-<hash>` (build React) filtradas.
+Resposta sempre inclui `truncado` e `proximoOffset`. Cap duro 200k chars.  
+Tabela: cada item em `tabelas[]` é `{ totalLinhas, offset, limit, linhas }`.
 
 ## Validações (DG_NAV_SMOKE=1)
 
 ```
-#1  janela aberta                        PASS
-#2  GET /status example.com              PASS
-#3  navegador_ler texto                  PASS
-#4  navegador_ler links (IANA)           PASS
-#5  preencher input httpbin              PASS
-#6  request sem token → 401              PASS
-#7  fechar painel → aberto:false/409     PASS
-#8  cookie persist:dgnav gravável        PASS
-#9  /screenshot PNG base64               PASS
-#10 /ler seletor inexistente → candidatos PASS
-#11 /clicar seletor+texto → candidatos   PASS
-#12 singleton: 2× criar = 1 BaseWindow, isVisible=false PASS
+#1  janela aberta                              PASS
+#2  GET /status example.com                    PASS
+#3  navegador_ler texto                        PASS
+#4  navegador_ler links (IANA)                 PASS
+#5  preencher input httpbin                    PASS
+#6  request sem token → 401                    PASS
+#7  fechar painel → aberto:false/409           PASS
+#8  cookie persist:dgnav                       PASS
+#9  /screenshot PNG                            PASS
+#10 /ler seletor inexistente → candidatos      PASS
+#11 /clicar seletor+texto → candidatos         PASS
+#12 singleton 2× criar, isVisible=false        PASS
+#13 download real em .dg-editor/downloads/     PASS
+#14 paginação /ler tabela (offset/limit)       PASS
 ```
 
-`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **12/12** PASS.
+`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **14/14** PASS.
 
-### Singleton / show (fix 995ca02+)
+## Singleton / show
 
-- `criarJanelaNavegador(url?, { mostrar? })` — uma só `BaseWindow`; `closed` zera refs.
-- Menu/IPC: `{ mostrar: true }` + última URL em `.dg-editor/nav-ultima-url`.
-- MCP/controle/smoke: `{ mostrar: false }` (navega sem aparecer).
-
-## Como usar
-
-1. Abrir DG Editor → **Arquivo → Navegador…**
-2. Logar manualmente no site desejado
-3. Agente MCP usa `navegador_ler` / `clicar` / etc. na sessão já autenticada
+- Menu/IPC: `{ mostrar: true }` + `.dg-editor/nav-ultima-url`
+- MCP/controle/smoke: `{ mostrar: false }`
+- `.gitignore`: `nav-token`, `nav-ultima-url`, `downloads/` (uma vez cada)

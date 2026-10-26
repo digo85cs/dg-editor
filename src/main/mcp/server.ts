@@ -204,12 +204,15 @@ const TOOLS = [
   },
   {
     name: 'navegador_ler',
-    description: 'Le conteudo da pagina atual do navegador embutido (texto|tabela|links|html).',
+    description:
+      'Le conteudo da pagina atual (texto|tabela|links|html). Paginação: offset/limit (texto=chars, tabela=linhas). Resposta inclui truncado e proximoOffset.',
     inputSchema: {
       type: 'object',
       properties: {
         modo: { type: 'string', enum: ['texto', 'tabela', 'links', 'html'] },
-        seletor: { type: 'string', description: 'CSS opcional para escopo' }
+        seletor: { type: 'string', description: 'CSS opcional para escopo' },
+        offset: { type: 'number', description: 'Inicio (chars em texto/html; linhas em tabela)' },
+        limit: { type: 'number', description: 'Tamanho da pagina (texto default 50000; tabela default 500)' }
       },
       required: []
     }
@@ -468,12 +471,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const parsed = z
         .object({
           modo: z.enum(['texto', 'tabela', 'links', 'html']).optional(),
-          seletor: z.string().optional()
+          seletor: z.string().optional(),
+          offset: z.number().optional(),
+          limit: z.number().optional()
         })
         .parse(args)
       const r = await chamarControle('POST', '/ler', {
         modo: parsed.modo || 'texto',
-        seletor: parsed.seletor
+        seletor: parsed.seletor,
+        offset: parsed.offset,
+        limit: parsed.limit
       })
       const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
       return {

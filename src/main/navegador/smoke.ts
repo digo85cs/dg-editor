@@ -3,11 +3,13 @@
  * Não imprime o token completo.
  */
 import { app } from 'electron'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
+import { isAbsolute, relative, resolve } from 'path'
 import { criarJanelaNavegador, fecharJanelaNavegador, estadoAtual } from './janela'
 import { NAV_HOST, NAV_PORT, prefixoTokenControle } from './controle'
 import { caminhoNavToken } from './token'
 import { dglog } from '../dglog'
+import { projectStateDir, resolverRaizProjeto } from '../paths'
 
 async function req(
   method: string,
@@ -192,6 +194,87 @@ export async function rodarSmokeESair(): Promise<void> {
         mesmaInstancia: a === b,
         visible: a.isVisible(),
         destroyed: a.isDestroyed()
+      })
+    })
+
+    // 13: download real → .dg-editor/downloads/ sem sobrescrever
+    criarJanelaNavegador('about:blank', { mostrar: false })
+    const downloadsDir = resolve(projectStateDir(resolverRaizProjeto()), 'downloads')
+    let urlUsada = 'https://httpbin.org/bytes/1024'
+    const urlDlFb =
+      'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
+    let dl1 = await req('POST', '/baixar', { url: urlUsada }, token)
+    if (!(dl1.status === 200 && dl1.json.ok === true && dl1.json.caminho)) {
+      urlUsada = urlDlFb
+      dl1 = await req('POST', '/baixar', { url: urlUsada }, token)
+    }
+    const caminho1 = String(dl1.json.caminho || '')
+    let ok13a = false
+    let size1 = 0
+    let mtime1 = 0
+    if (caminho1 && isAbsolute(caminho1) && existsSync(caminho1)) {
+      const st1 = statSync(caminho1)
+      size1 = st1.size
+      mtime1 = st1.mtimeMs
+      const rel = relative(downloadsDir, resolve(caminho1))
+      ok13a = size1 > 0 && !rel.startsWith('..') && !isAbsolute(rel)
+    }
+    await new Promise((r) => setTimeout(r, 800))
+    const dl2 = await req('POST', '/baixar', { url: urlUsada }, token)
+    const caminho2 = String(dl2.json.caminho || '')
+    const ok13b =
+      !!caminho2 &&
+      caminho2 !== caminho1 &&
+      existsSync(caminho2) &&
+      existsSync(caminho1) &&
+      statSync(caminho1).size === size1 &&
+      statSync(caminho1).mtimeMs <= mtime1 + 100
+    resultados.push({
+      id: 13,
+      ok: ok13a && ok13b && dl2.json.ok === true,
+      detalhe: JSON.stringify({
+        urlUsada,
+        caminho1,
+        caminho2,
+        size1,
+        size2: caminho2 && existsSync(caminho2) ? statSync(caminho2).size : 0,
+        mesmoNome: caminho1 === caminho2
+      })
+    })
+
+    // 14: paginação /ler modo tabela
+    await req('POST', '/abrir', { url: 'https://www.w3schools.com/html/html_tables.asp' }, token)
+    await new Promise((r) => setTimeout(r, 3500))
+    const tabAll = await req('POST', '/ler', { modo: 'tabela' }, token)
+    const totalLinhas = Number(tabAll.json.totalLinhas || 0)
+    const tab1 = await req('POST', '/ler', { modo: 'tabela', offset: 0, limit: 2 }, token)
+    const tabelas1 = (tab1.json.tabelas as Array<{ linhas?: unknown[] }>) || []
+    const linhas1 = (tabelas1[0] && tabelas1[0].linhas) || []
+    const prox = tab1.json.proximoOffset
+    const tab2 = await req(
+      'POST',
+      '/ler',
+      { modo: 'tabela', offset: prox, limit: 2 },
+      token
+    )
+    const tabelas2 = (tab2.json.tabelas as Array<{ linhas?: unknown[] }>) || []
+    const linhas2 = (tabelas2[0] && tabelas2[0].linhas) || []
+    const ok14 =
+      tabAll.status === 200 &&
+      totalLinhas > 0 &&
+      linhas1.length === 2 &&
+      prox != null &&
+      JSON.stringify(linhas1) !== JSON.stringify(linhas2) &&
+      linhas2.length > 0
+    resultados.push({
+      id: 14,
+      ok: ok14,
+      detalhe: JSON.stringify({
+        totalLinhas,
+        n1: linhas1.length,
+        n2: linhas2.length,
+        proximoOffset: prox,
+        truncado: tab1.json.truncado
       })
     })
   } catch (e) {
