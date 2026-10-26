@@ -25,6 +25,7 @@
     "../brain/agentes.ts",
     "../brain/registry.ts",
     "../brain/ollama.ts",
+    "../brain/providers.ts",
     "../brain/module.ts",
     "../dglog.ts"
   ]

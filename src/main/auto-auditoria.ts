@@ -261,7 +261,8 @@ async function checarModelos(): Promise<Achado[]> {
     const { escolherModelo, listModelos } = await import('./brain/ollama')
     const { listarRegistry, statsSelecao } = await import('./brain/registry')
     const instalados = await listModelos()
-    const escolhido = await escolherModelo('codigo')
+    // origem=auditoria: NAO conta no stats de pipeline (evita falso positivo do 14b)
+    const escolhido = await escolherModelo('codigo', { origem: 'auditoria' })
     const instaladoOk = instalados.some((d) => d === escolhido || d.startsWith(escolhido) || escolhido.startsWith(d.split(':')[0]))
 
     out.push({
@@ -310,15 +311,16 @@ async function checarModelos(): Promise<Achado[]> {
     const tem14 = instalados.some((d) => d.includes('14b'))
     const raiz = resolverRaizProjeto()
     const stats = statsSelecao(raiz)
-    const usos14 = Object.entries(stats.selecionados || {})
+    // So conta uso real de pipeline (exclui auditoria/teste)
+    const usos14 = Object.entries(stats.selecionadosPipeline || {})
       .filter(([k]) => k.includes('14b'))
       .reduce((s, [, n]) => s + n, 0)
     if (tem14 && usos14 === 0) {
       out.push({
         id: 'modelos:14b-parado',
         area: 'modelos',
-        titulo: 'qwen2.5-coder:14b instalado mas nunca selecionado',
-        detalhe: 'Use escolherModelo("codigo"|"raciocinio", { preferirQualidade: true }) ou pedido de analise profunda',
+        titulo: 'qwen2.5-coder:14b instalado mas nunca usado em pipeline',
+        detalhe: 'Contagem so pipeline (auditoria/teste excluidos). Fila raciocinio ou preferirQualidade.',
         severidade: 'warn',
         corrigivel: false,
         status: 'nao-aplicavel'
@@ -327,7 +329,7 @@ async function checarModelos(): Promise<Achado[]> {
       out.push({
         id: 'modelos:14b-usado',
         area: 'modelos',
-        titulo: '14b ja foi selecionado ' + usos14 + 'x',
+        titulo: '14b usado em pipeline ' + usos14 + 'x',
         severidade: 'ok',
         corrigivel: false,
         status: 'nao-aplicavel'
@@ -338,6 +340,86 @@ async function checarModelos(): Promise<Achado[]> {
       id: 'modelos:falha',
       area: 'modelos',
       titulo: 'Falha ao checar modelos',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
+async function checarProviders(): Promise<Achado[]> {
+  const out: Achado[] = []
+  try {
+    const { filaDeModelos, disponivel } = await import('./brain/registry')
+    const tarefas = ['codigo', 'raciocinio', 'chat'] as const
+    for (const t of tarefas) {
+      const fila = filaDeModelos(t)
+      const temLocal = fila.some((p) => p.tipo === 'local')
+      const semChave = fila.filter((p) => p.tipo === 'online' && !disponivel(p))
+      const comChave = fila.filter((p) => p.tipo === 'online' && disponivel(p))
+
+      out.push({
+        id: 'providers:fila-' + t,
+        area: 'providers',
+        titulo: 'Fila ' + t + ': ' + fila.length + ' entradas',
+        detalhe: fila
+          .map((p) => p.id + (disponivel(p) ? '[ok]' : '[sem-chave]'))
+          .join(', '),
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+
+      if (t === 'codigo' && !temLocal) {
+        out.push({
+          id: 'providers:codigo-sem-local',
+          area: 'providers',
+          titulo: 'Fila codigo sem provider local no fim (risco offline)',
+          severidade: 'erro',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      } else if (t === 'codigo' && temLocal) {
+        out.push({
+          id: 'providers:codigo-local-ok',
+          area: 'providers',
+          titulo: 'Fila codigo tem fallback local',
+          severidade: 'ok',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
+
+      if (semChave.length > 0) {
+        out.push({
+          id: 'providers:online-sem-chave-' + t,
+          area: 'providers',
+          titulo: semChave.length + ' provider(s) online sem chave (' + t + ')',
+          detalhe: semChave.map((p) => p.id + ' env=' + p.apiKeyEnv).join(', ') + ' (valor nunca logado)',
+          severidade: 'warn',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
+      if (comChave.length > 0) {
+        out.push({
+          id: 'providers:online-com-chave-' + t,
+          area: 'providers',
+          titulo: comChave.length + ' provider(s) online com chave presente (' + t + ')',
+          detalhe: comChave.map((p) => p.id).join(', '),
+          severidade: 'ok',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'providers:falha',
+      area: 'providers',
+      titulo: 'Falha ao checar providers',
       severidade: 'warn',
       corrigivel: false,
       status: 'falhou',
@@ -358,6 +440,7 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
   achados.push(...checarDependencias())
   achados.push(...(await checarOllama()))
   achados.push(...(await checarModelos()))
+  achados.push(...(await checarProviders()))
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined

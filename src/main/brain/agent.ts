@@ -3,15 +3,25 @@ import { montarContexto, blocoMemoria } from '../memory/hybrid'
 import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
 import { loadChat, appendChat } from '../chatstore'
-import { OLLAMA_URL, escolherModelo, ollamaHttpJson } from './ollama'
-import { limitesPorTarefa } from './registry'
+import { escolherModelo } from './ollama'
+import {
+  filaDeModelos,
+  disponivel,
+  appendFailoverLog,
+  type Tarefa
+} from './registry'
+import {
+  chamarProviderSharp,
+  ErroProvider,
+  type ProviderConfig,
+  type Message,
+  type ToolDef
+} from './providers'
 import { garantirSkillsPadrao, skillsRelevantes } from './skills'
 import { garantirAgentesPadrao } from './agentes'
 
 /**
- * Agente do DG Editor: modelo local (Ollama) + tools do MCP interno.
- * Loop de tool-calling no padrao OpenAI/Ollama.
- * Sem chamada externa: tudo em 127.0.0.1.
+ * Agente do DG Editor: fila hibrida (OpenRouter → Ollama) com failover.
  */
 
 const MAX_ITER = 6
@@ -31,13 +41,6 @@ export interface RespostaAgente {
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
-
-interface MensagemOllama {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string
-  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>
-  tool_name?: string
-}
 
 const SYSTEM = `Voce e o DG, agente interno do DG Editor.
 Voce opera o projeto localmente usando ferramentas (tools) do MCP interno.
@@ -233,15 +236,6 @@ function extrairPrimeiroBloco(
     }
   }
   return null
-}function toolsParaOllama(tools: McpTool[]): unknown[] {
-  return tools.map((t) => ({
-    type: 'function',
-    function: {
-      name: t.name,
-      description: t.description || t.name,
-      parameters: t.inputSchema || { type: 'object', properties: {} }
-    }
-  }))
 }
 
 function pareceJsonTool(texto: string): boolean {
@@ -284,17 +278,136 @@ async function finalizarAgente(
   return { texto: final, modelo, passos }
 }
 
+async function rodarLoopComProvider(
+  raiz: string,
+  pergunta: string,
+  cfg: ProviderConfig,
+  tools: McpTool[],
+  systemExtra: string
+): Promise<RespostaAgente> {
+  const mensagens: Message[] = [
+    { role: 'system', content: SYSTEM + systemExtra },
+    { role: 'user', content: pergunta }
+  ]
+  const toolDefs: ToolDef[] | undefined = tools.length
+    ? tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema
+      }))
+    : undefined
+
+  const passos: PassoAgente[] = []
+  const assinaturasFeitas = new Set<string>()
+  let pediuResumo = false
+  const labelModelo = cfg.modelo
+
+  for (let i = 0; i < MAX_ITER; i++) {
+    const jaUsouTool = passos.some((p) => p.tipo === 'tool')
+    if (jaUsouTool && !pediuResumo) {
+      mensagens.push({
+        role: 'user',
+        content:
+          'Com o resultado da tool acima, responda em portugues do Brasil, em linguagem natural. Nao emita JSON nem chame tools de novo.'
+      })
+      pediuResumo = true
+    }
+
+    const toolsAgora = !jaUsouTool ? toolDefs : undefined
+    const r = await chamarProviderSharp(cfg, mensagens, toolsAgora)
+
+    let chamadas = r.tool_calls.map((c) => ({
+      function: {
+        name: c.function.name,
+        arguments: normalizarArgs(c.function.arguments)
+      }
+    }))
+
+    dglog(
+      '[agente] iter=' + i + ' provider=' + cfg.id +
+      ' | tool_calls=' + chamadas.length +
+      ' | content=' + (r.content ? r.content.length + 'c' : 'vazio')
+    )
+
+    if (chamadas.length === 0 && r.content && !jaUsouTool) {
+      const extraido = extrairToolDoTexto(r.content, tools)
+      if (extraido) {
+        dglog('[agente] FALLBACK texto->tool: ' + extraido.nome)
+        chamadas = [{ function: { name: extraido.nome, arguments: extraido.args } }]
+        mensagens.push({
+          role: 'assistant',
+          content: r.content,
+          tool_calls: chamadas.map((c, idx) => ({
+            id: 'call_' + idx,
+            type: 'function',
+            function: {
+              name: c.function.name,
+              arguments: c.function.arguments
+            }
+          }))
+        })
+      }
+    }
+
+    if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(r.content || '')) {
+      dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
+      return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+    }
+
+    if (chamadas.length === 0) {
+      dglog('[agente] final apos ' + (i + 1) + ' iteracoes via ' + cfg.id)
+      return finalizarAgente(raiz, pergunta, labelModelo, r.content || '', passos)
+    }
+
+    if (r.tool_calls.length > 0) {
+      mensagens.push({
+        role: 'assistant',
+        content: r.content || '',
+        tool_calls: r.tool_calls.map((c, idx) => ({
+          id: 'call_' + idx,
+          type: 'function',
+          function: {
+            name: c.function.name,
+            arguments: c.function.arguments
+          }
+        }))
+      })
+    }
+
+    for (let ti = 0; ti < chamadas.length; ti++) {
+      const ch = chamadas[ti]
+      const nome = ch.function?.name || ''
+      const schemaDaTool = tools.find((t) => t.name === nome)?.inputSchema
+      const args = sanitizarArgs(normalizarArgs(ch.function?.arguments), schemaDaTool)
+      const sig = nome + '|' + JSON.stringify(args)
+      if (assinaturasFeitas.has(sig)) {
+        dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
+        return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+      }
+      assinaturasFeitas.add(sig)
+      dglog('[agente] tool ' + nome + ' ' + JSON.stringify(args).slice(0, 120))
+      const res = await chamarTool(nome, args)
+      passos.push({ tipo: 'tool', nome, args, resultado: res.texto })
+      mensagens.push({
+        role: 'tool',
+        tool_name: nome,
+        tool_call_id: 'call_' + ti,
+        name: nome,
+        content: res.texto.slice(0, 6000)
+      })
+    }
+  }
+
+  dglog('[agente] limite de iteracoes; sintetizando')
+  return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+}
+
 export async function executarAgente(
   raiz: string,
   pergunta: string,
   modeloForcado?: string
 ): Promise<RespostaAgente> {
-  const tarefa = 'codigo'
-  const lim = limitesPorTarefa(tarefa)
-  const modelo = modeloForcado || (await escolherModelo(tarefa, { pedido: pergunta }))
-  dglog('[agente] modelo=' + modelo + ' tarefa=' + tarefa +
-    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs)
-
+  const tarefa: Tarefa = 'codigo'
   garantirSkillsPadrao(raiz)
   garantirAgentesPadrao(raiz)
 
@@ -304,6 +417,7 @@ export async function executarAgente(
   const blocoSkills = skills.length
     ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
     : ''
+  const systemExtra = (memoria ? '\n\n' + memoria : '') + blocoSkills
 
   let tools: McpTool[] = []
   try {
@@ -313,108 +427,91 @@ export async function executarAgente(
     dglog('[agente] MCP indisponivel: ' + String(e))
   }
 
-  const mensagens: MensagemOllama[] = [
-    { role: 'system', content: SYSTEM + (memoria ? '\n\n' + memoria : '') + blocoSkills },
-    { role: 'user', content: pergunta }
-  ]
+  let fila: ProviderConfig[] = filaDeModelos(tarefa, { pedido: pergunta })
+  if (modeloForcado) {
+    fila = [
+      {
+        id: 'forcado:' + modeloForcado,
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: modeloForcado,
+        baseUrl: 'http://127.0.0.1:11434',
+        numPredict: 1024,
+        timeoutMs: 300_000
+      },
+      ...fila.filter((p) => p.modelo !== modeloForcado)
+    ]
+  }
 
-  const passos: PassoAgente[] = []
-  const assinaturasFeitas = new Set<string>()
-  let pediuResumo = false
+  const tentativas: Array<{ id: string; motivo: string }> = []
+  const maxTentativas = fila.length
 
-  for (let i = 0; i < MAX_ITER; i++) {
-    const jaUsouTool = passos.some((p) => p.tipo === 'tool')
-    const corpo: Record<string, unknown> = {
-      model: modelo,
-      messages: mensagens,
-      stream: false,
-      options: {
-        temperature: 0.3,
-        num_ctx: 8192,
-        num_predict: lim.num_predict
-      }
-    }
-    // Apos a primeira tool, nao oferece mais tools: forca linguagem natural.
-    if (tools.length > 0 && !jaUsouTool) corpo.tools = toolsParaOllama(tools)
-    if (jaUsouTool && !pediuResumo) {
-      mensagens.push({
-        role: 'user',
-        content: 'Com o resultado da tool acima, responda em portugues do Brasil, em linguagem natural. Nao emita JSON nem chame tools de novo.'
-      })
-      pediuResumo = true
+  for (let pi = 0; pi < maxTentativas; pi++) {
+    const cfg = fila[pi]
+    if (!disponivel(cfg)) {
+      const motivo = 'chave ausente (' + (cfg.apiKeyEnv || 'n/a') + ')'
+      dglog('[provider] tarefa=' + tarefa + ' tentou=' + cfg.id + ' motivo=' + motivo + ' resultado=falhou')
+      appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'pulado' })
+      tentativas.push({ id: cfg.id, motivo })
+      continue
     }
 
-    const r = (await ollamaHttpJson(OLLAMA_URL + '/api/chat', corpo, 'POST', lim.timeoutMs)) as {
-      message?: MensagemOllama
-      done?: boolean
-    }
-    const msg = r.message
-    if (!msg) throw new Error('resposta vazia do Ollama')
-
-    let chamadas = (msg.tool_calls || []).map((c) => ({
-      function: {
-        name: String((c as { function?: { name?: string } }).function?.name || ''),
-        arguments: normalizarArgs((c as { function?: { arguments?: unknown } }).function?.arguments)
-      }
-    })).filter((c) => c.function.name)
-
-    dglog('[agente] iter=' + i + ' | tool_calls=' + chamadas.length +
-      ' | content=' + (msg.content ? msg.content.length + 'c' : 'vazio'))
-
-    if (chamadas.length === 0 && msg.content && !jaUsouTool) {
-      const extraido = extrairToolDoTexto(msg.content, tools)
-      if (extraido) {
-        dglog('[agente] FALLBACK texto->tool: ' + extraido.nome)
-        chamadas = [{ function: { name: extraido.nome, arguments: extraido.args } }]
-        mensagens.push({
-          role: 'assistant',
-          content: msg.content,
-          tool_calls: chamadas
+    let retriesServer = 0
+    while (retriesServer < 2) {
+      const t0 = Date.now()
+      try {
+        dglog(
+          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+          ' motivo=tentativa resultado=...'
+        )
+        const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra)
+        const ms = Date.now() - t0
+        dglog(
+          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+          ' motivo=ok resultado=ok'
+        )
+        appendFailoverLog(raiz, {
+          tarefa,
+          tentou: cfg.id,
+          motivo: 'ok modelo=' + resp.modelo,
+          resultado: 'ok',
+          ms
         })
+        return resp
+      } catch (e) {
+        const ms = Date.now() - t0
+        const err = e instanceof ErroProvider
+          ? e
+          : new ErroProvider('outro', String(e), cfg.id)
+        const kind = err.kind
+        const motivo = kind + ': ' + err.message.slice(0, 160)
+        dglog(
+          '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+          ' motivo=' + motivo + ' resultado=falhou'
+        )
+        appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou', ms })
+        tentativas.push({ id: cfg.id, motivo })
+
+        if (kind === 'rate_limit' || kind === 'auth' || kind === 'timeout') {
+          break // pula para proximo da fila
+        }
+        if (kind === 'server' || kind === 'rede') {
+          retriesServer++
+          if (retriesServer < 2) {
+            dglog('[provider] retentativa no mesmo provider ' + cfg.id)
+            continue
+          }
+          break
+        }
+        break
       }
-    }
-
-    // Modelo insistiu em JSON de tool depois de ja ter resultado: sintetiza e fecha.
-    if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(msg.content || '')) {
-      dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
-      return finalizarAgente(raiz, pergunta, modelo, '', passos)
-    }
-
-    if (chamadas.length === 0) {
-      dglog('[agente] final apos ' + (i + 1) + ' iteracoes')
-      return finalizarAgente(raiz, pergunta, modelo, msg.content || '', passos)
-    }
-
-    if (msg.tool_calls && msg.tool_calls.length > 0) {
-      mensagens.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls })
-    }
-
-    for (const ch of chamadas) {
-      const nome = ch.function?.name || ''
-      const schemaDaTool = tools.find((t) => t.name === nome)?.inputSchema
-      const args = sanitizarArgs(
-        normalizarArgs(ch.function?.arguments),
-        schemaDaTool
-      )
-      const sig = nome + '|' + JSON.stringify(args)
-      if (assinaturasFeitas.has(sig)) {
-        dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
-        return finalizarAgente(raiz, pergunta, modelo, '', passos)
-      }
-      assinaturasFeitas.add(sig)
-      dglog('[agente] tool ' + nome + ' ' + JSON.stringify(args).slice(0, 120))
-      const res = await chamarTool(nome, args)
-      passos.push({ tipo: 'tool', nome, args, resultado: res.texto })
-      mensagens.push({
-        role: 'tool',
-        tool_name: nome,
-        content: res.texto.slice(0, 6000)
-      })
     }
   }
 
-  dglog('[agente] limite de iteracoes; sintetizando')
-  return finalizarAgente(raiz, pergunta, modelo, '', passos)
+  const lista = tentativas.map((t) => t.id + ' (' + t.motivo + ')').join('; ')
+  throw new Error(
+    'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')
+  )
 }
 
 export async function historico(raiz: string) {

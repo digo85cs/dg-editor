@@ -67,3 +67,9 @@ Timeout cancela via `AbortController` → `req.destroy()`.
   ]
 }
 ```
+
+## Atualizacao Fase B (2026-10-26)
+
+- Fila hibrida: online OpenRouter → local Ollama
+- Contagem 14b agora so selecionadosPipeline (auditoria/teste excluidos)
+- Bundle MD5: 71E65C2B6E2BBF5BCE676CB582481364

@@ -1,38 +1,45 @@
 /**
- * Registro de modelos (local Ollama + endpoints online opcionais).
- * escolherModelo(tarefa, opts) consulta este registry.
- *
- * Politica CPU (medicoes reais):
- *  1.5b 35.5 tok/s | 3b 18.8 | 7b 7.8 | 14b 3.8 | llama3.2 9.7
- * codigo → 7b padrao (teto pratico); 14b so com preferirQualidade
- * raciocinio → llama3.2; 14b se analise profunda / preferirQualidade
- * chat → 1.5b (mais rapido)
+ * Fila de providers por tarefa (online → local fallback).
+ * Entradas online sem chave ficam na fila com disponivel=false.
  */
 import { listModelos } from './ollama'
 import { dglog } from '../dglog'
 import fs from 'fs'
 import path from 'path'
+import {
+  type ProviderConfig,
+  disponivel as providerDisponivel
+} from './providers'
 
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'codigo' | 'raciocinio'
+export type Tarefa = TarefaModelo
 
 export interface ModeloReg {
   nome: string
   tipo: TipoModelo
   contexto: number
-  forca: number // 1-10
+  forca: number
   tarefas: TarefaModelo[]
   endpoint?: string
-  /** tok/s medido em CPU (referencia) */
   tokS?: number
 }
 
 export interface EscolherModeloOpts {
-  /** true → permite 14b em codigo/raciocinio */
   preferirQualidade?: boolean
-  /** texto do pedido para detectar "analise profunda" */
+  pedido?: string
+  /** 'pipeline' = uso real; 'auditoria'|'teste' = nao conta no stats de 14b */
+  origem?: 'pipeline' | 'auditoria' | 'teste'
+}
+
+export interface OpcoesFila {
+  preferirQualidade?: boolean
   pedido?: string
 }
+
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
+const OLLAMA_BASE = 'http://127.0.0.1:11434'
+const KEY_ENV = 'OPENROUTER_API_KEY'
 
 const REGISTRO_BASE: ModeloReg[] = [
   { nome: 'qwen2.5-coder:1.5b', tipo: 'local', contexto: 4096, forca: 3, tokS: 35.5, tarefas: ['chat', 'codigo'] },
@@ -42,16 +49,8 @@ const REGISTRO_BASE: ModeloReg[] = [
   { nome: 'llama3.2', tipo: 'local', contexto: 4096, forca: 5, tokS: 9.7, tarefas: ['chat', 'raciocinio'] }
 ]
 
-/** Preferencia de codigo em CPU: 7b > 3b > 1.5b; 14b so com override */
-const ORDEM_CODIGO = ['qwen2.5-coder:7b', 'qwen2.5-coder:3b', 'qwen2.5-coder:1.5b']
-const ORDEM_CODIGO_QUALIDADE = ['qwen2.5-coder:14b', 'qwen2.5-coder:7b', 'qwen2.5-coder:3b', 'qwen2.5-coder:1.5b']
-const ORDEM_CHAT = ['qwen2.5-coder:1.5b', 'qwen2.5-coder:3b', 'llama3.2']
-const ORDEM_RACIOCINIO = ['llama3.2', 'qwen2.5-coder:7b', 'qwen2.5-coder:3b']
-const ORDEM_RACIOCINIO_PROFUNDO = ['qwen2.5-coder:14b', 'qwen2.5-coder:7b', 'llama3.2']
-
 let extras: ModeloReg[] = []
 
-/** Contagem de selecoes por modelo (persistida) — para auditoria do 14b. */
 const STATS_FILE = '.dg-editor/modelos-stats.json'
 
 export function listarRegistry(): ModeloReg[] {
@@ -63,18 +62,136 @@ export function registrarModelo(m: ModeloReg): void {
   extras.push(m)
 }
 
-function normalizarTarefa(tarefa: string): TarefaModelo {
+export function normalizarTarefa(tarefa: string): TarefaModelo {
   const t = (tarefa || 'codigo').toLowerCase()
   if (t === 'chat' || t === 'simples') return 'chat'
   if (t === 'raciocinio' || t === 'estrategia') return 'raciocinio'
   return 'codigo'
 }
 
-function instalado(disponiveis: string[], nome: string): boolean {
-  return matchModelo(disponiveis, nome) !== null
+export function disponivel(cfg: ProviderConfig): boolean {
+  return providerDisponivel(cfg)
 }
 
-/** Resolve nome do registry para o tag real do Ollama (ex: llama3.2 → llama3.2:latest). */
+function cfg(
+  partial: Omit<ProviderConfig, 'numPredict' | 'timeoutMs'> & {
+    numPredict: number
+    timeoutMs: number
+  }
+): ProviderConfig {
+  return partial
+}
+
+/** Fila ordenada por tarefa. Online sem chave permanece (disponivel=false em runtime). */
+export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): ProviderConfig[] {
+  const t = normalizarTarefa(String(tarefa))
+
+  if (t === 'chat') {
+    return [
+      cfg({
+        id: 'openrouter:gemini-flash-1.5',
+        tipo: 'online',
+        formato: 'openai',
+        modelo: 'google/gemini-flash-1.5',
+        baseUrl: OPENROUTER_BASE,
+        apiKeyEnv: KEY_ENV,
+        numPredict: 512,
+        timeoutMs: 120_000
+      }),
+      cfg({
+        id: 'ollama:qwen2.5-coder:1.5b',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'qwen2.5-coder:1.5b',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 512,
+        timeoutMs: 120_000
+      })
+    ]
+  }
+
+  if (t === 'raciocinio') {
+    return [
+      cfg({
+        id: 'openrouter:llama-3.3-70b',
+        tipo: 'online',
+        formato: 'openai',
+        modelo: 'meta-llama/llama-3.3-70b-instruct',
+        baseUrl: OPENROUTER_BASE,
+        apiKeyEnv: KEY_ENV,
+        numPredict: 2048,
+        timeoutMs: 600_000
+      }),
+      cfg({
+        id: 'ollama:llama3.2',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'llama3.2:latest',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 2048,
+        timeoutMs: 600_000
+      }),
+      cfg({
+        id: 'ollama:qwen2.5-coder:14b',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'qwen2.5-coder:14b',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 2048,
+        timeoutMs: 600_000
+      })
+    ]
+  }
+
+  // codigo
+  return [
+    cfg({
+      id: 'openrouter:deepseek-chat',
+      tipo: 'online',
+      formato: 'openai',
+      modelo: 'deepseek/deepseek-chat',
+      baseUrl: OPENROUTER_BASE,
+      apiKeyEnv: KEY_ENV,
+      numPredict: 1024,
+      timeoutMs: 300_000
+    }),
+    cfg({
+      id: 'openrouter:qwen-2.5-coder-32b',
+      tipo: 'online',
+      formato: 'openai',
+      modelo: 'qwen/qwen-2.5-coder-32b-instruct',
+      baseUrl: OPENROUTER_BASE,
+      apiKeyEnv: KEY_ENV,
+      numPredict: 1024,
+      timeoutMs: 300_000
+    }),
+    cfg({
+      id: 'ollama:qwen2.5-coder:7b',
+      tipo: 'local',
+      formato: 'ollama',
+      modelo: 'qwen2.5-coder:7b',
+      baseUrl: OLLAMA_BASE,
+      numPredict: 1024,
+      timeoutMs: 300_000
+    }),
+    cfg({
+      id: 'ollama:qwen2.5-coder:3b',
+      tipo: 'local',
+      formato: 'ollama',
+      modelo: 'qwen2.5-coder:3b',
+      baseUrl: OLLAMA_BASE,
+      numPredict: 512,
+      timeoutMs: 180_000
+    })
+  ]
+}
+
+export function limitesPorTarefa(tarefa: string): { num_predict: number; timeoutMs: number } {
+  const fila = filaDeModelos(tarefa)
+  const local = fila.find((p) => p.tipo === 'local') || fila[0]
+  return { num_predict: local.numPredict, timeoutMs: local.timeoutMs }
+}
+
 function matchModelo(disponiveis: string[], pref: string): string | null {
   const exact = disponiveis.find((d) => d === pref)
   if (exact) return exact
@@ -82,116 +199,106 @@ function matchModelo(disponiveis: string[], pref: string): string | null {
   if (prefix) return prefix
   const base = pref.split(':')[0]
   const tag = pref.includes(':') ? pref.slice(pref.indexOf(':') + 1) : ''
-  const byTag = disponiveis.find((d) => {
-    if (d === base || d.startsWith(base + ':')) {
-      if (!tag) return true
-      const rest = d.slice(base.length + 1)
-      return rest === tag || rest.startsWith(tag)
-    }
-    return false
-  })
-  return byTag || null
+  return (
+    disponiveis.find((d) => {
+      if (d === base || d.startsWith(base + ':')) {
+        if (!tag) return true
+        const rest = d.slice(base.length + 1)
+        return rest === tag || rest.startsWith(tag)
+      }
+      return false
+    }) || null
+  )
 }
 
-function primeiroDisponivel(ordem: string[], disponiveis: string[]): string | null {
-  for (const pref of ordem) {
-    const hit = matchModelo(disponiveis, pref)
-    if (hit) return hit
-  }
-  return null
-}
-
-function pedidoProfundo(pedido?: string): boolean {
-  if (!pedido) return false
-  return /(analise profunda|an[aá]lise profunda|arquitet|estrat[eé]g|refator.*grande|auditoria completa|preferirQualidade|14b)/i.test(pedido)
-}
-
-function registrarSelecao(raiz: string, modelo: string, tarefa: TarefaModelo, motivo: string): void {
+function registrarSelecao(
+  raiz: string,
+  modelo: string,
+  tarefa: TarefaModelo,
+  motivo: string,
+  origem: 'pipeline' | 'auditoria' | 'teste' = 'pipeline'
+): void {
   try {
     const p = path.join(raiz, STATS_FILE)
     fs.mkdirSync(path.dirname(p), { recursive: true })
-    let data: { selecionados: Record<string, number>; ultimo: Record<string, string> } = {
-      selecionados: {},
-      ultimo: {}
-    }
+    let data: {
+      selecionados: Record<string, number>
+      selecionadosPipeline: Record<string, number>
+      ultimo: Record<string, string>
+    } = { selecionados: {}, selecionadosPipeline: {}, ultimo: {} }
     if (fs.existsSync(p)) {
-      try { data = JSON.parse(fs.readFileSync(p, 'utf8')) } catch { /* ignore */ }
+      try { data = { ...data, ...JSON.parse(fs.readFileSync(p, 'utf8')) } } catch { /* */ }
     }
+    if (!data.selecionadosPipeline) data.selecionadosPipeline = {}
     data.selecionados[modelo] = (data.selecionados[modelo] || 0) + 1
+    if (origem === 'pipeline') {
+      data.selecionadosPipeline[modelo] = (data.selecionadosPipeline[modelo] || 0) + 1
+    }
     data.ultimo[tarefa] = modelo
     data.ultimo.motivo = motivo
+    data.ultimo.origem = origem
     data.ultimo.em = new Date().toISOString()
     fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf8')
-  } catch { /* nao bloqueia */ }
+    dglog('[registry] selecao origem=' + origem + ' modelo=' + modelo + ' | ' + motivo)
+  } catch { /* */ }
 }
 
-export function statsSelecao(raiz: string): { selecionados: Record<string, number>; ultimo: Record<string, string> } {
+export function statsSelecao(raiz: string): {
+  selecionados: Record<string, number>
+  selecionadosPipeline: Record<string, number>
+  ultimo: Record<string, string>
+} {
   const p = path.join(raiz, STATS_FILE)
   try {
-    if (!fs.existsSync(p)) return { selecionados: {}, ultimo: {} }
-    return JSON.parse(fs.readFileSync(p, 'utf8'))
+    if (!fs.existsSync(p)) return { selecionados: {}, selecionadosPipeline: {}, ultimo: {} }
+    const data = JSON.parse(fs.readFileSync(p, 'utf8'))
+    return {
+      selecionados: data.selecionados || {},
+      selecionadosPipeline: data.selecionadosPipeline || {},
+      ultimo: data.ultimo || {}
+    }
   } catch {
-    return { selecionados: {}, ultimo: {} }
+    return { selecionados: {}, selecionadosPipeline: {}, ultimo: {} }
   }
 }
 
 /**
- * Escolhe modelo por tarefa.
- * Exposto tambem como escolherModelo em ollama.ts (mesma assinatura).
+ * Compat: retorna o primeiro provider disponivel da fila (local se online sem chave).
  */
 export async function escolherModeloPorTarefa(
   tarefa: TarefaModelo | string,
   opts: EscolherModeloOpts = {}
 ): Promise<string> {
   const t = normalizarTarefa(String(tarefa))
-  const disponiveis = await listModelos()
-  const qualidade = !!opts.preferirQualidade || (t === 'raciocinio' && pedidoProfundo(opts.pedido))
+  const fila = filaDeModelos(t, opts)
+  const origem = opts.origem || 'pipeline'
 
-  let ordem: string[]
-  let motivo: string
-
-  if (t === 'chat') {
-    ordem = ORDEM_CHAT
-    motivo = 'chat: mais rapido (1.5b ~35 tok/s)'
-  } else if (t === 'codigo') {
-    if (qualidade) {
-      ordem = ORDEM_CODIGO_QUALIDADE
-      motivo = 'codigo + preferirQualidade: 14b se disponivel'
-    } else {
-      ordem = ORDEM_CODIGO
-      motivo = 'codigo: 7b padrao (equilibrio 7.8 tok/s); 3b fallback'
+  for (const p of fila) {
+    if (!disponivel(p)) {
+      dglog('[registry] pula ' + p.id + ' (chave ausente)')
+      continue
     }
-  } else {
-    // raciocinio
-    if (qualidade) {
-      ordem = ORDEM_RACIOCINIO_PROFUNDO
-      motivo = 'raciocinio profundo: 14b se disponivel'
-    } else {
-      ordem = ORDEM_RACIOCINIO
-      motivo = 'raciocinio: llama3.2 padrao (~9.7 tok/s)'
+    if (p.tipo === 'local') {
+      const instalados = await listModelos()
+      const hit = matchModelo(instalados, p.modelo)
+      if (!hit) {
+        dglog('[registry] pula ' + p.id + ' (modelo nao instalado)')
+        continue
+      }
+      registrarSelecao(process.env.DG_ROOT || process.cwd(), hit, t, 'fila→' + p.id, origem)
+      return hit
     }
+    // online disponivel
+    registrarSelecao(process.env.DG_ROOT || process.cwd(), p.modelo, t, 'fila→' + p.id, origem)
+    return p.modelo
   }
 
-  let escolhido = primeiroDisponivel(ordem, disponiveis)
-  if (!escolhido) {
-    // fallback: qualquer do registry para a tarefa, por forca
-    const candidatos = listarRegistry()
-      .filter((m) => m.tipo === 'local' && m.tarefas.includes(t))
-      .filter((m) => instalado(disponiveis, m.nome))
-      .sort((a, b) => (t === 'chat' ? a.forca - b.forca : b.forca - a.forca))
-    escolhido = candidatos[0]
-      ? (disponiveis.find((d) => d === candidatos[0].nome || d.startsWith(candidatos[0].nome)) || candidatos[0].nome)
-      : (t === 'chat' ? 'qwen2.5-coder:1.5b' : 'qwen2.5-coder:7b')
-    motivo += ' | fallback registry'
-  }
-
-  dglog('[registry] escolherModelo tarefa=' + t + ' → ' + escolhido + ' | ' + motivo +
-    (qualidade ? ' | preferirQualidade' : ''))
-  registrarSelecao(process.env.DG_ROOT || process.cwd(), escolhido, t, motivo)
-  return escolhido
+  // fallback duro
+  const fb = t === 'chat' ? 'qwen2.5-coder:1.5b' : 'qwen2.5-coder:7b'
+  registrarSelecao(process.env.DG_ROOT || process.cwd(), fb, t, 'fallback duro', origem)
+  return fb
 }
 
-/** Alias pedido pelo spec da Fase A */
 export async function escolherModelo(
   tarefa: TarefaModelo | string = 'codigo',
   opts: EscolherModeloOpts = {}
@@ -199,9 +306,32 @@ export async function escolherModelo(
   return escolherModeloPorTarefa(tarefa, opts)
 }
 
-export function limitesPorTarefa(tarefa: string): { num_predict: number; timeoutMs: number } {
-  const t = normalizarTarefa(tarefa)
-  if (t === 'chat') return { num_predict: 512, timeoutMs: 120_000 }
-  if (t === 'raciocinio') return { num_predict: 2048, timeoutMs: 600_000 }
-  return { num_predict: 1024, timeoutMs: 300_000 }
+/** Historico de failover para auditoria-providers.md */
+export function appendFailoverLog(
+  raiz: string,
+  entrada: {
+    tarefa: string
+    tentou: string
+    motivo: string
+    resultado: 'ok' | 'falhou' | 'pulado'
+    ms?: number
+  }
+): void {
+  try {
+    const p = path.join(raiz, '.dg-editor', 'auditoria-providers.md')
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+    if (!fs.existsSync(p)) {
+      fs.writeFileSync(
+        p,
+        '# Auditoria de providers\n\nHistorico de failover (sem chaves).\n\n',
+        'utf8'
+      )
+    }
+    const linha =
+      `- ${new Date().toISOString()} | tarefa=${entrada.tarefa} | tentou=${entrada.tentou} | ` +
+      `motivo=${entrada.motivo} | resultado=${entrada.resultado}` +
+      (entrada.ms != null ? ` | ${entrada.ms}ms` : '') +
+      '\n'
+    fs.appendFileSync(p, linha, 'utf8')
+  } catch { /* */ }
 }
