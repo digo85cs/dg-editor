@@ -42,7 +42,10 @@ function registrarChamadaCriacao(): void {
 }
 
 function caminhoUltimaUrl(): string {
-  return join(projectStateDir(resolverRaizProjeto()), 'nav-ultima-url')
+  // smoke NÃO contamina a URL real do usuário
+  const nome =
+    process.env.DG_NAV_SMOKE === '1' ? 'nav-ultima-url.smoke' : 'nav-ultima-url'
+  return join(projectStateDir(resolverRaizProjeto()), nome)
 }
 
 export function lerUltimaUrlNavegador(): string {
@@ -301,7 +304,12 @@ export async function navegarPara(url: string, timeoutMs = 30_000): Promise<{ ok
   if (!contentView) return { ok: false, url: '', erro: 'navegador fechado' }
   const wc = contentView.webContents
   let destino = url.trim()
-  if (!/^https?:\/\//i.test(destino) && !destino.startsWith('about:')) {
+  if (
+    !/^https?:\/\//i.test(destino) &&
+    !destino.startsWith('about:') &&
+    !destino.startsWith('data:') &&
+    !destino.startsWith('file:')
+  ) {
     destino = 'https://' + destino
   }
   return new Promise((resolve) => {

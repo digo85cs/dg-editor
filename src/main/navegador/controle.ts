@@ -7,7 +7,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import type { DownloadItem, Event as ElectronEvent } from 'electron'
+import type { DownloadItem, Event as ElectronEvent, WebContents, WebFrameMain } from 'electron'
 import { projectStateDir, resolverRaizProjeto } from '../paths'
 import { dglog } from '../dglog'
 import {
@@ -20,6 +20,7 @@ import {
   forcarLayoutNavegador
 } from './janela'
 import { garantirNavToken } from './token'
+import { resolverCaminhoDownload } from './download-nome'
 
 export const NAV_HOST = '127.0.0.1'
 export const NAV_PORT = 47821
@@ -64,9 +65,73 @@ async function parseJson(req: IncomingMessage): Promise<Json> {
 }
 
 function downloadsDir(): string {
-  const d = join(projectStateDir(resolverRaizProjeto()), 'downloads')
+  const base = join(projectStateDir(resolverRaizProjeto()), 'downloads')
+  const d = process.env.DG_NAV_SMOKE === '1' ? join(base, '_smoke') : base
   if (!existsSync(d)) mkdirSync(d, { recursive: true })
   return d
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+type FrameInfo = { indice: number; url: string; nome: string }
+
+function listarFrames(wc: WebContents): FrameInfo[] {
+  try {
+    const main = wc.mainFrame
+    const frames = main.framesInSubtree || []
+    return frames.map((f, i) => ({
+      indice: i,
+      url: f.url || '',
+      nome: f.name || ''
+    }))
+  } catch {
+    return []
+  }
+}
+
+function resolverFrame(wc: WebContents, frame?: number | string): WebFrameMain | null {
+  try {
+    const main = wc.mainFrame
+    if (frame === undefined || frame === null || frame === '') return main
+    const frames = main.framesInSubtree || []
+    if (typeof frame === 'number') return frames[frame] || null
+    const s = String(frame)
+    return frames.find((f) => (f.url || '').includes(s) || (f.name || '').includes(s)) || null
+  } catch {
+    return null
+  }
+}
+
+async function execNoAlvo(
+  wc: WebContents,
+  script: string,
+  frame?: number | string
+): Promise<unknown> {
+  const alvo = resolverFrame(wc, frame)
+  if (!alvo) throw new Error('frame nao encontrado')
+  return alvo.executeJavaScript(script, true)
+}
+
+async function esperarSeletorNoAlvo(
+  wc: WebContents,
+  seletor: string,
+  timeoutMs: number,
+  frame?: number | string
+): Promise<boolean> {
+  const deadline = Date.now() + Math.max(0, timeoutMs)
+  const js = `!!document.querySelector(${JSON.stringify(seletor)})`
+  while (Date.now() < deadline) {
+    try {
+      const ok = (await execNoAlvo(wc, js, frame)) as boolean
+      if (ok) return true
+    } catch {
+      /* frame ainda carregando */
+    }
+    await sleep(200)
+  }
+  return false
 }
 
 /** Candidatos clicáveis/estruturais para o agente se auto-corrigir (cap 30). */
@@ -129,6 +194,54 @@ async function handleLer(body: Json): Promise<Json> {
   const offsetRaw = body.offset != null ? Number(body.offset) : 0
   const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : 0
   const limitRaw = body.limit != null ? Number(body.limit) : null
+  const frameSpec = body.frame as number | string | undefined
+  const esperarSel = body.esperarSeletor ? String(body.esperarSeletor) : ''
+  const esperarMs =
+    body.esperarTimeoutMs != null && Number.isFinite(Number(body.esperarTimeoutMs))
+      ? Math.floor(Number(body.esperarTimeoutMs))
+      : 10_000
+
+  if (frameSpec !== undefined && frameSpec !== null && frameSpec !== '') {
+    try {
+      const frames = wc.mainFrame.framesInSubtree || []
+      let hit = false
+      if (typeof frameSpec === 'number') hit = !!frames[frameSpec]
+      else {
+        hit = frames.some(
+          (f) =>
+            (f.url || '').includes(String(frameSpec)) ||
+            (f.name || '').includes(String(frameSpec))
+        )
+      }
+      if (!hit) {
+        return {
+          ok: false,
+          motivo: 'frame nao encontrado',
+          frame: frameSpec,
+          framesDisponiveis: listarFrames(wc)
+        }
+      }
+    } catch {
+      return {
+        ok: false,
+        motivo: 'frame nao encontrado',
+        frame: frameSpec,
+        framesDisponiveis: listarFrames(wc)
+      }
+    }
+  }
+
+  if (esperarSel) {
+    const okEsp = await esperarSeletorNoAlvo(wc, esperarSel, esperarMs, frameSpec)
+    if (!okEsp) {
+      return {
+        ok: false,
+        motivo: 'timeout esperarSeletor',
+        esperarSeletor: esperarSel,
+        framesDisponiveis: listarFrames(wc)
+      }
+    }
+  }
 
   const script = `(() => {
     const modo = ${JSON.stringify(modo)};
@@ -236,15 +349,62 @@ async function handleLer(body: Json): Promise<Json> {
     return { ok: false, motivo: 'modo invalido: ' + modo, truncado: false, proximoOffset: null };
   })()`
 
-  const r = (await wc.executeJavaScript(script, true)) as Json
+  let r: Json
+  try {
+    r = (await execNoAlvo(wc, script, frameSpec)) as Json
+  } catch (e) {
+    return {
+      ok: false,
+      motivo: String((e as Error).message || e),
+      framesDisponiveis: listarFrames(wc)
+    }
+  }
   if (r && r.ok === false && String(r.motivo || '').includes('elemento nao encontrado')) {
     const candidatos = await extrairCandidatos()
-    return erroElementoNaoEncontrado(seletor || String(r.seletorPedido || ''), candidatos)
+    const err = erroElementoNaoEncontrado(seletor || String(r.seletorPedido || ''), candidatos)
+    err.framesDisponiveis = listarFrames(wc)
+    return err
   }
   // garantir campos de paginação
   if (r && r.ok === true) {
     if (r.truncado === undefined) r.truncado = false
     if (r.proximoOffset === undefined) r.proximoOffset = null
+
+    // aviso SPA: texto curto mas página tem table/main
+    try {
+      const meta = (await execNoAlvo(
+        wc,
+        `({ len: (document.body && document.body.innerText || '').length, table: !!document.querySelector('table'), main: !!document.querySelector('main') })`,
+        frameSpec
+      )) as { len: number; table: boolean; main: boolean }
+      const textoLen =
+        typeof r.texto === 'string'
+          ? r.texto.length
+          : typeof r.totalLinhas === 'number'
+            ? Number(r.totalLinhas)
+            : meta.len
+      if (
+        (modo === 'texto' && textoLen < 50 && (meta.table || meta.main)) ||
+        (modo === 'tabela' && Number(r.totalLinhas || 0) === 0 && meta.table)
+      ) {
+        r.aviso =
+          'conteudo possivelmente nao renderizado — tente esperarSeletor'
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // se extração vazia e há iframes, listar
+    const vazio =
+      (modo === 'tabela' && Number(r.totalLinhas || 0) === 0) ||
+      (modo === 'texto' && String(r.texto || '').trim().length < 20)
+    if (vazio && (frameSpec === undefined || frameSpec === null || frameSpec === '')) {
+      const frames = listarFrames(wc)
+      if (frames.length) {
+        r.aviso = r.aviso || 'conteudo vazio no documento principal — tente frame'
+        r.framesDisponiveis = frames
+      }
+    }
   }
   return r
 }
@@ -255,6 +415,23 @@ async function handleClicar(body: Json): Promise<Json> {
   const seletor = body.seletor != null ? String(body.seletor) : ''
   const texto = body.texto != null ? String(body.texto) : ''
   const seletorPedido = seletor || (texto ? 'texto:' + texto : '')
+  const frameSpec = body.frame as number | string | undefined
+  const esperarSel = body.esperarSeletor ? String(body.esperarSeletor) : ''
+  const esperarMs =
+    body.esperarTimeoutMs != null && Number.isFinite(Number(body.esperarTimeoutMs))
+      ? Math.floor(Number(body.esperarTimeoutMs))
+      : 10_000
+
+  if (esperarSel) {
+    const okEsp = await esperarSeletorNoAlvo(wc, esperarSel, esperarMs, frameSpec)
+    if (!okEsp) {
+      return {
+        ok: false,
+        motivo: 'timeout esperarSeletor',
+        framesDisponiveis: listarFrames(wc)
+      }
+    }
+  }
 
   const script = `(() => {
     const seletor = ${JSON.stringify(seletor)};
@@ -286,10 +463,21 @@ async function handleClicar(body: Json): Promise<Json> {
     };
   })()`
 
-  const r = (await wc.executeJavaScript(script, true)) as Json
+  let r: Json
+  try {
+    r = (await execNoAlvo(wc, script, frameSpec)) as Json
+  } catch (e) {
+    return {
+      ok: false,
+      motivo: String((e as Error).message || e),
+      framesDisponiveis: listarFrames(wc)
+    }
+  }
   if (r && r.ok === false) {
     const candidatos = await extrairCandidatos()
-    return erroElementoNaoEncontrado(seletorPedido, candidatos)
+    const err = erroElementoNaoEncontrado(seletorPedido, candidatos)
+    err.framesDisponiveis = listarFrames(wc)
+    return err
   }
   return r
 }
@@ -344,8 +532,7 @@ async function handleBaixar(body: Json): Promise<Json> {
   if (!url) return { ok: false, motivo: 'informe url ou seletor com href/src' }
 
   const dir = downloadsDir()
-  const stamp = Date.now()
-  const nomeFallback = 'download-' + stamp
+  const nomeFallback = `download-${Date.now()}`
 
   return new Promise((resolve) => {
     const sess = wc.session
@@ -358,18 +545,36 @@ async function handleBaixar(body: Json): Promise<Json> {
     }, 60_000)
 
     const onWill = (_e: ElectronEvent, item: DownloadItem) => {
-      const filename = item.getFilename() || nomeFallback
-      const dest = join(dir, `${stamp}-${filename}`)
-      item.setSavePath(dest)
+      const nomeBruto = item.getFilename() || nomeFallback
+      const { caminho, nomeOriginal, nomeSalvo, renomeado } = resolverCaminhoDownload(
+        dir,
+        nomeBruto
+      )
+      item.setSavePath(caminho)
       item.once('done', (_ev, state) => {
         if (settled) return
         settled = true
         clearTimeout(timer)
         sess.removeListener('will-download', onWill)
         if (state === 'completed') {
-          resolve({ ok: true, caminho: dest, bytes: item.getTotalBytes(), filename })
+          resolve({
+            ok: true,
+            caminho,
+            bytes: item.getTotalBytes(),
+            nomeOriginal,
+            nomeSalvo,
+            renomeado,
+            filename: nomeSalvo
+          })
         } else {
-          resolve({ ok: false, motivo: 'download ' + state, caminho: dest })
+          resolve({
+            ok: false,
+            motivo: 'download ' + state,
+            caminho,
+            nomeOriginal,
+            nomeSalvo,
+            renomeado
+          })
         }
       })
     }
@@ -460,7 +665,28 @@ async function despachar(req: IncomingMessage, res: ServerResponse): Promise<voi
     }
     if (!aberto) criarJanelaNavegador('about:blank', { mostrar: false })
     const r = await navegarPara(dest, 30_000)
-    send(res, r.ok ? 200 : 504, r)
+    const esperarSel = body.esperarSeletor ? String(body.esperarSeletor) : ''
+    const esperarMs =
+      body.esperarTimeoutMs != null && Number.isFinite(Number(body.esperarTimeoutMs))
+        ? Math.floor(Number(body.esperarTimeoutMs))
+        : 10_000
+    if (r.ok && esperarSel) {
+      const wc = getContentWebContents()
+      if (wc) {
+        const okEsp = await esperarSeletorNoAlvo(wc, esperarSel, esperarMs)
+        if (!okEsp) {
+          send(res, 504, {
+            ok: false,
+            url: r.url,
+            erro: 'timeout esperarSeletor',
+            esperarSeletor: esperarSel,
+            framesDisponiveis: listarFrames(wc)
+          })
+          return
+        }
+      }
+    }
+    send(res, r.ok ? 200 : 504, { ...r, esperarSeletor: esperarSel || undefined })
     return
   }
 
