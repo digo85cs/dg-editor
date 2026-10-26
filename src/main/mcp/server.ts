@@ -19,6 +19,7 @@ import {
   executarAgente,
   profundidadeExecucaoAgente
 } from '../brain/agent'
+import { chamarControle } from './navegador-client'
 
 const RAIZ = resolverRaizProjeto()
 const VAULT = projectStateDir(RAIZ)
@@ -189,6 +190,64 @@ const TOOLS = [
         }
       },
       required: ['mensagem']
+    }
+  },
+  {
+    name: 'navegador_abrir',
+    description:
+      'Abre/navega URL no navegador embutido do DG Editor (WebContentsView, sessao persist:dgnav). Login e manual pelo usuario.',
+    inputSchema: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'URL absoluta (https://...)' } },
+      required: ['url']
+    }
+  },
+  {
+    name: 'navegador_ler',
+    description: 'Le conteudo da pagina atual do navegador embutido (texto|tabela|links|html).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        modo: { type: 'string', enum: ['texto', 'tabela', 'links', 'html'] },
+        seletor: { type: 'string', description: 'CSS opcional para escopo' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'navegador_clicar',
+    description: 'Clica elemento por seletor CSS ou texto exato de botao/link.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        seletor: { type: 'string' },
+        texto: { type: 'string' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'navegador_preencher',
+    description: 'Preenche input/textarea (compatível com React/Vue controlados).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        seletor: { type: 'string' },
+        valor: { type: 'string' }
+      },
+      required: ['seletor', 'valor']
+    }
+  },
+  {
+    name: 'navegador_baixar',
+    description: 'Baixa arquivo (url ou seletor com href/src) para .dg-editor/downloads/.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        seletor: { type: 'string' },
+        url: { type: 'string' }
+      },
+      required: []
     }
   }
 ]
@@ -392,6 +451,80 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           erro: msg
         }
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true }
+      }
+    }
+
+    if (name === 'navegador_abrir') {
+      const parsed = z.object({ url: z.string().min(1) }).parse(args)
+      const r = await chamarControle('POST', '/abrir', { url: parsed.url })
+      const err = r.status === 0 || r.status >= 400 || r.json.erro
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
+        isError: !!err
+      }
+    }
+
+    if (name === 'navegador_ler') {
+      const parsed = z
+        .object({
+          modo: z.enum(['texto', 'tabela', 'links', 'html']).optional(),
+          seletor: z.string().optional()
+        })
+        .parse(args)
+      const r = await chamarControle('POST', '/ler', {
+        modo: parsed.modo || 'texto',
+        seletor: parsed.seletor
+      })
+      const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
+        isError: !!err
+      }
+    }
+
+    if (name === 'navegador_clicar') {
+      const parsed = z
+        .object({ seletor: z.string().optional(), texto: z.string().optional() })
+        .parse(args)
+      if (!parsed.seletor && !parsed.texto) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ erro: 'informe seletor ou texto' }) }],
+          isError: true
+        }
+      }
+      const r = await chamarControle('POST', '/clicar', parsed)
+      const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
+        isError: !!err
+      }
+    }
+
+    if (name === 'navegador_preencher') {
+      const parsed = z.object({ seletor: z.string(), valor: z.string() }).parse(args)
+      const r = await chamarControle('POST', '/preencher', parsed)
+      const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
+        isError: !!err
+      }
+    }
+
+    if (name === 'navegador_baixar') {
+      const parsed = z
+        .object({ seletor: z.string().optional(), url: z.string().optional() })
+        .parse(args)
+      if (!parsed.seletor && !parsed.url) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ erro: 'informe seletor ou url' }) }],
+          isError: true
+        }
+      }
+      const r = await chamarControle('POST', '/baixar', parsed)
+      const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
+        isError: !!err
       }
     }
 
