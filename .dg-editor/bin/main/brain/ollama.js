@@ -34,13 +34,13 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OLLAMA_URL = void 0;
+exports.ollamaHttpJson = ollamaHttpJson;
 exports.detectarGpu = detectarGpu;
 exports.escolherModelo = escolherModelo;
 exports.ollamaPing = ollamaPing;
 exports.listModelos = listModelos;
 exports.getOllamaStatus = getOllamaStatus;
 exports.askOllama = askOllama;
-exports.ollamaHttpJson = httpJson;
 /**
  * Unico ponto de contato com o Ollama local.
  * URL, escolha de modelo e chat simples vivem aqui.
@@ -62,12 +62,21 @@ function loadDgConfig() {
         return {};
     }
 }
-function httpJson(url, corpo, method = 'POST', timeout = 120000) {
+/**
+ * POST/GET JSON com timeout real: AbortController cancela a request HTTP.
+ * (Node http.request + abort → req.destroy)
+ */
+function httpJson(url, corpo, method = 'POST', timeoutMs = 120000, signal) {
     return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(new Error('abort ollama'));
+            return;
+        }
         const dados = corpo === null ? null : Buffer.from(JSON.stringify(corpo), 'utf8');
+        let settled = false;
         const req = (0, http_1.request)(url, {
             method,
-            timeout,
+            timeout: timeoutMs,
             headers: dados
                 ? { 'Content-Type': 'application/json', 'Content-Length': dados.length }
                 : {}
@@ -75,6 +84,9 @@ function httpJson(url, corpo, method = 'POST', timeout = 120000) {
             const chunks = [];
             res.on('data', (c) => chunks.push(c));
             res.on('end', () => {
+                if (settled)
+                    return;
+                settled = true;
                 const txt = Buffer.concat(chunks).toString('utf8');
                 if (res.statusCode && res.statusCode >= 400) {
                     reject(new Error('HTTP ' + res.statusCode + ': ' + txt.slice(0, 200)));
@@ -88,12 +100,44 @@ function httpJson(url, corpo, method = 'POST', timeout = 120000) {
                 }
             });
         });
-        req.on('error', reject);
-        req.on('timeout', () => { req.destroy(new Error('timeout ollama')); });
+        const onAbort = () => {
+            if (settled)
+                return;
+            settled = true;
+            try {
+                req.destroy(new Error('abort ollama (AbortController)'));
+            }
+            catch { /* */ }
+            reject(new Error('timeout/abort ollama apos ' + timeoutMs + 'ms'));
+        };
+        if (signal) {
+            if (signal.aborted)
+                onAbort();
+            else
+                signal.addEventListener('abort', onAbort, { once: true });
+        }
+        req.on('error', (e) => {
+            if (settled)
+                return;
+            settled = true;
+            reject(e);
+        });
+        req.on('timeout', () => onAbort());
         if (dados)
             req.write(dados);
         req.end();
     });
+}
+/** Wrapper com AbortController: timeout cancela de fato a conexao. */
+async function ollamaHttpJson(url, corpo, method = 'POST', timeoutMs = 120000) {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+        return await httpJson(url, corpo, method, timeoutMs, ac.signal);
+    }
+    finally {
+        clearTimeout(timer);
+    }
 }
 function httpGet(path, timeoutMs = 5000) {
     return new Promise((resolve) => {
@@ -109,7 +153,7 @@ function httpGet(path, timeoutMs = 5000) {
 }
 async function detectarGpu() {
     try {
-        const r = (await httpJson(exports.OLLAMA_URL + '/api/ps', {}, 'POST', 5000).catch(() => null));
+        const r = (await ollamaHttpJson(exports.OLLAMA_URL + '/api/ps', {}, 'POST', 5000).catch(() => null));
         if (r && r.models && r.models.length > 0) {
             const vram = r.models.reduce((s, m) => s + (m.size_vram || 0), 0) / 1024 / 1024 / 1024;
             return vram > 0.5;
@@ -119,24 +163,14 @@ async function detectarGpu() {
     return false;
 }
 /**
- * Unica funcao de escolha de modelo do DG Editor.
- * Delegada ao registry (local + online declarado).
- * tarefa: chat | codigo | raciocinio | (legado: simples/analise/...)
+ * Unica API publica de escolha de modelo.
+ * NAO rebaixa 7b/14b para 3b em CPU — o 7b e o teto pratico medido.
  */
-async function escolherModelo(tarefa = 'codigo') {
+async function escolherModelo(tarefa = 'codigo', opts = {}) {
     const { escolherModeloPorTarefa } = await Promise.resolve().then(() => __importStar(require('./registry')));
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const os = require('os');
-    const livresGB = os.freemem() / 1024 / 1024 / 1024;
-    const gpu = await detectarGpu();
-    let escolhido = await escolherModeloPorTarefa(tarefa);
-    // Ajuste por hardware: sem GPU evita 7b/14b
-    if (!gpu && /:(7b|14b)/.test(escolhido)) {
-        escolhido = livresGB >= 6 ? 'qwen2.5-coder:3b' : 'qwen2.5-coder:1.5b';
-    }
-    else if (gpu && livresGB < 6 && /:(7b|14b)/.test(escolhido)) {
-        escolhido = 'qwen2.5-coder:3b';
-    }
+    const escolhido = await escolherModeloPorTarefa(tarefa, opts);
+    (0, dglog_1.dglog)('[ollama] escolherModelo(' + tarefa + ') = ' + escolhido +
+        (opts.preferirQualidade ? ' [preferirQualidade]' : ''));
     return escolhido;
 }
 function ollamaInstalado() {
@@ -181,11 +215,14 @@ async function getOllamaStatus() {
     };
 }
 /** Chat simples (sem tools) — usado por analyzer/chat IPC. */
-async function askOllama(prompt, context, tarefa = 'codigo') {
-    const model = await escolherModelo(tarefa);
-    (0, dglog_1.dglog)('[ollama] ask modelo=' + model + ' tarefa=' + tarefa);
+async function askOllama(prompt, context, tarefa = 'codigo', opts = {}) {
+    const { limitesPorTarefa } = await Promise.resolve().then(() => __importStar(require('./registry')));
+    const model = await escolherModelo(tarefa, opts);
+    const lim = limitesPorTarefa(tarefa);
+    (0, dglog_1.dglog)('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
+        ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs);
     const cfg = loadDgConfig();
-    const r = (await httpJson(exports.OLLAMA_URL + '/api/chat', {
+    const r = (await ollamaHttpJson(exports.OLLAMA_URL + '/api/chat', {
         model,
         messages: [
             {
@@ -196,7 +233,11 @@ async function askOllama(prompt, context, tarefa = 'codigo') {
         ],
         stream: false,
         keep_alive: cfg.ollama?.keepAlive || '30s',
-        options: { num_ctx: 8192, temperature: 0.3 }
-    }));
+        options: {
+            num_ctx: 8192,
+            temperature: 0.3,
+            num_predict: lim.num_predict
+        }
+    }, 'POST', lim.timeoutMs));
     return { text: r.message?.content || '', provider: 'ollama', model };
 }

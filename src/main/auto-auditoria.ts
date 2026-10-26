@@ -255,6 +255,98 @@ async function autoAtualizar(): Promise<Achado> {
   }
 }
 
+async function checarModelos(): Promise<Achado[]> {
+  const out: Achado[] = []
+  try {
+    const { escolherModelo, listModelos } = await import('./brain/ollama')
+    const { listarRegistry, statsSelecao } = await import('./brain/registry')
+    const instalados = await listModelos()
+    const escolhido = await escolherModelo('codigo')
+    const instaladoOk = instalados.some((d) => d === escolhido || d.startsWith(escolhido) || escolhido.startsWith(d.split(':')[0]))
+
+    out.push({
+      id: 'modelos:codigo-instalado',
+      area: 'modelos',
+      titulo: instaladoOk
+        ? 'escolherModelo(codigo)=' + escolhido + ' esta instalado'
+        : 'escolherModelo(codigo)=' + escolhido + ' NAO instalado',
+      detalhe: 'instalados: ' + instalados.slice(0, 8).join(', '),
+      severidade: instaladoOk ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+
+    // Mais forte disponivel para codigo no registry
+    const candidatos = listarRegistry()
+      .filter((m) => m.tipo === 'local' && m.tarefas.includes('codigo'))
+      .filter((m) => instalados.some((d) => d === m.nome || d.startsWith(m.nome)))
+      .sort((a, b) => b.forca - a.forca)
+    const maisForte = candidatos[0]
+    const regEscolhido = listarRegistry().find((m) => escolhido === m.nome || escolhido.startsWith(m.nome))
+    if (maisForte && regEscolhido && regEscolhido.forca < maisForte.forca - 2) {
+      // 7b (7) vs 14b (9) = diff 2 → nao alerta (7b e o padrao intencional)
+      // 3b (5) vs 14b (9) = diff 4 → alerta
+      out.push({
+        id: 'modelos:codigo-fraco',
+        area: 'modelos',
+        titulo: 'Modelo de codigo mais fraco que o teto disponivel',
+        detalhe: 'escolhido=' + escolhido + ' (forca ' + regEscolhido.forca + ') vs maisForte=' + maisForte.nome + ' (forca ' + maisForte.forca + '). Padrao e 7b; use preferirQualidade para 14b.',
+        severidade: regEscolhido.forca < 7 ? 'warn' : 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      out.push({
+        id: 'modelos:codigo-equilibrio',
+        area: 'modelos',
+        titulo: 'Politica codigo OK (7b padrao / 14b sob demanda)',
+        detalhe: 'escolhido=' + escolhido + (maisForte ? ' | teto=' + maisForte.nome : ''),
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+
+    const tem14 = instalados.some((d) => d.includes('14b'))
+    const raiz = resolverRaizProjeto()
+    const stats = statsSelecao(raiz)
+    const usos14 = Object.entries(stats.selecionados || {})
+      .filter(([k]) => k.includes('14b'))
+      .reduce((s, [, n]) => s + n, 0)
+    if (tem14 && usos14 === 0) {
+      out.push({
+        id: 'modelos:14b-parado',
+        area: 'modelos',
+        titulo: 'qwen2.5-coder:14b instalado mas nunca selecionado',
+        detalhe: 'Use escolherModelo("codigo"|"raciocinio", { preferirQualidade: true }) ou pedido de analise profunda',
+        severidade: 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else if (tem14) {
+      out.push({
+        id: 'modelos:14b-usado',
+        area: 'modelos',
+        titulo: '14b ja foi selecionado ' + usos14 + 'x',
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'modelos:falha',
+      area: 'modelos',
+      titulo: 'Falha ao checar modelos',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
 async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{ achados: Achado[]; reiniciarPendente: boolean; motivoReinicio?: string }> {
   const achados: Achado[] = []
   achados.push(garantirPasta(DIR_DADOS))
@@ -265,6 +357,7 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
   achados.push(...limparTemporarios())
   achados.push(...checarDependencias())
   achados.push(...(await checarOllama()))
+  achados.push(...(await checarModelos()))
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined

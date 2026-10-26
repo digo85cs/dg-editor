@@ -3,11 +3,12 @@
  * URL, escolha de modelo e chat simples vivem aqui.
  */
 import { execSync } from 'child_process'
-import { request } from 'http'
+import { request, type ClientRequest } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { dglog } from '../dglog'
 import type { BrainResponse, OllamaStatus } from '@shared/types'
+import type { EscolherModeloOpts } from './registry'
 
 export const OLLAMA_URL = 'http://127.0.0.1:11434'
 
@@ -21,14 +22,29 @@ function loadDgConfig(): DgConfig {
   try { return JSON.parse(readFileSync(p, 'utf-8')) as DgConfig } catch { return {} }
 }
 
-function httpJson(url: string, corpo: unknown | null, method = 'POST', timeout = 120000): Promise<unknown> {
+/**
+ * POST/GET JSON com timeout real: AbortController cancela a request HTTP.
+ * (Node http.request + abort → req.destroy)
+ */
+function httpJson(
+  url: string,
+  corpo: unknown | null,
+  method = 'POST',
+  timeoutMs = 120000,
+  signal?: AbortSignal
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('abort ollama'))
+      return
+    }
     const dados = corpo === null ? null : Buffer.from(JSON.stringify(corpo), 'utf8')
-    const req = request(
+    let settled = false
+    const req: ClientRequest = request(
       url,
       {
         method,
-        timeout,
+        timeout: timeoutMs,
         headers: dados
           ? { 'Content-Type': 'application/json', 'Content-Length': dados.length }
           : {}
@@ -37,6 +53,8 @@ function httpJson(url: string, corpo: unknown | null, method = 'POST', timeout =
         const chunks: Buffer[] = []
         res.on('data', (c: Buffer) => chunks.push(c))
         res.on('end', () => {
+          if (settled) return
+          settled = true
           const txt = Buffer.concat(chunks).toString('utf8')
           if (res.statusCode && res.statusCode >= 400) {
             reject(new Error('HTTP ' + res.statusCode + ': ' + txt.slice(0, 200)))
@@ -46,11 +64,44 @@ function httpJson(url: string, corpo: unknown | null, method = 'POST', timeout =
         })
       }
     )
-    req.on('error', reject)
-    req.on('timeout', () => { req.destroy(new Error('timeout ollama')) })
+
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      try { req.destroy(new Error('abort ollama (AbortController)')) } catch { /* */ }
+      reject(new Error('timeout/abort ollama apos ' + timeoutMs + 'ms'))
+    }
+    if (signal) {
+      if (signal.aborted) onAbort()
+      else signal.addEventListener('abort', onAbort, { once: true })
+    }
+
+    req.on('error', (e) => {
+      if (settled) return
+      settled = true
+      reject(e)
+    })
+    req.on('timeout', () => onAbort())
+
     if (dados) req.write(dados)
     req.end()
   })
+}
+
+/** Wrapper com AbortController: timeout cancela de fato a conexao. */
+export async function ollamaHttpJson(
+  url: string,
+  corpo: unknown | null,
+  method = 'POST',
+  timeoutMs = 120000
+): Promise<unknown> {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), timeoutMs)
+  try {
+    return await httpJson(url, corpo, method, timeoutMs, ac.signal)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function httpGet(path: string, timeoutMs = 5000): Promise<{ status: number; body: string }> {
@@ -72,7 +123,7 @@ function httpGet(path: string, timeoutMs = 5000): Promise<{ status: number; body
 
 export async function detectarGpu(): Promise<boolean> {
   try {
-    const r = (await httpJson(OLLAMA_URL + '/api/ps', {}, 'POST', 5000).catch(() => null)) as
+    const r = (await ollamaHttpJson(OLLAMA_URL + '/api/ps', {}, 'POST', 5000).catch(() => null)) as
       | { models?: Array<{ size_vram?: number }> }
       | null
     if (r && r.models && r.models.length > 0) {
@@ -84,26 +135,21 @@ export async function detectarGpu(): Promise<boolean> {
 }
 
 /**
- * Unica funcao de escolha de modelo do DG Editor.
- * Delegada ao registry (local + online declarado).
- * tarefa: chat | codigo | raciocinio | (legado: simples/analise/...)
+ * Unica API publica de escolha de modelo.
+ * NAO rebaixa 7b/14b para 3b em CPU — o 7b e o teto pratico medido.
  */
-export async function escolherModelo(tarefa: string = 'codigo'): Promise<string> {
+export async function escolherModelo(
+  tarefa: string = 'codigo',
+  opts: EscolherModeloOpts = {}
+): Promise<string> {
   const { escolherModeloPorTarefa } = await import('./registry')
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const os = require('os') as { freemem(): number }
-  const livresGB = os.freemem() / 1024 / 1024 / 1024
-  const gpu = await detectarGpu()
-  let escolhido = await escolherModeloPorTarefa(tarefa)
-
-  // Ajuste por hardware: sem GPU evita 7b/14b
-  if (!gpu && /:(7b|14b)/.test(escolhido)) {
-    escolhido = livresGB >= 6 ? 'qwen2.5-coder:3b' : 'qwen2.5-coder:1.5b'
-  } else if (gpu && livresGB < 6 && /:(7b|14b)/.test(escolhido)) {
-    escolhido = 'qwen2.5-coder:3b'
-  }
+  const escolhido = await escolherModeloPorTarefa(tarefa, opts)
+  dglog('[ollama] escolherModelo(' + tarefa + ') = ' + escolhido +
+    (opts.preferirQualidade ? ' [preferirQualidade]' : ''))
   return escolhido
 }
+
+export { type EscolherModeloOpts }
 
 function ollamaInstalado(): boolean {
   try {
@@ -149,25 +195,36 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
 export async function askOllama(
   prompt: string,
   context: string,
-  tarefa: string = 'codigo'
+  tarefa: string = 'codigo',
+  opts: EscolherModeloOpts = {}
 ): Promise<BrainResponse> {
-  const model = await escolherModelo(tarefa)
-  dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa)
+  const { limitesPorTarefa } = await import('./registry')
+  const model = await escolherModelo(tarefa, opts)
+  const lim = limitesPorTarefa(tarefa)
+  dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
+    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs)
   const cfg = loadDgConfig()
-  const r = (await httpJson(OLLAMA_URL + '/api/chat', {
-    model,
-    messages: [
-      {
-        role: 'system',
-        content: 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.'
-      },
-      { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
-    ],
-    stream: false,
-    keep_alive: cfg.ollama?.keepAlive || '30s',
-    options: { num_ctx: 8192, temperature: 0.3 }
-  })) as { message?: { content?: string } }
+  const r = (await ollamaHttpJson(
+    OLLAMA_URL + '/api/chat',
+    {
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.'
+        },
+        { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
+      ],
+      stream: false,
+      keep_alive: cfg.ollama?.keepAlive || '30s',
+      options: {
+        num_ctx: 8192,
+        temperature: 0.3,
+        num_predict: lim.num_predict
+      }
+    },
+    'POST',
+    lim.timeoutMs
+  )) as { message?: { content?: string } }
   return { text: r.message?.content || '', provider: 'ollama', model }
 }
-
-export { httpJson as ollamaHttpJson }

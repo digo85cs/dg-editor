@@ -4,6 +4,7 @@ import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
 import { loadChat, appendChat } from '../chatstore'
 import { OLLAMA_URL, escolherModelo, ollamaHttpJson } from './ollama'
+import { limitesPorTarefa } from './registry'
 import { garantirSkillsPadrao, skillsRelevantes } from './skills'
 import { garantirAgentesPadrao } from './agentes'
 
@@ -288,8 +289,11 @@ export async function executarAgente(
   pergunta: string,
   modeloForcado?: string
 ): Promise<RespostaAgente> {
-  const modelo = modeloForcado || (await escolherModelo('codigo'))
-  dglog('[agente] modelo=' + modelo)
+  const tarefa = 'codigo'
+  const lim = limitesPorTarefa(tarefa)
+  const modelo = modeloForcado || (await escolherModelo(tarefa, { pedido: pergunta }))
+  dglog('[agente] modelo=' + modelo + ' tarefa=' + tarefa +
+    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs)
 
   garantirSkillsPadrao(raiz)
   garantirAgentesPadrao(raiz)
@@ -324,7 +328,11 @@ export async function executarAgente(
       model: modelo,
       messages: mensagens,
       stream: false,
-      options: { temperature: 0.3, num_ctx: 8192 }
+      options: {
+        temperature: 0.3,
+        num_ctx: 8192,
+        num_predict: lim.num_predict
+      }
     }
     // Apos a primeira tool, nao oferece mais tools: forca linguagem natural.
     if (tools.length > 0 && !jaUsouTool) corpo.tools = toolsParaOllama(tools)
@@ -336,7 +344,7 @@ export async function executarAgente(
       pediuResumo = true
     }
 
-    const r = (await ollamaHttpJson(OLLAMA_URL + '/api/chat', corpo, 'POST', 180000)) as {
+    const r = (await ollamaHttpJson(OLLAMA_URL + '/api/chat', corpo, 'POST', lim.timeoutMs)) as {
       message?: MensagemOllama
       done?: boolean
     }
