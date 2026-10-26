@@ -47,3 +47,6 @@ dossie-tecnico.md
 
 # Build do servidor MCP (gerado por build:mcp)
 .dg-editor/bin/
+
+# telemetria de runtime (nao versionar)
+.dg-editor/modelos-stats.json
