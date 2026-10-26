@@ -1,29 +1,29 @@
 {
-    "name":  "dg-editor",
-    "version":  "0.2.0",
-    "description":  "DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)",
-    "main":  "out/main/index.js",
-    "scripts":  {
-                    "dev":  "electron-vite preview",
-                    "build":  "electron-vite build",
-                    "preview":  "electron-vite preview",
-                    "start":  "electron-vite preview",
-                    "test":  "node test/validator.cjs",
-                    "typecheck":  "tsc --noEmit",
-                    "build:mcp":  "tsc -p src/main/mcp/tsconfig.mcp.json",
-                    "mcp":  "npm run build:mcp \u0026\u0026 node .dg-editor\\bin\\main\\mcp\\server.js",
-                    "indice":  "node scripts/gerar-indice.cjs",
-                    "prebuild":  "npm run build:mcp"
-                },
-    "dependencies":  {
-                         "@modelcontextprotocol/sdk":  "^1.32.2",
-                         "zod":  "^4.6.7"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^20.11.0",
-                            "electron":  "^28.2.0",
-                            "electron-vite":  "^2.1.0",
-                            "esbuild":  "^0.20.0",
-                            "typescript":  "^5.3.3"
-                        }
+    "name": "dg-editor",
+    "version": "0.2.0",
+    "description": "DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)",
+    "main": "out/main/index.js",
+    "scripts": {
+        "dev": "electron-vite preview",
+        "build": "electron-vite build",
+        "preview": "electron-vite preview",
+        "start": "electron-vite preview",
+        "test": "node test/validator.cjs",
+        "typecheck": "tsc --noEmit",
+        "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
+        "mcp": "npm run build:mcp && node .dg-editor\\bin\\main\\mcp\\server.js",
+        "indice": "node scripts/gerar-indice.cjs",
+        "prebuild": "npm run build:mcp"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.32.2",
+        "zod": "^4.6.7"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "electron": "^33.2.1",
+        "electron-vite": "^2.1.0",
+        "esbuild": "^0.20.0",
+        "typescript": "^5.3.3"
+    }
 }
