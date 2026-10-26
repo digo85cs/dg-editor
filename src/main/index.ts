@@ -28,6 +28,12 @@ import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
 import { askOllama } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
+import {
+  criarJanelaNavegador,
+  fecharJanelaNavegador,
+  lerUltimaUrlNavegador
+} from './navegador/janela'
+import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -84,8 +90,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  installPtBrMenu()
+  installPtBrMenu({
+    onAbrirNavegador: () => {
+      const url = lerUltimaUrlNavegador() || 'about:blank'
+      dglog('[navegador] menu abrir url=' + url)
+      criarJanelaNavegador(url, { mostrar: true })
+    }
+  })
   bootSaudeIAs()
+  iniciarControleNavegador()
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
@@ -93,10 +106,25 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Smoke headless do navegador embutido (DG_NAV_SMOKE=1)
+  if (process.env.DG_NAV_SMOKE === '1') {
+    void import('./navegador/smoke').then((m) => m.rodarSmokeESair())
+  }
 })
 
 app.on('window-all-closed', () => {
+  pararControleNavegador()
+  fecharJanelaNavegador()
   if (process.platform !== 'darwin') app.quit()
+})
+
+ipcMain.handle('navegador:abrir', (_e, url?: string) => {
+  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
+  dglog('[navegador] ipc abrir url=' + dest)
+  // singleton: criarJanelaNavegador não cria segunda instância
+  criarJanelaNavegador(dest, { mostrar: true })
+  return { ok: true }
 })
 
 // ---------- Auth IPC ----------
