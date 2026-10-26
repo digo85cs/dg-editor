@@ -1,0 +1,70 @@
+================================================================
+DG EDITOR - DOSSIE DE ESTADO PRONTO
+Gerado em: 2026-10-26 09:51:16
+================================================================
+
+COMMIT DE REFERENCIA
+  git HEAD: 17fbe0c
+  branch:   main (10+ commits a frente do origin)
+
+HASHES DE VERIFICACAO
+  out/main/index.js : 6AF427A188F399B0061E5BE33707C6A9
+  src/main/brain/agent.ts : F0A282AF0B78886446ACD8121686B1BE
+
+GATES APROVADOS (10/10 do Cursor + 6 verificacoes extras)
+  [1]  typecheck              exit=0
+  [2]  build                  exit=0
+  [3]  hash bundle            6AF427A188F399B0061E5BE33707C6A9
+  [4]  build:mcp              exit=0
+  [5]  harness teste-eu.cjs   resposta em linguagem natural
+  [6]  codigo_buscar          indice sincronizado (divergencia 0)
+  [7]  skill_listar           2 skills (961-1162 chars)
+  [8]  agente_listar          2 agentes (890-1092 chars)
+  [9]  auditoria              ok=8 warn=0 erro=0
+  [10] chat.json              linguagem natural
+
+VERIFICACOES EXTRAS (pos-gate)
+  [FN1] indice sincronizado       divergencia 0 linha
+  [FO1] agente_invocar contrato   {id, pedido} confirmado
+  [FP4] agente_invocar executa    ok:true, revisor respondeu
+  [FP2] skills conteudo real      961-1162 chars (era 199-248)
+  [FP3] agentes conteudo real     890-1092 chars (era 173-180)
+  [FP6] hash apos FP              6AF427A188F399B0061E5BE33707C6A9 (identico)
+
+ARQUITETURA FINAL
+  brain/agent.ts       loop de tools + fallback texto->tool
+  brain/ollama.ts      unico ponto de contato Ollama (11434)
+  brain/registry.ts    registro de modelos por tarefa
+  brain/indice.ts      indice de simbolos via tsc
+  brain/skills.ts      carregamento de skills
+  brain/agentes.ts     carregamento de agentes
+  brain/editar.ts      codigo_editar com ancora unica + rollback
+  auto-auditoria.ts    6 areas: ia, limpeza, deps, dados, update, boot
+
+TOOLS MCP ATIVAS
+  codigo_buscar, codigo_ler, codigo_editar
+  skill_listar, skill_ler, agente_listar, agente_invocar
+  projeto_arvore, dossie_read, dossie_write, dossie_snapshot
+  vault_list, vault_read, vault_write
+
+SKILLS INSTALADAS
+  arvore-projeto  gatilho: arvore, arquivos, projeto_arvore
+  editar-seguro   gatilho: editar, trocar, codigo_editar
+
+AGENTES INSTALADOS
+  arquiteto  especialidade: raciocinio
+  revisor    especialidade: codigo
+
+PENDENCIAS CONHECIDAS
+  [1] auditoria NAO varre .dg-editor/ por .tmp/.bak orfaos (por design)
+  [2] modelo qwen2.5-coder:3b e o teto atual (CPU)
+  [3] git push pendente (10 commits locais)
+  [4] .gitattributes ausente (warnings LF/CRLF)
+
+MODELO ATUAL
+  qwen2.5-coder:3b via Ollama local
+  registry.ts permite plugar modelos maiores na tarefa "raciocinio"
+
+================================================================
+FIM DO DOSSIE
+================================================================
