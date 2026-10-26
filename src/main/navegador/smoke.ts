@@ -114,6 +114,72 @@ export async function rodarSmokeESair(): Promise<void> {
       ok: ainda,
       detalhe: 'cookie partition persist:dgnav gravado (reabrir app mantém sessão real de login)'
     })
+
+    // 9: screenshot da view (página estável)
+    await req('POST', '/abrir', { url: 'https://example.com' }, token)
+    await new Promise((r) => setTimeout(r, 2000))
+    let shot = await req('POST', '/screenshot', {}, token)
+    if (!(shot.status === 200 && Number(shot.json.bytes || 0) > 100)) {
+      await new Promise((r) => setTimeout(r, 1500))
+      shot = await req('POST', '/screenshot', {}, token)
+    }
+    resultados.push({
+      id: 9,
+      ok: shot.status === 200 && shot.json.ok === true && Number(shot.json.bytes || 0) > 100,
+      detalhe: 'bytes=' + String(shot.json.bytes || 0) + ' erro=' + String(shot.json.erro || '')
+    })
+
+    // 10: /ler com seletor inexistente → candidatos[]
+    await req('POST', '/abrir', { url: 'https://www.w3schools.com/html/html_tables.asp' }, token)
+    await new Promise((r) => setTimeout(r, 4000))
+    const lerBad = await req('POST', '/ler', { modo: 'texto', seletor: '#nao-existe-xyz' }, token)
+    const candLer = (lerBad.json.candidatos as Array<Record<string, unknown>>) || []
+    const lerCandOk =
+      lerBad.json.ok === false &&
+      candLer.length > 0 &&
+      candLer.every(
+        (c) =>
+          typeof c.tipo === 'string' &&
+          typeof c.tag === 'string' &&
+          typeof c.texto === 'string' &&
+          typeof c.seletor === 'string' &&
+          String(c.seletor).length > 0
+      )
+    resultados.push({
+      id: 10,
+      ok: lerCandOk,
+      detalhe: 'candidatos=' + candLer.length + ' motivo=' + String(lerBad.json.motivo || '')
+    })
+
+    // 11: /clicar seletor e texto inexistentes → candidatos[]
+    const clicSel = await req('POST', '/clicar', { seletor: '#nao-existe-xyz' }, token)
+    const cand1 = (clicSel.json.candidatos as Array<Record<string, unknown>>) || []
+    const shapeOk = (lista: Array<Record<string, unknown>>) =>
+      lista.length > 0 &&
+      lista.every(
+        (c) =>
+          typeof c.tipo === 'string' &&
+          typeof c.tag === 'string' &&
+          typeof c.texto === 'string' &&
+          typeof c.seletor === 'string' &&
+          String(c.seletor).length > 0
+      )
+    const clicTxt = await req('POST', '/clicar', { texto: 'Nao Existe 999' }, token)
+    const cand2 = (clicTxt.json.candidatos as Array<Record<string, unknown>>) || []
+    const ok11 =
+      clicSel.json.ok === false &&
+      shapeOk(cand1) &&
+      clicTxt.json.ok === false &&
+      shapeOk(cand2) &&
+      String(clicSel.json.dica || '').includes('candidatos')
+    resultados.push({
+      id: 11,
+      ok: ok11,
+      detalhe: JSON.stringify({
+        seletor: { n: cand1.length, pedido: clicSel.json.seletorPedido },
+        texto: { n: cand2.length, pedido: clicTxt.json.seletorPedido }
+      })
+    })
   } catch (e) {
     resultados.push({ id: 0, ok: false, detalhe: String((e as Error).message || e) })
   }
@@ -124,7 +190,11 @@ export async function rodarSmokeESair(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(r))
   }
+  const total = resultados.filter((r) => r.id > 0).length
+  const pass = resultados.filter((r) => r.id > 0 && r.ok).length
+  dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${falhas.length}`)
+  // eslint-disable-next-line no-console
+  console.log(`SMOKE=${pass}/${total}`)
   const code = falhas.length ? 1 : 0
-  dglog(`[nav-smoke] fim falhas=${falhas.length} exit=${code}`)
   app.exit(code)
 }

@@ -207,6 +207,14 @@ export function getContentView(): WebContentsView | null {
   return contentView
 }
 
+/** Reaplica bounds chrome+conteúdo (necessário antes de capturePage). */
+export function forcarLayoutNavegador(): { width: number; height: number } | null {
+  if (!janela || janela.isDestroyed() || !contentView) return null
+  layout()
+  const b = contentView.getBounds()
+  return { width: b.width, height: b.height }
+}
+
 export function getPartition(): string {
   return PARTITION
 }

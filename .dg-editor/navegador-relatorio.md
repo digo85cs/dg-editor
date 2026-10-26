@@ -41,20 +41,39 @@ Chamam o controle via HTTP local; se o app estiver fechado:
 
 `persist:dgnav` — cookies/localStorage em disco. Login é **manual** pelo usuário na view.
 
+## Fallback de seletores (`/clicar`, `/ler`)
+
+Quando seletor/texto não encontra elemento:
+
+```json
+{
+  "ok": false,
+  "motivo": "elemento nao encontrado",
+  "seletorPedido": "#nao-existe-xyz",
+  "candidatos": [{ "tipo": "interativo|estrutural", "tag": "a", "texto": "...", "seletor": "#id" }],
+  "dica": "reescolha o seletor a partir de candidatos[]"
+}
+```
+
+Cap 30. Classes `css-<hash>` (build React) filtradas.
+
 ## Validações (DG_NAV_SMOKE=1)
 
 ```
-#1 janela aberta                     PASS
-#2 GET /status example.com           PASS
-#3 navegador_ler texto               PASS
-#4 navegador_ler links (IANA)        PASS
-#5 preencher input httpbin           PASS
-#6 request sem token → 401           PASS
-#7 fechar painel → aberto:false/409  PASS
-#8 cookie persist:dgnav gravável     PASS
+#1  janela aberta                        PASS
+#2  GET /status example.com              PASS
+#3  navegador_ler texto                  PASS
+#4  navegador_ler links (IANA)           PASS
+#5  preencher input httpbin              PASS
+#6  request sem token → 401              PASS
+#7  fechar painel → aberto:false/409     PASS
+#8  cookie persist:dgnav gravável        PASS
+#9  /screenshot PNG base64               PASS
+#10 /ler seletor inexistente → candidatos PASS
+#11 /clicar seletor+texto → candidatos   PASS
 ```
 
-`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke exit 0.
+`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **11/11** PASS.
 
 ## Como usar
 

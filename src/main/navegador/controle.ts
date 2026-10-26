@@ -16,7 +16,8 @@ import {
   getContentWebContents,
   getContentView,
   navegarPara,
-  criarJanelaNavegador
+  criarJanelaNavegador,
+  forcarLayoutNavegador
 } from './janela'
 import { garantirNavToken } from './token'
 
@@ -68,26 +69,55 @@ function downloadsDir(): string {
   return d
 }
 
-const JS_SELECTORES = `(() => {
-  const out = []
-  const seen = new Set()
-  const push = (s) => { if (s && !seen.has(s) && seen.size < 30) { seen.add(s); out.push(s) } }
-  document.querySelectorAll('a[href],button,input,textarea,select,[role="button"]').forEach((el, i) => {
-    if (el.id) push('#' + CSS.escape(el.id))
-    else if (el.name) push(el.tagName.toLowerCase() + '[name=' + JSON.stringify(el.name) + ']')
-    else if (el.getAttribute('data-testid')) push('[data-testid=' + JSON.stringify(el.getAttribute('data-testid')) + ']')
-    else push(el.tagName.toLowerCase() + ':nth-of-type(' + (i + 1) + ')')
-  })
-  return out
+/** Candidatos clicáveis/estruturais para o agente se auto-corrigir (cap 30). */
+const JS_CANDIDATOS = `(() => {
+  const out = [];
+  const seen = new Set();
+  const add = (el, tipo) => {
+    if (out.length >= 30) return;
+    const txt = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 60);
+    let sel = '';
+    if (el.id) sel = '#' + el.id;
+    else if (el.name) sel = el.tagName.toLowerCase() + '[name="' + el.name + '"]';
+    else if (el.getAttribute('data-testid')) sel = '[data-testid="' + el.getAttribute('data-testid') + '"]';
+    else if (el.className && typeof el.className === 'string' && !/css-[a-z0-9]{5,}/i.test(el.className)) {
+      const classes = el.className.trim().split(/\\s+/).filter(Boolean).slice(0, 2);
+      if (classes.length) sel = el.tagName.toLowerCase() + '.' + classes.join('.');
+    }
+    if (!sel || seen.has(sel)) return;
+    seen.add(sel);
+    out.push({ tipo, tag: el.tagName.toLowerCase(), texto: txt, seletor: sel });
+  };
+  document.querySelectorAll('button, a, input, select, textarea, [role="button"]').forEach(el => {
+    if (el.offsetParent !== null) add(el, 'interativo');
+  });
+  document.querySelectorAll('h1, h2, h3, table, form, [id]').forEach(el => add(el, 'estrutural'));
+  return out.slice(0, 30);
 })()`
 
-async function extrairSelectores(): Promise<string[]> {
+type Candidato = { tipo: string; tag: string; texto: string; seletor: string }
+
+async function extrairCandidatos(): Promise<Candidato[]> {
   const wc = getContentWebContents()
   if (!wc) return []
   try {
-    return (await wc.executeJavaScript(JS_SELECTORES, true)) as string[]
+    const list = (await wc.executeJavaScript(JS_CANDIDATOS, true)) as Candidato[]
+    return Array.isArray(list) ? list.slice(0, 30) : []
   } catch {
     return []
+  }
+}
+
+function erroElementoNaoEncontrado(
+  seletorPedido: string,
+  candidatos: Candidato[]
+): Json {
+  return {
+    ok: false,
+    motivo: 'elemento nao encontrado',
+    seletorPedido,
+    candidatos,
+    dica: 'reescolha o seletor a partir de candidatos[]'
   }
 }
 
@@ -102,7 +132,7 @@ async function handleLer(body: Json): Promise<Json> {
     const seletor = ${JSON.stringify(seletor)};
     const CAP = ${CAP};
     const root = seletor ? document.querySelector(seletor) : document.body;
-    if (!root) return { ok: false, motivo: 'seletor nao encontrado', selectoresDisponiveis: null };
+    if (!root) return { ok: false, motivo: 'elemento nao encontrado', seletorPedido: seletor };
     if (modo === 'texto') {
       const t = (root.innerText || '').slice(0, CAP);
       return { ok: true, modo, texto: t, chars: t.length };
@@ -137,8 +167,9 @@ async function handleLer(body: Json): Promise<Json> {
   })()`
 
   const r = (await wc.executeJavaScript(script, true)) as Json
-  if (r && r.ok === false) {
-    r.selectoresDisponiveis = await extrairSelectores()
+  if (r && r.ok === false && String(r.motivo || '').includes('elemento nao encontrado')) {
+    const candidatos = await extrairCandidatos()
+    return erroElementoNaoEncontrado(seletor || String(r.seletorPedido || ''), candidatos)
   }
   return r
 }
@@ -148,6 +179,7 @@ async function handleClicar(body: Json): Promise<Json> {
   if (!wc) return { erro: 'navegador fechado' }
   const seletor = body.seletor != null ? String(body.seletor) : ''
   const texto = body.texto != null ? String(body.texto) : ''
+  const seletorPedido = seletor || (texto ? 'texto:' + texto : '')
 
   const script = `(() => {
     const seletor = ${JSON.stringify(seletor)};
@@ -159,8 +191,8 @@ async function handleClicar(body: Json): Promise<Json> {
       if (el) usado = seletor;
     }
     if (!el && texto) {
-      const candidatos = Array.from(document.querySelectorAll('button,a,input[type=submit],input[type=button],[role=button]'));
-      el = candidatos.find(e => {
+      const lista = Array.from(document.querySelectorAll('button,a,input[type=submit],input[type=button],[role=button]'));
+      el = lista.find(e => {
         const t = (e.innerText || e.textContent || e.value || '').trim();
         return t === texto;
       }) || null;
@@ -181,7 +213,8 @@ async function handleClicar(body: Json): Promise<Json> {
 
   const r = (await wc.executeJavaScript(script, true)) as Json
   if (r && r.ok === false) {
-    r.selectoresDisponiveis = await extrairSelectores()
+    const candidatos = await extrairCandidatos()
+    return erroElementoNaoEncontrado(seletorPedido, candidatos)
   }
   return r
 }
@@ -213,7 +246,8 @@ async function handlePreencher(body: Json): Promise<Json> {
 
   const r = (await wc.executeJavaScript(script, true)) as Json
   if (r && r.ok === false) {
-    r.selectoresDisponiveis = await extrairSelectores()
+    const candidatos = await extrairCandidatos()
+    return erroElementoNaoEncontrado(seletor, candidatos)
   }
   return r
 }
@@ -281,8 +315,23 @@ async function handleBaixar(body: Json): Promise<Json> {
 async function handleScreenshot(): Promise<Json> {
   const wc = getContentWebContents()
   if (!wc) return { erro: 'navegador fechado' }
-  const img = await wc.capturePage()
-  const png = img.toPNG()
+  const bounds = forcarLayoutNavegador()
+  // força paint antes do capture (WebContentsView pode devolver 0x0 se ainda não pintou)
+  try {
+    await wc.executeJavaScript('document.body && document.body.getBoundingClientRect().width', true)
+  } catch {
+    /* ignore */
+  }
+  await new Promise((r) => setTimeout(r, 200))
+  let img = await wc.capturePage()
+  let png = img.toPNG()
+  if (png.length < 100 && bounds && bounds.width > 0 && bounds.height > 0) {
+    img = await wc.capturePage({ x: 0, y: 0, width: bounds.width, height: bounds.height })
+    png = img.toPNG()
+  }
+  if (png.length < 100) {
+    return { ok: false, motivo: 'capturePage vazio (view sem paint?)', bounds: bounds || null }
+  }
   return {
     ok: true,
     mime: 'image/png',
