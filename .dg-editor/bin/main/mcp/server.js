@@ -17,7 +17,7 @@ const editar_1 = require("../brain/editar");
 const skills_1 = require("../brain/skills");
 const agentes_1 = require("../brain/agentes");
 const agent_1 = require("../brain/agent");
-const RAIZ = process.env.DG_ROOT || process.cwd();
+const RAIZ = (0, paths_1.resolverRaizProjeto)();
 const VAULT = (0, paths_1.projectStateDir)(RAIZ);
 (0, skills_1.garantirSkillsPadrao)(RAIZ);
 (0, agentes_1.garantirAgentesPadrao)(RAIZ);
@@ -111,11 +111,14 @@ const TOOLS = [
     },
     {
         name: 'codigo_ler',
-        description: 'Le o corpo de UMA funcao/simbolo pelo nome (nunca o arquivo inteiro).',
+        description: 'Le simbolo pelo nome OU arquivo pelo caminho relativo (ex: src/main/brain/providers.ts).',
         inputSchema: {
             type: 'object',
             properties: {
-                nome: { type: 'string', description: 'Nome exato do simbolo (ex: escolherModelo)' }
+                nome: {
+                    type: 'string',
+                    description: 'Nome do simbolo (escolherModelo) OU caminho relativo (src/main/brain/providers.ts)'
+                }
             },
             required: ['nome']
         }
@@ -295,7 +298,8 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (req) => {
                 novo: zod_1.z.string(),
                 verificar: zod_1.z.boolean().optional()
             }).parse(args);
-            const res = (0, editar_1.editarPorAncora)(RAIZ, parsed.arquivo, parsed.ancora, parsed.novo, parsed.verificar !== false);
+            const { rel } = (0, paths_1.caminhoDentroDaRaiz)(RAIZ, parsed.arquivo);
+            const res = (0, editar_1.editarPorAncora)(RAIZ, rel, parsed.ancora, parsed.novo, parsed.verificar !== false);
             return {
                 content: [{ type: 'text', text: JSON.stringify(res, null, 2) }],
                 isError: !res.ok
@@ -336,7 +340,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (req) => {
             const parsed = zod_1.z.object({
                 mensagem: zod_1.z.string(),
                 agente: zod_1.z.string().optional(),
-                tarefa: zod_1.z.enum(['chat', 'codigo', 'raciocinio']).optional()
+                tarefa: zod_1.z.enum(['chat', 'codigo', 'raciocinio', 'revisao']).optional()
             }).parse(args);
             const TIMEOUT_MS = 600_000;
             const trabalho = (0, agent_1.executarAgente)(RAIZ, parsed.mensagem, {

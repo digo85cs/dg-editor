@@ -52,11 +52,19 @@ const path_1 = require("path");
 const dglog_1 = require("../dglog");
 exports.OLLAMA_URL = 'http://127.0.0.1:11434';
 function loadDgConfig() {
-    const p = (0, path_1.join)(process.cwd(), 'dg-config.json');
+    let raiz = process.cwd();
+    try {
+        // lazy: evita ciclo de import com paths em boot
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        raiz = require('../paths').resolverRaizProjeto();
+    }
+    catch { /* cwd */ }
+    const p = (0, path_1.join)(raiz, 'dg-config.json');
     if (!(0, fs_1.existsSync)(p))
         return {};
     try {
-        return JSON.parse((0, fs_1.readFileSync)(p, 'utf-8'));
+        const bruto = (0, fs_1.readFileSync)(p, 'utf-8').replace(/^\uFEFF/, '');
+        return JSON.parse(bruto);
     }
     catch {
         return {};

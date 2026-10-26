@@ -47,7 +47,21 @@ function normalizarTarefa(tarefa) {
         return 'chat';
     if (t === 'raciocinio' || t === 'estrategia')
         return 'raciocinio';
+    if (t === 'revisao' || t === 'review')
+        return 'revisao';
     return 'codigo';
+}
+function cfgCursorCli() {
+    return cfg({
+        id: 'cursor-cli:cursor-agent',
+        tipo: 'cli',
+        formato: 'cursor-cli',
+        modelo: 'cursor-agent',
+        baseUrl: '',
+        numPredict: 0,
+        timeoutMs: 180_000,
+        modo: 'ask'
+    });
 }
 function disponivel(cfg) {
     return (0, providers_1.disponivel)(cfg);
@@ -59,17 +73,8 @@ function cfg(partial) {
 function filaDeModelos(tarefa, _opcoes) {
     const t = normalizarTarefa(String(tarefa));
     if (t === 'chat') {
+        // local primeiro — economia de credito (chat nao exige frontier)
         return [
-            cfg({
-                id: 'openrouter:gpt-4o-mini',
-                tipo: 'online',
-                formato: 'openai',
-                modelo: 'openai/gpt-4o-mini',
-                baseUrl: OPENROUTER_BASE,
-                apiKeyEnv: KEY_ENV,
-                numPredict: 512,
-                timeoutMs: 120_000
-            }),
             cfg({
                 id: 'ollama:qwen2.5-coder:1.5b',
                 tipo: 'local',
@@ -78,7 +83,27 @@ function filaDeModelos(tarefa, _opcoes) {
                 baseUrl: OLLAMA_BASE,
                 numPredict: 512,
                 timeoutMs: 120_000
-            })
+            }),
+            cfg({
+                id: 'ollama:qwen2.5-coder:3b',
+                tipo: 'local',
+                formato: 'ollama',
+                modelo: 'qwen2.5-coder:3b',
+                baseUrl: OLLAMA_BASE,
+                numPredict: 512,
+                timeoutMs: 120_000
+            }),
+            cfg({
+                id: 'openrouter:deepseek-chat',
+                tipo: 'online',
+                formato: 'openai',
+                modelo: 'deepseek/deepseek-chat',
+                baseUrl: OPENROUTER_BASE,
+                apiKeyEnv: KEY_ENV,
+                numPredict: 512,
+                timeoutMs: 120_000
+            }),
+            cfgCursorCli()
         ];
     }
     if (t === 'raciocinio') {
@@ -113,7 +138,31 @@ function filaDeModelos(tarefa, _opcoes) {
             })
         ];
     }
-    // codigo
+    if (t === 'revisao') {
+        return [
+            cfg({
+                id: 'openrouter:deepseek-chat',
+                tipo: 'online',
+                formato: 'openai',
+                modelo: 'deepseek/deepseek-chat',
+                baseUrl: OPENROUTER_BASE,
+                apiKeyEnv: KEY_ENV,
+                numPredict: 1024,
+                timeoutMs: 300_000
+            }),
+            cfgCursorCli(),
+            cfg({
+                id: 'ollama:qwen2.5-coder:7b',
+                tipo: 'local',
+                formato: 'ollama',
+                modelo: 'qwen2.5-coder:7b',
+                baseUrl: OLLAMA_BASE,
+                numPredict: 1024,
+                timeoutMs: 300_000
+            })
+        ];
+    }
+    // codigo: openrouter → openrouter → cursor-cli → ollama → ollama
     return [
         cfg({
             id: 'openrouter:deepseek-chat',
@@ -135,6 +184,7 @@ function filaDeModelos(tarefa, _opcoes) {
             numPredict: 1024,
             timeoutMs: 300_000
         }),
+        cfgCursorCli(),
         cfg({
             id: 'ollama:qwen2.5-coder:7b',
             tipo: 'local',

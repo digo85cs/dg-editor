@@ -1,30 +1,13 @@
-# Auditoria de agentes — Fase G4
+# Auditoria de agentes — Fase H4
 
-**Data:** 2026-10-26T16:55:09.013Z
+**Data:** 2026-10-26T17:26:59.553Z
 
-## G1 (contexto)
+| agente | ok | aprovado | modelo | ms | motivo | trecho (250) |
+|---|---|---|---|---:|---|---|
+| arquiteto | true | APROVADO | deepseek/deepseek-chat | 20299 | ok | **Decisão**: Não justifica separar providers.ts em arquivos por formato no momento atual. **Motivo**: O arquivo já está bem organizado com adaptadores específicos (Ollama, OpenAI, cursor-cli) compartilhando a mesma interface `ProviderConfig`. A separ |
+| revisor | true | APROVADO | deepseek/deepseek-chat | 27057 | ok | **Veredito**: Médio (riscos controláveis mas precisam de atenção) **Riscos de Regressão na Fila de Providers**: 1. **cursor-cli sem fallback explícito** - `registry.ts:179` - Em tarefas de "revisao", cursor-cli é o segundo provider sem verificação de |
+| seguranca | true | FALHOU | deepseek/deepseek-chat | 14994 | sem arquivo:linha | **Veredito**: Aprovado com observações **Achados**: 1. **Critico**: Nenhum segredo hardcoded encontrado - conforme cabeçalho do arquivo (linha 3): *"Nenhuma chave no codigo — so process.env[cfg.apiKeyEnv]"* 2. **Alto**: Confirmação de que `apiKey` só |
+| testador | true | APROVADO | deepseek/deepseek-chat | 32869 | ok | **3 Testes Críticos para o Pipeline de Agentes**: 1. **Teste de Limite de Iterações (MAX_ITER)** - *Arquivo:linha*: `agent.ts:26` (`const MAX_ITER = 6`) - *Objetivo*: Validar que o agente não excede o limite de 6 iterações - *Caso crítico*: Chamada r |
+| dg-engenheiro | true | APROVADO | deepseek/deepseek-chat | 21209 | ok | **Fluxo Completo de Edição de Código até Typecheck**: 1. **Recebimento do Pedido**: - O pedido é recebido em linguagem natural (ex: "altere o valor de MAX_ITER para 5"). - O arquivo relevante é identificado (ex: `src/main/brain/agent.ts`). 2. **Local |
 
-cursor-agent **REPROVADO** como provider (sem auth). G2 nao implementado.
-
-## G3
-
-- agente_listar: 5 → arquiteto, dg-engenheiro, revisor, seguranca, testador
-- dg-engenheiro exec: ok=true modelo=deepseek/deepseek-chat ms=15107 citaArquivoLinha=true
-
-## G4 — tabela dos 5 agentes
-
-| agente | ok | aprovado | modeloUsado | duracaoMs | trecho (200) |
-|---|---|---|---|---:|---|
-| arquiteto | true | true | `deepseek/deepseek-chat` | 17122 | A busca pelo arquivo `src/main/brain/providers.ts` não retornou resultados. Isso sugere que o arquivo pode não existir ou estar em outro local. Recomendo verificar a estrutura do projeto para identifi |
-| revisor | true | true | `deepseek/deepseek-chat` | 13853 | Não foi possível encontrar informações sobre o commit f7d46f7 na base de dados atual. Recomendo verificar se o hash do commit está correto ou se o commit já foi integrado ao repositório. Se precisar d |
-| seguranca | true | true | `deepseek/deepseek-chat` | 8421 | O arquivo `src/main/brain/providers.ts` não foi encontrado na estrutura do projeto. Isso pode significar que: 1. O caminho está incorreto 2. O arquivo foi renomeado/movido 3. Os providers estão implem |
-| testador | true | true | `deepseek/deepseek-chat` | 15664 | Analisando a estrutura do projeto, identifico que os testes atuais estão principalmente em arquivos isolados (teste-*.cjs) e não há um pipeline de testes integrado para os agentes. Com base na estrutu |
-| dg-engenheiro | true | true | `deepseek/deepseek-chat` | 10164 | 1. **Plano (passos)**: 1. Receber o pedido de edição em linguagem natural. 2. Decompor o pedido em ações específicas (ex: alterar valor de uma constante, adicionar função). 3. Localizar o arquivo e tr |
-
-**Aprovados:** 5/5 (criterio >= 4)
-
-## Gate
-
-- G3 list: PASS
-- G3 exec: PASS
-- G4: PASS
+**Aprovados qualitativos:** 4/5 (meta >= 4)

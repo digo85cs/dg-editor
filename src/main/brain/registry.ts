@@ -12,7 +12,7 @@ import {
 } from './providers'
 
 export type TipoModelo = 'local' | 'online'
-export type TarefaModelo = 'chat' | 'codigo' | 'raciocinio'
+export type TarefaModelo = 'chat' | 'codigo' | 'raciocinio' | 'revisao'
 export type Tarefa = TarefaModelo
 
 export interface ModeloReg {
@@ -66,7 +66,21 @@ export function normalizarTarefa(tarefa: string): TarefaModelo {
   const t = (tarefa || 'codigo').toLowerCase()
   if (t === 'chat' || t === 'simples') return 'chat'
   if (t === 'raciocinio' || t === 'estrategia') return 'raciocinio'
+  if (t === 'revisao' || t === 'review') return 'revisao'
   return 'codigo'
+}
+
+function cfgCursorCli(): ProviderConfig {
+  return cfg({
+    id: 'cursor-cli:cursor-agent',
+    tipo: 'cli',
+    formato: 'cursor-cli',
+    modelo: 'cursor-agent',
+    baseUrl: '',
+    numPredict: 0,
+    timeoutMs: 180_000,
+    modo: 'ask'
+  })
 }
 
 export function disponivel(cfg: ProviderConfig): boolean {
@@ -87,17 +101,8 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
   const t = normalizarTarefa(String(tarefa))
 
   if (t === 'chat') {
+    // local primeiro — economia de credito (chat nao exige frontier)
     return [
-      cfg({
-        id: 'openrouter:gpt-4o-mini',
-        tipo: 'online',
-        formato: 'openai',
-        modelo: 'openai/gpt-4o-mini',
-        baseUrl: OPENROUTER_BASE,
-        apiKeyEnv: KEY_ENV,
-        numPredict: 512,
-        timeoutMs: 120_000
-      }),
       cfg({
         id: 'ollama:qwen2.5-coder:1.5b',
         tipo: 'local',
@@ -106,7 +111,27 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
         baseUrl: OLLAMA_BASE,
         numPredict: 512,
         timeoutMs: 120_000
-      })
+      }),
+      cfg({
+        id: 'ollama:qwen2.5-coder:3b',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'qwen2.5-coder:3b',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 512,
+        timeoutMs: 120_000
+      }),
+      cfg({
+        id: 'openrouter:deepseek-chat',
+        tipo: 'online',
+        formato: 'openai',
+        modelo: 'deepseek/deepseek-chat',
+        baseUrl: OPENROUTER_BASE,
+        apiKeyEnv: KEY_ENV,
+        numPredict: 512,
+        timeoutMs: 120_000
+      }),
+      cfgCursorCli()
     ]
   }
 
@@ -143,7 +168,32 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
     ]
   }
 
-  // codigo
+  if (t === 'revisao') {
+    return [
+      cfg({
+        id: 'openrouter:deepseek-chat',
+        tipo: 'online',
+        formato: 'openai',
+        modelo: 'deepseek/deepseek-chat',
+        baseUrl: OPENROUTER_BASE,
+        apiKeyEnv: KEY_ENV,
+        numPredict: 1024,
+        timeoutMs: 300_000
+      }),
+      cfgCursorCli(),
+      cfg({
+        id: 'ollama:qwen2.5-coder:7b',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'qwen2.5-coder:7b',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 1024,
+        timeoutMs: 300_000
+      })
+    ]
+  }
+
+  // codigo: openrouter → openrouter → cursor-cli → ollama → ollama
   return [
     cfg({
       id: 'openrouter:deepseek-chat',
@@ -165,6 +215,7 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
       numPredict: 1024,
       timeoutMs: 300_000
     }),
+    cfgCursorCli(),
     cfg({
       id: 'ollama:qwen2.5-coder:7b',
       tipo: 'local',

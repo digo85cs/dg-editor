@@ -1,92 +1,66 @@
-# Auditoria completa consolidada
+﻿# Auditoria completa consolidada
 
-**Data:** 2026-10-26T16:56:54.993Z
+**Data:** 2026-10-26T17:28:44.542Z
 
 ## Hashes
-- `out/main/index.js`: `5fdbfdf20e1a1f0653524cecc1e8f078`
-- `.dg-editor/bin/main/mcp/server.js`: `441f344c2a79ceddfb227817656179f1`
+- `out/main/index.js`: `e29ec7cd20e009913e8f78d07ebc4677`
+- `.dg-editor/bin/main/mcp/server.js`: `24fe5477c955161d9f5904fd6d67f829`
 
-## Resumo global
+## Resumo
 
 | ok | warn | erro |
 |---:|---:|---:|
-| 32 | 3 | 0 |
+| 15 | 0 | 0 |
 
 ## 8 areas
 
 | area | ok | warn | erro |
 |---|---:|---:|---:|
-| modelos | 2 | 1 | 0 |
-| providers | 5 | 0 | 0 |
-| skills | 9 | 0 | 0 |
-| agentes | 7 | 0 | 0 |
-| mcp | 3 | 0 | 0 |
-| pipeline | 3 | 0 | 0 |
+| modelos | 1 | 0 | 0 |
+| providers | 4 | 0 | 0 |
+| skills | 1 | 0 | 0 |
+| agentes | 1 | 0 | 0 |
+| mcp | 2 | 0 | 0 |
+| pipeline | 1 | 0 | 0 |
 | build | 2 | 0 | 0 |
-| integridade | 1 | 2 | 0 |
+| integridade | 3 | 0 | 0 |
 
-## Detalhes
+## Extras H
+
+- G1/H2 cursor-cli: APROVADO (ask-only, fallback posicao 3 codigo)
+- Failover: openrouter 401×2 → cursor-cli ok (43725ms, texto=fallback-ok)
+- Regressao: {"ok":true,"editou":true,"revertido":true,"ms":34585,"provider":"openrouter:deepseek-chat","modelo":"deepseek/deepseek-chat","tentativas":[{"provider":"openrouter:deepseek-chat","resultado":"ok"}]}
+- H4 aprovados: 4/5
+- dg-config: github.token removido; usa GITHUB_TOKEN env
 
 ### modelos
-- escolherModelo(codigo)=deepseek/deepseek-chat
-- Politica 7b padrao / 14b sob demanda
-- 14b pipeline usos=0
+- raiz=D:\CURSOR\DG Editor fonte=env:DG_ROOT
 
 ### providers
-- Fila codigo (4): openrouter:deepseek-chat[ok], openrouter:qwen-2.5-coder-32b[ok], ollama:qwen2.5-coder:7b[ok], ollama:qwen2.5-coder:3b[ok]
-- local no fim codigo
-- Fila raciocinio (3): openrouter:llama-3.3-70b[ok], ollama:llama3.2[ok], ollama:qwen2.5-coder:14b[ok]
-- Fila chat (2): openrouter:gpt-4o-mini[ok], ollama:qwen2.5-coder:1.5b[ok]
-- cursor-agent G1 REPROVADO (sem auth); bin=presente; fora da fila
+- codigo(5): openrouter:deepseek-chat=true, openrouter:qwen-2.5-coder-32b=true, cursor-cli:cursor-agent=true, ollama:qwen2.5-coder:7b=true, ollama:qwen2.5-coder:3b=true
+- chat(4): ollama:qwen2.5-coder:1.5b=true, ollama:qwen2.5-coder:3b=true, openrouter:deepseek-chat=true, cursor-cli:cursor-agent=true
+- revisao(3): openrouter:deepseek-chat=true, cursor-cli:cursor-agent=true, ollama:qwen2.5-coder:7b=true
+- cursor-cli disponivel na fila codigo
 
 ### skills
-- count=8
-- arvore-projeto chars=961
-- debugger chars=1261
-- documentador chars=1149
-- editar-seguro chars=1162
-- leitor-codigo chars=1268
-- refatorador chars=1268
-- revisor-seguranca chars=1333
-- testador chars=1262
+- skills=8
 
 ### agentes
-- count=5 arquiteto,dg-engenheiro,revisor,seguranca,testador
-- arquiteto ok=true
-- dg-engenheiro ok=true
-- revisor ok=true
-- seguranca ok=true
-- testador ok=true
-- dg-engenheiro 8 skills ok
+- agentes=5 arquiteto,dg-engenheiro,revisor,seguranca,testador
 
 ### mcp
-- tools=15
 - agente_executar
-- schemas
+- usa resolverRaizProjeto
 
 ### pipeline
-- executarAgente
-- agente_executar MCP
-- anti-recursao
+- anti-recursao + cursor-cli ask-only
 
 ### build
-- out/main/index.js md5=5fdbfdf20e1a1f0653524cecc1e8f078
-- .dg-editor/bin/main/mcp/server.js md5=441f344c2a79ceddfb227817656179f1
+- out/main/index.js md5=e29ec7cd20e009913e8f78d07ebc4677
+- .dg-editor/bin/main/mcp/server.js md5=24fe5477c955161d9f5904fd6d67f829
 
 ### integridade
-- indice simbolos=244
-- dossie ausente (nao bloqueante)
-- git sujo (12)
+- dg-config sem ghp_ token
+- .env.example presente
+- H1 raiz deterministica ativa
 
-## G1 cursor-agent
-
-- **REPROVADO**: Authentication required / Not logged in. G2 nao implementado.
-
-## Regressao G5
-
-- ok=true editou=true revertido=true
-- ms=32682 limite=60000 provider=openrouter:deepseek-chat modelo=deepseek/deepseek-chat
-
-## G4 agentes
-
-- aprovados=5/5
