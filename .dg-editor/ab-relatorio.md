@@ -1,72 +1,69 @@
-# A/B deepseek-v3.2 vs deepseek-v4-flash
+# A/B2 — deepseek-v3.2 vs deepseek-v4-flash (harness semântico)
 
 **Branch:** `teste-v4-flash`  
 **Data:** 2026-10-26  
-**Base:** `45b602c`
+**Pedido (imutável):** cite UMA linha do CORPO de `providers.ts` com número exato.
 
-## A1 — Validação prévia
+## Correção do harness (A/B1 era inválido)
 
-| check | resultado |
+O A/B1 exigia o formato `providers.ts:N` e `N>20`. Isso premiava formato de citação, não leitura:
+- v4-flash escrevia `Linha 18: ...` → `n=null` → FALHOU
+- v3.2 escrevia `providers.ts:18` → casava
+
+A/B2: extrator tolerante (`providers.ts:N`, `Linha N`, `line N`, `L18`, …) + match de conteúdo (≥15 chars contíguos da linha real). Relatório A/B1 (`0/5 vs 1/5`) **invalidado**.
+
+## Preços OpenRouter (API)
+
+| modelo | prompt | completion |
+|---|---|---|
+| deepseek/deepseek-v3.2 | US$ 0,28 / MTok | US$ 0,42 / MTok |
+| deepseek/deepseek-v4-flash | US$ 0,09 / MTok | US$ 0,18 / MTok |
+
+v4-flash ≈ **32%** do custo do v3.2 (prompt).
+
+## Tabelas lado a lado
+
+### v3.2 — 4/5 — latência média **21312 ms**
+
+| agente | ok | nExtraido | linhaReal | match | ms | aprovado |
+|---|---|---|---|---|---|---|
+| arquiteto | true | 18 | formato: 'ollama' \| … | true | 7521 | sim |
+| revisor | true | 22 | numPredict: number | **false** | 5948 | **não** |
+| seguranca | true | 5 | import httpRequest… | true | 15748 | sim |
+| testador | true | 18 | formato: … | true | 41381 | sim |
+| dg-engenheiro | true | 157 | const b = (body… | true | 35961 | sim |
+
+Falha revisor: citou `Linha 22: modelo: string` — conteúdo real da 22 é `numPredict: number` (`modelo: string` é a linha 19).
+
+### v4-flash — 4/5 — latência média **16932 ms** (−21%)
+
+| agente | ok | nExtraido | linhaReal | match | ms | aprovado |
+|---|---|---|---|---|---|---|
+| arquiteto | true | 22 | numPredict: number | **false** | 10149 | **não** |
+| revisor | true | 15 | export interface ProviderConfig | true | 15719 | sim |
+| seguranca | true | 15 | export interface ProviderConfig | true | 7127 | sim |
+| testador | true | 5 | import httpRequest… | true | 15569 | sim |
+| dg-engenheiro | true | 15 | export interface ProviderConfig | true | 36098 | sim |
+
+Falha arquiteto: mesma classe de erro (offset de linha: citou `modelo: string` como linha 22).
+
+Override: **5/5** em ambas as rodadas (`modeloUsado` = MODELO_TESTADO).
+
+## Decisão
+
+| cenário B4 | este resultado |
 |---|---|
-| `deepseek/deepseek-v4-flash` chat | HTTP 200, id aceito `deepseek/deepseek-v4-flash` |
-| quirk | modelo usa *reasoning tokens*; com `max_tokens=10/32` o `content` vem `null` (`finish=length`). Com ≥128 tokens responde `ok`. |
-| pricing v3.2 | prompt **$0.28**/1M · completion **$0.42**/1M |
-| pricing v4-flash | prompt **$0.091**/1M · completion **$0.182**/1M |
-| ratio prompt v4/v3 | **0.325** (< 0.5) → A/B **vale** por preço |
+| mesma qualidade + v4 mais barato/rápido | **4/5 = 4/5**, v4 −21% latência, ~32% do preço |
 
-## A2 — Harness
+**TROCAR.** Empate de qualidade; o custo e a latência favorecem o v4-flash. A falha residual é offset de linha (ambos), não ausência de leitura.
 
-- Script: `scripts/ab-modelos.mjs`
-- `invocarAgente` **não** força OpenRouter (só Ollama) → harness usa `executarAgente({ modeloForcado })`
-- Override online corrigido em `agent.ts` (antes forçava formato ollama e invalidava o A/B)
-- PEDIDO idêntico nas duas rodadas
-- `modeloUsado` bateu com `MODELO_TESTADO` em **10/10** chamadas (`overrideOk=true`)
+### Fila `codigo` aplicada
 
-## Tabelas (critério N > 20 + `providers.ts:N`)
+1. openrouter / `deepseek/deepseek-v4-flash`  
+2. openrouter / `deepseek/deepseek-v3.2`  
+3. openrouter / `qwen/qwen-2.5-coder-32b-instruct`  
+4. cursor-cli / `cursor-agent`  
+5. ollama / `qwen2.5-coder:7b`  
+6. ollama / `qwen2.5-coder:3b`
 
-### Baseline — deepseek/deepseek-v3.2
-
-| agente | ok | modelo | ms | N | veredito |
-|---|---|---|---:|---:|---|
-| arquiteto | true | v3.2 | 11567 | 18 | FALHOU (N≤20) |
-| revisor | true | v3.2 | 6640 | 18 | FALHOU (N≤20) |
-| seguranca | true | v3.2 | 15163 | 5 | FALHOU (N≤20) |
-| testador | true | v3.2 | 55201 | 156 | **APROVADO** |
-| dg-engenheiro | true | v3.2 | 46379 | 18 | FALHOU (N≤20) |
-
-**1/5 aprovados** · tempo médio ≈ 27.0 s
-
-### Candidato — deepseek/deepseek-v4-flash
-
-| agente | ok | modelo | ms | N | veredito |
-|---|---|---|---:|---:|---|
-| arquiteto | true | v4-flash | 7168 | — | FALHOU (sem `providers.ts:N`; citou "Linha 10") |
-| revisor | true | v4-flash | 12577 | — | FALHOU (sem `providers.ts:N`; "Linha 18") |
-| seguranca | true | v4-flash | 33931 | — | FALHOU (dump da tool, sem cite) |
-| testador | true | v4-flash | 10626 | — | FALHOU (sem `providers.ts:N`; "Linha 18") |
-| dg-engenheiro | true | v4-flash | 7827 | — | FALHOU (sem `providers.ts:N`; "Linha 6") |
-
-**0/5 aprovados** · tempo médio ≈ 14.4 s (mais rápido, mas fora do formato de cite)
-
-## A3 — Decisão
-
-| cenário aplicável | decisão |
-|---|---|
-| v4 ≤ 3/5 | **NÃO TROCAR** |
-
-Justificativa numérica:
-- v4-flash: **0/5** no critério qualitativo (abaixo de 4)
-- v3.2 baseline com o **mesmo** critério: só **1/5** → o limiar `N > 20` reprova o modelo em produção, não só o candidato
-- Preço favorece v4 (~3× mais barato no prompt), mas qualidade de cite no formato exigido é pior
-- Tempo: v4 mais rápido (~14s vs ~27s médios), insuficiente para trocar com 0/5
-
-**Fila `codigo` permanece:** v3.2 → qwen-32b → cursor-cli → ollama 7b → ollama 3b
-
-## A4 — Aplicação
-
-- Fila **não** alterada
-- Mantidos nesta branch: harness `scripts/ab-modelos.mjs`, fix de `modeloForcado` online, logs JSON em `.dg-editor/ab-*.json`
-
-## Pendente (para o dono)
-
-Ajustar limiar do critério (b): com `N > 20`, o A/B mede dificuldade da tarefa, não diferença de modelo. Sugestões possíveis: `N >= 5`, ou aceitar `Linha N` + trecho do corpo, ou exigir símbolo/função nomeada em vez de número arbitrário.
+Artefatos: `.dg-editor/ab2-deepseek_deepseek-v3.2.json`, `.dg-editor/ab2-deepseek_deepseek-v4-flash.json`.

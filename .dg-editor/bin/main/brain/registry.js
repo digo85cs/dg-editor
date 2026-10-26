@@ -246,8 +246,18 @@ function filaDeModelos(tarefa, _opcoes) {
             })
         ];
     }
-    // codigo: openrouter → openrouter → cursor-cli → ollama → ollama
+    // codigo: v4-flash → v3.2 → qwen → cursor-cli → ollama → ollama (A/B2)
     return [
+        cfg({
+            id: 'openrouter:deepseek-v4-flash',
+            tipo: 'online',
+            formato: 'openai',
+            modelo: 'deepseek/deepseek-v4-flash',
+            baseUrl: OPENROUTER_BASE,
+            apiKeyEnv: KEY_ENV,
+            numPredict: 1024,
+            timeoutMs: 300_000
+        }),
         cfg({
             id: 'openrouter:deepseek-v3.2',
             tipo: 'online',

@@ -1,0 +1,74 @@
+{
+  "modelo": "deepseek/deepseek-v3.2",
+  "pedido": "Leia src/main/brain/providers.ts e cite UMA linha do CORPO do arquivo (ignore o cabeçalho e comentários) com o numero de linha exato.",
+  "aprovados": 4,
+  "total": 5,
+  "latenciaMediaMs": 21312,
+  "rows": [
+    {
+      "agente": "arquiteto",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v3.2",
+      "overrideOk": true,
+      "duracaoMs": 7521,
+      "nExtraido": 18,
+      "linhaReal": "formato: 'ollama' | 'openai' | 'cursor-cli'",
+      "trechoCitado": "Linha 18: ` formato: 'ollama' | 'openai' | 'cursor-cli'`",
+      "matchConteudo": true,
+      "aprovado": true,
+      "veredito": "APROVADO"
+    },
+    {
+      "agente": "revisor",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v3.2",
+      "overrideOk": true,
+      "duracaoMs": 5948,
+      "nExtraido": 22,
+      "linhaReal": "numPredict: number",
+      "trechoCitado": "Linha 22: ` modelo: string`",
+      "matchConteudo": false,
+      "aprovado": false,
+      "veredito": "FALHOU:conteudo-nao-bate-com-linha-22"
+    },
+    {
+      "agente": "seguranca",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v3.2",
+      "overrideOk": true,
+      "duracaoMs": 15748,
+      "nExtraido": 5,
+      "linhaReal": "import { request as httpRequest, type ClientRequest } from 'http'",
+      "trechoCitado": "Linha 5: `import { request as httpRequest, type ClientRequest } from 'http'`",
+      "matchConteudo": true,
+      "aprovado": true,
+      "veredito": "APROVADO"
+    },
+    {
+      "agente": "testador",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v3.2",
+      "overrideOk": true,
+      "duracaoMs": 41381,
+      "nExtraido": 18,
+      "linhaReal": "formato: 'ollama' | 'openai' | 'cursor-cli'",
+      "trechoCitado": "Linha 18: ` formato: 'ollama' | 'openai' | 'cursor-cli'`",
+      "matchConteudo": true,
+      "aprovado": true,
+      "veredito": "APROVADO"
+    },
+    {
+      "agente": "dg-engenheiro",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v3.2",
+      "overrideOk": true,
+      "duracaoMs": 35961,
+      "nExtraido": 157,
+      "linhaReal": "const b = (body || '').toLowerCase()",
+      "trechoCitado": "Linha 157: ` const b = (body || '').toLowerCase()` Essa é a primeira linha do corpo da função `classificarHttp`, que normaliza o corpo da resposta HTTP para minúsculas antes de classificar o erro.",
+      "matchConteudo": true,
+      "aprovado": true,
+      "veredito": "APROVADO"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 /**
  * A/B de modelos OpenRouter na posicao 1 (codigo).
  * Uso: MODELO_TESTADO=deepseek/deepseek-v3.2 node scripts/ab-modelos.mjs
+ * Saida: .dg-editor/ab2-<modelo_sanitizado>.json
  *
- * Nota: invocarAgente() so usa Ollama local — nao permite override OpenRouter.
- * Este harness usa executarAgente({ modeloForcado, agente }) para forcar o modelo.
+ * Critério semântico: extrai linha (formatos variados) e confere se o trecho
+ * citado bate com a linha real do arquivo — nao premia so o formato providers.ts:N.
  */
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,6 +31,8 @@ const PEDIDO =
   'Leia src/main/brain/providers.ts e cite UMA linha do CORPO do arquivo (ignore o cabeçalho e comentários) com o numero de linha exato.'
 
 const AGENTES = ['arquiteto', 'revisor', 'seguranca', 'testador', 'dg-engenheiro']
+const ARQ = path.join(RAIZ, 'src', 'main', 'brain', 'providers.ts')
+const LINHAS_ARQ = fs.readFileSync(ARQ, 'utf8').split(/\r?\n/)
 
 const require = createRequire(import.meta.url)
 const { executarAgente } = require(path.join(RAIZ, '.dg-editor/bin/main/brain/agent.js'))
@@ -50,6 +53,53 @@ const probe = {
 }
 console.log('MODELO_TESTADO=' + MODELO)
 console.log('disponivel_status=' + disponivel(probe))
+console.log('providers.ts_linhas=' + LINHAS_ARQ.length)
+
+function extrairLinha(texto) {
+  const padroes = [
+    /providers\.ts:(\d+)/i,
+    /\blinha\s+(\d+)/i,
+    /\blinhas\s+(\d+)/i,
+    /\bline\s+(\d+)/i,
+    /\bL(\d+)\b/,
+    /:(\d+)\s*[—\-–]/
+  ]
+  for (const p of padroes) {
+    const m = texto.match(p)
+    if (m) return parseInt(m[1], 10)
+  }
+  return null
+}
+
+function normalizar(s) {
+  return String(s || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+/** Maior substring contígua comum; match se >= 15 chars. */
+function matchConteudo(textoAgente, linhaReal) {
+  const a = normalizar(textoAgente)
+  const b = normalizar(linhaReal)
+  if (!a || !b) return false
+  if (a.includes(b) || b.includes(a)) {
+    return Math.min(a.length, b.length) >= 15 || b.length < 15
+  }
+  // procurar 15 chars contíguos da linha real no texto do agente (e vice-versa)
+  const min = 15
+  if (b.length >= min) {
+    for (let i = 0; i <= b.length - min; i++) {
+      if (a.includes(b.slice(i, i + min))) return true
+    }
+  }
+  if (a.length >= min) {
+    for (let i = 0; i <= a.length - min; i++) {
+      if (b.includes(a.slice(i, i + min))) return true
+    }
+  }
+  return false
+}
 
 function veredito(texto, ok) {
   const t = String(texto || '')
@@ -63,24 +113,27 @@ function veredito(texto, ok) {
     'no such file'
   ]
   const frase = falhas.find((f) => t.toLowerCase().includes(f))
-  const m = t.match(/providers\.ts:(\d+)/i)
-  const n = m ? parseInt(m[1], 10) : null
+  const n = extrairLinha(t)
+  const linhaReal = n != null && n >= 1 && n <= LINHAS_ARQ.length ? LINHAS_ARQ[n - 1] : null
+  const match = linhaReal != null ? matchConteudo(t, linhaReal) : false
   const a = ok === true
-  const b = n != null && n > 20
-  const c = !frase && t.trim().length > 0
-  const aprovado = a && b && c
+  const b = n != null
+  const c = linhaReal != null
+  const d = match
+  const e = !frase && t.trim().length > 0
+  const aprovado = a && b && c && d && e
+  let motivo = 'ok'
+  if (!a) motivo = 'ok=false'
+  else if (!e) motivo = frase || 'vazio'
+  else if (!b) motivo = 'sem-numero-linha'
+  else if (!c) motivo = 'n=' + n + ' fora-do-arquivo'
+  else if (!d) motivo = 'conteudo-nao-bate-com-linha-' + n
   return {
     aprovado,
-    n,
-    motivo: !a
-      ? 'ok=false'
-      : !c
-        ? frase || 'vazio'
-        : !b
-          ? n == null
-            ? 'sem-cite providers.ts:N'
-            : 'cite N=' + n + ' (<=20, cabeçalho/inicio)'
-          : 'ok'
+    nExtraido: n,
+    linhaReal: linhaReal != null ? linhaReal.trim().slice(0, 120) : null,
+    matchConteudo: match,
+    motivo
   }
 }
 
@@ -102,6 +155,21 @@ for (const agente of AGENTES) {
   const texto = String(r.texto || '')
   const modeloUsado = r.modelo || ''
   const overrideOk = modeloUsado === MODELO || modeloUsado.startsWith(MODELO)
+  if (!overrideOk) {
+    console.error('ABORT: overrideOk=false agente=' + agente + ' modeloUsado=' + modeloUsado)
+    const abort = {
+      modelo: MODELO,
+      abort: true,
+      motivo: 'overrideOk=false',
+      agente,
+      modeloUsado,
+      esperado: MODELO
+    }
+    const abortPath = path.join(RAIZ, '.dg-editor', 'ab2-' + MODELO.replace(/[\\/]/g, '_') + '.json')
+    fs.writeFileSync(abortPath, JSON.stringify({ ...abort, rows }, null, 2))
+    console.log(JSON.stringify(abort, null, 2))
+    process.exit(3)
+  }
   const v = veredito(texto, r.ok !== false && !!texto.trim())
   const row = {
     agente,
@@ -109,30 +177,31 @@ for (const agente of AGENTES) {
     modeloUsado,
     overrideOk,
     duracaoMs: ms,
-    veredito: v.aprovado ? 'APROVADO' : 'FALHOU:' + v.motivo,
+    nExtraido: v.nExtraido,
+    linhaReal: v.linhaReal,
+    trechoCitado: texto.replace(/\s+/g, ' ').slice(0, 400),
+    matchConteudo: v.matchConteudo,
     aprovado: v.aprovado && overrideOk,
-    n: v.n,
-    trecho: texto.replace(/\s+/g, ' ').slice(0, 400),
+    veredito: v.aprovado ? 'APROVADO' : 'FALHOU:' + v.motivo,
     erro: r.erro
-  }
-  if (!overrideOk) {
-    row.veredito = 'FALHOU:modeloUsado!=' + MODELO + ' (foi ' + modeloUsado + ')'
-    row.aprovado = false
   }
   rows.push(row)
   console.log(JSON.stringify(row, null, 2))
 }
 
 const aprovados = rows.filter((r) => r.aprovado).length
+const latMedia = Math.round(rows.reduce((s, r) => s + r.duracaoMs, 0) / rows.length)
 const out = {
   modelo: MODELO,
   pedido: PEDIDO,
   aprovados,
   total: rows.length,
+  latenciaMediaMs: latMedia,
   rows
 }
-const outPath = path.join(RAIZ, '.dg-editor', 'ab-' + MODELO.replace(/[\\/]/g, '_') + '.json')
+const outPath = path.join(RAIZ, '.dg-editor', 'ab2-' + MODELO.replace(/[\\/]/g, '_') + '.json')
 fs.writeFileSync(outPath, JSON.stringify(out, null, 2))
 console.log('APROVADOS=' + aprovados + '/' + rows.length)
+console.log('LAT_MEDIA_MS=' + latMedia)
 console.log('SAIDA=' + outPath)
 process.exit(0)
