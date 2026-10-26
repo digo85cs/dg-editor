@@ -263,15 +263,20 @@ async function checarModelos(): Promise<Achado[]> {
     const instalados = await listModelos()
     // origem=auditoria: NAO conta no stats de pipeline (evita falso positivo do 14b)
     const escolhido = await escolherModelo('codigo', { origem: 'auditoria' })
-    const instaladoOk = instalados.some((d) => d === escolhido || d.startsWith(escolhido) || escolhido.startsWith(d.split(':')[0]))
+    const isOnlineSlug = escolhido.includes('/') // ex: deepseek/deepseek-chat
+    const instaladoOk = isOnlineSlug
+      ? true
+      : instalados.some((d) => d === escolhido || d.startsWith(escolhido) || escolhido.startsWith(d.split(':')[0]))
 
     out.push({
       id: 'modelos:codigo-instalado',
       area: 'modelos',
-      titulo: instaladoOk
-        ? 'escolherModelo(codigo)=' + escolhido + ' esta instalado'
-        : 'escolherModelo(codigo)=' + escolhido + ' NAO instalado',
-      detalhe: 'instalados: ' + instalados.slice(0, 8).join(', '),
+      titulo: isOnlineSlug
+        ? 'escolherModelo(codigo)=' + escolhido + ' (online, chave presente)'
+        : instaladoOk
+          ? 'escolherModelo(codigo)=' + escolhido + ' esta instalado'
+          : 'escolherModelo(codigo)=' + escolhido + ' NAO instalado',
+      detalhe: 'instalados ollama: ' + instalados.slice(0, 8).join(', '),
       severidade: instaladoOk ? 'ok' : 'erro',
       corrigivel: false,
       status: 'nao-aplicavel'
