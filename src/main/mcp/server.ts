@@ -195,36 +195,49 @@ const TOOLS = [
   {
     name: 'navegador_abrir',
     description:
-      'Abre/navega URL no navegador embutido do DG Editor (WebContentsView, sessao persist:dgnav). Login e manual pelo usuario.',
+      'Abre/navega URL no navegador embutido (persist:dgnav). Opcional: esperarSeletor para SPAs.',
     inputSchema: {
       type: 'object',
-      properties: { url: { type: 'string', description: 'URL absoluta (https://...)' } },
+      properties: {
+        url: { type: 'string', description: 'URL absoluta (https://...)' },
+        esperarSeletor: { type: 'string', description: 'CSS a aguardar apos load' },
+        esperarTimeoutMs: { type: 'number', description: 'Timeout ms (default 10000)' }
+      },
       required: ['url']
     }
   },
   {
     name: 'navegador_ler',
     description:
-      'Le conteudo da pagina atual (texto|tabela|links|html). Paginação: offset/limit (texto=chars, tabela=linhas). Resposta inclui truncado e proximoOffset.',
+      'Le conteudo (texto|tabela|links|html). Paginação offset/limit. Opcional: esperarSeletor, frame (indice ou URL parcial de iframe).',
     inputSchema: {
       type: 'object',
       properties: {
         modo: { type: 'string', enum: ['texto', 'tabela', 'links', 'html'] },
         seletor: { type: 'string', description: 'CSS opcional para escopo' },
         offset: { type: 'number', description: 'Inicio (chars em texto/html; linhas em tabela)' },
-        limit: { type: 'number', description: 'Tamanho da pagina (texto default 50000; tabela default 500)' }
+        limit: { type: 'number', description: 'Tamanho da pagina (texto default 50000; tabela default 500)' },
+        esperarSeletor: { type: 'string' },
+        esperarTimeoutMs: { type: 'number' },
+        frame: {
+          description: 'Indice do iframe ou substring da URL do frame',
+          oneOf: [{ type: 'number' }, { type: 'string' }]
+        }
       },
       required: []
     }
   },
   {
     name: 'navegador_clicar',
-    description: 'Clica elemento por seletor CSS ou texto exato de botao/link.',
+    description: 'Clica elemento por seletor CSS ou texto. Opcional: frame, esperarSeletor.',
     inputSchema: {
       type: 'object',
       properties: {
         seletor: { type: 'string' },
-        texto: { type: 'string' }
+        texto: { type: 'string' },
+        frame: { oneOf: [{ type: 'number' }, { type: 'string' }] },
+        esperarSeletor: { type: 'string' },
+        esperarTimeoutMs: { type: 'number' }
       },
       required: []
     }
@@ -458,9 +471,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     }
 
     if (name === 'navegador_abrir') {
-      const parsed = z.object({ url: z.string().min(1) }).parse(args)
-      const r = await chamarControle('POST', '/abrir', { url: parsed.url })
-      const err = r.status === 0 || r.status >= 400 || r.json.erro
+      const parsed = z
+        .object({
+          url: z.string().min(1),
+          esperarSeletor: z.string().optional(),
+          esperarTimeoutMs: z.number().optional()
+        })
+        .parse(args)
+      const r = await chamarControle('POST', '/abrir', parsed)
+      const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
       return {
         content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
         isError: !!err
@@ -473,14 +492,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           modo: z.enum(['texto', 'tabela', 'links', 'html']).optional(),
           seletor: z.string().optional(),
           offset: z.number().optional(),
-          limit: z.number().optional()
+          limit: z.number().optional(),
+          esperarSeletor: z.string().optional(),
+          esperarTimeoutMs: z.number().optional(),
+          frame: z.union([z.number(), z.string()]).optional()
         })
         .parse(args)
       const r = await chamarControle('POST', '/ler', {
         modo: parsed.modo || 'texto',
         seletor: parsed.seletor,
         offset: parsed.offset,
-        limit: parsed.limit
+        limit: parsed.limit,
+        esperarSeletor: parsed.esperarSeletor,
+        esperarTimeoutMs: parsed.esperarTimeoutMs,
+        frame: parsed.frame
       })
       const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false
       return {
@@ -491,7 +516,13 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     if (name === 'navegador_clicar') {
       const parsed = z
-        .object({ seletor: z.string().optional(), texto: z.string().optional() })
+        .object({
+          seletor: z.string().optional(),
+          texto: z.string().optional(),
+          frame: z.union([z.number(), z.string()]).optional(),
+          esperarSeletor: z.string().optional(),
+          esperarTimeoutMs: z.number().optional()
+        })
         .parse(args)
       if (!parsed.seletor && !parsed.texto) {
         return {
