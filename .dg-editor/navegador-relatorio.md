@@ -1,53 +1,65 @@
 # Navegador embutido — relatório
 
-**Branch:** `feat/navegador-embutido`  
-**Electron:** 33.2.1 (`BaseWindow` + `WebContentsView`)
+**Branch:** `main`  
+**Electron:** 33.2.1 · `BaseWindow` + `WebContentsView` · partition `persist:dgnav`  
+**Controle:** `127.0.0.1:47821` + header `X-DG-Token`
 
-## Peças
+## Validações (ids reais de `smoke.ts`)
 
-| peça | caminho |
+| # | O que valida |
 |---|---|
-| Janela singleton | `src/main/navegador/janela.ts` |
-| Controle HTTP | `127.0.0.1:47821` + `X-DG-Token` |
-| Downloads | sempre `.dg-editor/downloads/<timestamp>-<nome>` |
-| Tools MCP | `navegador_abrir/ler/clicar/preencher/baixar` |
+| 1 | Janela aberta (`estadoAtual().aberto`) |
+| 2 | `GET /status` em example.com |
+| 3 | `/ler` modo texto |
+| 4 | `/ler` modo links (IANA) |
+| 5 | `/preencher` em httpbin forms |
+| 6 | Request sem token → 401 |
+| 7 | Painel fechado → `aberto:false` + 409 |
+| 8 | Cookie `persist:dgnav` gravável |
+| 9 | `/screenshot` PNG base64 |
+| 10 | `/ler` seletor inexistente → `candidatos[]` |
+| 11 | `/clicar` seletor+texto inexistentes → `candidatos[]` |
+| 12 | Singleton: 2× `criar` = mesma instância, `isVisible=false` |
+| 13 | Download real em `downloads/_smoke/`, nome legível, colisão `_1` |
+| 14 | Paginação `/ler` tabela (`offset`/`limit`/`proximoOffset`) |
+| 15 | Sanitização path traversal + nome ≤120 chars |
+| 16 | `esperarSeletor` em `/abrir` e `/ler` |
+| 17 | Iframe: host sem tabela + `framesDisponiveis` + `/ler` com `frame` |
 
-## `/ler` com paginação
+Smoke: **17/17 PASS** · `typecheck` 0 · `build:mcp` 0 · `build` 0
 
-Body: `{ modo, seletor?, offset?, limit? }`
+## Download
 
-| modo | offset/limit | default limit |
-|---|---|---|
-| `texto` / `html` | caracteres | 50000 |
-| `tabela` | linhas | 500 |
-| `links` | itens | todos |
+- Sempre em `.dg-editor/downloads/` (smoke → `downloads/_smoke/`, removida ao final)
+- Nome legível (`relatorio.pdf`); colisão → `relatorio_1.pdf`
+- `sanitizarNomeArquivo`: remove `/ \ ..`, chars Windows inválidos, reservados; valida `resolve` dentro do dir
+- Retorno: `{ ok, caminho, bytes, nomeOriginal, nomeSalvo, renomeado }`
 
-Resposta sempre inclui `truncado` e `proximoOffset`. Cap duro 200k chars.  
-Tabela: cada item em `tabelas[]` é `{ totalLinhas, offset, limit, linhas }`.
+## SPA / iframes
 
-## Validações (DG_NAV_SMOKE=1)
+- `/abrir` e `/ler`: `esperarSeletor`, `esperarTimeoutMs` (default 10000)
+- `/ler` e `/clicar`: `frame` (índice ou substring de URL)
+- Conteúdo vazio no host → `aviso` + `framesDisponiveis`
 
-```
-#1  janela aberta                              PASS
-#2  GET /status example.com                    PASS
-#3  navegador_ler texto                        PASS
-#4  navegador_ler links (IANA)                 PASS
-#5  preencher input httpbin                    PASS
-#6  request sem token → 401                    PASS
-#7  fechar painel → aberto:false/409           PASS
-#8  cookie persist:dgnav                       PASS
-#9  /screenshot PNG                            PASS
-#10 /ler seletor inexistente → candidatos      PASS
-#11 /clicar seletor+texto → candidatos         PASS
-#12 singleton 2× criar, isVisible=false        PASS
-#13 download real em .dg-editor/downloads/     PASS
-#14 paginação /ler tabela (offset/limit)       PASS
-```
+## Isolamento smoke
 
-`typecheck` 0 · `build:mcp` 0 · `build` 0 · smoke **14/14** PASS.
+- `DG_NAV_SMOKE=1` → `nav-ultima-url.smoke` (não toca `nav-ultima-url`)
+- Downloads de teste só em `downloads/_smoke/` (apagada no `finally`)
 
-## Singleton / show
+## Auditoria de segurança
 
-- Menu/IPC: `{ mostrar: true }` + `.dg-editor/nav-ultima-url`
-- MCP/controle/smoke: `{ mostrar: false }`
-- `.gitignore`: `nav-token`, `nav-ultima-url`, `downloads/` (uma vez cada)
+| item | resultado |
+|---|---|
+| a) bind só `127.0.0.1` (nunca `0.0.0.0`) | PASS |
+| b) token 64 hex via `randomBytes(32)`, arquivo em `.dg-editor/nav-token` + gitignore | PASS |
+| c) nenhum token 64hex hardcoded em `src/` | PASS |
+| d) nenhum caminho absoluto de máquina em `src/`/relatório | PASS |
+| e) sanitização de nome de download + path traversal | PASS |
+| f) `contextIsolation:true`, `nodeIntegration:false`, `sandbox:true` | PASS |
+| g) sem `executeJavaScript` lendo localStorage de terceiros | PASS |
+| h) cap 200k chars nas extrações | PASS |
+
+## Tools MCP
+
+`navegador_abrir` · `navegador_ler` · `navegador_clicar` · `navegador_preencher` · `navegador_baixar`  
+(params: `esperarSeletor`, `frame`, `offset`, `limit`)
