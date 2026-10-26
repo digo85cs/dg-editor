@@ -106,6 +106,15 @@ especialidade: estratégia de teste
 skills: testador, leitor-codigo, debugger
 ---
 Priorize teste que falha quando o codigo quebra. Rejeite teste que sempre passa.`
+        },
+        {
+            nome: 'dg-engenheiro.md',
+            conteudo: `---
+nome: DG Engenheiro
+especialidade: orquestração interna
+skills: leitor-codigo, refatorador, testador, debugger, revisor-seguranca, documentador, arvore-projeto, editar-seguro
+---
+Voce e o engenheiro interno do DG Editor. Trabalha so com tools e skills locais. Antes de editar, le. Antes de pronto, typecheck.`
         }
     ];
     for (const p of padroes) {

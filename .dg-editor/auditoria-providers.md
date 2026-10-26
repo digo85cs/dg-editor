@@ -2,7 +2,33 @@
 
 Historico de failover (sem chaves). Gerado automaticamente pelo agente e pela auditoria.
 
-## Politica de fila (Fase B)
+## Fase G1 — cursor-agent como provider (2026-10-26)
+
+**Decisao: REPROVADO** — cursor-agent indisponivel como provider: exige autenticacao (`agent login` ou `CURSOR_API_KEY`); CLI reporta `Not logged in`; chamada nao-interativa `-p` retorna exit 1 sem texto util.
+
+### Interface CLI (bruta)
+- Versao: `2026.10.19-6bbf2c4`
+- Binario: `C:\Users\digo8\AppData\Local\cursor-agent\cursor-agent.ps1` (presente)
+- Flag prompt: `-p` / `--print` + argumento prompt — **presente**
+- Flag JSON: `--output-format text|json|stream-json` — **presente**
+- Flag somente leitura: `--mode ask|plan`, `--plan` — **presente**
+- Flag modelo: `--model` — **presente**
+- Flag workspace: `--workspace` — **presente**
+
+### G1.2 chamada nao-interativa
+```
+comando: cursor-agent -p "Responda apenas a palavra: ok" --mode ask
+exit: 1
+stdout: (vazio)
+stderr: Error: Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY environment variable.
+tempo: ~3743 ms (encerrou sozinho)
+```
+
+### G1.3 isolamento de escrita
+- arquivo `_g1-teste.txt` intacto = **sim** (auth falhou antes de qualquer tool; arquivo apagado apos teste)
+- G2 **NAO implementado** (G1 reprovado). cursor-cli **nao** entrou na fila.
+
+## Politica de fila (atual)
 
 ### codigo
 1. openrouter / deepseek/deepseek-chat (online)
@@ -16,10 +42,11 @@ Historico de failover (sem chaves). Gerado automaticamente pelo agente e pela au
 3. ollama / qwen2.5-coder:14b
 
 ### chat
-1. openrouter / google/gemini-flash-1.5
-2. ollama / qwen2.5-coder:1.5b
+1. openrouter / openai/gpt-4o-mini (online)
+2. ollama / qwen2.5-coder:1.5b (local)
 
 Chave: apenas `OPENROUTER_API_KEY` em variavel de ambiente do usuario.
+Nenhuma `CURSOR_API_KEY` no projeto.
 
 ## Historico
 
@@ -70,3 +97,10 @@ Chave: apenas `OPENROUTER_API_KEY` em variavel de ambiente do usuario.
 - 2026-10-26T14:38:38.364Z | tarefa=chat | tentou=ollama:qwen2.5-coder:1.5b | motivo=ok modelo=qwen2.5-coder:1.5b | resultado=ok | 29083ms
 - 2026-10-26T14:38:41.259Z | tarefa=chat | tentou=openrouter:gemini-flash-1.5 | motivo=outro: HTTP 404: {"error":{"message":"google/gemini-flash-1.5 is no longer available on OpenRouter: no provider serves this model anymore. See available models at http | resultado=falhou | 125ms
 - 2026-10-26T14:40:36.167Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 18678ms
+- 2026-10-26T16:53:47.792Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 12588ms
+- 2026-10-26T16:54:07.974Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 16308ms
+- 2026-10-26T16:54:24.457Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 13093ms
+- 2026-10-26T16:54:35.879Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 7540ms
+- 2026-10-26T16:54:54.136Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 14931ms
+- 2026-10-26T16:55:06.989Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 9344ms
+- 2026-10-26T16:56:54.777Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 30257ms

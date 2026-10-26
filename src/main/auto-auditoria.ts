@@ -364,6 +364,7 @@ async function checarProviders(): Promise<Achado[]> {
       const temLocal = fila.some((p) => p.tipo === 'local')
       const semChave = fila.filter((p) => p.tipo === 'online' && !disponivel(p))
       const comChave = fila.filter((p) => p.tipo === 'online' && disponivel(p))
+      const temCursorCli = fila.some((p) => (p as { formato?: string }).formato === 'cursor-cli' || p.id.includes('cursor'))
 
       out.push({
         id: 'providers:fila-' + t,
@@ -419,7 +420,36 @@ async function checarProviders(): Promise<Achado[]> {
           status: 'nao-aplicavel'
         })
       }
+      if (temCursorCli) {
+        out.push({
+          id: 'providers:cursor-cli-na-fila-' + t,
+          area: 'providers',
+          titulo: 'cursor-cli na fila ' + t + ' mas G1 REPROVADO',
+          detalhe: 'G1 exigiu auth; adapter nao deveria estar ativo',
+          severidade: 'erro',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
     }
+
+    const binCursor = path.join(
+      process.env.LOCALAPPDATA || '',
+      'cursor-agent',
+      'cursor-agent.ps1'
+    )
+    const binExiste = !!(process.env.LOCALAPPDATA && fs.existsSync(binCursor))
+    out.push({
+      id: 'providers:cursor-agent-g1',
+      area: 'providers',
+      titulo: binExiste
+        ? 'cursor-agent presente em disco; G1 REPROVADO (sem auth) — fora da fila'
+        : 'cursor-agent ausente em disco; G1 REPROVADO',
+      detalhe: binExiste ? binCursor : 'path esperado sob LOCALAPPDATA/cursor-agent',
+      severidade: 'ok',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
   } catch (e: any) {
     out.push({
       id: 'providers:falha',
@@ -496,7 +526,7 @@ function checarAgentesArea(): Achado[] {
       area: 'agentes',
       titulo: agentes.length + ' agente(s) em disco',
       detalhe: agentes.map((a) => a.id).join(', '),
-      severidade: agentes.length >= 4 ? 'ok' : 'erro',
+      severidade: agentes.length >= 5 ? 'ok' : 'erro',
       corrigivel: false,
       status: 'nao-aplicavel'
     })
@@ -515,6 +545,34 @@ function checarAgentesArea(): Achado[] {
           ' skills=' + (a.skills || []).join(',') +
           (faltando.length ? ' FALTANDO=' + faltando.join(',') : ''),
         severidade: ok ? 'ok' : 'erro',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+    const eng = agentes.find((a) => a.id === 'dg-engenheiro')
+    if (!eng) {
+      out.push({
+        id: 'agentes:dg-engenheiro',
+        area: 'agentes',
+        titulo: 'dg-engenheiro ausente',
+        severidade: 'erro',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      const esperadas = [
+        'leitor-codigo', 'refatorador', 'testador', 'debugger',
+        'revisor-seguranca', 'documentador', 'arvore-projeto', 'editar-seguro'
+      ]
+      const falt = esperadas.filter((id) => !(eng.skills || []).includes(id) || !skillIds.has(id))
+      out.push({
+        id: 'agentes:dg-engenheiro-skills',
+        area: 'agentes',
+        titulo: falt.length === 0
+          ? 'dg-engenheiro com 8 skills validas'
+          : 'dg-engenheiro skills incompletas',
+        detalhe: falt.length ? 'faltando=' + falt.join(',') : esperadas.join(','),
+        severidade: falt.length === 0 ? 'ok' : 'erro',
         corrigivel: false,
         status: 'nao-aplicavel'
       })

@@ -1,94 +1,92 @@
 # Auditoria completa consolidada
 
-**Data:** 2026-10-26T14:42:13.587Z
+**Data:** 2026-10-26T16:56:54.993Z
 
 ## Hashes
-- `out/main/index.js`: `596a191eb658d260b091e2bda6b8a142`
+- `out/main/index.js`: `5fdbfdf20e1a1f0653524cecc1e8f078`
 - `.dg-editor/bin/main/mcp/server.js`: `441f344c2a79ceddfb227817656179f1`
 
 ## Resumo global
 
 | ok | warn | erro |
 |---:|---:|---:|
-| 33 | 2 | 0 |
+| 32 | 3 | 0 |
 
 ## 8 areas
 
 | area | ok | warn | erro |
 |---|---:|---:|---:|
 | modelos | 2 | 1 | 0 |
-| providers | 7 | 0 | 0 |
+| providers | 5 | 0 | 0 |
 | skills | 9 | 0 | 0 |
-| agentes | 5 | 0 | 0 |
+| agentes | 7 | 0 | 0 |
 | mcp | 3 | 0 | 0 |
 | pipeline | 3 | 0 | 0 |
 | build | 2 | 0 | 0 |
-| integridade | 2 | 1 | 0 |
+| integridade | 1 | 2 | 0 |
 
 ## Detalhes
 
 ### modelos
-- escolherModelo(codigo)=deepseek/deepseek-chat online
+- escolherModelo(codigo)=deepseek/deepseek-chat
 - Politica 7b padrao / 14b sob demanda
-- 14b pipeline usos=0 (so origin=pipeline)
+- 14b pipeline usos=0
 
 ### providers
-- Fila codigo: openrouter:deepseek-chat[ok], openrouter:qwen-2.5-coder-32b[ok], ollama:qwen2.5-coder:7b[ok], ollama:qwen2.5-coder:3b[ok]
-- local no fim
-- chave presente sim (codigo): openrouter:deepseek-chat,openrouter:qwen-2.5-coder-32b
-- Fila raciocinio: openrouter:llama-3.3-70b[ok], ollama:llama3.2[ok], ollama:qwen2.5-coder:14b[ok]
-- chave presente sim (raciocinio): openrouter:llama-3.3-70b
-- Fila chat: openrouter:gpt-4o-mini[ok], ollama:qwen2.5-coder:1.5b[ok]
-- chave presente sim (chat): openrouter:gpt-4o-mini
+- Fila codigo (4): openrouter:deepseek-chat[ok], openrouter:qwen-2.5-coder-32b[ok], ollama:qwen2.5-coder:7b[ok], ollama:qwen2.5-coder:3b[ok]
+- local no fim codigo
+- Fila raciocinio (3): openrouter:llama-3.3-70b[ok], ollama:llama3.2[ok], ollama:qwen2.5-coder:14b[ok]
+- Fila chat (2): openrouter:gpt-4o-mini[ok], ollama:qwen2.5-coder:1.5b[ok]
+- cursor-agent G1 REPROVADO (sem auth); bin=presente; fora da fila
 
 ### skills
 - count=8
-- arvore-projeto chars=961 gatilho=true proc=true
-- debugger chars=1261 gatilho=true proc=true
-- documentador chars=1149 gatilho=true proc=true
-- editar-seguro chars=1162 gatilho=true proc=true
-- leitor-codigo chars=1268 gatilho=true proc=true
-- refatorador chars=1268 gatilho=true proc=true
-- revisor-seguranca chars=1333 gatilho=true proc=true
-- testador chars=1262 gatilho=true proc=true
+- arvore-projeto chars=961
+- debugger chars=1261
+- documentador chars=1149
+- editar-seguro chars=1162
+- leitor-codigo chars=1268
+- refatorador chars=1268
+- revisor-seguranca chars=1333
+- testador chars=1262
 
 ### agentes
-- count=4
-- arquiteto esp/sys/skills=true skills=leitor-codigo,refatorador,documentador
-- revisor esp/sys/skills=true skills=leitor-codigo,refatorador,testador
-- seguranca esp/sys/skills=true skills=revisor-seguranca,leitor-codigo,documentador
-- testador esp/sys/skills=true skills=testador,leitor-codigo,debugger
+- count=5 arquiteto,dg-engenheiro,revisor,seguranca,testador
+- arquiteto ok=true
+- dg-engenheiro ok=true
+- revisor ok=true
+- seguranca ok=true
+- testador ok=true
+- dg-engenheiro 8 skills ok
 
 ### mcp
-- tools=15 dossie_read,dossie_write,dossie_snapshot,vault_list,vault_read,vault_write,projeto_arvore,codigo_buscar,codigo_ler,codigo_editar,skill_listar,skill_ler,agente_listar,agente_invocar,agente_executar
-- agente_executar presente
-- schemas presentes
+- tools=15
+- agente_executar
+- schemas
 
 ### pipeline
-- executarAgente acessivel
-- agente_executar acessivel
+- executarAgente
+- agente_executar MCP
 - anti-recursao
 
 ### build
-- out/main/index.js md5=596a191eb658d260b091e2bda6b8a142
+- out/main/index.js md5=5fdbfdf20e1a1f0653524cecc1e8f078
 - .dg-editor/bin/main/mcp/server.js md5=441f344c2a79ceddfb227817656179f1
 
 ### integridade
 - indice simbolos=244
-- dossie ausente
-- git limpo (working tree clean apos commit final)
+- dossie ausente (nao bloqueante)
+- git sujo (12)
 
-## Regressao F3
+## G1 cursor-agent
 
-- editou: true (MAX_ITER 6→7)
-- ms: 20930 (limite online 60000)
-- provider: openrouter:deepseek-chat
-- modelo: deepseek/deepseek-chat
-- online: true
-- revertido: true
+- **REPROVADO**: Authentication required / Not logged in. G2 nao implementado.
 
-## Chave OpenRouter
+## Regressao G5
 
-- chave presente (env User): sim (valor nunca logado)
-- slug `google/gemini-flash-1.5` removido (HTTP 404 no provedor); chat usa `openai/gpt-4o-mini`
-- codigo online: `deepseek/deepseek-chat` OK (HTTP 200)
+- ok=true editou=true revertido=true
+- ms=32682 limite=60000 provider=openrouter:deepseek-chat modelo=deepseek/deepseek-chat
+
+## G4 agentes
+
+- aprovados=5/5
