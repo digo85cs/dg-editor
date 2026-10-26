@@ -20,3 +20,21 @@ logs/
 .dg-editor/backup/
 
 src/**/*.js
+
+# Testes e diagnosticos soltos na raiz
+teste-*.cjs
+teste-*.log
+diag-*.cjs
+*_teste_*.mjs
+_test-*.mjs
+
+# Dossies gerados
+dossie-tecnico.cjs
+dossie-tecnico.json
+dossie-tecnico.md
+
+# Estado local do DG Editor
+.dg-editor/chat.json
+.dg-editor/indice-codigo.json
+.dg-editor/memoria/
+.dg-editor/logs/

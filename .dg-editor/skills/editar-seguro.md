@@ -1,6 +1,32 @@
 ---
 titulo: Edicao segura
-gatilho: editar, trocar, alterar, codigo_editar, MAX_ITER
+gatilho: editar, trocar, alterar, mudar, codigo_editar, refatorar, MAX_ITER
 ---
-Antes de editar codigo, use codigo_buscar/codigo_ler para localizar o simbolo.
-Edite apenas com codigo_editar e ancora unica. Nunca reescreva o arquivo inteiro.
+
+# Edicao segura
+
+## Regra de ouro
+Nenhuma edicao acontece sem localizar o simbolo antes. O DG Editor tem consciencia do codigo.
+
+## Procedimento obrigatorio
+1. **Localizar**: `codigo_buscar` com o nome do simbolo ou termo de busca.
+   - Retorna arquivo + linha + assinatura.
+   - Se retornar mais de um candidato, pergunte qual.
+2. **Ler**: `codigo_ler` com o nome exato.
+   - Confirme que e a funcao certa antes de editar.
+3. **Editar**: `codigo_editar` com:
+   - `arquivo`: caminho relativo retornado pela busca
+   - `ancora`: trecho EXATO e UNICO do arquivo (minimo 20 chars)
+   - `novo`: substituicao completa
+   - `verificar`: true
+4. Se a tool retornar erro de ancora ambigua, amplie a ancora incluindo linha anterior ou posterior.
+
+## Proibicoes
+- NUNCA reescrever o arquivo inteiro.
+- NUNCA usar `write` para editar codigo existente.
+- NUNCA editar sem antes ter passado por `codigo_buscar` e `codigo_ler`.
+
+## Formato da resposta
+- Qual simbolo foi localizado (arquivo:linha)
+- O que mudou (antes -> depois, 1 linha cada)
+- Resultado do typecheck
