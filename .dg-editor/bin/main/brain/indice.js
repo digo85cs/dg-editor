@@ -256,7 +256,8 @@ function expandirTermo(termo) {
 }
 function buscarSimbolos(raiz, termo, tipo) {
     let idx = carregarIndiceCodigo(raiz);
-    if (!idx) {
+    const raizAbs = path_1.default.resolve(raiz);
+    if (!idx || !idx.simbolos?.length || path_1.default.resolve(idx.raiz || '') !== raizAbs) {
         idx = gerarIndice(raiz);
         salvarIndice(raiz, idx);
     }
@@ -268,11 +269,18 @@ function buscarSimbolos(raiz, termo, tipo) {
         todos: ['funcao', 'classe', 'interface', 'type', 'const']
     };
     const tiposOk = new Set(mapaTipo[tipo || 'todos'] || mapaTipo.todos);
+    const termoL = termo.toLowerCase();
     return idx.simbolos
         .filter((s) => tiposOk.has(s.tipo))
         .filter((s) => {
         const n = s.nome.toLowerCase();
-        return variantes.some((v) => n.includes(v) || n.includes(termo.toLowerCase()));
+        const arq = s.arquivo.toLowerCase();
+        return (variantes.some((v) => n.includes(v) || n.includes(termoL)) ||
+            arq.includes(termoL) ||
+            arq.endsWith('/' + termoL) ||
+            path_1.default.basename(arq) === termoL ||
+            path_1.default.basename(arq) === termoL + '.ts' ||
+            path_1.default.basename(arq) === termoL + '.js');
     })
         .map((s) => ({
         nome: s.nome,
@@ -283,8 +291,31 @@ function buscarSimbolos(raiz, termo, tipo) {
     }));
 }
 function lerSimbolo(raiz, nome) {
+    const pedido = (nome || '').trim();
+    if (!pedido)
+        return null;
+    // Aceita caminho de arquivo (relativo ou so o basename com extensao)
+    const pareceArquivo = /[\\/]/.test(pedido) ||
+        /\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(pedido);
+    if (pareceArquivo) {
+        const abs = path_1.default.isAbsolute(pedido) ? path_1.default.normalize(pedido) : path_1.default.normalize(path_1.default.join(raiz, pedido));
+        const rel = path_1.default.relative(raiz, abs).replace(/\\/g, '/');
+        if (rel.startsWith('..') || path_1.default.isAbsolute(rel)) {
+            return null;
+        }
+        if (!fs_1.default.existsSync(abs)) {
+            // tenta achar por basename no indice / src
+            const base = path_1.default.basename(pedido);
+            const encontrado = acharArquivoPorNome(raiz, base);
+            if (!encontrado)
+                return null;
+            return lerArquivoCompleto(raiz, encontrado);
+        }
+        return lerArquivoCompleto(raiz, rel);
+    }
     let idx = carregarIndiceCodigo(raiz);
-    if (!idx) {
+    const raizAbsLer = path_1.default.resolve(raiz);
+    if (!idx || !idx.simbolos?.length || path_1.default.resolve(idx.raiz || '') !== raizAbsLer) {
         idx = gerarIndice(raiz);
         salvarIndice(raiz, idx);
     }
@@ -304,6 +335,50 @@ function lerSimbolo(raiz, nome) {
         linhaInicio: hit.linhaInicio,
         linhaFim: hit.linhaFim,
         corpo,
-        chamadoPor: [...new Set(chamadoPor)]
+        chamadoPor: [...new Set(chamadoPor)],
+        modo: 'simbolo'
     };
+}
+function lerArquivoCompleto(raiz, rel) {
+    const abs = path_1.default.join(raiz, rel);
+    const texto = fs_1.default.readFileSync(abs, 'utf8');
+    const linhas = texto.split(/\r?\n/);
+    const MAX = 400;
+    const corpo = linhas.length > MAX
+        ? linhas.slice(0, MAX).join('\n') + '\n/* ... truncado ' + linhas.length + ' linhas ... */'
+        : texto;
+    return {
+        arquivo: rel.replace(/\\/g, '/'),
+        linhaInicio: 1,
+        linhaFim: Math.min(linhas.length, MAX),
+        corpo,
+        chamadoPor: [],
+        totalLinhas: linhas.length,
+        modo: 'arquivo'
+    };
+}
+function acharArquivoPorNome(raiz, base) {
+    const alvo = base.toLowerCase();
+    const saida = [];
+    function walk(dir) {
+        let ents;
+        try {
+            ents = fs_1.default.readdirSync(dir, { withFileTypes: true });
+        }
+        catch {
+            return;
+        }
+        for (const e of ents) {
+            if (e.name === 'node_modules' || e.name === 'out' || e.name === '.git' || e.name === 'dist')
+                continue;
+            const abs = path_1.default.join(dir, e.name);
+            if (e.isDirectory())
+                walk(abs);
+            else if (e.name.toLowerCase() === alvo) {
+                saida.push(path_1.default.relative(raiz, abs).replace(/\\/g, '/'));
+            }
+        }
+    }
+    walk(path_1.default.join(raiz, 'src'));
+    return saida[0] || null;
 }

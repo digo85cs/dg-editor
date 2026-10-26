@@ -12,6 +12,7 @@ const index_js_1 = require("@modelcontextprotocol/sdk/client/index.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/client/stdio.js");
 const dglog_1 = require("../dglog");
 const path_1 = __importDefault(require("path"));
+const paths_1 = require("../paths");
 /**
  * Cliente MCP interno do DG Editor.
  * Fala com o NOSSO servidor local (subprocesso node) por stdio.
@@ -21,8 +22,7 @@ let client = null;
 let transport = null;
 let conectando = null;
 function serverJs() {
-    // aponta para o binario isolado em .dg-editor/bin (fora do out/ do electron-vite)
-    const raiz = process.env.DG_ROOT || process.cwd();
+    const raiz = (0, paths_1.resolverRaizProjeto)();
     return path_1.default.join(raiz, '.dg-editor', 'bin', 'main', 'mcp', 'server.js');
 }
 async function conectarMcp() {
@@ -31,14 +31,15 @@ async function conectarMcp() {
     if (conectando)
         return conectando;
     conectando = (async () => {
+        const raiz = (0, paths_1.resolverRaizProjeto)();
         const alvo = serverJs();
-        (0, dglog_1.dglog)('[mcp-client] conectando em ' + alvo);
+        (0, dglog_1.dglog)('[mcp-client] conectando em ' + alvo + ' DG_ROOT=' + raiz);
         transport = new stdio_js_1.StdioClientTransport({
             command: process.execPath,
             args: [alvo],
             env: {
                 ...process.env,
-                DG_ROOT: process.env.DG_ROOT || process.cwd(),
+                DG_ROOT: raiz,
                 ELECTRON_RUN_AS_NODE: '1'
             },
             stderr: 'pipe'

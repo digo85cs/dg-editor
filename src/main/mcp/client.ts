@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { dglog } from '../dglog'
 import path from 'path'
+import { resolverRaizProjeto } from '../paths'
 
 /**
  * Cliente MCP interno do DG Editor.
@@ -14,8 +15,7 @@ let transport: StdioClientTransport | null = null
 let conectando: Promise<Client> | null = null
 
 function serverJs(): string {
-  // aponta para o binario isolado em .dg-editor/bin (fora do out/ do electron-vite)
-  const raiz = process.env.DG_ROOT || process.cwd()
+  const raiz = resolverRaizProjeto()
   return path.join(raiz, '.dg-editor', 'bin', 'main', 'mcp', 'server.js')
 }
 
@@ -24,15 +24,16 @@ export async function conectarMcp(): Promise<Client> {
   if (conectando) return conectando
 
   conectando = (async () => {
+    const raiz = resolverRaizProjeto()
     const alvo = serverJs()
-    dglog('[mcp-client] conectando em ' + alvo)
+    dglog('[mcp-client] conectando em ' + alvo + ' DG_ROOT=' + raiz)
 
     transport = new StdioClientTransport({
       command: process.execPath,
       args: [alvo],
       env: {
         ...process.env,
-        DG_ROOT: process.env.DG_ROOT || process.cwd(),
+        DG_ROOT: raiz,
         ELECTRON_RUN_AS_NODE: '1'
       },
       stderr: 'pipe'

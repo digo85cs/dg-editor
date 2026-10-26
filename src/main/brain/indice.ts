@@ -289,7 +289,8 @@ export function buscarSimbolos(
   tipo?: 'funcao' | 'classe' | 'tipo' | 'todos'
 ): Array<{ nome: string; tipo: string; arquivo: string; linha: number; assinatura: string }> {
   let idx = carregarIndiceCodigo(raiz)
-  if (!idx) {
+  const raizAbs = path.resolve(raiz)
+  if (!idx || !idx.simbolos?.length || path.resolve(idx.raiz || '') !== raizAbs) {
     idx = gerarIndice(raiz)
     salvarIndice(raiz, idx)
   }
@@ -302,11 +303,20 @@ export function buscarSimbolos(
   }
   const tiposOk = new Set(mapaTipo[tipo || 'todos'] || mapaTipo.todos)
 
+  const termoL = termo.toLowerCase()
   return idx.simbolos
     .filter((s) => tiposOk.has(s.tipo))
     .filter((s) => {
       const n = s.nome.toLowerCase()
-      return variantes.some((v) => n.includes(v) || n.includes(termo.toLowerCase()))
+      const arq = s.arquivo.toLowerCase()
+      return (
+        variantes.some((v) => n.includes(v) || n.includes(termoL)) ||
+        arq.includes(termoL) ||
+        arq.endsWith('/' + termoL) ||
+        path.basename(arq) === termoL ||
+        path.basename(arq) === termoL + '.ts' ||
+        path.basename(arq) === termoL + '.js'
+      )
     })
     .map((s) => ({
       nome: s.nome,
@@ -326,9 +336,36 @@ export function lerSimbolo(
   linhaFim: number
   corpo: string
   chamadoPor: string[]
+  totalLinhas?: number
+  modo?: 'simbolo' | 'arquivo'
 } | null {
+  const pedido = (nome || '').trim()
+  if (!pedido) return null
+
+  // Aceita caminho de arquivo (relativo ou so o basename com extensao)
+  const pareceArquivo =
+    /[\\/]/.test(pedido) ||
+    /\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(pedido)
+
+  if (pareceArquivo) {
+    const abs = path.isAbsolute(pedido) ? path.normalize(pedido) : path.normalize(path.join(raiz, pedido))
+    const rel = path.relative(raiz, abs).replace(/\\/g, '/')
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return null
+    }
+    if (!fs.existsSync(abs)) {
+      // tenta achar por basename no indice / src
+      const base = path.basename(pedido)
+      const encontrado = acharArquivoPorNome(raiz, base)
+      if (!encontrado) return null
+      return lerArquivoCompleto(raiz, encontrado)
+    }
+    return lerArquivoCompleto(raiz, rel)
+  }
+
   let idx = carregarIndiceCodigo(raiz)
-  if (!idx) {
+  const raizAbsLer = path.resolve(raiz)
+  if (!idx || !idx.simbolos?.length || path.resolve(idx.raiz || '') !== raizAbsLer) {
     idx = gerarIndice(raiz)
     salvarIndice(raiz, idx)
   }
@@ -349,6 +386,56 @@ export function lerSimbolo(
     linhaInicio: hit.linhaInicio,
     linhaFim: hit.linhaFim,
     corpo,
-    chamadoPor: [...new Set(chamadoPor)]
+    chamadoPor: [...new Set(chamadoPor)],
+    modo: 'simbolo'
   }
+}
+
+function lerArquivoCompleto(
+  raiz: string,
+  rel: string
+): {
+  arquivo: string
+  linhaInicio: number
+  linhaFim: number
+  corpo: string
+  chamadoPor: string[]
+  totalLinhas: number
+  modo: 'arquivo'
+} {
+  const abs = path.join(raiz, rel)
+  const texto = fs.readFileSync(abs, 'utf8')
+  const linhas = texto.split(/\r?\n/)
+  const MAX = 400
+  const corpo = linhas.length > MAX
+    ? linhas.slice(0, MAX).join('\n') + '\n/* ... truncado ' + linhas.length + ' linhas ... */'
+    : texto
+  return {
+    arquivo: rel.replace(/\\/g, '/'),
+    linhaInicio: 1,
+    linhaFim: Math.min(linhas.length, MAX),
+    corpo,
+    chamadoPor: [],
+    totalLinhas: linhas.length,
+    modo: 'arquivo'
+  }
+}
+
+function acharArquivoPorNome(raiz: string, base: string): string | null {
+  const alvo = base.toLowerCase()
+  const saida: string[] = []
+  function walk(dir: string) {
+    let ents: fs.Dirent[]
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of ents) {
+      if (e.name === 'node_modules' || e.name === 'out' || e.name === '.git' || e.name === 'dist') continue
+      const abs = path.join(dir, e.name)
+      if (e.isDirectory()) walk(abs)
+      else if (e.name.toLowerCase() === alvo) {
+        saida.push(path.relative(raiz, abs).replace(/\\/g, '/'))
+      }
+    }
+  }
+  walk(path.join(raiz, 'src'))
+  return saida[0] || null
 }

@@ -2,105 +2,105 @@
 
 Historico de failover (sem chaves). Gerado automaticamente pelo agente e pela auditoria.
 
-## Fase G1 — cursor-agent como provider (2026-10-26)
+## Fase H2 — cursor-cli APROVADO (2026-10-26)
 
-**Decisao: REPROVADO** — cursor-agent indisponivel como provider: exige autenticacao (`agent login` ou `CURSOR_API_KEY`); CLI reporta `Not logged in`; chamada nao-interativa `-p` retorna exit 1 sem texto util.
+**Decisao G1 revalidada: APROVADO** (login presente: `Logged in as digo85cs@gmail.com`).
 
-### Interface CLI (bruta)
-- Versao: `2026.10.19-6bbf2c4`
-- Binario: `C:\Users\digo8\AppData\Local\cursor-agent\cursor-agent.ps1` (presente)
-- Flag prompt: `-p` / `--print` + argumento prompt — **presente**
-- Flag JSON: `--output-format text|json|stream-json` — **presente**
-- Flag somente leitura: `--mode ask|plan`, `--plan` — **presente**
-- Flag modelo: `--model` — **presente**
-- Flag workspace: `--workspace` — **presente**
-
-### G1.2 chamada nao-interativa
+### H2.1
 ```
-comando: cursor-agent -p "Responda apenas a palavra: ok" --mode ask
-exit: 1
-stdout: (vazio)
-stderr: Error: Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY environment variable.
-tempo: ~3743 ms (encerrou sozinho)
+cursor-agent -p "Responda apenas a palavra: ok" --mode ask --trust
+exit: 0
+stdout: ok
+tempo: ~16274 ms
+version: 2026.10.19-6bbf2c4
 ```
 
-### G1.3 isolamento de escrita
-- arquivo `_g1-teste.txt` intacto = **sim** (auth falhou antes de qualquer tool; arquivo apagado apos teste)
-- G2 **NAO implementado** (G1 reprovado). cursor-cli **nao** entrou na fila.
+### H2.2 leitura de workspace
+```
+pedido: linhas de src/main/brain/providers.ts
+resposta CLI: 398
+Get-Content Count: 397 (diff = newline final)
+git status codigo: apenas mudancas da sessao H (CLI nao editou projeto)
+```
 
-## Politica de fila (atual)
+### Adapter
+- formato `cursor-cli`, modo **ask** fixo (somente leitura)
+- binario: `cursor-agent.ps1` via powershell -File (evita EINVAL do .cmd)
+- timeoutMs: 180000
+- disponivel: binario + status H2.1 (`.dg-editor/cursor-cli-status.json` ou `DG_CURSOR_CLI_OK=1`)
 
-### codigo
-1. openrouter / deepseek/deepseek-chat (online)
-2. openrouter / qwen/qwen-2.5-coder-32b-instruct (online)
-3. ollama / qwen2.5-coder:7b (local)
-4. ollama / qwen2.5-coder:3b (local)
+### Chamada isolada
+```
+texto: pong
+modeloUsado: cursor-agent
+ms: ~15414
+```
 
-### raciocinio
-1. openrouter / meta-llama/llama-3.3-70b-instruct
-2. ollama / llama3.2:latest
-3. ollama / qwen2.5-coder:14b
+### Fila codigo (5)
+1. openrouter:deepseek-chat [online]
+2. openrouter:qwen-2.5-coder-32b [online]
+3. cursor-cli:cursor-agent [cli ask]
+4. ollama:qwen2.5-coder:7b [local]
+5. ollama:qwen2.5-coder:3b [local]
 
-### chat
-1. openrouter / openai/gpt-4o-mini (online)
-2. ollama / qwen2.5-coder:1.5b (local)
+### Fila chat (4) — local primeiro (economia)
+1. ollama:qwen2.5-coder:1.5b
+2. ollama:qwen2.5-coder:3b
+3. openrouter:deepseek-chat
+4. cursor-cli:cursor-agent
 
-Chave: apenas `OPENROUTER_API_KEY` em variavel de ambiente do usuario.
-Nenhuma `CURSOR_API_KEY` no projeto.
+### Fila revisao (3)
+1. openrouter:deepseek-chat
+2. cursor-cli:cursor-agent
+3. ollama:qwen2.5-coder:7b
 
-## Historico
+### Custo OpenRouter (nota)
+- `deepseek/deepseek-chat`: tipicamente barato/free-tier no OpenRouter (verificar pricing atual no site; nao logamos chaves).
+- `qwen/qwen-2.5-coder-32b-instruct`: pode ser pago conforme provedor — preferir como 2a posicao, nao chat.
+- Chat local 1.5b: **zero custo**, ~35 tok/s.
 
-- 2026-10-26T14:13:51.881Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=chave ausente (OPENROUTER_API_KEY) | resultado=pulado
-- 2026-10-26T14:13:51.883Z | tarefa=codigo | tentou=openrouter:qwen-2.5-coder-32b | motivo=chave ausente (OPENROUTER_API_KEY) | resultado=pulado
-- 2026-10-26T14:17:26.150Z | tarefa=codigo | tentou=ollama:qwen2.5-coder:7b | motivo=ok modelo=qwen2.5-coder:7b | resultado=ok | 214266ms
+### Failover real (H5.7)
+```
+OPENROUTER_API_KEY invalida no processo
+1. openrouter:deepseek-chat → auth HTTP 401
+2. openrouter:qwen-2.5-coder-32b → auth HTTP 401
+3. cursor-cli:cursor-agent → ok (texto: fallback-ok)
+ms: ~43725
+modelo: cursor-agent
+```
 
-## Teste failover sem chave (2026-10-26)
+## Fase G1 (historico) — REPROVADO na epoca por falta de login
 
-- OPENROUTER_API_KEY: ausente
-- Pulados: openrouter:deepseek-chat, openrouter:qwen-2.5-coder-32b (chave ausente)
-- Usado: ollama:qwen2.5-coder:7b
-- Tempo: 216618 ms
-- Tool: codigo_editar MAX_ITER 6→7 (revertido)
-- Bundle MD5: 71E65C2B6E2BBF5BCE676CB582481364
+Ver secao H2 acima para estado atual.
 
-- 2026-10-26T14:21:53.550Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 10907ms
-- 2026-10-26T14:23:05.044Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=auth: HTTP 401: {"error":{"message":"User not found.","code":401}} | resultado=falhou | 351ms
-- 2026-10-26T14:23:05.136Z | tarefa=codigo | tentou=openrouter:qwen-2.5-coder-32b | motivo=auth: HTTP 401: {"error":{"message":"User not found.","code":401}} | resultado=falhou | 91ms
-- 2026-10-26T14:24:54.876Z | tarefa=codigo | tentou=ollama:qwen2.5-coder:7b | motivo=ok modelo=qwen2.5-coder:7b | resultado=ok | 109739ms
+## Fase H1 — raiz deterministica
 
-## Fase C — chave ativa (2026-10-26)
+- `resolverRaizProjeto()`: env DG_ROOT → `.dg-root` → subida package.json+.dg-editor → cwd
+- `codigo_ler` aceita caminho de arquivo (ex: `src/main/brain/providers.ts`)
+- Gate: `node scripts/teste-raiz.mjs` PASS (providers.ts lido, filaDeModelos hit)
 
-### Presenca da chave
-- OPENROUTER_API_KEY na env User: sim (valor nunca logado)
+## Segredos (H3)
 
-### Pipeline online (MAX_ITER 6→7→revert)
-- Provider: openrouter:deepseek-chat / deepseek/deepseek-chat
-- Tempo: **15.6 s**
-- Local Fase A (referencia): **214.6 s**
-- Ganho: ~13.7x mais rapido
-- Tool codigo_editar: ok + typecheck ok
-- Bundle MD5: 230DE2497F45D2E83EACE9D1BB4DCB25
+- `dg-config.json`: chave `github.token` **removida**; agora `{ "tokenEnv": "GITHUB_TOKEN" }`
+- arquivo no `.gitignore` (nunca trackeado: `git ls-files dg-config.json` vazio)
+- `git log --all -p -- dg-config.json | ghp_`: **sem ocorrencias** (token nao commitado)
+- **Acao humana obrigatoria**: revogar o token `ghp_...` em https://github.com/settings/tokens (foi colado em chat)
 
-### Failover forçado (chave invalida temporaria)
-- openrouter:deepseek-chat → HTTP 401 auth → falhou
-- openrouter:qwen-2.5-coder-32b → HTTP 401 auth → falhou
-- ollama:qwen2.5-coder:7b → ok (112.7 s, pergunta simples)
-- Chave User restaurada apos o teste
+## Historico recente
 
-### Comparacao
-| Cenario | Provider | Tempo |
-|---|---|---:|
-| Local (Fase A) | qwen2.5-coder:7b | 214.6 s |
-| Online (Fase C) | deepseek/deepseek-chat | 15.6 s |
-| Failover auth | 7b local apos 401 | 112.7 s |
-- 2026-10-26T14:38:09.274Z | tarefa=chat | tentou=openrouter:gemini-flash-1.5 | motivo=outro: HTTP 404: {"error":{"message":"google/gemini-flash-1.5 is no longer available on OpenRouter: no provider serves this model anymore. See available models at http | resultado=falhou | 366ms
-- 2026-10-26T14:38:38.364Z | tarefa=chat | tentou=ollama:qwen2.5-coder:1.5b | motivo=ok modelo=qwen2.5-coder:1.5b | resultado=ok | 29083ms
-- 2026-10-26T14:38:41.259Z | tarefa=chat | tentou=openrouter:gemini-flash-1.5 | motivo=outro: HTTP 404: {"error":{"message":"google/gemini-flash-1.5 is no longer available on OpenRouter: no provider serves this model anymore. See available models at http | resultado=falhou | 125ms
-- 2026-10-26T14:40:36.167Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 18678ms
-- 2026-10-26T16:53:47.792Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 12588ms
-- 2026-10-26T16:54:07.974Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 16308ms
-- 2026-10-26T16:54:24.457Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 13093ms
-- 2026-10-26T16:54:35.879Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 7540ms
-- 2026-10-26T16:54:54.136Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 14931ms
-- 2026-10-26T16:55:06.989Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 9344ms
-- 2026-10-26T16:56:54.777Z | tarefa=codigo | tentou=openrouter:deepseek-chat | motivo=ok modelo=deepseek/deepseek-chat | resultado=ok | 30257ms
+- 2026-10-26 failover H5.7: openrouter 401 → cursor-cli ok (43725 ms)
+- 2026-10-26T17:54:54.309Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 3341ms
+- 2026-10-26T17:55:34.119Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 7018ms
+- 2026-10-26T17:55:58.804Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 20803ms
+- 2026-10-26T17:56:12.033Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 8209ms
+- 2026-10-26T17:56:23.881Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 7861ms
+- 2026-10-26T17:56:42.222Z | tarefa=codigo | tentou=openrouter:deepseek-v3.2 | motivo=ok modelo=deepseek/deepseek-v3.2 | resultado=ok | 13742ms
+
+## Fix modelos mortos + disponivel honesto (2026-10-26)
+
+- deepseek/deepseek-chat ? deepseek/deepseek-v3.2 (codigo/chat/revisao)
+- qwen/qwen-2.5-coder-32b-instruct: ainda valido (HTTP 200)
+- disponivel() agora retorna ok|sem-chave|modelo-invalido|indisponivel + catalogo OpenRouter TTL 10min
+- failover modelo_morto (404/410) avanca na fila (max 5 saltos)
+- Custo estimado OpenRouter (/1M tokens): deepseek-v3.2 prompt~$0.28 completion~$0.42; qwen-2.5-coder-32b prompt~$0.66 completion~$1.00 (valores da API pricing; podem mudar)
+

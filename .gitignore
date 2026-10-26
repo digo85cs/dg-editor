@@ -38,3 +38,7 @@ dossie-tecnico.md
 .dg-editor/indice-codigo.json
 .dg-editor/memoria/
 .dg-editor/logs/
+
+.dg-root
+.dg-editor/cursor-cli-status.json
+

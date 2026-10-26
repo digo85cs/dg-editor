@@ -362,8 +362,11 @@ async function checarProviders(): Promise<Achado[]> {
     for (const t of tarefas) {
       const fila = filaDeModelos(t)
       const temLocal = fila.some((p) => p.tipo === 'local')
-      const semChave = fila.filter((p) => p.tipo === 'online' && !disponivel(p))
-      const comChave = fila.filter((p) => p.tipo === 'online' && disponivel(p))
+      const stOf = (p: { id: string }) => {
+        try { return String(disponivel(p as any)) } catch { return 'indisponivel' }
+      }
+      const semChave = fila.filter((p) => p.tipo === 'online' && stOf(p) === 'sem-chave')
+      const comChave = fila.filter((p) => p.tipo === 'online' && stOf(p) === 'ok')
       const temCursorCli = fila.some((p) => (p as { formato?: string }).formato === 'cursor-cli' || p.id.includes('cursor'))
 
       out.push({
@@ -371,7 +374,7 @@ async function checarProviders(): Promise<Achado[]> {
         area: 'providers',
         titulo: 'Fila ' + t + ': ' + fila.length + ' entradas',
         detalhe: fila
-          .map((p) => p.id + (disponivel(p) ? '[ok]' : '[sem-chave]'))
+          .map((p) => p.id + '[' + stOf(p) + ']')
           .join(', '),
         severidade: 'ok',
         corrigivel: false,

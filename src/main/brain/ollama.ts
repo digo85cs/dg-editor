@@ -17,9 +17,20 @@ interface DgConfig {
 }
 
 function loadDgConfig(): DgConfig {
-  const p = join(process.cwd(), 'dg-config.json')
+  let raiz = process.cwd()
+  try {
+    // lazy: evita ciclo de import com paths em boot
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    raiz = (require('../paths') as typeof import('../paths')).resolverRaizProjeto()
+  } catch { /* cwd */ }
+  const p = join(raiz, 'dg-config.json')
   if (!existsSync(p)) return {}
-  try { return JSON.parse(readFileSync(p, 'utf-8')) as DgConfig } catch { return {} }
+  try {
+    const bruto = readFileSync(p, 'utf-8').replace(/^\uFEFF/, '')
+    return JSON.parse(bruto) as DgConfig
+  } catch {
+    return {}
+  }
 }
 
 /**

@@ -2,18 +2,26 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ErroProvider = void 0;
 exports.classificarHttp = classificarHttp;
+exports.marcarCursorCliAprovado = marcarCursorCliAprovado;
+exports.cursorCliAprovadoNaSessao = cursorCliAprovadoNaSessao;
+exports.resolverBinarioCursorAgent = resolverBinarioCursorAgent;
+exports.chamarCursorCli = chamarCursorCli;
 exports.chamarProvider = chamarProvider;
 exports.chamarProviderSharp = chamarProviderSharp;
 exports.disponivel = disponivel;
 /**
- * Adapters unificados: Ollama local + OpenAI-compatible (OpenRouter etc).
+ * Adapters unificados: Ollama local + OpenAI-compatible (OpenRouter etc) + cursor-cli.
  * Nenhuma chave no codigo — so process.env[cfg.apiKeyEnv].
  */
 const http_1 = require("http");
 const https_1 = require("https");
+const child_process_1 = require("child_process");
+const fs_1 = require("fs");
+const path_1 = require("path");
 const url_1 = require("url");
 const dglog_1 = require("../dglog");
 const ollama_1 = require("./ollama");
+const paths_1 = require("../paths");
 class ErroProvider extends Error {
     kind;
     status;
@@ -102,6 +110,12 @@ function httpJsonUrl(urlStr, corpo, method, timeoutMs, headers, signal) {
     });
 }
 function classificarHttp(status, body, providerId) {
+    const b = (body || '').toLowerCase();
+    const modeloMorto = status === 410 ||
+        (status === 404 && /model/.test(b) && /not found|no longer available|does not exist|unavailable/.test(b));
+    if (modeloMorto) {
+        return new ErroProvider('modelo_morto', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status);
+    }
     if (status === 429)
         return new ErroProvider('rate_limit', 'HTTP 429: ' + body.slice(0, 200), providerId, status);
     if (status === 401 || status === 403)
@@ -287,10 +301,160 @@ async function adapterOpenAI(cfg, mensagens, tools, signal) {
         usage: json.usage
     };
 }
+const CURSOR_STATUS_REL = (0, path_1.join)('.dg-editor', 'cursor-cli-status.json');
+function marcarCursorCliAprovado(ok, detalhe) {
+    try {
+        const raiz = (0, paths_1.resolverRaizProjeto)();
+        const p = (0, path_1.join)(raiz, CURSOR_STATUS_REL);
+        (0, fs_1.mkdirSync)((0, path_1.join)(raiz, '.dg-editor'), { recursive: true });
+        (0, fs_1.writeFileSync)(p, JSON.stringify({ ok, at: new Date().toISOString(), detalhe: (detalhe || '').slice(0, 120) }, null, 2), 'utf8');
+    }
+    catch { /* nao bloqueia */ }
+}
+function cursorCliAprovadoNaSessao() {
+    if (process.env.DG_CURSOR_CLI_OK === '1')
+        return true;
+    try {
+        const raiz = (0, paths_1.resolverRaizProjeto)();
+        const p = (0, path_1.join)(raiz, CURSOR_STATUS_REL);
+        if (!(0, fs_1.existsSync)(p))
+            return false;
+        const j = JSON.parse((0, fs_1.readFileSync)(p, 'utf8'));
+        if (!j.ok)
+            return false;
+        const age = Date.now() - new Date(j.at || 0).getTime();
+        return age >= 0 && age < 24 * 3600 * 1000;
+    }
+    catch {
+        return false;
+    }
+}
+function resolverBinarioCursorAgent() {
+    const fallbackPs1 = (0, path_1.join)(process.env.LOCALAPPDATA || '', 'cursor-agent', 'cursor-agent.ps1');
+    // Preferir .ps1: spawn de .cmd no Windows com shell:false gera EINVAL
+    if ((0, fs_1.existsSync)(fallbackPs1))
+        return fallbackPs1;
+    try {
+        const outs = (0, child_process_1.execFileSync)('where.exe', ['cursor-agent'], {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: 5000
+        }).trim().split(/\r?\n/).filter(Boolean);
+        const ps1 = outs.find((p) => p.toLowerCase().endsWith('.ps1'));
+        if (ps1 && (0, fs_1.existsSync)(ps1))
+            return ps1;
+    }
+    catch { /* ignore */ }
+    return (0, fs_1.existsSync)(fallbackPs1) ? fallbackPs1 : null;
+}
+/**
+ * cursor-cli SEMPRE em --mode ask (somente leitura). Nunca edita.
+ */
+async function chamarCursorCli(cfg, mensagem) {
+    const bin = cfg.binario || resolverBinarioCursorAgent();
+    if (!bin) {
+        throw new ErroProvider('rede', 'binario cursor-agent nao encontrado', cfg.id);
+    }
+    const preview = mensagem.slice(0, 80);
+    (0, dglog_1.dglog)('[cursor-cli] start msg=' + JSON.stringify(preview) + ' timeoutMs=' + cfg.timeoutMs);
+    const raiz = (0, paths_1.resolverRaizProjeto)();
+    const args = ['-p', mensagem, '--mode', 'ask', '--trust', '--output-format', 'text'];
+    if (cfg.modelo && cfg.modelo !== 'cursor-agent') {
+        args.push('--model', cfg.modelo);
+    }
+    // workspace como arg separado (espacos seguros)
+    args.push('--workspace', raiz);
+    // Sempre via powershell -File no .ps1 (evita EINVAL do .cmd)
+    const ps1 = bin.toLowerCase().endsWith('.ps1')
+        ? bin
+        : (0, path_1.join)(process.env.LOCALAPPDATA || '', 'cursor-agent', 'cursor-agent.ps1');
+    if (!(0, fs_1.existsSync)(ps1)) {
+        throw new ErroProvider('rede', 'cursor-agent.ps1 nao encontrado', cfg.id);
+    }
+    const cmd = 'powershell.exe';
+    const cmdArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, ...args];
+    return new Promise((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        let killedByTimeout = false;
+        const child = (0, child_process_1.spawn)(cmd, cmdArgs, {
+            cwd: raiz,
+            windowsHide: true,
+            shell: false,
+            env: { ...process.env }
+        });
+        const killHard = () => {
+            try {
+                child.kill('SIGKILL');
+            }
+            catch { /* */ }
+            try {
+                if (process.platform === 'win32' && child.pid) {
+                    (0, child_process_1.spawn)('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, shell: false });
+                }
+            }
+            catch { /* */ }
+        };
+        const tSoft = setTimeout(() => {
+            killedByTimeout = true;
+            try {
+                child.kill('SIGTERM');
+            }
+            catch { /* */ }
+            setTimeout(killHard, 5000);
+        }, cfg.timeoutMs);
+        child.stdout?.on('data', (d) => { stdout += d.toString(); });
+        child.stderr?.on('data', (d) => { stderr += d.toString(); });
+        child.on('error', (e) => {
+            clearTimeout(tSoft);
+            reject(new ErroProvider('rede', String(e), cfg.id));
+        });
+        child.on('close', (code) => {
+            clearTimeout(tSoft);
+            if (killedByTimeout) {
+                reject(new ErroProvider('timeout', 'cursor-cli timeout apos ' + cfg.timeoutMs + 'ms', cfg.id));
+                return;
+            }
+            const errL = (stderr || '').toLowerCase();
+            if (code !== 0) {
+                if (/authentication|not logged in|api.key|login/.test(errL)) {
+                    reject(new ErroProvider('auth', stderr.slice(0, 200) || 'auth cursor-cli', cfg.id, 401));
+                    return;
+                }
+                if (/trust|workspace trust|workspace directory does not exist/.test(errL)) {
+                    reject(new ErroProvider('auth', stderr.slice(0, 200) || 'trust/workspace cursor-cli', cfg.id));
+                    return;
+                }
+                reject(new ErroProvider('server', (stderr || stdout || 'exit ' + code).slice(0, 300), cfg.id, code || 1));
+                return;
+            }
+            let texto = stdout.trim();
+            // tenta JSON se parecer
+            if (texto.startsWith('{')) {
+                try {
+                    const j = JSON.parse(texto);
+                    texto = String(j.result || j.text || j.message || j.content || texto);
+                }
+                catch { /* texto puro */ }
+            }
+            resolve({
+                content: texto,
+                tool_calls: [],
+                modeloUsado: 'cursor-agent',
+                providerId: cfg.id
+            });
+        });
+    });
+}
 async function chamarProvider(cfg, mensagens, tools) {
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), cfg.timeoutMs);
     try {
+        if (cfg.formato === 'cursor-cli') {
+            const ultima = [...mensagens].reverse().find((m) => m.role === 'user');
+            const msg = ultima?.content || mensagens.map((m) => m.content).filter(Boolean).join('\n');
+            return await chamarCursorCli(cfg, msg);
+        }
         if (cfg.formato === 'ollama') {
             return await adapterOllama(cfg, mensagens, tools, ac.signal);
         }
@@ -307,6 +471,10 @@ async function chamarProviderSharp(cfg, mensagens, tools) {
     return r;
 }
 function disponivel(cfg) {
+    if (cfg.formato === 'cursor-cli' || cfg.tipo === 'cli') {
+        const bin = cfg.binario || resolverBinarioCursorAgent();
+        return !!bin && cursorCliAprovadoNaSessao();
+    }
     if (cfg.tipo === 'local')
         return true;
     if (!cfg.apiKeyEnv)

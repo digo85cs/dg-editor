@@ -9,7 +9,7 @@ import { promises as fs } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { z } from 'zod'
 import { gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
-import { projectStateDir } from '../paths'
+import { projectStateDir, resolverRaizProjeto, caminhoDentroDaRaiz } from '../paths'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 import { editarPorAncora } from '../brain/editar'
@@ -20,7 +20,7 @@ import {
   profundidadeExecucaoAgente
 } from '../brain/agent'
 
-const RAIZ = process.env.DG_ROOT || process.cwd()
+const RAIZ = resolverRaizProjeto()
 const VAULT = projectStateDir(RAIZ)
 garantirSkillsPadrao(RAIZ)
 garantirAgentesPadrao(RAIZ)
@@ -116,11 +116,14 @@ const TOOLS = [
   },
   {
     name: 'codigo_ler',
-    description: 'Le o corpo de UMA funcao/simbolo pelo nome (nunca o arquivo inteiro).',
+    description: 'Le simbolo pelo nome OU arquivo pelo caminho relativo (ex: src/main/brain/providers.ts).',
     inputSchema: {
       type: 'object',
       properties: {
-        nome: { type: 'string', description: 'Nome exato do simbolo (ex: escolherModelo)' }
+        nome: {
+          type: 'string',
+          description: 'Nome do simbolo (escolherModelo) OU caminho relativo (src/main/brain/providers.ts)'
+        }
       },
       required: ['nome']
     }
@@ -304,9 +307,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         novo: z.string(),
         verificar: z.boolean().optional()
       }).parse(args)
+      const { rel } = caminhoDentroDaRaiz(RAIZ, parsed.arquivo)
       const res = editarPorAncora(
         RAIZ,
-        parsed.arquivo,
+        rel,
         parsed.ancora,
         parsed.novo,
         parsed.verificar !== false
@@ -355,7 +359,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const parsed = z.object({
         mensagem: z.string(),
         agente: z.string().optional(),
-        tarefa: z.enum(['chat', 'codigo', 'raciocinio']).optional()
+        tarefa: z.enum(['chat', 'codigo', 'raciocinio', 'revisao']).optional()
       }).parse(args)
 
       const TIMEOUT_MS = 600_000

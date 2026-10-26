@@ -6,8 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.listarRegistry = listarRegistry;
 exports.registrarModelo = registrarModelo;
 exports.normalizarTarefa = normalizarTarefa;
+exports.garantirCatalogoOpenRouterSync = garantirCatalogoOpenRouterSync;
+exports.garantirCatalogoOpenRouter = garantirCatalogoOpenRouter;
 exports.disponivel = disponivel;
+exports.disponivelOk = disponivelOk;
 exports.filaDeModelos = filaDeModelos;
+exports.filaPronta = filaPronta;
 exports.limitesPorTarefa = limitesPorTarefa;
 exports.statsSelecao = statsSelecao;
 exports.escolherModeloPorTarefa = escolherModeloPorTarefa;
@@ -15,12 +19,13 @@ exports.escolherModelo = escolherModelo;
 exports.appendFailoverLog = appendFailoverLog;
 /**
  * Fila de providers por tarefa (online → local fallback).
- * Entradas online sem chave ficam na fila com disponivel=false.
+ * disponivel() retorna status honesto (ok | sem-chave | modelo-invalido | indisponivel).
  */
 const ollama_1 = require("./ollama");
 const dglog_1 = require("../dglog");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const child_process_1 = require("child_process");
 const providers_1 = require("./providers");
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
@@ -47,10 +52,103 @@ function normalizarTarefa(tarefa) {
         return 'chat';
     if (t === 'raciocinio' || t === 'estrategia')
         return 'raciocinio';
+    if (t === 'revisao' || t === 'review')
+        return 'revisao';
     return 'codigo';
 }
+function cfgCursorCli() {
+    return cfg({
+        id: 'cursor-cli:cursor-agent',
+        tipo: 'cli',
+        formato: 'cursor-cli',
+        modelo: 'cursor-agent',
+        baseUrl: '',
+        numPredict: 0,
+        timeoutMs: 180_000,
+        modo: 'ask'
+    });
+}
+const CATALOG_TTL_MS = 10 * 60 * 1000;
+let catalogOpenRouter = null;
+function logStderr(msg) {
+    try {
+        process.stderr.write(msg + '\n');
+    }
+    catch {
+        (0, dglog_1.dglog)(msg);
+    }
+}
+/** Busca catálogo OpenRouter (sync via subprocess) com TTL 10 min. */
+function garantirCatalogoOpenRouterSync() {
+    if (catalogOpenRouter && Date.now() - catalogOpenRouter.at < CATALOG_TTL_MS)
+        return;
+    const key = process.env.OPENROUTER_API_KEY || '';
+    if (!key.trim()) {
+        catalogOpenRouter = { ids: new Set(), at: Date.now(), erro: 'sem-chave' };
+        return;
+    }
+    const script = "fetch('https://openrouter.ai/api/v1/models',{headers:{Authorization:'Bearer '+process.env.OPENROUTER_API_KEY}})" +
+        ".then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
+        ".then(j=>{const ids=(j.data||[]).map(x=>x.id);process.stdout.write(JSON.stringify(ids))})" +
+        ".catch(e=>{process.stderr.write(String(e.message||e));process.exit(2)})";
+    const r = (0, child_process_1.spawnSync)(process.execPath, ['-e', script], {
+        encoding: 'utf8',
+        timeout: 45000,
+        windowsHide: true,
+        env: process.env
+    });
+    if (r.status === 0 && r.stdout) {
+        try {
+            const ids = JSON.parse(r.stdout);
+            catalogOpenRouter = { ids: new Set(ids), at: Date.now() };
+            return;
+        }
+        catch { /* fallthrough */ }
+    }
+    catalogOpenRouter = {
+        ids: new Set(),
+        at: Date.now(),
+        erro: (r.stderr || r.stdout || 'falha catalogo').toString().slice(0, 160)
+    };
+}
+async function garantirCatalogoOpenRouter() {
+    garantirCatalogoOpenRouterSync();
+}
+/**
+ * Status honesto do provider.
+ * OpenRouter: exige chave + modelo presente no catálogo (cache 10 min).
+ */
 function disponivel(cfg) {
-    return (0, providers_1.disponivel)(cfg);
+    if (cfg.formato === 'cursor-cli' || cfg.tipo === 'cli') {
+        const bin = cfg.binario || (0, providers_1.resolverBinarioCursorAgent)();
+        if (!bin)
+            return 'indisponivel';
+        if (!(0, providers_1.cursorCliAprovadoNaSessao)() && process.env.DG_CURSOR_CLI_OK !== '1')
+            return 'indisponivel';
+        return 'ok';
+    }
+    if (cfg.tipo === 'local')
+        return 'ok';
+    // online
+    if (!cfg.apiKeyEnv || !String(process.env[cfg.apiKeyEnv] || '').trim()) {
+        return 'sem-chave';
+    }
+    if (cfg.formato === 'openai' && (cfg.baseUrl || '').includes('openrouter.ai')) {
+        garantirCatalogoOpenRouterSync();
+        if (catalogOpenRouter?.erro === 'sem-chave')
+            return 'sem-chave';
+        if (!catalogOpenRouter || catalogOpenRouter.ids.size === 0) {
+            // falha de rede no catalogo: nao bloqueia (failover em modelo_morto cobre 404)
+            return 'ok';
+        }
+        if (!catalogOpenRouter.ids.has(cfg.modelo))
+            return 'modelo-invalido';
+    }
+    return 'ok';
+}
+/** true só quando status === 'ok' (compat boolean em callers antigos). */
+function disponivelOk(cfg) {
+    return disponivel(cfg) === 'ok';
 }
 function cfg(partial) {
     return partial;
@@ -59,17 +157,8 @@ function cfg(partial) {
 function filaDeModelos(tarefa, _opcoes) {
     const t = normalizarTarefa(String(tarefa));
     if (t === 'chat') {
+        // local primeiro — economia de credito (chat nao exige frontier)
         return [
-            cfg({
-                id: 'openrouter:gpt-4o-mini',
-                tipo: 'online',
-                formato: 'openai',
-                modelo: 'openai/gpt-4o-mini',
-                baseUrl: OPENROUTER_BASE,
-                apiKeyEnv: KEY_ENV,
-                numPredict: 512,
-                timeoutMs: 120_000
-            }),
             cfg({
                 id: 'ollama:qwen2.5-coder:1.5b',
                 tipo: 'local',
@@ -78,7 +167,27 @@ function filaDeModelos(tarefa, _opcoes) {
                 baseUrl: OLLAMA_BASE,
                 numPredict: 512,
                 timeoutMs: 120_000
-            })
+            }),
+            cfg({
+                id: 'ollama:qwen2.5-coder:3b',
+                tipo: 'local',
+                formato: 'ollama',
+                modelo: 'qwen2.5-coder:3b',
+                baseUrl: OLLAMA_BASE,
+                numPredict: 512,
+                timeoutMs: 120_000
+            }),
+            cfg({
+                id: 'openrouter:deepseek-v3.2',
+                tipo: 'online',
+                formato: 'openai',
+                modelo: 'deepseek/deepseek-v3.2',
+                baseUrl: OPENROUTER_BASE,
+                apiKeyEnv: KEY_ENV,
+                numPredict: 512,
+                timeoutMs: 120_000
+            }),
+            cfgCursorCli()
         ];
     }
     if (t === 'raciocinio') {
@@ -113,13 +222,47 @@ function filaDeModelos(tarefa, _opcoes) {
             })
         ];
     }
-    // codigo
+    if (t === 'revisao') {
+        return [
+            cfg({
+                id: 'openrouter:deepseek-v3.2',
+                tipo: 'online',
+                formato: 'openai',
+                modelo: 'deepseek/deepseek-v3.2',
+                baseUrl: OPENROUTER_BASE,
+                apiKeyEnv: KEY_ENV,
+                numPredict: 1024,
+                timeoutMs: 300_000
+            }),
+            cfgCursorCli(),
+            cfg({
+                id: 'ollama:qwen2.5-coder:7b',
+                tipo: 'local',
+                formato: 'ollama',
+                modelo: 'qwen2.5-coder:7b',
+                baseUrl: OLLAMA_BASE,
+                numPredict: 1024,
+                timeoutMs: 300_000
+            })
+        ];
+    }
+    // codigo: v4-flash → v3.2 → qwen → cursor-cli → ollama → ollama (A/B2)
     return [
         cfg({
-            id: 'openrouter:deepseek-chat',
+            id: 'openrouter:deepseek-v4-flash',
             tipo: 'online',
             formato: 'openai',
-            modelo: 'deepseek/deepseek-chat',
+            modelo: 'deepseek/deepseek-v4-flash',
+            baseUrl: OPENROUTER_BASE,
+            apiKeyEnv: KEY_ENV,
+            numPredict: 1024,
+            timeoutMs: 300_000
+        }),
+        cfg({
+            id: 'openrouter:deepseek-v3.2',
+            tipo: 'online',
+            formato: 'openai',
+            modelo: 'deepseek/deepseek-v3.2',
             baseUrl: OPENROUTER_BASE,
             apiKeyEnv: KEY_ENV,
             numPredict: 1024,
@@ -135,6 +278,7 @@ function filaDeModelos(tarefa, _opcoes) {
             numPredict: 1024,
             timeoutMs: 300_000
         }),
+        cfgCursorCli(),
         cfg({
             id: 'ollama:qwen2.5-coder:7b',
             tipo: 'local',
@@ -154,6 +298,29 @@ function filaDeModelos(tarefa, _opcoes) {
             timeoutMs: 180_000
         })
     ];
+}
+/**
+ * Filtra a fila para status === 'ok', loga pulos, e falha se nada sobrar.
+ */
+function filaPronta(tarefa, opcoes) {
+    const t = normalizarTarefa(String(tarefa));
+    const bruta = filaDeModelos(t, opcoes);
+    const ok = [];
+    const motivos = [];
+    for (const p of bruta) {
+        const st = disponivel(p);
+        if (st === 'ok') {
+            ok.push(p);
+        }
+        else {
+            logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=' + st);
+            motivos.push(p.id + '=' + st);
+        }
+    }
+    if (ok.length === 0) {
+        throw new Error('Nenhum modelo disponivel para a tarefa ' + t + ': ' + (motivos.join('; ') || '(fila vazia)'));
+    }
+    return ok;
 }
 function limitesPorTarefa(tarefa) {
     const fila = filaDeModelos(tarefa);
@@ -229,8 +396,9 @@ async function escolherModeloPorTarefa(tarefa, opts = {}) {
     const fila = filaDeModelos(t, opts);
     const origem = opts.origem || 'pipeline';
     for (const p of fila) {
-        if (!disponivel(p)) {
-            (0, dglog_1.dglog)('[registry] pula ' + p.id + ' (chave ausente)');
+        const st = disponivel(p);
+        if (st !== 'ok') {
+            logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=' + st);
             continue;
         }
         if (p.tipo === 'local') {
