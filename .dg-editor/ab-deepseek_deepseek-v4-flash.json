@@ -1,0 +1,63 @@
+{
+  "modelo": "deepseek/deepseek-v4-flash",
+  "pedido": "Leia src/main/brain/providers.ts e cite UMA linha do CORPO do arquivo (ignore o cabeçalho e comentários) com o numero de linha exato.",
+  "aprovados": 0,
+  "total": 5,
+  "rows": [
+    {
+      "agente": "arquiteto",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v4-flash",
+      "overrideOk": true,
+      "duracaoMs": 7168,
+      "veredito": "FALHOU:sem-cite providers.ts:N",
+      "aprovado": false,
+      "n": null,
+      "trecho": "Linha 10: `import { OLLAMA_URL } from './ollama'`"
+    },
+    {
+      "agente": "revisor",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v4-flash",
+      "overrideOk": true,
+      "duracaoMs": 12577,
+      "veredito": "FALHOU:sem-cite providers.ts:N",
+      "aprovado": false,
+      "n": null,
+      "trecho": "Linha 18: ` formato: 'ollama' | 'openai' | 'cursor-cli'`"
+    },
+    {
+      "agente": "seguranca",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v4-flash",
+      "overrideOk": true,
+      "duracaoMs": 33931,
+      "veredito": "FALHOU:sem-cite providers.ts:N",
+      "aprovado": false,
+      "n": null,
+      "trecho": "A tool \"codigo_ler\" retornou 9 linhas. Trecho: { \"arquivo\": \"src/main/brain/providers.ts\", \"linhaInicio\": 1, \"linhaFim\": 400, \"corpo\": \"/**\\n * Adapters unificados: Ollama local + OpenAI-compatible (OpenRouter etc) + cursor-cli.\\n * Nenhuma chave no codigo — so process.env[cfg.apiKeyEnv].\\n */\\nimport { request as httpRequest, type ClientRequest } from 'http'\\nimport { request as httpsRequest } fr"
+    },
+    {
+      "agente": "testador",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v4-flash",
+      "overrideOk": true,
+      "duracaoMs": 10626,
+      "veredito": "FALHOU:sem-cite providers.ts:N",
+      "aprovado": false,
+      "n": null,
+      "trecho": "Linha 18: ` formato: 'ollama' | 'openai' | 'cursor-cli'`"
+    },
+    {
+      "agente": "dg-engenheiro",
+      "ok": true,
+      "modeloUsado": "deepseek/deepseek-v4-flash",
+      "overrideOk": true,
+      "duracaoMs": 7827,
+      "veredito": "FALHOU:sem-cite providers.ts:N",
+      "aprovado": false,
+      "n": null,
+      "trecho": "Linha 6: `import { request as httpRequest, type ClientRequest } from 'http'`"
+    }
+  ]
+}

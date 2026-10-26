@@ -423,8 +423,19 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
             throw e;
         }
         if (modeloForcado) {
-            fila = [
-                {
+            const onlineSlug = modeloForcado.includes('/');
+            const forcado = onlineSlug
+                ? {
+                    id: 'forcado:' + modeloForcado,
+                    tipo: 'online',
+                    formato: 'openai',
+                    modelo: modeloForcado,
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    apiKeyEnv: 'OPENROUTER_API_KEY',
+                    numPredict: 2048,
+                    timeoutMs: 300_000
+                }
+                : {
                     id: 'forcado:' + modeloForcado,
                     tipo: 'local',
                     formato: 'ollama',
@@ -432,9 +443,8 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
                     baseUrl: 'http://127.0.0.1:11434',
                     numPredict: 1024,
                     timeoutMs: 300_000
-                },
-                ...fila.filter((p) => p.modelo !== modeloForcado)
-            ];
+                };
+            fila = [forcado, ...fila.filter((p) => p.modelo !== modeloForcado)];
         }
         const maxTentativas = fila.length;
         let saltos = 0;
