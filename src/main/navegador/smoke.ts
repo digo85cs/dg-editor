@@ -3,8 +3,8 @@
  * Não imprime o token completo.
  */
 import { app } from 'electron'
-import { existsSync, readFileSync, statSync } from 'fs'
-import { isAbsolute, relative, resolve } from 'path'
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs'
+import { basename, isAbsolute, join, relative, resolve } from 'path'
 import { criarJanelaNavegador, fecharJanelaNavegador, estadoAtual } from './janela'
 import { NAV_HOST, NAV_PORT, prefixoTokenControle } from './controle'
 import { caminhoNavToken } from './token'
@@ -31,6 +31,17 @@ async function req(
 export async function rodarSmokeESair(): Promise<void> {
   const resultados: Array<{ id: number; ok: boolean; detalhe: string }> = []
   const token = readFileSync(caminhoNavToken(), 'utf8').trim()
+  const estadoDir = projectStateDir(resolverRaizProjeto())
+  const downloadsRoot = resolve(estadoDir, 'downloads')
+  const smokeDlDir = join(downloadsRoot, '_smoke')
+  const urlRealPath = join(estadoDir, 'nav-ultima-url')
+  const urlSmokePath = join(estadoDir, 'nav-ultima-url.smoke')
+  let urlRealAntes: string | null = null
+  try {
+    urlRealAntes = existsSync(urlRealPath) ? readFileSync(urlRealPath, 'utf8') : null
+  } catch {
+    urlRealAntes = null
+  }
   dglog(`[nav-smoke] token prefix=${prefixoTokenControle()}…`)
 
   try {
@@ -197,9 +208,8 @@ export async function rodarSmokeESair(): Promise<void> {
       })
     })
 
-    // 13: download real → .dg-editor/downloads/ sem sobrescrever
+    // 13: download real → _smoke/, nome legível, colisão _1
     criarJanelaNavegador('about:blank', { mostrar: false })
-    const downloadsDir = resolve(projectStateDir(resolverRaizProjeto()), 'downloads')
     let urlUsada = 'https://httpbin.org/bytes/1024'
     const urlDlFb =
       'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
@@ -209,36 +219,39 @@ export async function rodarSmokeESair(): Promise<void> {
       dl1 = await req('POST', '/baixar', { url: urlUsada }, token)
     }
     const caminho1 = String(dl1.json.caminho || '')
+    const nome1 = String(dl1.json.nomeSalvo || basename(caminho1))
     let ok13a = false
     let size1 = 0
-    let mtime1 = 0
     if (caminho1 && isAbsolute(caminho1) && existsSync(caminho1)) {
-      const st1 = statSync(caminho1)
-      size1 = st1.size
-      mtime1 = st1.mtimeMs
-      const rel = relative(downloadsDir, resolve(caminho1))
-      ok13a = size1 > 0 && !rel.startsWith('..') && !isAbsolute(rel)
+      size1 = statSync(caminho1).size
+      const rel = relative(smokeDlDir, resolve(caminho1))
+      ok13a =
+        size1 > 0 &&
+        !rel.startsWith('..') &&
+        !isAbsolute(rel) &&
+        !/^\d+-/.test(nome1)
     }
-    await new Promise((r) => setTimeout(r, 800))
+    await new Promise((r) => setTimeout(r, 400))
     const dl2 = await req('POST', '/baixar', { url: urlUsada }, token)
     const caminho2 = String(dl2.json.caminho || '')
+    const nome2 = String(dl2.json.nomeSalvo || basename(caminho2))
     const ok13b =
       !!caminho2 &&
       caminho2 !== caminho1 &&
       existsSync(caminho2) &&
       existsSync(caminho1) &&
       statSync(caminho1).size === size1 &&
-      statSync(caminho1).mtimeMs <= mtime1 + 100
+      (/_\d+(\.|$)/.test(nome2) || dl2.json.renomeado === true)
     resultados.push({
       id: 13,
       ok: ok13a && ok13b && dl2.json.ok === true,
       detalhe: JSON.stringify({
         urlUsada,
+        nome1,
+        nome2,
         caminho1,
         caminho2,
-        size1,
-        size2: caminho2 && existsSync(caminho2) ? statSync(caminho2).size : 0,
-        mesmoNome: caminho1 === caminho2
+        renomeado: dl2.json.renomeado
       })
     })
 
@@ -277,8 +290,152 @@ export async function rodarSmokeESair(): Promise<void> {
         truncado: tab1.json.truncado
       })
     })
+
+    // 15: sanitização path traversal + nome longo
+    const urlEvil =
+      'https://httpbin.org/response-headers?Content-Disposition=attachment%3B%20filename%3D%22..%2F..%2Fevil.txt%22'
+    const dlEvil = await req('POST', '/baixar', { url: urlEvil }, token)
+    const caminhoEvil = String(dlEvil.json.caminho || '')
+    const nomeEvil = String(dlEvil.json.nomeSalvo || '')
+    const relEvil = caminhoEvil ? relative(smokeDlDir, resolve(caminhoEvil)) : '..'
+    const foraProjeto = join(resolverRaizProjeto(), '..', 'evil.txt')
+    const ok15a =
+      dlEvil.json.ok === true &&
+      !!caminhoEvil &&
+      existsSync(caminhoEvil) &&
+      !relEvil.startsWith('..') &&
+      !isAbsolute(relEvil) &&
+      !nomeEvil.includes('..') &&
+      !existsSync(foraProjeto)
+
+    const longName = 'a'.repeat(200) + '.txt'
+    const urlLong =
+      'https://httpbin.org/response-headers?Content-Disposition=attachment%3B%20filename%3D%22' +
+      encodeURIComponent(longName) +
+      '%22'
+    const dlLong = await req('POST', '/baixar', { url: urlLong }, token)
+    const nomeLong = String(dlLong.json.nomeSalvo || '')
+    const ok15b =
+      dlLong.json.ok === true &&
+      nomeLong.length > 0 &&
+      nomeLong.length <= 120 &&
+      !nomeLong.includes('..')
+    resultados.push({
+      id: 15,
+      ok: ok15a && ok15b,
+      detalhe: JSON.stringify({
+        nomeEvil,
+        caminhoEvil,
+        nomeLong,
+        lenLong: nomeLong.length,
+        evilFora: existsSync(foraProjeto)
+      })
+    })
+
+    // 16: esperarSeletor (SPA)
+    await req(
+      'POST',
+      '/abrir',
+      {
+        url: 'https://www.w3schools.com/html/html_tables.asp',
+        esperarSeletor: 'table',
+        esperarTimeoutMs: 15000
+      },
+      token
+    )
+    const tabEsp = await req(
+      'POST',
+      '/ler',
+      { modo: 'tabela', esperarSeletor: 'table', esperarTimeoutMs: 10000 },
+      token
+    )
+    const tabJa = await req('POST', '/ler', { modo: 'tabela' }, token)
+    const ok16 =
+      Number(tabEsp.json.totalLinhas || 0) > 0 && Number(tabJa.json.totalLinhas || 0) > 0
+    resultados.push({
+      id: 16,
+      ok: ok16,
+      detalhe: JSON.stringify({
+        comEspera: tabEsp.json.totalLinhas,
+        semEspera: tabJa.json.totalLinhas
+      })
+    })
+
+    // 17: iframe — data URL com tabela no frame
+    const iframeHtml =
+      '<!DOCTYPE html><html><body><p>host-sem-tabela</p>' +
+      '<iframe id="f1" src="data:text/html,' +
+      encodeURIComponent(
+        '<!DOCTYPE html><html><body><table id="t"><tr><th>H</th></tr><tr><td>v1</td></tr><tr><td>v2</td></tr></table></body></html>'
+      ) +
+      '"></iframe></body></html>'
+    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(iframeHtml)
+    const abriu = await req('POST', '/abrir', { url: dataUrl }, token)
+    await new Promise((r) => setTimeout(r, 2000))
+    const st17 = await req('GET', '/status', undefined, token)
+    const lerHost = await req('POST', '/ler', { modo: 'tabela' }, token)
+    const framesDisp = (lerHost.json.framesDisponiveis as Array<{ indice: number; url?: string }>) || []
+    const totalHost = Number(lerHost.json.totalLinhas || 0)
+    const temFrames = framesDisp.length > 0
+    let totalFrame = 0
+    let frameUsado: number | null = null
+    for (const fr of framesDisp) {
+      const lerFrame = await req('POST', '/ler', { modo: 'tabela', frame: fr.indice }, token)
+      const n = Number(lerFrame.json.totalLinhas || 0)
+      if (n > 0) {
+        totalFrame = n
+        frameUsado = fr.indice
+        break
+      }
+    }
+    const ok17 =
+      String(st17.json.url || '').startsWith('data:') &&
+      totalHost === 0 &&
+      temFrames &&
+      totalFrame > 0 &&
+      frameUsado != null
+    resultados.push({
+      id: 17,
+      ok: ok17,
+      detalhe: JSON.stringify({
+        abriu: abriu.json.ok,
+        url: String(st17.json.url || '').slice(0, 48),
+        framesHost: framesDisp.length,
+        totalHost,
+        totalFrame,
+        frameUsado,
+        aviso: lerHost.json.aviso
+      })
+    })
+
+    // P4: nav-ultima-url real inalterado
+    let urlRealDepois: string | null = null
+    try {
+      urlRealDepois = existsSync(urlRealPath) ? readFileSync(urlRealPath, 'utf8') : null
+    } catch {
+      urlRealDepois = null
+    }
+    if (urlRealAntes !== urlRealDepois) {
+      resultados.push({
+        id: 0,
+        ok: false,
+        detalhe: 'nav-ultima-url real foi alterado pelo smoke'
+      })
+    }
   } catch (e) {
     resultados.push({ id: 0, ok: false, detalhe: String((e as Error).message || e) })
+  } finally {
+    // P3: limpar só _smoke
+    try {
+      if (existsSync(smokeDlDir)) rmSync(smokeDlDir, { recursive: true, force: true })
+    } catch {
+      /* best-effort */
+    }
+    try {
+      if (existsSync(urlSmokePath)) unlinkSync(urlSmokePath)
+    } catch {
+      /* best-effort */
+    }
   }
 
   const falhas = resultados.filter((r) => !r.ok)
@@ -287,11 +444,22 @@ export async function rodarSmokeESair(): Promise<void> {
     // eslint-disable-next-line no-console
     console.log(JSON.stringify(r))
   }
+  // resíduo em downloads (fora _smoke)
+  let residuo = false
+  try {
+    if (existsSync(smokeDlDir)) residuo = true
+    if (existsSync(downloadsRoot)) {
+      const ents = readdirSync(downloadsRoot)
+      if (ents.includes('_smoke')) residuo = true
+    }
+  } catch {
+    /* ignore */
+  }
   const total = resultados.filter((r) => r.id > 0).length
   const pass = resultados.filter((r) => r.id > 0 && r.ok).length
-  dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${falhas.length}`)
+  dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${falhas.length} residuoSmoke=${residuo}`)
   // eslint-disable-next-line no-console
   console.log(`SMOKE=${pass}/${total}`)
-  const code = falhas.length ? 1 : 0
+  const code = falhas.length || residuo ? 1 : 0
   app.exit(code)
 }
