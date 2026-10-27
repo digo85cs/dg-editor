@@ -93,13 +93,16 @@
       <div id="terminal-panel" class="terminal-panel" aria-hidden="true">
         <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar"></div>
         <header class="terminal-header">
-          <span class="terminal-title">Terminal</span>
+          <div class="terminal-tabs-wrap">
+            <div id="terminal-tabs" class="terminal-tabs" role="tablist" aria-label="Abas do terminal"></div>
+            <button type="button" id="terminal-btn-add" class="terminal-btn-add" title="Nova aba" aria-label="Nova aba">+</button>
+          </div>
           <span id="terminal-shell-label" class="terminal-shell-label"></span>
           <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
           <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
         </header>
         <div class="terminal-body">
-          <div id="terminal-mount"></div>
+          <div id="terminal-panes" class="terminal-panes"></div>
         </div>
       </div>
     </section>

@@ -472,22 +472,81 @@ body {
   background: var(--dg-sidebar);
   border-bottom: 1px solid var(--dg-border-subtle);
   flex-shrink: 0;
+  min-width: 0;
 }
-.terminal-title {
-  font-size: var(--dg-fs-xs);
-  font-weight: 700;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
+.terminal-tabs-wrap {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 60%;
+  gap: 0;
+}
+.terminal-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  scrollbar-width: thin;
+}
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  height: 100%;
+  padding: 0 var(--dg-space-2);
+  border: 0;
+  border-right: 1px solid var(--dg-border-subtle);
+  background: transparent;
   color: var(--dg-text-muted);
+  font-size: var(--dg-fs-xs);
+  cursor: pointer;
+  white-space: nowrap;
 }
+.terminal-tab:hover { color: var(--dg-text); background: var(--dg-surface-raised); }
+.terminal-tab.ativa {
+  color: var(--dg-text);
+  background: var(--dg-bg);
+  box-shadow: inset 0 -2px 0 var(--dg-accent);
+}
+.terminal-tab-title { pointer-events: none; }
+.terminal-tab-close {
+  border: 0;
+  background: transparent;
+  color: var(--dg-text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: var(--dg-radius-sm);
+}
+.terminal-tab-close:hover { color: var(--dg-text); background: var(--dg-surface-raised); }
+.terminal-btn-add {
+  flex: 0 0 auto;
+  width: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--dg-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.terminal-btn-add:hover { color: var(--dg-accent); background: var(--dg-surface-raised); }
 .terminal-shell-label {
-  flex: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 28%;
   font-size: var(--dg-fs-xs);
   color: var(--dg-accent);
   font-family: var(--fonte-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-left: auto;
 }
 .terminal-body {
   flex: 1;
@@ -495,12 +554,19 @@ body {
   padding: var(--dg-space-1);
   background: var(--dg-bg);
 }
-#terminal-mount {
+.terminal-panes {
+  position: relative;
   width: 100%;
   height: 100%;
 }
-#terminal-mount .xterm { height: 100%; }
-#terminal-mount .xterm-viewport { background: var(--dg-bg) !important; }
+.terminal-tab-pane {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.terminal-tab-pane .xterm { height: 100%; }
+.terminal-tab-pane .xterm-viewport { background: var(--dg-bg) !important; }
 
 /* Chat panel ID preserved but relocated inside exec */
 #chat-panel {
