@@ -164,7 +164,7 @@ async function main() {
   assert('statuses tem 1 provider', statuses.length === 1)
   assert('provider name = ollama', statuses[0].name === 'ollama')
 
-  // ---------- 6. Renderer: selecionarPasta não regride a perf ----------
+  // ---------- 5. Renderer: selecionarPasta não regride a perf ----------
   section('5. Renderer: selecionarPasta (assertion estática)')
   const path6 = require('path')
   const fs6 = require('fs')
