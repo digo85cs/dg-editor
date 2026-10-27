@@ -19,7 +19,7 @@ const invokeChannels = [
   'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
-  'terminal:shells'
+  'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('api', {
     kill: (id: string) => ipcRenderer.invoke('terminal:kill', id),
     shell: () => ipcRenderer.invoke('terminal:shell'),
     shells: () => ipcRenderer.invoke('terminal:shells'),
+    getShellPadrao: () => ipcRenderer.invoke('terminal:getShellPadrao'),
+    setShellPadrao: (id: string | null) => ipcRenderer.invoke('terminal:setShellPadrao', id),
     onData: (cb: (payload: { id: string; data: string }) => void) => {
       const handler = (_e: IpcRendererEvent, payload: { id: string; data: string }) => cb(payload)
       ipcRenderer.on('terminal:data', handler)

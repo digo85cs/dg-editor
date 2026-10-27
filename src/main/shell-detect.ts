@@ -1,9 +1,10 @@
 /**
  * Detecção de shell em cascata: pwsh (maior versão) → preview → PATH → WindowsApps → powershell → cmd.
  */
-import { existsSync, readdirSync, statSync } from 'fs'
-import { join } from 'path'
+import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { join, dirname } from 'path'
 import { execFileSync, spawnSync } from 'child_process'
+import { appDataDir } from './paths'
 
 export interface ShellInfo {
   exe: string
@@ -279,5 +280,44 @@ export function acharShellPorId(id: string): ShellOpcao | null {
     return listarShells().find((s) => s.id === id) || null
   } catch {
     return null
+  }
+}
+
+function configPath(): string {
+  return join(appDataDir(), 'dg-editor.json')
+}
+
+/** Preferência de shell padrão (userData/dg-editor.json). */
+export function lerShellPadrao(): string | null {
+  try {
+    const p = configPath()
+    if (!existsSync(p)) return null
+    const data = JSON.parse(readFileSync(p, 'utf-8')) as { shellPadraoId?: string | null }
+    const id = data.shellPadraoId
+    return typeof id === 'string' && id.trim() ? id.trim() : null
+  } catch {
+    return null
+  }
+}
+
+/** Persiste shellPadraoId sem apagar outras chaves do JSON. id=null remove a preferência. */
+export function salvarShellPadrao(id: string | null): void {
+  try {
+    const p = configPath()
+    const dir = dirname(p)
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    let data: Record<string, unknown> = {}
+    if (existsSync(p)) {
+      try {
+        data = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>
+      } catch {
+        data = {}
+      }
+    }
+    if (id && String(id).trim()) data.shellPadraoId = String(id).trim()
+    else delete data.shellPadraoId
+    writeFileSync(p, JSON.stringify(data, null, 2), 'utf-8')
+  } catch (e) {
+    console.warn('[shell] salvarShellPadrao falhou:', String((e as Error)?.message || e))
   }
 }

@@ -49,7 +49,7 @@ import {
   killAllTerminals,
   shellAtivo
 } from './terminal'
-import { getShellCache, listarShells } from './shell-detect'
+import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -180,6 +180,20 @@ ipcMain.handle('terminal:shells', () => {
     return listarShells()
   } catch {
     return []
+  }
+})
+ipcMain.handle('terminal:getShellPadrao', () => {
+  try {
+    return lerShellPadrao()
+  } catch {
+    return null
+  }
+})
+ipcMain.handle('terminal:setShellPadrao', (_e, id: string | null) => {
+  try {
+    salvarShellPadrao(id == null || id === '' ? null : String(id))
+  } catch (e) {
+    dglog('[terminal] setShellPadrao falhou: ' + String((e as Error)?.message || e))
   }
 })
 

@@ -6,6 +6,7 @@ import { dglog } from './dglog'
 import {
   acharShellPorId,
   getShellCache,
+  lerShellPadrao,
   listarCandidatosShell,
   type ShellInfo
 } from './shell-detect'
@@ -68,6 +69,21 @@ function candidatosParaOpts(opts: TerminalOpts): ShellInfo[] {
       origem: 'opts'
     }
     return [preferred, ...todos.filter((s) => s.exe.toLowerCase() !== preferred.exe.toLowerCase())]
+  }
+  const padraoId = lerShellPadrao()
+  if (padraoId) {
+    const op = acharShellPorId(padraoId)
+    if (op) {
+      const preferred: ShellInfo = {
+        exe: op.exe,
+        args: op.args,
+        versao: op.tipo === 'cmd' ? null : op.id.replace(/^pwsh-preview-|^pwsh-|^powershell-/, '') || null,
+        tipo: op.tipo,
+        origem: 'shellPadrao'
+      }
+      return [preferred, ...todos.filter((s) => s.exe.toLowerCase() !== preferred.exe.toLowerCase())]
+    }
+    dglog(`[terminal] shell padrao '${padraoId}' inativo — usando cascata`)
   }
   const cache = getShellCache()
   return [cache, ...todos.filter((s) => s.exe.toLowerCase() !== cache.exe.toLowerCase())]
