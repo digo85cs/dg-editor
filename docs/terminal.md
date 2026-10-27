@@ -59,7 +59,13 @@ Botão **⧉** divide o painel em dois grupos independentes (abas e sessões pr�
 - Orientação horizontal/vertical (⇄); divisor arrastável (20%–80%)
 - Fechar divisão (▣) mata o grupo B e preserva o A
 - Última aba de um grupo em split: remove aquele grupo; se sobrar um, volta a `single`
-- Persistidos: modo, orientação e altura — não abas nem conteúdo
+- Em split, arraste abas entre grupos (ou reordene) sem matar o pty
+- Persistidos: modo, orientação, altura e estrutura de abas (`dg.terminal.layout`) — nunca o conteúdo do terminal
+
+### Perfil padrão e restauração
+
+- Estrela no header: define o shell da aba ativa como padrão (`userData/dg-editor.json`)
+- Ao reabrir o painel, restaura grupos/abas/shells do snapshot (máx. 4 abas/grupo); JSON inválido cai em single com 1 aba
 
 ## Troubleshooting
 
