@@ -7,6 +7,8 @@ let pastaAtual = null
 const pastasRecentes = []
 /** @type {Map<string, { expandida: boolean, filhosCarregados: boolean }>} */
 const estadoArvore = new Map()
+/** Containers .tree-children com listagem IPC em andamento (anti duplo clique). */
+const carregandoNos = new WeakSet()
 /** @type {{ caminho: string, nome: string, dirty: boolean }[]} */
 let abas = []
 let abaAtiva = null
@@ -243,6 +245,30 @@ async function selecionarPasta(path) {
 }
 
 // ---------- Árvore ----------
+/**
+ * Contexto do chat (pastaAtual / chat-title):
+ * muda só aqui — ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
+ * ou ao abrir um arquivo. Expandir/retrair árvore NÃO chama isto.
+ */
+function definirContextoPasta(p) {
+  if (!p) return
+  pastaAtual = p
+  $('chat-title').textContent = nomeArquivo(p)
+  $('chat-send').disabled = false
+  $('btn-reanalyze').classList.remove('hidden')
+}
+
+function raizWorkspaceDe(caminho) {
+  const a = String(caminho || '')
+  for (const r of pastasRecentes) {
+    if (!r) continue
+    if (a === r) return r
+    const sep = r.endsWith('\\') || r.endsWith('/') ? '' : '\\'
+    if (a.toLowerCase().startsWith((r + sep).toLowerCase())) return r
+  }
+  return pastaAtual
+}
+
 async function renderizarPastas() {
   const lista = $('folder-list')
   lista.innerHTML = ''
@@ -267,53 +293,67 @@ async function renderizarPastas() {
     header.title = p
     const chev = header.querySelector('.chevron')
     if (st.expandida) chev.classList.add('open')
-    header.addEventListener('click', async () => {
-      st.expandida = !st.expandida
-      chev.classList.toggle('open', st.expandida)
-      children.classList.toggle('open', st.expandida)
-      if (st.expandida) {
-        pastaAtual = p
-        $('chat-title').textContent = nomeArquivo(p)
-        $('chat-send').disabled = false
-        $('btn-reanalyze').classList.remove('hidden')
-        if (!st.filhosCarregados) await carregarFilhos(p, children, 1)
-      }
-    })
-    root.appendChild(header)
 
     const children = document.createElement('div')
     children.className = 'tree-children' + (st.expandida ? ' open' : '')
+
+    header.addEventListener('click', async (e) => {
+      if (carregandoNos.has(children)) return
+      const noChevron = !e.target.closest('.chevron')
+      // Pasta já expandida + clique no nome/ícone → só contexto do chat (não retrai).
+      if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
+        definirContextoPasta(p)
+        return
+      }
+      // Expandir / retrair: só classe 'open'. NÃO limpar DOM. NÃO mudar chat.
+      st.expandida = !st.expandida
+      chev.classList.toggle('open', st.expandida)
+      children.classList.toggle('open', st.expandida)
+      if (!st.expandida) return
+      if (children.childElementCount > 0) return
+      carregandoNos.add(children)
+      try {
+        await carregarFilhos(p, children, 1)
+      } finally {
+        carregandoNos.delete(children)
+      }
+    })
+    root.appendChild(header)
     root.appendChild(children)
     lista.appendChild(root)
 
-    if (st.expandida) {
-      if (!st.filhosCarregados) await carregarFilhos(p, children, 1)
-      else {
-        /* já tem DOM? reconstruir */
-        children.innerHTML = ''
-        st.filhosCarregados = false
-        await carregarFilhos(p, children, 1)
-      }
+    // Re-render completo (lista recriada): se estava expandida e container vazio, lazy load 1x.
+    if (st.expandida && children.childElementCount === 0) {
+      await carregarFilhos(p, children, 1)
     }
   }
 }
 
 async function carregarFilhos(dir, container, nivel) {
-  const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
-  const st = estadoArvore.get(dir)
-  if (st) st.filhosCarregados = true
-  container.innerHTML = ''
-  if (!r.ok) {
-    container.innerHTML =
-      '<div class="muted" style="padding:4px 12px;font-size:11px">' + escapar(r.erro || 'erro') + '</div>'
-    return
-  }
-  for (const ent of r.entradas || []) {
-    if (ent.tipo === 'dir') {
-      container.appendChild(criarNoDir(ent, nivel))
-    } else {
-      container.appendChild(criarNoFile(ent, nivel))
+  try {
+    const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
+    container.innerHTML = ''
+    if (!r.ok) {
+      container.innerHTML =
+        '<div class="muted" style="padding:4px 12px;font-size:11px">' + escapar(r.erro || 'erro') + '</div>'
+      return false
     }
+    const st = estadoArvore.get(dir)
+    if (st) st.filhosCarregados = true
+    for (const ent of r.entradas || []) {
+      if (ent.tipo === 'dir') {
+        container.appendChild(criarNoDir(ent, nivel))
+      } else {
+        container.appendChild(criarNoFile(ent, nivel))
+      }
+    }
+    return true
+  } catch (e) {
+    container.innerHTML =
+      '<div class="muted" style="padding:4px 12px;font-size:11px">erro ao listar: ' +
+      escapar(String(e && e.message ? e.message : e)) +
+      '</div>'
+    return false
   }
 }
 
@@ -330,12 +370,20 @@ function criarNoDir(ent, nivel) {
   let carregado = false
   row.addEventListener('click', async (e) => {
     e.stopPropagation()
+    if (carregandoNos.has(kids)) return
     aberto = !aberto
     row.querySelector('.chevron').classList.toggle('open', aberto)
     kids.classList.toggle('open', aberto)
-    if (aberto && !carregado) {
-      await carregarFilhos(ent.caminho, kids, nivel + 1)
-      carregado = true
+    if (!aberto) return
+    if (carregado || kids.childElementCount > 0) {
+      carregado = kids.childElementCount > 0
+      return
+    }
+    carregandoNos.add(kids)
+    try {
+      carregado = await carregarFilhos(ent.caminho, kids, nivel + 1)
+    } finally {
+      carregandoNos.delete(kids)
     }
   })
   wrap.appendChild(row)
@@ -358,6 +406,8 @@ function criarNoFile(ent, nivel) {
     }
     document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'))
     row.classList.add('active')
+    const raiz = raizWorkspaceDe(ent.caminho)
+    if (raiz) definirContextoPasta(raiz)
     abrirArquivoNaAba(ent.caminho)
   })
   return row
