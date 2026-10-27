@@ -307,6 +307,7 @@ async function renderizarPastas() {
     lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
     return
   }
+  const promessasFilhos = []
   for (const p of pastasRecentes) {
     const root = document.createElement('div')
     root.className = 'tree-root' + (p === pastaAtual ? ' selected' : '')
@@ -353,10 +354,17 @@ async function renderizarPastas() {
     root.appendChild(children)
     lista.appendChild(root)
 
+    // Re-render: leituras em paralelo (sem await no loop).
     if (st.expandida && children.childElementCount === 0) {
-      await carregarFilhos(p, children, 1)
+      carregandoNos.add(children)
+      promessasFilhos.push(
+        carregarFilhos(p, children, 1)
+          .catch(() => false)
+          .finally(() => carregandoNos.delete(children))
+      )
     }
   }
+  if (promessasFilhos.length) await Promise.all(promessasFilhos)
 }
 
 async function carregarFilhos(dir, container, nivel) {
