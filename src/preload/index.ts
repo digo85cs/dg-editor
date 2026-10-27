@@ -19,7 +19,8 @@ const invokeChannels = [
   'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
-  'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao'
+  'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',
+  'qa:run'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

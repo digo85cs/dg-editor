@@ -490,6 +490,31 @@ ipcMain.handle('memoria:indexar', async (_e, root: string, role: 'user' | 'assis
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
 
+// ---------- Agente de QA (subprocesso Node; nao carrega Playwright no main) ----------
+ipcMain.handle('qa:run', async (_e, opcoes?: { suite?: string }) => {
+  try {
+    const { execFileSync } = await import('child_process')
+    const { readFileSync, existsSync } = await import('fs')
+    const { join } = await import('path')
+    const { resolverRaizProjeto } = await import('./paths')
+    const raiz = resolverRaizProjeto()
+    const script = join(raiz, 'scripts', 'run-qa.cjs')
+    const suite = (opcoes && opcoes.suite) || 'ipc'
+    const nodeBin = process.env.npm_node_execpath || 'node'
+    execFileSync(nodeBin, [script, '--suite=' + suite, '--no-e2e'], {
+      cwd: raiz,
+      encoding: 'utf-8',
+      timeout: 180000,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const latest = join(raiz, 'qa-artifacts', 'latest', 'relatorio.json')
+    if (!existsSync(latest)) return { ok: false, erro: 'relatorio nao gerado' }
+    return JSON.parse(readFileSync(latest, 'utf-8'))
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 // ---------- Auto auditoria no boot + periodica ----------
 setTimeout(async () => {
   try {
