@@ -164,6 +164,27 @@ async function main() {
   assert('statuses tem 1 provider', statuses.length === 1)
   assert('provider name = ollama', statuses[0].name === 'ollama')
 
+  // ---------- 6. Renderer: selecionarPasta não regride a perf ----------
+  section('6. Renderer: selecionarPasta (assertion estática)')
+  const path6 = require('path')
+  const fs6 = require('fs')
+  const appSrc = fs6.readFileSync(path6.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf-8')
+  // extrai o corpo de selecionarPasta (da declaração até o fechamento da função)
+  const mSel = appSrc.match(/async function selecionarPasta\([^)]*\)\s*\{([\s\S]*?)\n\}/)
+  assert('selecionarPasta existe em app.js', !!mSel)
+  const corpoSel = mSel ? mSel[1] : ''
+  // anti-regressão A: NÃO deve chamar renderizarPastas (a causa do lag de 220ms)
+  assert('selecionarPasta NAO chama renderizarPastas', !/renderizarPastas\s*\(/.test(corpoSel))
+  // anti-regressão B: deve usar Promise.all (as 3 chamadas IPC em paralelo)
+  assert('selecionarPasta usa Promise.all', /Promise\.all\s*\(/.test(corpoSel))
+  // anti-regressão C: as 3 chamadas IPC estão DENTRO do Promise.all
+  assert('selecionarPasta chama chat:load dentro de Promise.all', /Promise\.all\s*\([\s\S]*chat:load/.test(corpoSel))
+  assert('selecionarPasta chama analysis:cached dentro de Promise.all', /Promise\.all\s*\([\s\S]*analysis:cached/.test(corpoSel))
+  // anti-regressão D: carregarFilhos só é chamado condicionalmente (childElementCount === 0)
+  const temCarregarFilhos = /carregarFilhos\s*\(/.test(corpoSel)
+  const temGuard = /childElementCount\s*===\s*0/.test(corpoSel)
+  assert('carregarFilhos so quando childElementCount===0', !temCarregarFilhos || temGuard)
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
