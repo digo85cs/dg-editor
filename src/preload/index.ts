@@ -15,7 +15,9 @@ const invokeChannels = [
   'roteador:planejar',
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
-  'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado'
+  'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
+  'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'navegador:abrir'
 ]
 
 const sendChannels = ['app:quit']

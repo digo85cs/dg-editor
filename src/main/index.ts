@@ -35,6 +35,12 @@ import {
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
+import {
+  lerArquivo,
+  salvarArquivo,
+  listarDiretorio,
+  arquivoExiste
+} from './arquivos'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -133,6 +139,25 @@ ipcMain.handle('navegador:abrir', (_e, url?: string) => {
   criarJanelaNavegador(dest, { mostrar: true })
   return { ok: true }
 })
+
+// ---------- Arquivos (IDE) ----------
+ipcMain.handle(
+  'arquivo:ler',
+  (_e, caminho: string, pastas: string[]) => lerArquivo(caminho, pastas || [])
+)
+ipcMain.handle(
+  'arquivo:salvar',
+  (_e, caminho: string, conteudo: string, pastas: string[]) =>
+    salvarArquivo(caminho, conteudo, pastas || [])
+)
+ipcMain.handle(
+  'arquivo:listar',
+  (_e, dir: string, pastas: string[]) => listarDiretorio(dir, pastas || [])
+)
+ipcMain.handle(
+  'arquivo:existe',
+  (_e, caminho: string, pastas: string[]) => arquivoExiste(caminho, pastas || [])
+)
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {
