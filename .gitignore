@@ -20,6 +20,7 @@ logs/
 .dg-editor/backup/
 
 src/**/*.js
+!src/renderer/**/*.js
 
 # Testes e diagnosticos soltos na raiz
 teste-*.cjs
