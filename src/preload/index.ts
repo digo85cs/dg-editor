@@ -17,8 +17,11 @@ const invokeChannels = [
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
   'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
-  'navegador:abrir'
+  'navegador:abrir',
+  'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell'
 ]
+
+const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
 
 const sendChannels = ['app:quit']
 
@@ -37,5 +40,25 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.send(channel, ...args)
   },
   getVersion: () => ipcRenderer.invoke('app:get-version'),
-  quit: () => ipcRenderer.send('app:quit')
+  quit: () => ipcRenderer.send('app:quit'),
+  terminal: {
+    create: (id: string, opts?: unknown) => ipcRenderer.invoke('terminal:create', id, opts),
+    write: (id: string, data: string) => ipcRenderer.invoke('terminal:write', id, data),
+    resize: (id: string, cols: number, rows: number) =>
+      ipcRenderer.invoke('terminal:resize', id, cols, rows),
+    kill: (id: string) => ipcRenderer.invoke('terminal:kill', id),
+    shell: () => ipcRenderer.invoke('terminal:shell'),
+    onData: (cb: (payload: { id: string; data: string }) => void) => {
+      const handler = (_e: IpcRendererEvent, payload: { id: string; data: string }) => cb(payload)
+      ipcRenderer.on('terminal:data', handler)
+      return () => ipcRenderer.removeListener('terminal:data', handler)
+    },
+    onExit: (cb: (payload: { id: string; code: number }) => void) => {
+      const handler = (_e: IpcRendererEvent, payload: { id: string; code: number }) => cb(payload)
+      ipcRenderer.on('terminal:exit', handler)
+      return () => ipcRenderer.removeListener('terminal:exit', handler)
+    }
+  }
 })
+
+void terminalOnChannels
