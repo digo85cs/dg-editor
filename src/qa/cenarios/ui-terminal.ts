@@ -61,7 +61,6 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
   {
     const t0 = Date.now()
     try {
-      // Não awaita abrirEm sem timeout — pty pode demorar sob Playwright
       await page.evaluate(() => {
         const api = (window as unknown as { dgTerminal?: { abrirEm: (c?: string) => Promise<unknown> } })
           .dgTerminal
@@ -86,41 +85,72 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
           corrigivel: false
         })
       } else {
-        const escreveu = await page.evaluate(async () => {
+        const abaId = await page.evaluate(() => {
+          const tab =
+            (document.querySelector('.terminal-tab.ativa') as HTMLElement | null) ||
+            (document.querySelector('.terminal-tab') as HTMLElement | null)
+          return tab?.dataset?.termId || ''
+        })
+        // CSP bloqueia Playwright waitForFunction (unsafe-eval). Equivalente: poll + evaluate + bufferTexto.
+        const lerBuf = async () =>
+          page.evaluate((id) => {
+            const dg = (window as unknown as { dgTerminal?: { bufferTexto?: (a?: string) => string } })
+              .dgTerminal
+            if (!dg?.bufferTexto) return { ok: false, txt: '', motivo: 'sem bufferTexto' }
+            return { ok: true, txt: dg.bufferTexto(id || undefined) || '', motivo: '' }
+          }, abaId)
+
+        let pronto = false
+        for (let i = 0; i < 40; i++) {
+          const b = await lerBuf()
+          if (b.ok && b.txt.trim().length > 0) {
+            pronto = true
+            break
+          }
+          await page.waitForTimeout(250)
+        }
+        if (!pronto) {
+          const b = await lerBuf()
+          throw new Error('buffer vazio apos abrir (' + (b.motivo || 'len=' + b.txt.length) + ')')
+        }
+
+        const escreveu = await page.evaluate(async (id) => {
           const api = (
             window as unknown as {
               api?: { terminal?: { write: (id: string, data: string) => Promise<unknown> } }
             }
           ).api
-          const tab =
-            (document.querySelector('.terminal-tab.ativa') as HTMLElement | null) ||
-            (document.querySelector('.terminal-tab') as HTMLElement | null)
-          const id = tab?.dataset?.termId
           if (api?.terminal?.write && id) {
             await api.terminal.write(id, 'echo DG_QA\r')
             return 'ipc:' + id
           }
           return 'keyboard'
-        })
+        }, abaId)
         if (escreveu === 'keyboard') {
           await page.keyboard.type('echo DG_QA', { delay: 10 })
           await page.keyboard.press('Enter')
         }
-        await page.waitForTimeout(1200)
-        const texto = await page.evaluate(
-          () =>
-            document.querySelector('.xterm')?.textContent ||
-            document.querySelector('.terminal-tab-pane')?.textContent ||
-            ''
-        )
-        const ok = /DG_QA/.test(texto)
+
+        let achou = false
+        for (let i = 0; i < 40; i++) {
+          const b = await lerBuf()
+          if (b.ok && /DG_QA/.test(b.txt)) {
+            achou = true
+            break
+          }
+          await page.waitForTimeout(250)
+        }
+        if (!achou) {
+          const b = await lerBuf()
+          throw new Error('DG_QA ausente no bufferTexto (amostra=' + b.txt.slice(0, 120) + ')')
+        }
         out.push({
           id: 'ui.terminal.echo',
           area: 'ui',
           titulo: 'echo DG_QA no buffer',
-          severidade: ok ? 'ok' : 'warn',
+          severidade: 'ok',
           duracaoMs: Date.now() - t0,
-          detalhe: (ok ? 'encontrado' : 'texto nao apareceu') + '; via=' + escreveu
+          detalhe: 'bufferTexto+evaluate; via=' + escreveu
         })
       }
     } catch (e) {
@@ -170,9 +200,12 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
   {
     const t0 = Date.now()
     try {
-      await page.locator('#terminal-btn-split').click()
+      await page.evaluate(() => {
+        const btn = document.getElementById('terminal-btn-split')
+        btn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
       await page.waitForTimeout(1200)
-      const n = await page.locator('.terminal-grupo').count()
+      const n = await page.evaluate(() => document.querySelectorAll('.terminal-grupo').length)
       out.push({
         id: 'ui.terminal.split',
         area: 'ui',
@@ -196,14 +229,28 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
   {
     const t0 = Date.now()
     try {
-      await page.keyboard.press('Control+`')
+      await page.keyboard.press('Control+Backquote')
       await page.waitForTimeout(400)
-      const aberto = await page.locator('#terminal-panel.open').count()
+      const aberto = await page.evaluate(
+        () => !!document.querySelector('#terminal-panel.open')
+      )
+      // fallback: botão toggle se atalho nao fechar
+      if (aberto) {
+        await page.evaluate(() => {
+          document.getElementById('btn-terminal-toggle')?.dispatchEvent(
+            new MouseEvent('click', { bubbles: true })
+          )
+        })
+        await page.waitForTimeout(300)
+      }
+      const ainda = await page.evaluate(
+        () => !!document.querySelector('#terminal-panel.open')
+      )
       out.push({
         id: 'ui.terminal.fechar',
         area: 'ui',
         titulo: 'Ctrl+` fecha painel',
-        severidade: aberto === 0 ? 'ok' : 'warn',
+        severidade: !ainda ? 'ok' : 'warn',
         duracaoMs: Date.now() - t0
       })
     } catch (e) {

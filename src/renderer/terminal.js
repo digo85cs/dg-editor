@@ -965,7 +965,39 @@ export function initTerminalPanel() {
     return entry
   }
 
-  window.dgTerminal = { abrirEm }
+  /**
+   * Lê o buffer do xterm (canvas nao expoe texto no DOM).
+   * @param {string} [abaId] id da aba; se omitido, usa a aba ativa do grupo ativo
+   * @returns {string}
+   */
+  function acharAba(abaId) {
+    if (abaId) {
+      for (const g of grupos.values()) {
+        if (g.abas.has(abaId)) return g.abas.get(abaId)
+      }
+    }
+    return abaAtivaDoGrupo(grupoAtivo())
+  }
+
+  function bufferTexto(abaId) {
+    const aba = acharAba(abaId)
+    if (!aba || !aba.xterm) return ''
+    try {
+      const buf = aba.xterm.buffer.active
+      const linhas = []
+      // baseY..baseY+rows cobre o viewport; length cobre scrollback
+      const fim = Math.max(buf.length, (buf.baseY || 0) + (aba.xterm.rows || 0))
+      for (let i = 0; i < fim; i++) {
+        const l = buf.getLine(i)
+        if (l) linhas.push(l.translateToString(true))
+      }
+      return linhas.join('\n')
+    } catch {
+      return ''
+    }
+  }
+
+  window.dgTerminal = { abrirEm, bufferTexto }
 
   if (handle) {
     let startY = 0
