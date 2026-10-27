@@ -219,6 +219,10 @@ const TOOLS = [
         limit: { type: 'number', description: 'Tamanho da pagina (texto default 50000; tabela default 500)' },
         esperarSeletor: { type: 'string' },
         esperarTimeoutMs: { type: 'number' },
+        aguardarEstavel: {
+          type: 'number',
+          description: 'Ms de silencio DOM (MutationObserver) apos esperarSeletor; 0=desligado'
+        },
         frame: {
           description: 'Indice do iframe ou substring da URL do frame',
           oneOf: [{ type: 'number' }, { type: 'string' }]
@@ -495,6 +499,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           limit: z.number().optional(),
           esperarSeletor: z.string().optional(),
           esperarTimeoutMs: z.number().optional(),
+          aguardarEstavel: z.number().optional(),
           frame: z.union([z.number(), z.string()]).optional()
         })
         .parse(args)
@@ -505,6 +510,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         limit: parsed.limit,
         esperarSeletor: parsed.esperarSeletor,
         esperarTimeoutMs: parsed.esperarTimeoutMs,
+        aguardarEstavel: parsed.aguardarEstavel,
         frame: parsed.frame
       })
       const err = r.status === 0 || r.status >= 400 || r.json.erro || r.json.ok === false

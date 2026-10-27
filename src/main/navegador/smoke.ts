@@ -6,8 +6,13 @@ import { app } from 'electron'
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs'
 import { basename, isAbsolute, join, relative, resolve } from 'path'
 import { criarJanelaNavegador, fecharJanelaNavegador, estadoAtual } from './janela'
-import { NAV_HOST, NAV_PORT, prefixoTokenControle } from './controle'
-import { caminhoNavToken } from './token'
+import { NAV_HOST, NAV_PORT, prefixoTokenControle, resetarRateLimit } from './controle'
+import {
+  caminhoNavToken,
+  garantirTokenSessao,
+  removerTokenSessao,
+  getTokenSessao
+} from './token'
 import { dglog } from '../dglog'
 import { projectStateDir, resolverRaizProjeto } from '../paths'
 
@@ -30,7 +35,8 @@ async function req(
 
 export async function rodarSmokeESair(): Promise<void> {
   const resultados: Array<{ id: number; ok: boolean; detalhe: string }> = []
-  const token = readFileSync(caminhoNavToken(), 'utf8').trim()
+  resetarRateLimit()
+  let token = readFileSync(caminhoNavToken(), 'utf8').trim()
   const estadoDir = projectStateDir(resolverRaizProjeto())
   const downloadsRoot = resolve(estadoDir, 'downloads')
   const smokeDlDir = join(downloadsRoot, '_smoke')
@@ -422,6 +428,149 @@ export async function rodarSmokeESair(): Promise<void> {
         detalhe: 'nav-ultima-url real foi alterado pelo smoke'
       })
     }
+
+    // 20: fallback debugger — força CDP (_forceDebugger) num iframe data: (sem sandbox
+    // opaco: sandbox real bloqueia createIsolatedWorld no Electron 33 offline)
+    const iframeDbg =
+      '<!DOCTYPE html><html><body><p>host</p>' +
+      '<iframe id="f1" src="data:text/html,' +
+      encodeURIComponent(
+        '<!DOCTYPE html><html><body><table id="t"><tr><th>H</th></tr><tr><td>dbg</td></tr><tr><td>dbg2</td></tr></table></body></html>'
+      ) +
+      '"></iframe></body></html>'
+    await req(
+      'POST',
+      '/abrir',
+      { url: 'data:text/html;charset=utf-8,' + encodeURIComponent(iframeDbg) },
+      token
+    )
+    await new Promise((r) => setTimeout(r, 2000))
+    const host20 = await req('POST', '/ler', { modo: 'tabela' }, token)
+    const frames20 =
+      (host20.json.framesDisponiveis as Array<{ indice: number }>) || []
+    let ok20 = false
+    let det20: Record<string, unknown> = { frames: frames20.length }
+    for (const fr of frames20) {
+      const lerDbg = await req(
+        'POST',
+        '/ler',
+        { modo: 'tabela', frame: fr.indice, _forceDebugger: true },
+        token
+      )
+      if (
+        lerDbg.json.ok === true &&
+        lerDbg.json.tentouDebugger === true &&
+        Number(lerDbg.json.totalLinhas || 0) > 0
+      ) {
+        ok20 = true
+        det20 = {
+          frame: fr.indice,
+          totalLinhas: lerDbg.json.totalLinhas,
+          tentouDebugger: true
+        }
+        break
+      }
+      det20 = {
+        frame: fr.indice,
+        ok: lerDbg.json.ok,
+        motivo: lerDbg.json.motivo || lerDbg.json.erro,
+        erroDebugger: lerDbg.json.erroDebugger,
+        tentouDebugger: lerDbg.json.tentouDebugger,
+        totalLinhas: lerDbg.json.totalLinhas
+      }
+    }
+    resultados.push({ id: 20, ok: ok20, detalhe: JSON.stringify(det20) })
+
+    // 21: MutationObserver aguardarEstavel
+    const mutHtml =
+      '<!DOCTYPE html><html><body><div id="root">aguarde</div><script>' +
+      'setTimeout(function(){' +
+      'var t=document.createElement("table");t.id="dyn";document.body.appendChild(t);' +
+      'var n=0;var iv=setInterval(function(){n++;' +
+      't.innerHTML="";for(var i=0;i<n;i++){var tr=document.createElement("tr");' +
+      'var td=document.createElement("td");td.textContent="r"+i;tr.appendChild(td);t.appendChild(tr);}' +
+      'if(n>=5)clearInterval(iv);},200);},500);' +
+      '</script></body></html>'
+    await req(
+      'POST',
+      '/abrir',
+      { url: 'data:text/html;charset=utf-8,' + encodeURIComponent(mutHtml) },
+      token
+    )
+    const tabEst = await req(
+      'POST',
+      '/ler',
+      {
+        modo: 'tabela',
+        esperarSeletor: 'table#dyn',
+        aguardarEstavel: 300,
+        esperarTimeoutMs: 8000
+      },
+      token
+    )
+    const linhasFinais = Number(tabEst.json.totalLinhas || 0)
+    // 5 linhas de dados (sem header separado — cada iteração cria n rows)
+    const ok21 = tabEst.json.ok === true && linhasFinais === 5
+    resultados.push({
+      id: 21,
+      ok: ok21,
+      detalhe: JSON.stringify({
+        totalLinhas: linhasFinais,
+        aviso: tabEst.json.aviso
+      })
+    })
+
+    // 19: rate limit — 130 /ler rápidos → 429 (depois dos testes que usam /ler)
+    resetarRateLimit()
+    let lastStatus = 200
+    let retryAfter = 0
+    for (let i = 0; i < 130; i++) {
+      const r = await req('POST', '/ler', { modo: 'texto' }, token)
+      lastStatus = r.status
+      if (r.status === 429) {
+        retryAfter = Number(r.json.retryAfterSec || 0)
+        break
+      }
+    }
+    const stOk = await req('GET', '/status', undefined, token)
+    const ok19 = lastStatus === 429 && retryAfter > 0 && stOk.status === 200
+    resultados.push({
+      id: 19,
+      ok: ok19,
+      detalhe: JSON.stringify({ lastStatus, retryAfter, statusOk: stOk.status })
+    })
+    resetarRateLimit()
+
+    // 18: rotação de token (por último — invalida token atual)
+    const tokenAntigo = token
+    const pathTok = caminhoNavToken()
+    removerTokenSessao()
+    const arquivoSumiu = !existsSync(pathTok)
+    const semTok = await req('GET', '/status', undefined, null)
+    const novo = garantirTokenSessao()
+    token = novo
+    const memOk = getTokenSessao() === novo
+    const comAntigo = await req('GET', '/status', undefined, tokenAntigo)
+    const comNovo = await req('GET', '/status', undefined, novo)
+    const ok18 =
+      arquivoSumiu &&
+      semTok.status === 401 &&
+      novo !== tokenAntigo &&
+      memOk &&
+      comAntigo.status === 401 &&
+      comNovo.status === 200
+    resultados.push({
+      id: 18,
+      ok: ok18,
+      detalhe: JSON.stringify({
+        arquivoSumiu,
+        semTok: semTok.status,
+        diferente: novo !== tokenAntigo,
+        antigo401: comAntigo.status,
+        novo200: comNovo.status,
+        prefixNovo: novo.slice(0, 8)
+      })
+    })
   } catch (e) {
     resultados.push({ id: 0, ok: false, detalhe: String((e as Error).message || e) })
   } finally {
@@ -460,6 +609,12 @@ export async function rodarSmokeESair(): Promise<void> {
   dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${falhas.length} residuoSmoke=${residuo}`)
   // eslint-disable-next-line no-console
   console.log(`SMOKE=${pass}/${total}`)
+  // before-quit não roda com app.exit — remover token aqui (espelha before-quit)
+  try {
+    removerTokenSessao()
+  } catch {
+    /* ignore */
+  }
   const code = falhas.length || residuo ? 1 : 0
   app.exit(code)
 }
