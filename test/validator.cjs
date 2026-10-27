@@ -185,6 +185,48 @@ async function main() {
   const temGuard = /childElementCount\s*===\s*0/.test(corpoSel)
   assert('carregarFilhos so quando childElementCount===0', !temCarregarFilhos || temGuard)
 
+  // ---------- 6. Terminal: invariantes estáticas ----------
+  section('6. Terminal: invariantes estaticas')
+  const pathT = require('path')
+  const fsT = require('fs')
+  const rootT = pathT.join(__dirname, '..')
+  const termJs = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'terminal.js'), 'utf-8')
+  const termTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'terminal.ts'), 'utf-8')
+  const shellTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'shell-detect.ts'), 'utf-8')
+  const indexTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+  const audTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'auto-auditoria.ts'), 'utf-8')
+
+  assert(
+    'terminal.js nao recria xterm ao trocar de aba',
+    /display\s*=\s*['"]none['"]|style\.display/.test(termJs) &&
+      !/async function ativarAba[\s\S]{0,800}new Terminal/.test(termJs)
+  )
+  assert(
+    'terminal.js tem unsubscribe em onData e onExit',
+    /onData/.test(termJs) &&
+      /onExit/.test(termJs) &&
+      (/unsub/.test(termJs) || /removeListener/.test(termJs) || /\.off\b/.test(termJs))
+  )
+  assert(
+    'terminal.ts expoe killAllTerminals e e chamado no main no will-quit',
+    /killAllTerminals/.test(termTs) &&
+      /killAllTerminals/.test(indexTs) &&
+      /before-quit|will-quit/.test(indexTs)
+  )
+  assert(
+    'split: ultima aba remove grupo',
+    /grupo/.test(termJs) &&
+      (/aposEsvaziarGrupo|voltarSinglePreservando|removerGrupo/.test(termJs)) &&
+      (/abas\.size\s*===\s*0|abas\.size\s*<=\s*0/.test(termJs))
+  )
+  assert(
+    'shell-detect: semver numerico, nao string',
+    /split\([^\)]*\)/.test(shellTs) &&
+      (/parseInt|Number\s*\(/.test(shellTs)) &&
+      /compararSemver|semver/i.test(shellTs)
+  )
+  assert('auto-auditoria tem checarTerminal', /checarTerminal/.test(audTs))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
