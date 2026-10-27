@@ -19,15 +19,18 @@ import {
   criarJanelaNavegador,
   forcarLayoutNavegador
 } from './janela'
-import { garantirNavToken } from './token'
+import { garantirTokenSessao, validarToken, getTokenSessao } from './token'
 import { resolverCaminhoDownload } from './download-nome'
+import { checarRateLimit, resetarRateLimit } from './rate-limit'
+import { extrairDoFrame } from './debugger-fallback'
 
 export const NAV_HOST = '127.0.0.1'
 export const NAV_PORT = 47821
 const CAP = 200_000
 
 let server: Server | null = null
-let token = ''
+
+export { resetarRateLimit }
 
 type Json = Record<string, unknown>
 
@@ -107,11 +110,18 @@ function resolverFrame(wc: WebContents, frame?: number | string): WebFrameMain |
 async function execNoAlvo(
   wc: WebContents,
   script: string,
-  frame?: number | string
-): Promise<unknown> {
-  const alvo = resolverFrame(wc, frame)
-  if (!alvo) throw new Error('frame nao encontrado')
-  return alvo.executeJavaScript(script, true)
+  frame?: number | string,
+  opts?: { forceDebugger?: boolean }
+): Promise<{ valor: unknown; tentouDebugger?: boolean }> {
+  const r = await extrairDoFrame(wc, frame, script, resolverFrame, {
+    forceDebugger: opts?.forceDebugger
+  })
+  if (!r.ok) {
+    const err = new Error(r.erro) as Error & { tentouDebugger?: boolean }
+    err.tentouDebugger = r.tentouDebugger
+    throw err
+  }
+  return { valor: r.dados, tentouDebugger: r.tentouDebugger }
 }
 
 async function esperarSeletorNoAlvo(
@@ -124,14 +134,61 @@ async function esperarSeletorNoAlvo(
   const js = `!!document.querySelector(${JSON.stringify(seletor)})`
   while (Date.now() < deadline) {
     try {
-      const ok = (await execNoAlvo(wc, js, frame)) as boolean
-      if (ok) return true
+      const r = await execNoAlvo(wc, js, frame)
+      if (r.valor) return true
     } catch {
       /* frame ainda carregando */
     }
     await sleep(200)
   }
   return false
+}
+
+/** Espera silêncio de mutações (MutationObserver) após seletor existir. */
+async function aguardarDomEstavel(
+  wc: WebContents,
+  seletor: string,
+  estavelMs: number,
+  timeoutMs: number,
+  frame?: number | string
+): Promise<{ ok: boolean; aviso?: string }> {
+  const script = `(() => {
+    const seletor = ${JSON.stringify(seletor)};
+    const estavelMs = ${Math.max(0, estavelMs)};
+    const timeoutMs = ${Math.max(0, timeoutMs)};
+    return new Promise((resolve) => {
+      let quietTimer = null;
+      let hard = null;
+      let finished = false;
+      const obs = new MutationObserver(() => bump());
+      const finish = (aviso) => {
+        if (finished) return;
+        finished = true;
+        try { obs.disconnect(); } catch (_) {}
+        clearTimeout(quietTimer);
+        clearTimeout(hard);
+        resolve({ ok: !!document.querySelector(seletor), aviso: aviso || null });
+      };
+      const bump = () => {
+        clearTimeout(quietTimer);
+        quietTimer = setTimeout(() => finish(null), estavelMs);
+      };
+      try {
+        obs.observe(document.documentElement || document.body, {
+          childList: true, subtree: true, attributes: true, characterData: true
+        });
+      } catch (_) {}
+      bump();
+      hard = setTimeout(() => finish('dom_ainda_mutando'), timeoutMs);
+    });
+  })()`
+  try {
+    const r = await execNoAlvo(wc, script, frame)
+    const v = r.valor as { ok?: boolean; aviso?: string | null }
+    return { ok: !!v?.ok, aviso: v?.aviso || undefined }
+  } catch (e) {
+    return { ok: false, aviso: String((e as Error).message || e) }
+  }
 }
 
 /** Candidatos clicáveis/estruturais para o agente se auto-corrigir (cap 30). */
@@ -200,6 +257,12 @@ async function handleLer(body: Json): Promise<Json> {
     body.esperarTimeoutMs != null && Number.isFinite(Number(body.esperarTimeoutMs))
       ? Math.floor(Number(body.esperarTimeoutMs))
       : 10_000
+  const aguardarEstavel =
+    body.aguardarEstavel != null && Number.isFinite(Number(body.aguardarEstavel))
+      ? Math.max(0, Math.floor(Number(body.aguardarEstavel)))
+      : 0
+  const forceDebugger =
+    process.env.DG_NAV_SMOKE === '1' && body._forceDebugger === true
 
   if (frameSpec !== undefined && frameSpec !== null && frameSpec !== '') {
     try {
@@ -239,6 +302,14 @@ async function handleLer(body: Json): Promise<Json> {
         motivo: 'timeout esperarSeletor',
         esperarSeletor: esperarSel,
         framesDisponiveis: listarFrames(wc)
+      }
+    }
+    if (aguardarEstavel > 0) {
+      const rest = Math.max(500, esperarMs - 0)
+      const est = await aguardarDomEstavel(wc, esperarSel, aguardarEstavel, rest, frameSpec)
+      if (est.aviso === 'dom_ainda_mutando') {
+        // segue para extrair o que houver, com aviso
+        ;(body as Json)._avisoEstavel = 'dom_ainda_mutando'
       }
     }
   }
@@ -350,13 +421,28 @@ async function handleLer(body: Json): Promise<Json> {
   })()`
 
   let r: Json
+  let tentouDebugger = false
   try {
-    r = (await execNoAlvo(wc, script, frameSpec)) as Json
+    const ex = await execNoAlvo(wc, script, frameSpec, { forceDebugger })
+    tentouDebugger = !!ex.tentouDebugger
+    r = ex.valor as Json
   } catch (e) {
+    const te = e as Error & { tentouDebugger?: boolean }
+    const motivo = String(te.message || e)
+    if (frameSpec !== undefined && frameSpec !== null && frameSpec !== '') {
+      return {
+        ok: false,
+        motivo: te.tentouDebugger ? 'iframe cross-origin inacessivel' : motivo,
+        erroDebugger: te.tentouDebugger ? motivo : undefined,
+        framesDisponiveis: listarFrames(wc),
+        tentouDebugger: te.tentouDebugger
+      }
+    }
     return {
       ok: false,
-      motivo: String((e as Error).message || e),
-      framesDisponiveis: listarFrames(wc)
+      motivo,
+      framesDisponiveis: listarFrames(wc),
+      tentouDebugger: te.tentouDebugger
     }
   }
   if (r && r.ok === false && String(r.motivo || '').includes('elemento nao encontrado')) {
@@ -369,14 +455,17 @@ async function handleLer(body: Json): Promise<Json> {
   if (r && r.ok === true) {
     if (r.truncado === undefined) r.truncado = false
     if (r.proximoOffset === undefined) r.proximoOffset = null
+    if (tentouDebugger) r.tentouDebugger = true
+    if (body._avisoEstavel) r.aviso = String(body._avisoEstavel)
 
     // aviso SPA: texto curto mas página tem table/main
     try {
-      const meta = (await execNoAlvo(
+      const metaEx = await execNoAlvo(
         wc,
         `({ len: (document.body && document.body.innerText || '').length, table: !!document.querySelector('table'), main: !!document.querySelector('main') })`,
         frameSpec
-      )) as { len: number; table: boolean; main: boolean }
+      )
+      const meta = metaEx.valor as { len: number; table: boolean; main: boolean }
       const textoLen =
         typeof r.texto === 'string'
           ? r.texto.length
@@ -465,12 +554,26 @@ async function handleClicar(body: Json): Promise<Json> {
 
   let r: Json
   try {
-    r = (await execNoAlvo(wc, script, frameSpec)) as Json
+    const ex = await execNoAlvo(wc, script, frameSpec)
+    r = ex.valor as Json
+    if (ex.tentouDebugger) r.tentouDebugger = true
   } catch (e) {
+    const te = e as Error & { tentouDebugger?: boolean }
+    if (frameSpec !== undefined && frameSpec !== null && frameSpec !== '') {
+      return {
+        ok: false,
+        motivo: te.tentouDebugger
+          ? 'iframe cross-origin inacessivel'
+          : String(te.message || e),
+        framesDisponiveis: listarFrames(wc),
+        tentouDebugger: te.tentouDebugger
+      }
+    }
     return {
       ok: false,
-      motivo: String((e as Error).message || e),
-      framesDisponiveis: listarFrames(wc)
+      motivo: String(te.message || e),
+      framesDisponiveis: listarFrames(wc),
+      tentouDebugger: te.tentouDebugger
     }
   }
   if (r && r.ok === false) {
@@ -628,13 +731,25 @@ async function despachar(req: IncomingMessage, res: ServerResponse): Promise<voi
   }
 
   const hdr = String(req.headers['x-dg-token'] || '')
-  if (!hdr || hdr !== token) {
+  // 401 antes do rate limit (requests sem token não contam)
+  if (!hdr || !validarToken(hdr)) {
     send(res, 401, { erro: 'token invalido ou ausente' })
     return
   }
 
   const url = new URL(req.url || '/', `http://${NAV_HOST}:${NAV_PORT}`)
   const path = url.pathname
+
+  const rl = checarRateLimit(hdr, path)
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfterSec))
+    send(res, 429, {
+      ok: false,
+      motivo: 'rate limit',
+      retryAfterSec: rl.retryAfterSec
+    })
+    return
+  }
 
   if (req.method === 'GET' && path === '/status') {
     send(res, 200, await estadoComLogado())
@@ -721,7 +836,7 @@ async function despachar(req: IncomingMessage, res: ServerResponse): Promise<voi
 
 export function iniciarControleNavegador(): void {
   if (server) return
-  token = garantirNavToken()
+  const tok = getTokenSessao() || garantirTokenSessao()
   // guardrail: nunca bind em 0.0.0.0
   const host = NAV_HOST
   if (host !== '127.0.0.1') {
@@ -735,7 +850,7 @@ export function iniciarControleNavegador(): void {
   })
 
   server.listen(NAV_PORT, host, () => {
-    dglog(`[navegador] controle http://${host}:${NAV_PORT} token=${token.slice(0, 4)}…`)
+    dglog(`[navegador] controle http://${host}:${NAV_PORT} token=${tok.slice(0, 8)}…`)
   })
 
   server.on('error', (e) => {
@@ -751,7 +866,8 @@ export function pararControleNavegador(): void {
 
 /** Exposto para smoke tests sem vazar o token completo. */
 export function prefixoTokenControle(): string {
-  return token ? token.slice(0, 4) : ''
+  const t = getTokenSessao()
+  return t ? t.slice(0, 8) : ''
 }
 
 export function gerarNonceTeste(): string {
