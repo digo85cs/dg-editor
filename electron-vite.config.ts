@@ -7,7 +7,7 @@ export default defineConfig({
       target: 'node20',
       rollupOptions: {
         input: resolve('src/main/index.ts'),
-        external: ['electron', 'bcryptjs']
+        external: ['electron', 'bcryptjs', 'node-pty']
       }
     },
     plugins: []

@@ -13,7 +13,8 @@
         "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
         "mcp": "npm run build:mcp && node .dg-editor\\bin\\main\\mcp\\server.js",
         "indice": "node scripts/gerar-indice.cjs",
-        "prebuild": "npm run build:mcp"
+        "prebuild": "npm run build:mcp",
+        "postinstall": "node scripts/patch-node-pty-spectre.cjs && electron-rebuild -f -w node-pty"
     },
     "dependencies": {
         "@codemirror/lang-css": "^6.3.1",
@@ -26,14 +27,22 @@
         "@codemirror/search": "^6.7.2",
         "@codemirror/theme-one-dark": "^6.1.3",
         "@modelcontextprotocol/sdk": "^1.32.2",
+        "@xterm/addon-fit": "^0.11.0",
+        "@xterm/addon-web-links": "^0.12.0",
+        "@xterm/xterm": "^6.0.0",
         "codemirror": "^6.0.2",
+        "node-pty": "^1.1.0",
         "zod": "^4.6.7"
     },
     "devDependencies": {
+        "@electron/rebuild": "^4.2.1",
         "@types/node": "^20.11.0",
         "electron": "^33.2.1",
         "electron-vite": "^2.1.0",
         "esbuild": "^0.20.0",
         "typescript": "^5.3.3"
+    },
+    "allowScripts": {
+        "node-pty@1.1.0": true
     }
 }
