@@ -14,7 +14,13 @@
         "mcp": "npm run build:mcp && node .dg-editor\\bin\\main\\mcp\\server.js",
         "indice": "node scripts/gerar-indice.cjs",
         "prebuild": "npm run build:mcp",
-        "postinstall": "node scripts/patch-node-pty-spectre.cjs && electron-rebuild -f -w node-pty"
+        "postinstall": "node scripts/patch-node-pty-spectre.cjs && electron-rebuild -f -w node-pty",
+        "qa": "node scripts/run-qa.cjs",
+        "qa:ipc": "node scripts/run-qa.cjs --suite=ipc",
+        "qa:e2e": "node scripts/run-qa.cjs --suite=e2e",
+        "qa:perf": "node scripts/run-qa.cjs --suite=perf",
+        "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
+        "qa:report": "node scripts/run-qa.cjs --report-only"
     },
     "dependencies": {
         "@codemirror/lang-css": "^6.3.1",
@@ -40,6 +46,7 @@
         "electron": "^33.2.1",
         "electron-vite": "^2.1.0",
         "esbuild": "^0.20.0",
+        "playwright-core": "^1.49.1",
         "typescript": "^5.3.3"
     },
     "allowScripts": {
