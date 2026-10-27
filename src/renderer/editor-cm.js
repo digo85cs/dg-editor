@@ -128,6 +128,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
       })
     },
     aplicarTema: () => {
+      // escuro → oneDark; claro → [] (tema padrão do CodeMirror)
       view.dispatch({
         effects: themeCompartment.reconfigure(temaEscuro() ? oneDark : [])
       })

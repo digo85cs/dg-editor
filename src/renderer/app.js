@@ -883,13 +883,18 @@ async function alternarTema() {
   aplicarTema(novo)
 }
 
+/** CodeMirror: escuro → oneDark; claro → tema padrão (themeCompartment). Body já deve ter a classe. */
+function trocarTemaEditor(_tema) {
+  editor?.aplicarTema()
+}
+
 function aplicarTema(tema) {
   document.body.classList.toggle('tema-escuro', tema === 'escuro')
   document.body.classList.toggle('tema-claro', tema !== 'escuro')
   try {
     localStorage.setItem('dg-tema', tema)
   } catch {}
-  editor?.aplicarTema()
+  trocarTemaEditor(tema)
 }
 
 async function carregarTema() {
