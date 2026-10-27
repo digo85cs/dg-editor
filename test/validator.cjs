@@ -288,6 +288,36 @@ async function main() {
       /npm test/.test(fsT.readFileSync(qaIa, 'utf-8'))
   )
 
+  // ---------- 9. Agente de QA: leitura de buffer e baseline integro ----------
+  section('9. Agente de QA: leitura de buffer e baseline integro')
+  const termJs9 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'terminal.js'), 'utf-8')
+  const uiTerm9 = fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'cenarios', 'ui-terminal.ts'), 'utf-8')
+  const ipcRun9 = fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'runner-ipc.ts'), 'utf-8')
+  assert('terminal.js expoe bufferTexto', /bufferTexto/.test(termJs9))
+  assert('bufferTexto usa translateToString', /translateToString/.test(termJs9))
+  assert(
+    'ui-terminal le buffer via waitForFunction',
+    /bufferTexto/.test(uiTerm9) && /waitForFunction/.test(uiTerm9)
+  )
+  assert('runner-ipc respeita ausencia de TTY', /isTTY/.test(ipcRun9))
+  const basePath9 = pathT.join(rootT, 'qa-artifacts', 'baseline.json')
+  let baselineOk9 = false
+  if (fsT.existsSync(basePath9)) {
+    try {
+      const bj = JSON.parse(fsT.readFileSync(basePath9, 'utf-8'))
+      const vals = Object.values(bj.metricas || {}).flatMap((m) => {
+        if (!m || typeof m !== 'object') return []
+        return Object.values(m).filter((v) => typeof v === 'number')
+      })
+      baselineOk9 = vals.length === 0 || vals.every((v) => v !== 0)
+    } catch {
+      baselineOk9 = false
+    }
+  } else {
+    baselineOk9 = true
+  }
+  assert('baseline nao contem metricas zeradas', baselineOk9)
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
