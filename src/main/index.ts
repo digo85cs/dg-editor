@@ -316,6 +316,7 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
 
   const { readRules: rr } = await import('./dgrules')
   const { getCachedAnalysis: gca } = await import('./analyzer')
+  const { contextoChatHibrido, executarHibrido } = await import('./brain/hibrido')
   const rules = rr(root)
   const analysis = gca(root)
 
@@ -326,8 +327,36 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
   if (rules) {
     context += `\nREGRAS DO PROJETO (.dgrules - respeite):\n${rules}\n`
   }
+  // Fase 1 hibrida (sempre): predicao factual no contexto do chat
+  try {
+    context += '\n' + contextoChatHibrido(root, content) + '\n'
+  } catch {
+    /* briefing opcional */
+  }
+
+  const trim = (content || '').trim()
+  const forceHibrido = /^\/hibrido\b/i.test(trim)
+  const forceOk = /\bconfirmo\b/i.test(trim)
+  const pedidoHibrido = forceHibrido ? trim.replace(/^\/hibrido\b/i, '').trim() || trim : trim
 
   try {
+    if (forceHibrido) {
+      const r = await executarHibrido(root, pedidoHibrido, {
+        pastaAberta: analysis?.root || root,
+        force: forceOk
+      })
+      const assistantMsg = {
+        role: 'assistant' as const,
+        content: r.texto,
+        at: Date.now(),
+        provider: 'hibrido:' + (r.modelo || 'core')
+      }
+      appendChat(root, assistantMsg)
+      await gravarDossie(loadChat(root), { root })
+      gerarContinuidade(dossieDirDoApp())
+      return { ok: r.ok !== false, message: assistantMsg, hibrido: r.briefing }
+    }
+
     await ensureOllama()
     const response = await askOllama(content, context, 'chat')
     const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
@@ -464,6 +493,31 @@ ipcMain.handle('agente:historico', async (_e, root: string) => {
   try { return { ok: true, mensagens: await historico(root) } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
+
+// ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------
+ipcMain.handle('hibrido:analisar', async (_e, root: string, pedido?: string, pastaAberta?: string) => {
+  const { prepararBriefing } = await import('./brain/hibrido')
+  return prepararBriefing(root || process.cwd(), pedido || 'status do workspace', pastaAberta)
+})
+
+ipcMain.handle(
+  'hibrido:executar',
+  async (
+    _e,
+    root: string,
+    pedido: string,
+    opcoes?: { force?: boolean; modeloForcado?: string; pastaAberta?: string }
+  ) => {
+    try {
+      const { executarHibrido } = await import('./brain/hibrido')
+      return await executarHibrido(root, pedido, opcoes)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      dglog('[hibrido:executar] falhou: ' + msg)
+      return { ok: false, texto: msg, modelo: '', passos: [], briefing: null }
+    }
+  }
+)
 
 ipcMain.handle('mcp:tools', async () => {
   try {
