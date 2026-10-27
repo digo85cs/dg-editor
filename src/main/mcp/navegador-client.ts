@@ -13,11 +13,12 @@ function tokenPath(): string {
   return join(projectStateDir(resolverRaizProjeto()), 'nav-token')
 }
 
+/** Reler a CADA chamada — token rotaciona por sessão do app. */
 function lerToken(): string {
   const p = tokenPath()
   if (!existsSync(p)) {
     throw new Error(
-      'navegador do DG Editor não está aberto — abra o painel Navegador no app (gera .dg-editor/nav-token)'
+      'app não está aberto ou token expirado — abra o DG Editor (painel Navegador)'
     )
   }
   const t = readFileSync(p, 'utf8').trim()
@@ -61,7 +62,7 @@ export async function chamarControle(
       status: 0,
       json: {
         erro: offline
-          ? 'navegador do DG Editor não está aberto — abra o painel Navegador no app'
+          ? 'app não está aberto ou token expirado — abra o DG Editor (painel Navegador)'
           : msg
       }
     }

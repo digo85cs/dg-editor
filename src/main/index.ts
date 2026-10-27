@@ -34,6 +34,7 @@ import {
   lerUltimaUrlNavegador
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
+import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -90,6 +91,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Token de sessão ANTES do servidor de controle (sempre novo)
+  garantirTokenSessao()
   installPtBrMenu({
     onAbrirNavegador: () => {
       const url = lerUltimaUrlNavegador() || 'about:blank'
@@ -111,6 +114,10 @@ app.whenReady().then(() => {
   if (process.env.DG_NAV_SMOKE === '1') {
     void import('./navegador/smoke').then((m) => m.rodarSmokeESair())
   }
+})
+
+app.on('before-quit', () => {
+  removerTokenSessao()
 })
 
 app.on('window-all-closed', () => {
