@@ -53,7 +53,7 @@ dossie-tecnico.md
 # telemetria de runtime (nao versionar)
 .dg-editor/modelos-stats.json
 
-# Agente QA
-qa-artifacts/
+# Agente QA (versionar so baseline e keep)
+qa-artifacts/*
 !qa-artifacts/baseline.json
 !qa-artifacts/.gitkeep

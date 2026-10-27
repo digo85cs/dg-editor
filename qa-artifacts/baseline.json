@@ -1,0 +1,17 @@
+{
+  "atualizadoEm": "2026-10-27T20:37:53.883Z",
+  "metricas": {
+    "perf.shell.listar": {
+      "limite": 5000,
+      "ultimoValor": 1284
+    },
+    "perf.brain.provider": {
+      "limite": 50,
+      "ultimoValor": 0
+    },
+    "perf.analise": {
+      "limite": 200,
+      "ultimoValor": 0
+    }
+  }
+}
