@@ -1,5 +1,5 @@
 /**
- * Painel de terminal: abas, perfis de shell e split panes.
+ * Painel de terminal: abas, perfis, split, drag-and-drop e restauração de layout.
  */
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -10,6 +10,8 @@ const LS_HEIGHT = 'dg-terminal-height'
 const LS_MODE = 'dg-terminal-mode'
 const LS_ORIENT = 'dg-terminal-orient'
 const LS_SPLIT_RATIO = 'dg-terminal-split-ratio'
+const LS_LAYOUT = 'dg.terminal.layout'
+const MAX_ABAS_RESTORE = 4
 
 function cssVar(name, fallback) {
   const v = getComputedStyle(document.body).getPropertyValue(name).trim()
@@ -53,7 +55,7 @@ function shellIdFromInfo(shell) {
 
 /**
  * @typedef {{ id: string, titulo: string, shellId: string|null, xterm: any, fit: any, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (()=>void)|null, unsubExit: (()=>void)|null }} Aba
- * @typedef {{ key: string, root: HTMLElement, tabsEl: HTMLElement, panesEl: HTMLElement, abas: Map<string, Aba>, ativoId: string|null }} Grupo
+ * @typedef {{ key: string, root: HTMLElement, bar: HTMLElement, tabsEl: HTMLElement, panesEl: HTMLElement, abas: Map<string, Aba>, ativoId: string|null }} Grupo
  */
 
 export function initTerminalPanel() {
@@ -61,6 +63,8 @@ export function initTerminalPanel() {
   const splitEl = document.getElementById('terminal-split')
   const label = document.getElementById('terminal-shell-label')
   const selectEl = document.getElementById('terminal-shell-select')
+  const btnPadrao = document.getElementById('terminal-btn-padrao')
+  const btnPadraoClear = document.getElementById('terminal-btn-padrao-clear')
   const btnClose = document.getElementById('terminal-btn-close')
   const btnClear = document.getElementById('terminal-btn-clear')
   const btnSplit = document.getElementById('terminal-btn-split')
@@ -79,6 +83,7 @@ export function initTerminalPanel() {
   let tabSeq = 0
   /** @type {Array<{id:string,rotulo:string}>|null} */
   let shellsCache = null
+  let shellPadraoId = null
   let observer = null
   let divisorEl = null
   const ratioRef = {
@@ -100,6 +105,44 @@ export function initTerminalPanel() {
   function persistLayout() {
     localStorage.setItem(LS_MODE, modo)
     localStorage.setItem(LS_ORIENT, orientacao)
+  }
+
+  function salvarSnapshot() {
+    try {
+      const keys = [...grupos.keys()].sort()
+      const snap = {
+        modo,
+        orientacao,
+        grupos: keys.map((k) => ({
+          abas: [...(grupos.get(k)?.abas.values() || [])].map((a) => ({
+            shellId: a.shellId || ''
+          }))
+        })),
+        grupoAtivo: Math.max(0, keys.indexOf(grupoAtivoKey))
+      }
+      localStorage.setItem(LS_LAYOUT, JSON.stringify(snap))
+      persistLayout()
+    } catch {
+      /* ignora */
+    }
+  }
+
+  function lerSnapshot() {
+    try {
+      const raw = localStorage.getItem(LS_LAYOUT)
+      if (!raw) return null
+      const snap = JSON.parse(raw)
+      if (!snap || (snap.modo !== 'single' && snap.modo !== 'split')) return null
+      if (!Array.isArray(snap.grupos) || snap.grupos.length < 1) return null
+      return snap
+    } catch {
+      try {
+        localStorage.removeItem(LS_LAYOUT)
+      } catch {
+        /* */
+      }
+      return null
+    }
   }
 
   function aplicarTema() {
@@ -137,6 +180,52 @@ export function initTerminalPanel() {
     a?.xterm.focus()
   }
 
+  function limparDropAlvo() {
+    for (const g of grupos.values()) {
+      g.bar?.classList.remove('drop-alvo')
+      g.tabsEl?.classList.remove('drop-alvo')
+    }
+  }
+
+  function wireDrag(g, a) {
+    const btn = a.tabBtn
+    btn.draggable = modo === 'split'
+    btn.ondragstart = (e) => {
+      if (modo !== 'split') {
+        e.preventDefault()
+        return
+      }
+      e.dataTransfer.setData('text/plain', a.id)
+      e.dataTransfer.setData('application/x-dg-grupo', g.key)
+      e.dataTransfer.effectAllowed = 'move'
+    }
+    btn.ondragend = () => limparDropAlvo()
+  }
+
+  function wireDropZone(g) {
+    const zone = g.bar
+    zone.ondragover = (e) => {
+      if (modo !== 'split') return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      limparDropAlvo()
+      zone.classList.add('drop-alvo')
+    }
+    zone.ondragleave = (e) => {
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove('drop-alvo')
+    }
+    zone.ondrop = (e) => {
+      e.preventDefault()
+      limparDropAlvo()
+      const abaId = e.dataTransfer.getData('text/plain')
+      if (!abaId) return
+      let beforeId = null
+      const el = e.target?.closest?.('.terminal-tab')
+      if (el?.dataset?.termId && el.dataset.termId !== abaId) beforeId = el.dataset.termId
+      void moverAba(abaId, g.key, beforeId)
+    }
+  }
+
   function renderTabs(g) {
     const ids = [...g.abas.keys()]
     for (const a of g.abas.values()) {
@@ -158,7 +247,9 @@ export function initTerminalPanel() {
       a.tabBtn.appendChild(title)
       a.tabBtn.appendChild(close)
       a.tabBtn.classList.toggle('ativa', a.id === g.ativoId)
+      a.tabBtn.draggable = modo === 'split'
       a.pane.style.display = a.id === g.ativoId ? 'block' : 'none'
+      wireDrag(g, a)
     }
   }
 
@@ -181,6 +272,11 @@ export function initTerminalPanel() {
     } catch {
       shellsCache = []
     }
+    try {
+      shellPadraoId = await apiTerm().getShellPadrao()
+    } catch {
+      shellPadraoId = null
+    }
     return shellsCache
   }
 
@@ -192,6 +288,8 @@ export function initTerminalPanel() {
 
     if (!lista.length) {
       selectEl.hidden = true
+      if (btnPadrao) btnPadrao.hidden = true
+      if (btnPadraoClear) btnPadraoClear.hidden = true
       label.hidden = false
       label.textContent = a ? formatShellLabel({ tipo: 'pwsh', versao: a.shellId }) : ''
       return
@@ -199,17 +297,23 @@ export function initTerminalPanel() {
 
     selectEl.hidden = false
     label.hidden = true
+    if (btnPadrao) btnPadrao.hidden = false
+    if (btnPadraoClear) btnPadraoClear.hidden = !shellPadraoId
     selectEl.innerHTML = ''
     for (const op of lista) {
       const opt = document.createElement('option')
       opt.value = op.id
-      opt.textContent = op.rotulo
+      opt.textContent = op.rotulo + (shellPadraoId === op.id ? ' ★' : '')
       selectEl.appendChild(opt)
     }
     if (a?.shellId && lista.some((o) => o.id === a.shellId)) {
       selectEl.value = a.shellId
     } else if (lista[0]) {
       selectEl.value = lista[0].id
+    }
+    if (btnPadrao) {
+      btnPadrao.textContent = shellPadraoId && selectEl.value === shellPadraoId ? '★' : '☆'
+      btnPadrao.classList.toggle('ativa', !!(shellPadraoId && selectEl.value === shellPadraoId))
     }
   }
 
@@ -219,6 +323,7 @@ export function initTerminalPanel() {
     const heranca =
       shellIdHeranca ||
       abaAtivaDoGrupo(g)?.shellId ||
+      shellPadraoId ||
       (shellsCache && shellsCache[0] && shellsCache[0].id) ||
       null
 
@@ -261,6 +366,7 @@ export function initTerminalPanel() {
       unsubExit: null
     }
     g.abas.set(id, entry)
+    wireDrag(g, entry)
 
     const opts = { cols: xterm.cols, rows: xterm.rows }
     if (heranca) opts.shellId = heranca
@@ -278,6 +384,7 @@ export function initTerminalPanel() {
     })
 
     await ativarAba(g, id)
+    salvarSnapshot()
     return entry
   }
 
@@ -305,6 +412,7 @@ export function initTerminalPanel() {
     fitEResize(g, a.id)
     a.xterm.focus()
     syncShellUi()
+    salvarSnapshot()
   }
 
   async function destruirAbaObj(g, a) {
@@ -325,10 +433,25 @@ export function initTerminalPanel() {
     g.abas.delete(a.id)
   }
 
-  /**
-   * Regra última aba em split: remove o grupo vazio; se sobrar 1 grupo, volta a single.
-   * Em single: fecha o painel.
-   */
+  /** Grupo vazio em split: remove DOM do grupo; se sobrar 1, volta a single (sem matar o outro). */
+  async function aposEsvaziarGrupo(key) {
+    const g = grupos.get(key)
+    if (!g) return
+    if (g.abas.size > 0) return
+    g.root.remove()
+    grupos.delete(key)
+    if (grupoAtivoKey === key) {
+      grupoAtivoKey = [...grupos.keys()][0] || 'A'
+    }
+    if (grupos.size <= 1) {
+      await voltarSinglePreservando()
+    } else {
+      marcarGrupoAtivo(grupoAtivoKey)
+      aplicarSplitCss()
+    }
+    salvarSnapshot()
+  }
+
   async function fecharAba(g, id) {
     const a = g.abas.get(id)
     if (!a) return
@@ -338,13 +461,10 @@ export function initTerminalPanel() {
       g.ativoId = null
       if (modo === 'single') {
         await fecharPainel(false)
+        salvarSnapshot()
         return
       }
-      // split: remove grupo vazio
-      await removerGrupo(g.key)
-      if (grupos.size <= 1) {
-        await voltarSinglePreservando()
-      }
+      await aposEsvaziarGrupo(g.key)
       return
     }
     if (g.ativoId === id) {
@@ -352,6 +472,60 @@ export function initTerminalPanel() {
       await ativarAba(g, next)
     } else {
       renderTabs(g)
+    }
+    salvarSnapshot()
+  }
+
+  function encontrarGrupoDaAba(abaId) {
+    for (const g of grupos.values()) {
+      if (g.abas.has(abaId)) return g
+    }
+    return null
+  }
+
+  /** Move aba entre grupos ou reordena — NÃO mata/recria pty. */
+  async function moverAba(abaId, destKey, beforeId) {
+    const fromG = encontrarGrupoDaAba(abaId)
+    const toG = grupos.get(destKey)
+    if (!fromG || !toG) return
+    const a = fromG.abas.get(abaId)
+    if (!a) return
+
+    fromG.abas.delete(abaId)
+    if (fromG.ativoId === abaId) {
+      fromG.ativoId = [...fromG.abas.keys()].pop() || null
+    }
+
+    const ids = [...toG.abas.keys()].filter((id) => id !== abaId)
+    const idx = beforeId ? ids.indexOf(beforeId) : -1
+    if (idx >= 0) ids.splice(idx, 0, abaId)
+    else ids.push(abaId)
+
+    const bag = new Map(toG.abas)
+    bag.set(abaId, a)
+    const next = new Map()
+    for (const id of ids) {
+      const item = bag.get(id)
+      if (item) next.set(id, item)
+    }
+    toG.abas = next
+
+    // DOM: move tab + pane (xterm viaja junto)
+    if (beforeId && toG.abas.get(beforeId)?.tabBtn) {
+      toG.tabsEl.insertBefore(a.tabBtn, toG.abas.get(beforeId).tabBtn)
+    } else {
+      toG.tabsEl.appendChild(a.tabBtn)
+    }
+    toG.panesEl.appendChild(a.pane)
+
+    if (fromG !== toG) renderTabs(fromG)
+    await ativarAba(toG, abaId)
+    requestAnimationFrame(() => fitEResize(toG, abaId))
+
+    if (fromG !== toG && fromG.abas.size === 0) {
+      await aposEsvaziarGrupo(fromG.key)
+    } else {
+      salvarSnapshot()
     }
   }
 
@@ -405,8 +579,9 @@ export function initTerminalPanel() {
     root.appendChild(panesEl)
 
     /** @type {Grupo} */
-    const g = { key, root, tabsEl, panesEl, abas: new Map(), ativoId: null }
+    const g = { key, root, bar, tabsEl, panesEl, abas: new Map(), ativoId: null }
     grupos.set(key, g)
+    wireDropZone(g)
     return g
   }
 
@@ -418,6 +593,12 @@ export function initTerminalPanel() {
     if (btnOrient) btnOrient.hidden = modo !== 'split'
     if (btnUnsplit) btnUnsplit.hidden = modo !== 'split'
     if (btnSplit) btnSplit.hidden = modo === 'split'
+
+    for (const g of grupos.values()) {
+      for (const a of g.abas.values()) {
+        a.tabBtn.draggable = modo === 'split'
+      }
+    }
 
     if (modo === 'split' && grupos.size >= 2) {
       const pct = Math.round(ratioRef.value * 100)
@@ -467,7 +648,6 @@ export function initTerminalPanel() {
 
   async function voltarSinglePreservando() {
     const keys = [...grupos.keys()]
-    // Prefer A if present, else first
     const keepKey = grupos.has('A') ? 'A' : keys[0]
     for (const k of keys) {
       if (k !== keepKey) await removerGrupo(k)
@@ -478,11 +658,9 @@ export function initTerminalPanel() {
     }
     modo = 'single'
     persistLayout()
-    // Re-mount keep group alone
     splitEl.innerHTML = ''
     const keep = grupos.get(keepKey)
     if (keep) {
-      // Remap to A
       if (keepKey !== 'A') {
         grupos.delete(keepKey)
         keep.key = 'A'
@@ -495,6 +673,7 @@ export function initTerminalPanel() {
     }
     aplicarSplitCss()
     fitTodos()
+    salvarSnapshot()
   }
 
   async function ativarSplit() {
@@ -504,7 +683,6 @@ export function initTerminalPanel() {
     modo = 'split'
     persistLayout()
 
-    // Ensure A is keyed A
     if (gA.key !== 'A') {
       grupos.delete(gA.key)
       gA.key = 'A'
@@ -524,6 +702,7 @@ export function initTerminalPanel() {
     await criarAba(gB, heranca)
     marcarGrupoAtivo('B')
     fitTodos()
+    salvarSnapshot()
   }
 
   async function fecharSplit() {
@@ -537,6 +716,55 @@ export function initTerminalPanel() {
     persistLayout()
     aplicarSplitCss()
     requestAnimationFrame(() => fitTodos())
+    salvarSnapshot()
+  }
+
+  async function restaurarDoSnapshot(snap) {
+    try {
+      modo = snap.modo === 'split' ? 'split' : 'single'
+      orientacao = snap.orientacao === 'vertical' ? 'vertical' : 'horizontal'
+      persistLayout()
+      splitEl.innerHTML = ''
+      grupos.clear()
+      divisorEl = null
+
+      const defs = snap.grupos.slice(0, 2)
+      const keys = defs.length >= 2 && modo === 'split' ? ['A', 'B'] : ['A']
+      if (keys.length === 1) modo = 'single'
+
+      for (let i = 0; i < keys.length; i++) {
+        const g = criarDomGrupo(keys[i])
+        if (i === 0) splitEl.appendChild(g.root)
+        else {
+          splitEl.appendChild(montarDivisor())
+          splitEl.appendChild(g.root)
+        }
+        let abasDef = Array.isArray(defs[i]?.abas) ? defs[i].abas : [{ shellId: '' }]
+        if (abasDef.length > MAX_ABAS_RESTORE) {
+          console.info('[terminal] snapshot truncado a ' + MAX_ABAS_RESTORE + ' abas/grupo')
+          abasDef = abasDef.slice(0, MAX_ABAS_RESTORE)
+        }
+        if (abasDef.length === 0) abasDef = [{ shellId: '' }]
+        for (const meta of abasDef) {
+          const sid =
+            meta?.shellId && shellsCache?.some((o) => o.id === meta.shellId)
+              ? meta.shellId
+              : shellPadraoId || shellsCache?.[0]?.id || null
+          await criarAba(g, sid)
+        }
+      }
+
+      const ativoIdx = typeof snap.grupoAtivo === 'number' ? snap.grupoAtivo : 0
+      const ativoKey = keys[Math.min(ativoIdx, keys.length - 1)] || 'A'
+      grupoAtivoKey = ativoKey
+      aplicarSplitCss()
+      marcarGrupoAtivo(ativoKey)
+      fitTodos()
+      return true
+    } catch (e) {
+      console.info('[terminal] restore falhou, single 1 aba', e)
+      return false
+    }
   }
 
   async function abrirPainel() {
@@ -547,18 +775,28 @@ export function initTerminalPanel() {
     panel.classList.add('open')
     panel.setAttribute('aria-hidden', 'false')
 
-    const preferSplit = localStorage.getItem(LS_MODE) === 'split'
     if (grupos.size === 0) {
-      splitEl.innerHTML = ''
-      const gA = criarDomGrupo('A')
-      splitEl.appendChild(gA.root)
-      grupoAtivoKey = 'A'
-      modo = 'single'
-      aplicarSplitCss()
-      await criarAba(gA)
-      if (preferSplit) await ativarSplit()
-    } else if (preferSplit && grupos.size === 1) {
-      await ativarSplit()
+      const snap = lerSnapshot()
+      let ok = false
+      if (snap) ok = await restaurarDoSnapshot(snap)
+      if (!ok) {
+        for (const key of [...grupos.keys()]) {
+          try {
+            await removerGrupo(key)
+          } catch {
+            /* */
+          }
+        }
+        splitEl.innerHTML = ''
+        grupos.clear()
+        divisorEl = null
+        const gA = criarDomGrupo('A')
+        splitEl.appendChild(gA.root)
+        grupoAtivoKey = 'A'
+        modo = 'single'
+        aplicarSplitCss()
+        await criarAba(gA)
+      }
     } else {
       aplicarSplitCss()
       fitTodos()
@@ -578,6 +816,7 @@ export function initTerminalPanel() {
     panel.classList.remove('open')
     panel.setAttribute('aria-hidden', 'true')
     if (destruir) {
+      salvarSnapshot()
       for (const key of [...grupos.keys()]) {
         await removerGrupo(key)
       }
@@ -600,6 +839,36 @@ export function initTerminalPanel() {
     const a = abaAtivaDoGrupo(g)
     if (!g || !a || !selectEl.value) return
     void reiniciarAbaComShell(g, a, selectEl.value)
+  })
+
+  btnPadrao?.addEventListener('click', async () => {
+    const id = selectEl?.value
+    if (!id) return
+    try {
+      await apiTerm().setShellPadrao(id)
+      shellPadraoId = id
+      if (btnPadrao) {
+        btnPadrao.textContent = '★'
+        btnPadrao.classList.add('ativa')
+        setTimeout(() => {
+          btnPadrao.classList.remove('flash')
+        }, 1500)
+        btnPadrao.classList.add('flash')
+      }
+      syncShellUi()
+    } catch (e) {
+      console.warn('[terminal] setShellPadrao falhou', e)
+    }
+  })
+
+  btnPadraoClear?.addEventListener('click', async () => {
+    try {
+      await apiTerm().setShellPadrao(null)
+      shellPadraoId = null
+      syncShellUi()
+    } catch (e) {
+      console.warn('[terminal] clear padrao falhou', e)
+    }
   })
 
   btnClose?.addEventListener('click', () => void fecharPainel(true))

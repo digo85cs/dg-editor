@@ -491,6 +491,16 @@ body {
   outline: 1px solid var(--dg-accent);
   outline-offset: 0;
 }
+.terminal-btn-padrao.ativa,
+.terminal-btn-padrao.flash {
+  color: var(--dg-accent);
+}
+.terminal-grupo-bar.drop-alvo,
+.terminal-tabs.drop-alvo {
+  outline: 1px dashed var(--dg-accent);
+  outline-offset: -1px;
+  background: var(--dg-surface-raised);
+}
 .terminal-tabs {
   display: flex;
   align-items: stretch;
