@@ -1,5 +1,6 @@
 // DG Editor - renderer (IDE Opção B)
 import { criarEditor } from './editor-cm.js'
+import { initTerminalPanel } from './terminal.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -1363,6 +1364,7 @@ carregarPastas()
 initResizers()
 initActivityBar()
 carregarTema()
+initTerminalPanel()
 renderizarPastas().then(() => restaurarAbas())
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
