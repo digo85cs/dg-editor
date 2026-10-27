@@ -53,7 +53,7 @@ function stubSender() {
  * Exercita funções/handlers de main SEM abrir BrowserWindow.
  * Handlers que dependem de webContents: terminal create — usa stubSender.
  */
-export async function rodarCenariosIpc(): Promise<{
+export async function rodarCenariosIpc(temTTY = true): Promise<{
   resultados: ResultadoCenario[]
   stubs: string[]
 }> {
@@ -88,21 +88,33 @@ export async function rodarCenariosIpc(): Promise<{
     }
   }
 
-  // --- terminal Map vida curta ---
+  // --- terminal Map vida curta (ConPTY exige TTY) ---
   {
     const t0 = Date.now()
-    try {
-      const { createTerminal, killTerminal, killAllTerminals } = await import('../../main/terminal')
-      stubs.push('terminal:create (WebContents stub)')
-      const sender = stubSender() as import('electron').WebContents
-      const id = 'qa-ipc-' + Date.now()
-      const r = createTerminal(id, { cols: 40, rows: 12 }, sender)
-      if (!r || !r.pid) throw new Error('create sem pid')
-      killTerminal(id)
-      killAllTerminals()
-      resultados.push(ok('ipc.terminal.vida', 'create+kill sessao', t0, 'pid=' + r.pid))
-    } catch (e) {
-      resultados.push(erro('ipc.terminal.vida', 'create+kill sessao', t0, e))
+    if (!temTTY) {
+      resultados.push({
+        id: 'ipc.terminal.vida',
+        area: 'ipc',
+        titulo: 'create+kill sessao',
+        severidade: 'ok',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'pty indisponivel em console nao-interativo (ConPTY) — cenario pulado',
+        corrigivel: false
+      })
+    } else {
+      try {
+        const { createTerminal, killTerminal, killAllTerminals } = await import('../../main/terminal')
+        stubs.push('terminal:create (WebContents stub)')
+        const sender = stubSender() as import('electron').WebContents
+        const id = 'qa-ipc-' + Date.now()
+        const r = createTerminal(id, { cols: 40, rows: 12 }, sender)
+        if (!r || !r.pid) throw new Error('create sem pid')
+        killTerminal(id)
+        killAllTerminals()
+        resultados.push(ok('ipc.terminal.vida', 'create+kill sessao', t0, 'pid=' + r.pid))
+      } catch (e) {
+        resultados.push(erro('ipc.terminal.vida', 'create+kill sessao', t0, e))
+      }
     }
   }
 
