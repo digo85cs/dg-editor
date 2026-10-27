@@ -316,6 +316,8 @@ async function checarModelos(): Promise<Achado[]> {
       })
     }
 
+    // Modelos instalados de proposito para uso manual/offline (nao exigem pipeline).
+    const MODELOS_MANUAIS = ['qwen2.5-coder:14b']
     const tem14 = instalados.some((d) => d.includes('14b'))
     const raiz = resolverRaizProjeto()
     const stats = statsSelecao(raiz)
@@ -323,7 +325,22 @@ async function checarModelos(): Promise<Achado[]> {
     const usos14 = Object.entries(stats.selecionadosPipeline || {})
       .filter(([k]) => k.includes('14b'))
       .reduce((s, [, n]) => s + n, 0)
-    if (tem14 && usos14 === 0) {
+    const manuaisPresentes = MODELOS_MANUAIS.filter((m) =>
+      instalados.some((d) => d === m || d.startsWith(m) || m.startsWith(d.split(':')[0]))
+    )
+    if (manuaisPresentes.length > 0 && usos14 === 0) {
+      for (const m of manuaisPresentes) {
+        out.push({
+          id: 'modelos:manual-' + m.replace(/[^a-z0-9]+/gi, '-'),
+          area: 'modelos',
+          titulo: 'modelo ' + m + ' reservado para uso manual',
+          detalhe: 'Instalado intencionalmente; nao conta como ociosidade de pipeline.',
+          severidade: 'ok',
+          corrigivel: false,
+          status: 'nao-aplicavel'
+        })
+      }
+    } else if (tem14 && usos14 === 0) {
       out.push({
         id: 'modelos:14b-parado',
         area: 'modelos',
