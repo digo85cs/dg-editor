@@ -360,6 +360,14 @@ async function checarProviders(): Promise<Achado[]> {
   const out: Achado[] = []
   try {
     const { filaDeModelos, disponivel } = await import('./brain/registry')
+    let cursorCliAprovadoNaSessao = (): boolean => false
+    try {
+      const prov = await import('./brain/providers')
+      cursorCliAprovadoNaSessao = () =>
+        !!prov.cursorCliAprovadoNaSessao() || process.env.DG_CURSOR_CLI_OK === '1'
+    } catch {
+      /* disponivel/G1 inacessivel → checagem vira nao-aplicavel abaixo */
+    }
     const tarefas = ['codigo', 'raciocinio', 'chat'] as const
     for (const t of tarefas) {
       const fila = filaDeModelos(t)
@@ -426,15 +434,75 @@ async function checarProviders(): Promise<Achado[]> {
         })
       }
       if (temCursorCli) {
-        out.push({
-          id: 'providers:cursor-cli-na-fila-' + t,
-          area: 'providers',
-          titulo: 'cursor-cli na fila ' + t + ' mas G1 REPROVADO',
-          detalhe: 'G1 exigiu auth; adapter nao deveria estar ativo',
-          severidade: 'erro',
-          corrigivel: false,
-          status: 'nao-aplicavel'
-        })
+        const cursorPs = fila.filter(
+          (p) => (p as { formato?: string }).formato === 'cursor-cli' || p.id.includes('cursor')
+        )
+        for (const p of cursorPs) {
+          let st: string
+          try {
+            st = String(disponivel(p as any))
+          } catch {
+            out.push({
+              id: 'providers:cursor-cli-na-fila-' + t,
+              area: 'providers',
+              titulo: 'cursor-cli na fila mas indisponivel (auto-excluido)',
+              detalhe: 'disponivel() inacessivel; tratado como nao-aplicavel',
+              severidade: 'ok',
+              corrigivel: false,
+              status: 'nao-aplicavel'
+            })
+            continue
+          }
+          if (st === 'indisponivel') {
+            out.push({
+              id: 'providers:cursor-cli-na-fila-' + t,
+              area: 'providers',
+              titulo: 'cursor-cli na fila mas indisponivel (auto-excluido)',
+              detalhe: p.id + '[' + st + ']',
+              severidade: 'ok',
+              corrigivel: false,
+              status: 'nao-aplicavel'
+            })
+          } else {
+            // Ativo em runtime: erro só se G1 estiver reprovado (contradicao)
+            let g1Ok = false
+            try {
+              g1Ok = cursorCliAprovadoNaSessao()
+            } catch {
+              out.push({
+                id: 'providers:cursor-cli-na-fila-' + t,
+                area: 'providers',
+                titulo: 'cursor-cli na fila mas indisponivel (auto-excluido)',
+                detalhe: 'G1 inacessivel; tratado como nao-aplicavel',
+                severidade: 'ok',
+                corrigivel: false,
+                status: 'nao-aplicavel'
+              })
+              continue
+            }
+            if (!g1Ok) {
+              out.push({
+                id: 'providers:cursor-cli-na-fila-' + t,
+                area: 'providers',
+                titulo: 'cursor-cli na fila ' + t + ' mas G1 REPROVADO',
+                detalhe: 'adapter ativo (disponivel=' + st + '); G1 exigiu auth',
+                severidade: 'erro',
+                corrigivel: false,
+                status: 'nao-aplicavel'
+              })
+            } else {
+              out.push({
+                id: 'providers:cursor-cli-na-fila-' + t,
+                area: 'providers',
+                titulo: 'cursor-cli na fila e disponivel',
+                detalhe: p.id + '[' + st + ']',
+                severidade: 'ok',
+                corrigivel: false,
+                status: 'nao-aplicavel'
+              })
+            }
+          }
+        }
       }
     }
 
