@@ -150,16 +150,19 @@ async function main() {
   const strength = profileStrength(profile)
   assert('profile strength valid', ['light', 'medium', 'strong'].includes(strength))
 
-  // ---------- 5. Brain providers ----------
+  // ---------- 5. Brain providers (fachada offline-only) ----------
   section('5. Brain providers')
-  const brainMod = loadModule('main/brain/index.ts')
-  const { getProviders, ApiProvider } = brainMod
-  const providers = getProviders()
-  assert('providers has 3', providers.length === 3)
-  assert('provider names', providers.map(p => p.name).sort().join(',') === 'api,maestro,ollama')
-  const api = new ApiProvider()
-  const avail = await api.isAvailable()
-  assert('api available without key returns boolean', typeof avail === 'boolean')
+  const brainMod = loadModule('main/brain/module.ts')
+  const { getBrain, __resetBrainForTests } = brainMod
+  __resetBrainForTests()
+  const brain = getBrain()
+  assert('brain tem ask()', typeof brain.ask === 'function')
+  assert('brain tem getActiveProvider()', typeof brain.getActiveProvider === 'function')
+  assert('brain tem getProviderStatuses()', typeof brain.getProviderStatuses === 'function')
+  assert('provider ativo e ollama', brain.getActiveProvider() === 'ollama')
+  const statuses = await brain.getProviderStatuses()
+  assert('statuses tem 1 provider', statuses.length === 1)
+  assert('provider name = ollama', statuses[0].name === 'ollama')
 
   // ---------- Summary ----------
   console.log('\n==============================')
