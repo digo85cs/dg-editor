@@ -177,6 +177,31 @@ body {
   overflow-y: auto;
   padding: var(--dg-space-2) 0;
 }
+.tree-ctx-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  padding: var(--dg-space-1) 0;
+  background: var(--dg-bg);
+  color: var(--dg-text);
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-sm);
+  box-shadow: var(--dg-shadow-2);
+}
+.tree-ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--dg-text);
+  font-size: var(--dg-fs-sm);
+  padding: var(--dg-space-2) var(--dg-space-3);
+  cursor: pointer;
+}
+.tree-ctx-item:hover {
+  background: var(--dg-selection);
+}
 .sidebar-footer {
   border-top: 1px solid var(--dg-border-subtle);
   padding: var(--dg-space-2);

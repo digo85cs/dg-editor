@@ -317,7 +317,7 @@ export function initTerminalPanel() {
     }
   }
 
-  async function criarAba(g, shellIdHeranca) {
+  async function criarAba(g, shellIdHeranca, cwdOpt) {
     tabSeq += 1
     const id = `term-${Date.now()}-${tabSeq}`
     const heranca =
@@ -370,7 +370,13 @@ export function initTerminalPanel() {
 
     const opts = { cols: xterm.cols, rows: xterm.rows }
     if (heranca) opts.shellId = heranca
-    const created = await apiTerm().create(id, opts)
+    if (cwdOpt) opts.cwd = cwdOpt
+    let created = await apiTerm().create(id, opts)
+    if (created?.erro && opts.cwd) {
+      console.warn('[terminal] cwd invalido, usando padrao:', opts.cwd, created.erro)
+      delete opts.cwd
+      created = await apiTerm().create(id, opts)
+    }
     if (created?.shell) {
       entry.shellId = shellIdFromInfo(created.shell) || heranca
     }
@@ -916,27 +922,91 @@ export function initTerminalPanel() {
     }
   })
 
+  function alturaUtilMax() {
+    return Math.floor(window.innerHeight * 0.6)
+  }
+
+  function alturaPadraoReset() {
+    const max = alturaUtilMax()
+    return Math.max(120, Math.min(300, max))
+  }
+
+  function aplicarAlturaPainel(px, comTransicao) {
+    const max = alturaUtilMax()
+    const h = Math.min(max, Math.max(120, px))
+    if (comTransicao) {
+      panel.style.transition = 'height 120ms ease'
+      const limpar = () => {
+        panel.style.transition = ''
+        panel.removeEventListener('transitionend', limpar)
+      }
+      panel.addEventListener('transitionend', limpar)
+      setTimeout(limpar, 200)
+    } else {
+      panel.style.transition = ''
+    }
+    panel.style.height = h + 'px'
+    localStorage.setItem(LS_HEIGHT, String(h))
+    fitTodos()
+  }
+
+  /**
+   * Abre o painel (se colapsado), cria aba no grupo ativo com cwd opcional e foca.
+   * Exposto como window.dgTerminal.abrirEm para a árvore (app.js).
+   */
+  async function abrirEm(cwd) {
+    const useCwd = typeof cwd === 'string' && cwd.trim() ? cwd.trim() : null
+    if (!aberto) await abrirPainel()
+    const g = grupoAtivo()
+    if (!g) return null
+    const shellId = abaAtivaDoGrupo(g)?.shellId
+    const entry = await criarAba(g, shellId, useCwd)
+    entry?.xterm?.focus()
+    return entry
+  }
+
+  window.dgTerminal = { abrirEm }
+
   if (handle) {
     let startY = 0
     let startH = 0
+    let startX = 0
+    let dragging = false
     const onMove = (e) => {
-      const dy = startY - e.clientY
-      const max = Math.floor(window.innerHeight * 0.6)
-      const h = Math.min(max, Math.max(120, startH + dy))
+      const dx = Math.abs(e.clientX - startX)
+      const dy = Math.abs(e.clientY - startY)
+      if (!dragging) {
+        if (dx + dy <= 3) return
+        dragging = true
+        panel.style.transition = ''
+      }
+      const max = alturaUtilMax()
+      const h = Math.min(max, Math.max(120, startH + (startY - e.clientY)))
       panel.style.height = h + 'px'
       fitTodos()
     }
     const onUp = () => {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
-      localStorage.setItem(LS_HEIGHT, String(parseInt(panel.style.height, 10) || 220))
+      if (dragging) {
+        localStorage.setItem(LS_HEIGHT, String(parseInt(panel.style.height, 10) || 220))
+      }
+      dragging = false
     }
     handle.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return
       e.preventDefault()
       startY = e.clientY
+      startX = e.clientX
       startH = panel.getBoundingClientRect().height
+      dragging = false
       document.addEventListener('mousemove', onMove)
       document.addEventListener('mouseup', onUp)
+    })
+    handle.addEventListener('dblclick', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      aplicarAlturaPainel(alturaPadraoReset(), true)
     })
   }
 

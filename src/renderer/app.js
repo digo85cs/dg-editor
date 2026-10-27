@@ -318,6 +318,8 @@ async function renderizarPastas() {
 
     const header = document.createElement('div')
     header.className = 'tree-root-header'
+    header.dataset.path = p
+    header.dataset.tipo = 'dir'
     header.innerHTML =
       CHEV +
       '<span class="file-icon">📁</span><span class="tab-name" style="overflow:hidden;text-overflow:ellipsis">' +
@@ -406,6 +408,8 @@ function criarNoDir(ent, nivel) {
   row.style.paddingLeft = 8 + nivel * 16 + 'px'
   row.innerHTML = CHEV + '<span class="file-icon">📁</span><span>' + escapar(ent.nome) + '</span>'
   row.title = ent.caminho
+  row.dataset.path = ent.caminho
+  row.dataset.tipo = 'dir'
   const kids = document.createElement('div')
   kids.className = 'tree-children'
   let aberto = false
@@ -440,6 +444,7 @@ function criarNoFile(ent, nivel) {
   row.innerHTML = extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>'
   row.title = ent.caminho
   row.dataset.path = ent.caminho
+  row.dataset.tipo = 'file'
   row.addEventListener('click', (e) => {
     e.stopPropagation()
     if (!ent.editavel) {
@@ -1349,6 +1354,79 @@ function perguntarEscolha(titulo, opcoes, config) {
 }
 window.perguntarEscolha = perguntarEscolha
 
+/** Diretório pai de um caminho (arquivo → pasta). */
+function dirPaiDe(caminho) {
+  const n = String(caminho || '').replace(/[/\\]+$/, '')
+  const i = Math.max(n.lastIndexOf('\\'), n.lastIndexOf('/'))
+  return i > 0 ? n.slice(0, i) : n
+}
+
+let menuCtxArvore = null
+
+function fecharMenuCtxArvore() {
+  if (menuCtxArvore) {
+    menuCtxArvore.remove()
+    menuCtxArvore = null
+  }
+}
+
+function abrirMenuCtxArvore(x, y, cwd) {
+  fecharMenuCtxArvore()
+  const menu = document.createElement('div')
+  menu.className = 'tree-ctx-menu'
+  menu.setAttribute('role', 'menu')
+  const item = document.createElement('button')
+  item.type = 'button'
+  item.className = 'tree-ctx-item'
+  item.setAttribute('role', 'menuitem')
+  item.textContent = 'Abrir terminal nesta pasta'
+  item.addEventListener('click', (e) => {
+    e.stopPropagation()
+    fecharMenuCtxArvore()
+    const api = window.dgTerminal
+    if (api && typeof api.abrirEm === 'function') {
+      void api.abrirEm(cwd)
+    } else {
+      console.warn('[arvore] dgTerminal.abrirEm indisponivel')
+    }
+  })
+  menu.appendChild(item)
+  document.body.appendChild(menu)
+  const pad = 4
+  const rect = menu.getBoundingClientRect()
+  let left = x
+  let top = y
+  if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad
+  if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad
+  menu.style.left = Math.max(pad, left) + 'px'
+  menu.style.top = Math.max(pad, top) + 'px'
+  menuCtxArvore = menu
+}
+
+function initMenuCtxArvore() {
+  const lista = $('folder-list')
+  if (!lista) return
+  lista.addEventListener('contextmenu', (e) => {
+    const alvo =
+      e.target.closest('.tree-item[data-path]') || e.target.closest('.tree-root-header[data-path]')
+    if (!alvo) return
+    e.preventDefault()
+    e.stopPropagation()
+    const path = alvo.dataset.path
+    if (!path) return
+    const tipo = alvo.dataset.tipo || (alvo.classList.contains('tree-root-header') ? 'dir' : 'file')
+    const cwd = tipo === 'file' ? dirPaiDe(path) : path
+    abrirMenuCtxArvore(e.clientX, e.clientY, cwd)
+  })
+  document.addEventListener('click', (e) => {
+    if (menuCtxArvore && !menuCtxArvore.contains(e.target)) fecharMenuCtxArvore()
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') fecharMenuCtxArvore()
+  })
+  window.addEventListener('blur', () => fecharMenuCtxArvore())
+}
+
 async function atualizarIconeMax() {
   try {
     const st = await window.api.invoke('janela:estado')
@@ -1365,6 +1443,7 @@ initResizers()
 initActivityBar()
 carregarTema()
 initTerminalPanel()
+initMenuCtxArvore()
 renderizarPastas().then(() => restaurarAbas())
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
