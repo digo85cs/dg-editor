@@ -93,16 +93,17 @@
       <div id="terminal-panel" class="terminal-panel" aria-hidden="true">
         <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar"></div>
         <header class="terminal-header">
-          <div class="terminal-tabs-wrap">
-            <div id="terminal-tabs" class="terminal-tabs" role="tablist" aria-label="Abas do terminal"></div>
-            <button type="button" id="terminal-btn-add" class="terminal-btn-add" title="Nova aba" aria-label="Nova aba">+</button>
-          </div>
+          <button type="button" id="terminal-btn-split" class="btn-icon" title="Dividir painel" aria-label="Dividir">⧉</button>
+          <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
+          <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
+          <span class="terminal-header-spacer"></span>
+          <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
           <span id="terminal-shell-label" class="terminal-shell-label"></span>
           <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
           <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
         </header>
         <div class="terminal-body">
-          <div id="terminal-panes" class="terminal-panes"></div>
+          <div id="terminal-split" class="terminal-split single horizontal"></div>
         </div>
       </div>
     </section>

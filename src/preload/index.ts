@@ -18,7 +18,8 @@ const invokeChannels = [
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
   'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
-  'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell'
+  'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
+  'terminal:shells'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
@@ -48,6 +49,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('terminal:resize', id, cols, rows),
     kill: (id: string) => ipcRenderer.invoke('terminal:kill', id),
     shell: () => ipcRenderer.invoke('terminal:shell'),
+    shells: () => ipcRenderer.invoke('terminal:shells'),
     onData: (cb: (payload: { id: string; data: string }) => void) => {
       const handler = (_e: IpcRendererEvent, payload: { id: string; data: string }) => cb(payload)
       ipcRenderer.on('terminal:data', handler)
