@@ -112,7 +112,7 @@ async function main() {
   assert('validateSession invalid', invalid.authenticated === false)
 
   // ---------- 3. Folder scan ignores node_modules/.git/etc ----------
-  section('3. Folder scan ignores node_modules/.git/etc')
+  section('2. Folder scan ignores node_modules/.git/etc')
   const scanMod = loadModule('main/scanner.ts')
   const { scanFolder } = scanMod
 
@@ -139,7 +139,7 @@ async function main() {
   assert('scan skippedDirs >= 4', result.skippedDirs >= 4, 'got ' + result.skippedDirs)
 
   // ---------- 4. System profile ----------
-  section('4. System profile')
+  section('3. System profile')
   const profileMod = loadModule('main/profile.ts')
   const { getSystemProfile, profileStrength } = profileMod
   const profile = getSystemProfile()
@@ -151,7 +151,7 @@ async function main() {
   assert('profile strength valid', ['light', 'medium', 'strong'].includes(strength))
 
   // ---------- 5. Brain providers (fachada offline-only) ----------
-  section('5. Brain providers')
+  section('4. Brain providers')
   const brainMod = loadModule('main/brain/module.ts')
   const { getBrain, __resetBrainForTests } = brainMod
   __resetBrainForTests()
@@ -165,7 +165,7 @@ async function main() {
   assert('provider name = ollama', statuses[0].name === 'ollama')
 
   // ---------- 6. Renderer: selecionarPasta não regride a perf ----------
-  section('6. Renderer: selecionarPasta (assertion estática)')
+  section('5. Renderer: selecionarPasta (assertion estática)')
   const path6 = require('path')
   const fs6 = require('fs')
   const appSrc = fs6.readFileSync(path6.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf-8')
