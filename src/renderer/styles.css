@@ -474,13 +474,22 @@ body {
   flex-shrink: 0;
   min-width: 0;
 }
-.terminal-tabs-wrap {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-  flex: 1 1 auto;
-  max-width: 60%;
-  gap: 0;
+.terminal-header-spacer { flex: 1 1 auto; min-width: 8px; }
+.terminal-shell-select {
+  max-width: 220px;
+  min-width: 120px;
+  height: 22px;
+  font-size: var(--dg-fs-xs);
+  font-family: var(--fonte-mono);
+  color: var(--dg-text);
+  background: var(--dg-bg);
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-sm);
+  padding: 0 var(--dg-space-1);
+}
+.terminal-shell-select:focus {
+  outline: 1px solid var(--dg-accent);
+  outline-offset: 0;
 }
 .terminal-tabs {
   display: flex;
@@ -551,19 +560,59 @@ body {
 .terminal-body {
   flex: 1;
   min-height: 0;
-  padding: var(--dg-space-1);
+  padding: 0;
   background: var(--dg-bg);
 }
+.terminal-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--dg-bg);
+}
+.terminal-split.single {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.terminal-grupo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid transparent;
+  background: var(--dg-bg);
+}
+.terminal-grupo.ativo {
+  border-color: var(--dg-accent);
+}
+.terminal-grupo-bar {
+  display: flex;
+  align-items: stretch;
+  height: 26px;
+  flex-shrink: 0;
+  background: var(--dg-sidebar);
+  border-bottom: 1px solid var(--dg-border-subtle);
+  min-width: 0;
+}
+.terminal-split-divisor {
+  background: var(--dg-border);
+  z-index: 2;
+}
+.terminal-split.horizontal > .terminal-split-divisor { cursor: col-resize; }
+.terminal-split.vertical > .terminal-split-divisor { cursor: row-resize; }
 .terminal-panes {
   position: relative;
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .terminal-tab-pane {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  padding: var(--dg-space-1);
+  box-sizing: border-box;
 }
 .terminal-tab-pane .xterm { height: 100%; }
 .terminal-tab-pane .xterm-viewport { background: var(--dg-bg) !important; }

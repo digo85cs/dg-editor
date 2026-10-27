@@ -1,5 +1,5 @@
 /**
- * Painel de terminal inferior com abas múltiplas (xterm.js + node-pty via IPC).
+ * Painel de terminal: abas, perfis de shell e split panes.
  */
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -7,6 +7,9 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 
 const LS_HEIGHT = 'dg-terminal-height'
+const LS_MODE = 'dg-terminal-mode'
+const LS_ORIENT = 'dg-terminal-orient'
+const LS_SPLIT_RATIO = 'dg-terminal-split-ratio'
 
 function cssVar(name, fallback) {
   const v = getComputedStyle(document.body).getPropertyValue(name).trim()
@@ -40,42 +43,75 @@ function formatShellLabel(shell) {
   return shell.tipo || 'shell'
 }
 
+function shellIdFromInfo(shell) {
+  if (!shell) return null
+  if (shell.tipo === 'cmd') return 'cmd'
+  if (shell.tipo === 'powershell') return 'powershell-' + (shell.versao || '5.1')
+  if (shell.tipo === 'pwsh-preview') return 'pwsh-preview-' + (shell.versao || 'x')
+  return 'pwsh-' + (shell.versao || 'x')
+}
+
+/**
+ * @typedef {{ id: string, titulo: string, shellId: string|null, xterm: any, fit: any, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (()=>void)|null, unsubExit: (()=>void)|null }} Aba
+ * @typedef {{ key: string, root: HTMLElement, tabsEl: HTMLElement, panesEl: HTMLElement, abas: Map<string, Aba>, ativoId: string|null }} Grupo
+ */
+
 export function initTerminalPanel() {
   const panel = document.getElementById('terminal-panel')
-  const panesEl = document.getElementById('terminal-panes')
-  const tabsEl = document.getElementById('terminal-tabs')
+  const splitEl = document.getElementById('terminal-split')
   const label = document.getElementById('terminal-shell-label')
+  const selectEl = document.getElementById('terminal-shell-select')
   const btnClose = document.getElementById('terminal-btn-close')
   const btnClear = document.getElementById('terminal-btn-clear')
-  const btnAdd = document.getElementById('terminal-btn-add')
+  const btnSplit = document.getElementById('terminal-btn-split')
+  const btnOrient = document.getElementById('terminal-btn-orient')
+  const btnUnsplit = document.getElementById('terminal-btn-unsplit')
   const btnToggle = document.getElementById('btn-terminal-toggle')
   const handle = document.getElementById('terminal-resize-handle')
-  if (!panel || !panesEl || !tabsEl || !apiTerm()) return
+  if (!panel || !splitEl || !apiTerm()) return
 
-  /** @type {Map<string, { id: string, titulo: string, xterm: import('@xterm/xterm').Terminal, fit: import('@xterm/addon-fit').FitAddon, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (() => void)|null, unsubExit: (() => void)|null }>} */
-  const abas = new Map()
-  let ativoId = null
+  /** @type {Map<string, Grupo>} */
+  const grupos = new Map()
+  let grupoAtivoKey = 'A'
+  let modo = localStorage.getItem(LS_MODE) === 'split' ? 'split' : 'single'
+  let orientacao = localStorage.getItem(LS_ORIENT) === 'vertical' ? 'vertical' : 'horizontal'
   let aberto = false
   let tabSeq = 0
+  /** @type {Array<{id:string,rotulo:string}>|null} */
+  let shellsCache = null
   let observer = null
+  let divisorEl = null
+  const ratioRef = {
+    value: Math.min(0.8, Math.max(0.2, parseFloat(localStorage.getItem(LS_SPLIT_RATIO) || '0.5') || 0.5))
+  }
 
   const alturaSalva = parseInt(localStorage.getItem(LS_HEIGHT) || '220', 10)
   panel.style.height = Math.max(120, alturaSalva) + 'px'
 
-  function abaAtiva() {
-    return ativoId ? abas.get(ativoId) || null : null
+  function grupoAtivo() {
+    return grupos.get(grupoAtivoKey) || null
+  }
+
+  function abaAtivaDoGrupo(g) {
+    if (!g || !g.ativoId) return null
+    return g.abas.get(g.ativoId) || null
+  }
+
+  function persistLayout() {
+    localStorage.setItem(LS_MODE, modo)
+    localStorage.setItem(LS_ORIENT, orientacao)
   }
 
   function aplicarTema() {
     const theme = temaXterm()
-    for (const a of abas.values()) {
-      a.xterm.options.theme = theme
+    for (const g of grupos.values()) {
+      for (const a of g.abas.values()) a.xterm.options.theme = theme
     }
   }
 
-  function fitEResize(id) {
-    if (!aberto) return
-    const a = id ? abas.get(id) : abaAtiva()
+  function fitEResize(g, id) {
+    if (!aberto || !g) return
+    const a = id ? g.abas.get(id) : abaAtivaDoGrupo(g)
     if (!a) return
     try {
       a.fit.fit()
@@ -86,9 +122,24 @@ export function initTerminalPanel() {
     }
   }
 
-  function renderTabs() {
-    const ids = [...abas.keys()]
-    for (const a of abas.values()) {
+  function fitTodos() {
+    for (const g of grupos.values()) fitEResize(g, g.ativoId)
+  }
+
+  function marcarGrupoAtivo(key) {
+    if (!grupos.has(key)) return
+    grupoAtivoKey = key
+    for (const [k, g] of grupos) {
+      g.root.classList.toggle('ativo', k === key)
+    }
+    syncShellUi()
+    const a = abaAtivaDoGrupo(grupoAtivo())
+    a?.xterm.focus()
+  }
+
+  function renderTabs(g) {
+    const ids = [...g.abas.keys()]
+    for (const a of g.abas.values()) {
       const idx = ids.indexOf(a.id) + 1
       a.titulo = `Terminal ${idx}`
       a.tabBtn.textContent = ''
@@ -99,45 +150,89 @@ export function initTerminalPanel() {
       close.type = 'button'
       close.className = 'terminal-tab-close'
       close.title = 'Fechar aba'
-      close.setAttribute('aria-label', 'Fechar aba')
       close.textContent = '×'
       close.addEventListener('click', (e) => {
         e.stopPropagation()
-        void fecharAba(a.id)
+        void fecharAba(g, a.id)
       })
       a.tabBtn.appendChild(title)
       a.tabBtn.appendChild(close)
-      a.tabBtn.classList.toggle('ativa', a.id === ativoId)
-      a.pane.style.display = a.id === ativoId ? 'block' : 'none'
+      a.tabBtn.classList.toggle('ativa', a.id === g.ativoId)
+      a.pane.style.display = a.id === g.ativoId ? 'block' : 'none'
     }
   }
 
-  async function ativarAba(id) {
-    if (!abas.has(id)) return
-    ativoId = id
-    renderTabs()
+  async function ativarAba(g, id) {
+    if (!g.abas.has(id)) return
+    g.ativoId = id
+    renderTabs(g)
+    marcarGrupoAtivo(g.key)
     requestAnimationFrame(() => {
-      fitEResize(id)
-      abas.get(id)?.xterm.focus()
+      fitEResize(g, id)
+      g.abas.get(id)?.xterm.focus()
     })
+    syncShellUi()
   }
 
-  async function criarAba() {
+  async function carregarShells() {
+    try {
+      const lista = await apiTerm().shells()
+      shellsCache = Array.isArray(lista) ? lista : []
+    } catch {
+      shellsCache = []
+    }
+    return shellsCache
+  }
+
+  function syncShellUi() {
+    const g = grupoAtivo()
+    const a = abaAtivaDoGrupo(g)
+    const lista = shellsCache || []
+    if (!selectEl || !label) return
+
+    if (!lista.length) {
+      selectEl.hidden = true
+      label.hidden = false
+      label.textContent = a ? formatShellLabel({ tipo: 'pwsh', versao: a.shellId }) : ''
+      return
+    }
+
+    selectEl.hidden = false
+    label.hidden = true
+    selectEl.innerHTML = ''
+    for (const op of lista) {
+      const opt = document.createElement('option')
+      opt.value = op.id
+      opt.textContent = op.rotulo
+      selectEl.appendChild(opt)
+    }
+    if (a?.shellId && lista.some((o) => o.id === a.shellId)) {
+      selectEl.value = a.shellId
+    } else if (lista[0]) {
+      selectEl.value = lista[0].id
+    }
+  }
+
+  async function criarAba(g, shellIdHeranca) {
     tabSeq += 1
     const id = `term-${Date.now()}-${tabSeq}`
-    const titulo = `Terminal ${abas.size + 1}`
+    const heranca =
+      shellIdHeranca ||
+      abaAtivaDoGrupo(g)?.shellId ||
+      (shellsCache && shellsCache[0] && shellsCache[0].id) ||
+      null
 
     const pane = document.createElement('div')
     pane.className = 'terminal-tab-pane'
     pane.dataset.termId = id
-    panesEl.appendChild(pane)
+    g.panesEl.appendChild(pane)
 
     const tabBtn = document.createElement('button')
     tabBtn.type = 'button'
     tabBtn.className = 'terminal-tab'
     tabBtn.dataset.termId = id
-    tabBtn.addEventListener('click', () => void ativarAba(id))
-    tabsEl.appendChild(tabBtn)
+    tabBtn.addEventListener('click', () => void ativarAba(g, id))
+    g.tabsEl.appendChild(tabBtn)
 
     const fit = new FitAddon()
     const xterm = new Terminal({
@@ -153,9 +248,11 @@ export function initTerminalPanel() {
     xterm.open(pane)
     xterm.onData((data) => apiTerm().write(id, data))
 
+    /** @type {Aba} */
     const entry = {
       id,
-      titulo,
+      titulo: `Terminal ${g.abas.size + 1}`,
+      shellId: heranca,
       xterm,
       fit,
       pane,
@@ -163,18 +260,15 @@ export function initTerminalPanel() {
       unsubData: null,
       unsubExit: null
     }
-    abas.set(id, entry)
+    g.abas.set(id, entry)
 
-    const created = await apiTerm().create(id, {
-      cols: xterm.cols,
-      rows: xterm.rows
-    })
-    if (created?.shell && label) {
-      label.textContent = formatShellLabel(created.shell)
+    const opts = { cols: xterm.cols, rows: xterm.rows }
+    if (heranca) opts.shellId = heranca
+    const created = await apiTerm().create(id, opts)
+    if (created?.shell) {
+      entry.shellId = shellIdFromInfo(created.shell) || heranca
     }
-    if (created?.erro) {
-      xterm.writeln('\r\n[erro] ' + created.erro)
-    }
+    if (created?.erro) xterm.writeln('\r\n[erro] ' + created.erro)
 
     entry.unsubData = apiTerm().onData(({ id: sid, data }) => {
       if (sid === id) xterm.write(data)
@@ -183,100 +277,314 @@ export function initTerminalPanel() {
       if (sid === id) xterm.writeln(`\r\n[exit ${code}]`)
     })
 
-    await ativarAba(id)
+    await ativarAba(g, id)
     return entry
   }
 
-  async function fecharAba(id) {
-    const a = abas.get(id)
-    if (!a) return
+  async function reiniciarAbaComShell(g, a, shellId) {
     a.unsubData?.()
     a.unsubExit?.()
     try {
-      await apiTerm().kill(id)
+      await apiTerm().kill(a.id)
     } catch {
-      /* ignora */
+      /* */
+    }
+    a.shellId = shellId
+    a.xterm.reset()
+    a.xterm.clear()
+    const opts = { cols: a.xterm.cols, rows: a.xterm.rows, shellId }
+    const created = await apiTerm().create(a.id, opts)
+    if (created?.shell) a.shellId = shellIdFromInfo(created.shell) || shellId
+    if (created?.erro) a.xterm.writeln('\r\n[erro] ' + created.erro)
+    a.unsubData = apiTerm().onData(({ id: sid, data }) => {
+      if (sid === a.id) a.xterm.write(data)
+    })
+    a.unsubExit = apiTerm().onExit(({ id: sid, code }) => {
+      if (sid === a.id) a.xterm.writeln(`\r\n[exit ${code}]`)
+    })
+    fitEResize(g, a.id)
+    a.xterm.focus()
+    syncShellUi()
+  }
+
+  async function destruirAbaObj(g, a) {
+    a.unsubData?.()
+    a.unsubExit?.()
+    try {
+      await apiTerm().kill(a.id)
+    } catch {
+      /* */
     }
     try {
       a.xterm.dispose()
     } catch {
-      /* ignora */
+      /* */
     }
     a.pane.remove()
     a.tabBtn.remove()
-    abas.delete(id)
+    g.abas.delete(a.id)
+  }
 
-    if (abas.size === 0) {
-      ativoId = null
-      await fecharPainel(false)
+  /**
+   * Regra última aba em split: remove o grupo vazio; se sobrar 1 grupo, volta a single.
+   * Em single: fecha o painel.
+   */
+  async function fecharAba(g, id) {
+    const a = g.abas.get(id)
+    if (!a) return
+    await destruirAbaObj(g, a)
+
+    if (g.abas.size === 0) {
+      g.ativoId = null
+      if (modo === 'single') {
+        await fecharPainel(false)
+        return
+      }
+      // split: remove grupo vazio
+      await removerGrupo(g.key)
+      if (grupos.size <= 1) {
+        await voltarSinglePreservando()
+      }
       return
     }
-    if (ativoId === id) {
-      const next = [...abas.keys()].pop()
-      await ativarAba(next)
+    if (g.ativoId === id) {
+      const next = [...g.abas.keys()].pop()
+      await ativarAba(g, next)
     } else {
-      renderTabs()
+      renderTabs(g)
     }
   }
 
-  async function destruirTodasAbas() {
-    const ids = [...abas.keys()]
-    for (const id of ids) {
-      const a = abas.get(id)
-      if (!a) continue
-      a.unsubData?.()
-      a.unsubExit?.()
-      try {
-        await apiTerm().kill(id)
-      } catch {
-        /* ignora */
-      }
-      try {
-        a.xterm.dispose()
-      } catch {
-        /* ignora */
-      }
-      a.pane.remove()
-      a.tabBtn.remove()
-      abas.delete(id)
+  async function destruirGrupoCompleto(g) {
+    for (const id of [...g.abas.keys()]) {
+      const a = g.abas.get(id)
+      if (a) await destruirAbaObj(g, a)
     }
-    ativoId = null
-    tabsEl.innerHTML = ''
-    panesEl.innerHTML = ''
+    g.root.remove()
+    grupos.delete(g.key)
+  }
+
+  async function removerGrupo(key) {
+    const g = grupos.get(key)
+    if (!g) return
+    await destruirGrupoCompleto(g)
+    if (grupoAtivoKey === key) {
+      grupoAtivoKey = [...grupos.keys()][0] || 'A'
+      if (grupos.has(grupoAtivoKey)) marcarGrupoAtivo(grupoAtivoKey)
+    }
+  }
+
+  function criarDomGrupo(key) {
+    const root = document.createElement('div')
+    root.className = 'terminal-grupo'
+    root.dataset.grupo = key
+    root.addEventListener('mousedown', () => marcarGrupoAtivo(key))
+
+    const bar = document.createElement('div')
+    bar.className = 'terminal-grupo-bar'
+    const tabsEl = document.createElement('div')
+    tabsEl.className = 'terminal-tabs'
+    tabsEl.setAttribute('role', 'tablist')
+    const btnAdd = document.createElement('button')
+    btnAdd.type = 'button'
+    btnAdd.className = 'terminal-btn-add'
+    btnAdd.title = 'Nova aba'
+    btnAdd.textContent = '+'
+    btnAdd.addEventListener('click', (e) => {
+      e.stopPropagation()
+      marcarGrupoAtivo(key)
+      void criarAba(grupos.get(key))
+    })
+    bar.appendChild(tabsEl)
+    bar.appendChild(btnAdd)
+
+    const panesEl = document.createElement('div')
+    panesEl.className = 'terminal-panes'
+
+    root.appendChild(bar)
+    root.appendChild(panesEl)
+
+    /** @type {Grupo} */
+    const g = { key, root, tabsEl, panesEl, abas: new Map(), ativoId: null }
+    grupos.set(key, g)
+    return g
+  }
+
+  function aplicarSplitCss() {
+    splitEl.classList.toggle('single', modo === 'single')
+    splitEl.classList.toggle('split', modo === 'split')
+    splitEl.classList.toggle('horizontal', orientacao === 'horizontal')
+    splitEl.classList.toggle('vertical', orientacao === 'vertical')
+    if (btnOrient) btnOrient.hidden = modo !== 'split'
+    if (btnUnsplit) btnUnsplit.hidden = modo !== 'split'
+    if (btnSplit) btnSplit.hidden = modo === 'split'
+
+    if (modo === 'split' && grupos.size >= 2) {
+      const pct = Math.round(ratioRef.value * 100)
+      if (orientacao === 'horizontal') {
+        splitEl.style.gridTemplateColumns = `${pct}% 4px 1fr`
+        splitEl.style.gridTemplateRows = '1fr'
+      } else {
+        splitEl.style.gridTemplateRows = `${pct}% 4px 1fr`
+        splitEl.style.gridTemplateColumns = '1fr'
+      }
+    } else {
+      splitEl.style.gridTemplateColumns = '1fr'
+      splitEl.style.gridTemplateRows = '1fr'
+    }
+  }
+
+  function montarDivisor() {
+    if (divisorEl) divisorEl.remove()
+    divisorEl = document.createElement('div')
+    divisorEl.className = 'terminal-split-divisor'
+    divisorEl.title = 'Arrastar para redimensionar'
+    const onMove = (e) => {
+      const rect = splitEl.getBoundingClientRect()
+      let r =
+        orientacao === 'horizontal'
+          ? (e.clientX - rect.left) / rect.width
+          : (e.clientY - rect.top) / rect.height
+      r = Math.min(0.8, Math.max(0.2, r))
+      ratioRef.value = r
+      localStorage.setItem(LS_SPLIT_RATIO, String(r))
+      const pct = Math.round(r * 100)
+      if (orientacao === 'horizontal') splitEl.style.gridTemplateColumns = `${pct}% 4px 1fr`
+      else splitEl.style.gridTemplateRows = `${pct}% 4px 1fr`
+      fitTodos()
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    divisorEl.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    })
+    return divisorEl
+  }
+
+  async function voltarSinglePreservando() {
+    const keys = [...grupos.keys()]
+    // Prefer A if present, else first
+    const keepKey = grupos.has('A') ? 'A' : keys[0]
+    for (const k of keys) {
+      if (k !== keepKey) await removerGrupo(k)
+    }
+    if (divisorEl) {
+      divisorEl.remove()
+      divisorEl = null
+    }
+    modo = 'single'
+    persistLayout()
+    // Re-mount keep group alone
+    splitEl.innerHTML = ''
+    const keep = grupos.get(keepKey)
+    if (keep) {
+      // Remap to A
+      if (keepKey !== 'A') {
+        grupos.delete(keepKey)
+        keep.key = 'A'
+        keep.root.dataset.grupo = 'A'
+        grupos.set('A', keep)
+      }
+      splitEl.appendChild(keep.root)
+      grupoAtivoKey = 'A'
+      marcarGrupoAtivo('A')
+    }
+    aplicarSplitCss()
+    fitTodos()
+  }
+
+  async function ativarSplit() {
+    if (modo === 'split') return
+    const gA = grupos.get('A') || grupoAtivo()
+    if (!gA) return
+    modo = 'split'
+    persistLayout()
+
+    // Ensure A is keyed A
+    if (gA.key !== 'A') {
+      grupos.delete(gA.key)
+      gA.key = 'A'
+      gA.root.dataset.grupo = 'A'
+      grupos.set('A', gA)
+    }
+
+    splitEl.innerHTML = ''
+    splitEl.appendChild(gA.root)
+    const div = montarDivisor()
+    splitEl.appendChild(div)
+    const gB = criarDomGrupo('B')
+    splitEl.appendChild(gB.root)
+
+    aplicarSplitCss()
+    const heranca = abaAtivaDoGrupo(gA)?.shellId
+    await criarAba(gB, heranca)
+    marcarGrupoAtivo('B')
+    fitTodos()
+  }
+
+  async function fecharSplit() {
+    if (modo !== 'split') return
+    await voltarSinglePreservando()
+  }
+
+  function alternarOrientacao() {
+    if (modo !== 'split') return
+    orientacao = orientacao === 'horizontal' ? 'vertical' : 'horizontal'
+    persistLayout()
+    aplicarSplitCss()
+    requestAnimationFrame(() => fitTodos())
   }
 
   async function abrirPainel() {
     if (aberto) return
+    await carregarShells()
+
     aberto = true
     panel.classList.add('open')
     panel.setAttribute('aria-hidden', 'false')
 
-    const shell = await apiTerm().shell()
-    if (label) label.textContent = formatShellLabel(shell)
-
-    if (abas.size === 0) {
-      await criarAba()
+    const preferSplit = localStorage.getItem(LS_MODE) === 'split'
+    if (grupos.size === 0) {
+      splitEl.innerHTML = ''
+      const gA = criarDomGrupo('A')
+      splitEl.appendChild(gA.root)
+      grupoAtivoKey = 'A'
+      modo = 'single'
+      aplicarSplitCss()
+      await criarAba(gA)
+      if (preferSplit) await ativarSplit()
+    } else if (preferSplit && grupos.size === 1) {
+      await ativarSplit()
     } else {
-      fitEResize(ativoId)
-      abaAtiva()?.xterm.focus()
+      aplicarSplitCss()
+      fitTodos()
+      abaAtivaDoGrupo(grupoAtivo())?.xterm.focus()
     }
 
+    syncShellUi()
+
     if (!observer) {
-      observer = new ResizeObserver(() => fitEResize(ativoId))
-      observer.observe(panesEl)
+      observer = new ResizeObserver(() => fitTodos())
+      observer.observe(splitEl)
     }
   }
 
   async function fecharPainel(destruir = true) {
-    if (!aberto && !destruir) {
-      panel.classList.remove('open')
-      panel.setAttribute('aria-hidden', 'true')
-      return
-    }
     aberto = false
     panel.classList.remove('open')
     panel.setAttribute('aria-hidden', 'true')
-    if (destruir) await destruirTodasAbas()
+    if (destruir) {
+      for (const key of [...grupos.keys()]) {
+        await removerGrupo(key)
+      }
+      splitEl.innerHTML = ''
+      divisorEl = null
+      modo = localStorage.getItem(LS_MODE) === 'split' ? 'split' : 'single'
+    }
   }
 
   function toggle() {
@@ -284,12 +592,24 @@ export function initTerminalPanel() {
     else void abrirPainel()
   }
 
-  btnClose?.addEventListener('click', () => void fecharPainel(true))
-  btnClear?.addEventListener('click', () => abaAtiva()?.xterm.clear())
-  btnAdd?.addEventListener('click', () => {
-    if (!aberto) void abrirPainel()
-    else void criarAba()
+  selectEl?.addEventListener('focus', () => {
+    void carregarShells().then(() => syncShellUi())
   })
+  selectEl?.addEventListener('change', () => {
+    const g = grupoAtivo()
+    const a = abaAtivaDoGrupo(g)
+    if (!g || !a || !selectEl.value) return
+    void reiniciarAbaComShell(g, a, selectEl.value)
+  })
+
+  btnClose?.addEventListener('click', () => void fecharPainel(true))
+  btnClear?.addEventListener('click', () => abaAtivaDoGrupo(grupoAtivo())?.xterm.clear())
+  btnSplit?.addEventListener('click', () => {
+    if (!aberto) void abrirPainel().then(() => ativarSplit())
+    else void ativarSplit()
+  })
+  btnUnsplit?.addEventListener('click', () => void fecharSplit())
+  btnOrient?.addEventListener('click', () => alternarOrientacao())
   btnToggle?.addEventListener('click', () => toggle())
 
   document.addEventListener('keydown', (e) => {
@@ -298,13 +618,31 @@ export function initTerminalPanel() {
       toggle()
       return
     }
-    if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key)) {
-      if (!aberto || abas.size === 0) return
+    if (!aberto) return
+
+    if (e.ctrlKey && e.altKey) {
+      if (modo === 'split') {
+        if (orientacao === 'horizontal' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          e.preventDefault()
+          marcarGrupoAtivo(e.key === 'ArrowLeft' ? 'A' : 'B')
+          return
+        }
+        if (orientacao === 'vertical' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          e.preventDefault()
+          marcarGrupoAtivo(e.key === 'ArrowUp' ? 'A' : 'B')
+          return
+        }
+      }
+    }
+
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && /^[1-9]$/.test(e.key)) {
+      const g = grupoAtivo()
+      if (!g || g.abas.size === 0) return
       const idx = parseInt(e.key, 10) - 1
-      const ids = [...abas.keys()]
+      const ids = [...g.abas.keys()]
       if (idx >= 0 && idx < ids.length) {
         e.preventDefault()
-        void ativarAba(ids[idx])
+        void ativarAba(g, ids[idx])
       }
     }
   })
@@ -317,7 +655,7 @@ export function initTerminalPanel() {
       const max = Math.floor(window.innerHeight * 0.6)
       const h = Math.min(max, Math.max(120, startH + dy))
       panel.style.height = h + 'px'
-      fitEResize(ativoId)
+      fitTodos()
     }
     const onUp = () => {
       document.removeEventListener('mousemove', onMove)
@@ -335,6 +673,5 @@ export function initTerminalPanel() {
 
   const mo = new MutationObserver(() => aplicarTema())
   mo.observe(document.body, { attributes: true, attributeFilter: ['class'] })
-
-  window.addEventListener('resize', () => fitEResize(ativoId))
+  window.addEventListener('resize', () => fitTodos())
 }
