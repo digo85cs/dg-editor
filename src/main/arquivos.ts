@@ -2,7 +2,8 @@
  * IPC de arquivos do DG Editor — nunca expor fs cru ao renderer.
  * Validação: relative() + isAbsolute() (não path.startsWith).
  */
-import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, statSync } from 'fs'
+import { readdir } from 'fs/promises'
 import { join, resolve, relative, isAbsolute, extname, basename, dirname } from 'path'
 
 const LIMITE_BYTES = 5 * 1024 * 1024
@@ -140,10 +141,10 @@ export type EntradaDir = {
   editavel: boolean
 }
 
-export function listarDiretorio(
+export async function listarDiretorio(
   dir: string,
   pastas: string[]
-): { ok: boolean; entradas?: EntradaDir[]; erro?: string } {
+): Promise<{ ok: boolean; entradas?: EntradaDir[]; erro?: string }> {
   if (!validarCaminho(dir, pastas)) {
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
@@ -168,18 +169,14 @@ export function listarDiretorio(
     'vendor'
   ])
   try {
-    const nomes = readdirSync(abs)
+    const dirents = await readdir(abs, { withFileTypes: true })
     const entradas: EntradaDir[] = []
-    for (const nome of nomes) {
+    for (const d of dirents) {
+      const nome = d.name
       if (ignorar.has(nome)) continue
       if (nome === '.' || nome === '..') continue
       const full = join(abs, nome)
-      let tipo: 'dir' | 'file' = 'file'
-      try {
-        tipo = statSync(full).isDirectory() ? 'dir' : 'file'
-      } catch {
-        continue
-      }
+      const tipo: 'dir' | 'file' = d.isDirectory() ? 'dir' : 'file'
       const ext = extname(nome).toLowerCase()
       const editavel =
         tipo === 'file' &&
