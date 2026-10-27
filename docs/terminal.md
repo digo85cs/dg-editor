@@ -40,7 +40,9 @@ Reinicie o DG Editor após a atualização (a detecção roda no boot).
 - **Ctrl+`** — abre/fecha o painel
 - **Ctrl+1..9** — troca de aba no grupo ativo
 - **Ctrl+Alt+←/→** (split horizontal) ou **Ctrl+Alt+↑/↓** (vertical) — alterna grupo
-- Arrastar a borda superior redimensiona (altura em `localStorage`)
+- Arrastar a borda superior redimensiona (altura em `localStorage`; só após mover >3px)
+- **Duplo-clique** no divisor de altura — reseta para 300px (com transição)
+- Menu de contexto na árvore: **Abrir terminal nesta pasta** (nova aba no grupo ativo, com `cwd`)
 
 ## Perfis de shell
 
