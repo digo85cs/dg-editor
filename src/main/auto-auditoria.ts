@@ -7,6 +7,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import fs from 'node:fs'
 import path from 'node:path'
+import { listarSkills } from './brain/skills'
+import { listarAgentes } from './brain/agentes'
 
 const execFileP = promisify(execFile)
 
@@ -471,7 +473,6 @@ function checarSkills(): Achado[] {
   const out: Achado[] = []
   const raiz = resolverRaizProjeto()
   try {
-    const { listarSkills } = require('./brain/skills') as typeof import('./brain/skills')
     const skills = listarSkills(raiz)
     out.push({
       id: 'skills:count',
@@ -520,8 +521,6 @@ function checarAgentesArea(): Achado[] {
   const out: Achado[] = []
   const raiz = resolverRaizProjeto()
   try {
-    const { listarAgentes } = require('./brain/agentes') as typeof import('./brain/agentes')
-    const { listarSkills } = require('./brain/skills') as typeof import('./brain/skills')
     const agentes = listarAgentes(raiz)
     const skillIds = new Set(listarSkills(raiz).map((s) => s.id))
     out.push({
