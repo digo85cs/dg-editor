@@ -38,7 +38,28 @@ Reinicie o DG Editor após a atualização (a detecção roda no boot).
 ## Atalho
 
 - **Ctrl+`** — abre/fecha o painel
+- **Ctrl+1..9** — troca de aba no grupo ativo
+- **Ctrl+Alt+←/→** (split horizontal) ou **Ctrl+Alt+↑/↓** (vertical) — alterna grupo
 - Arrastar a borda superior redimensiona (altura em `localStorage`)
+
+## Perfis de shell
+
+O seletor no header lista todos os shells detectados (`listarShells()`):
+
+- cada versão de pwsh em `%ProgramFiles%\PowerShell`
+- pwsh no PATH / WindowsApps (sem duplicar versão)
+- pwsh-preview, Windows PowerShell 5.1 e cmd
+
+A troca de perfil reinicia **só a aba ativa**. Abas novas herdam o shell da aba ativa.
+
+## Split panes
+
+Botão **⧉** divide o painel em dois grupos independentes (abas e sessões próprias).
+
+- Orientação horizontal/vertical (⇄); divisor arrastável (20%–80%)
+- Fechar divisão (▣) mata o grupo B e preserva o A
+- Última aba de um grupo em split: remove aquele grupo; se sobrar um, volta a `single`
+- Persistidos: modo, orientação e altura — não abas nem conteúdo
 
 ## Troubleshooting
 
