@@ -237,7 +237,7 @@ async function selecionarPasta(path) {
     renderizarAnalise(cached, true)
   } else {
     $('analysis-content').innerHTML =
-      '<p class="muted">Pasta aberta. Clique em <strong>Analisar de novo</strong> quando quiser a análise.</p>'
+      '<p class="muted">Pasta aberta. Clique em <strong>Analisar</strong> quando quiser a análise.</p>'
   }
 
   const temRegras = await window.api.invoke('rules:exists', path)
@@ -905,7 +905,7 @@ async function carregarTema() {
 const COMANDOS = [
   { id: 'abrir-pasta', label: 'Abrir pasta de trabalho', hint: 'Ctrl+O' },
   { id: 'analisar', label: 'Analisar sistema aberto', hint: 'IA' },
-  { id: 'reanalisar', label: 'Analisar de novo (forcar)', hint: 'IA' },
+  { id: 'reanalisar', label: 'Analisar novamente', hint: 'IA' },
   { id: 'limpar-chat', label: 'Limpar chat desta pasta', hint: 'chat' },
   { id: 'contas', label: 'Abrir Contas e saude do sistema', hint: 'Fase 2' },
   { id: 'config', label: 'Abrir Configuracoes', hint: 'sistema' },
