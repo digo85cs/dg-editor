@@ -1086,7 +1086,7 @@ function checarTerminal(): Achado[] {
       out.push({
         id: 'terminal:shell',
         area: 'terminal',
-        titulo: 'shell: PowerShell 5.1 (pwsh nao instalado) — winget upgrade --id Microsoft.PowerShell',
+        titulo: 'shell: PowerShell 5.1 — winget upgrade --id Microsoft.PowerShell',
         detalhe: shell.exe,
         severidade: 'warn',
         corrigivel: false,
@@ -1096,7 +1096,7 @@ function checarTerminal(): Achado[] {
       out.push({
         id: 'terminal:shell',
         area: 'terminal',
-        titulo: 'shell: cmd.exe (nenhum PowerShell detectado)',
+        titulo: 'shell: cmd.exe (nenhum PowerShell)',
         detalhe: shell.exe,
         severidade: 'warn',
         corrigivel: false,
@@ -1108,6 +1108,50 @@ function checarTerminal(): Achado[] {
       id: 'terminal:shell',
       area: 'terminal',
       titulo: 'Falha ao detectar shell',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  try {
+    const { listarShells, lerShellPadrao, acharShellPorId } = require('./shell-detect') as typeof import('./shell-detect')
+    const perfis = listarShells()
+    const n = perfis.length
+    out.push({
+      id: 'terminal:perfis',
+      area: 'terminal',
+      titulo: n >= 2 ? 'perfis: ' + n + ' shells detectados' : 'perfis: apenas ' + n + ' shell(s)',
+      detalhe: perfis.map((p) => p.id).join(', '),
+      severidade: n >= 2 ? 'ok' : 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    const padrao = lerShellPadrao()
+    if (padrao && !acharShellPorId(padrao)) {
+      out.push({
+        id: 'terminal:shell-padrao',
+        area: 'terminal',
+        titulo: 'shell padrao inativo: ' + padrao + ' nao encontrado (usando cascata)',
+        severidade: 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else if (padrao) {
+      out.push({
+        id: 'terminal:shell-padrao',
+        area: 'terminal',
+        titulo: 'shell padrao: ' + padrao,
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'terminal:perfis',
+      area: 'terminal',
+      titulo: 'Falha ao listar perfis de shell',
       severidade: 'warn',
       corrigivel: false,
       status: 'falhou',
