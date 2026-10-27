@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
+import { detectarShell } from './shell-detect'
 
 const execFileP = promisify(execFile)
 
@@ -1028,6 +1029,77 @@ export async function rodarAuditoriaConsolidada(): Promise<RelatorioConsolidado>
   return rel
 }
 
+function checarTerminal(): Achado[] {
+  const out: Achado[] = []
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('node-pty')
+    out.push({
+      id: 'terminal:node-pty',
+      area: 'terminal',
+      titulo: 'node-pty carregavel',
+      severidade: 'ok',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } catch (e: any) {
+    out.push({
+      id: 'terminal:node-pty',
+      area: 'terminal',
+      titulo: 'node-pty nao carrega (postinstall/electron-rebuild?)',
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  try {
+    const shell = detectarShell()
+    if (shell.tipo === 'pwsh' || shell.tipo === 'pwsh-preview') {
+      out.push({
+        id: 'terminal:shell',
+        area: 'terminal',
+        titulo: 'shell: pwsh ' + (shell.versao || '?') + ' (' + shell.origem + ')',
+        detalhe: shell.exe,
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else if (shell.tipo === 'powershell') {
+      out.push({
+        id: 'terminal:shell',
+        area: 'terminal',
+        titulo: 'shell: PowerShell 5.1 (pwsh nao instalado) — winget upgrade --id Microsoft.PowerShell',
+        detalhe: shell.exe,
+        severidade: 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    } else {
+      out.push({
+        id: 'terminal:shell',
+        area: 'terminal',
+        titulo: 'shell: cmd.exe (nenhum PowerShell detectado)',
+        detalhe: shell.exe,
+        severidade: 'warn',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e: any) {
+    out.push({
+      id: 'terminal:shell',
+      area: 'terminal',
+      titulo: 'Falha ao detectar shell',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'falhou',
+      erro: String(e?.message || e)
+    })
+  }
+  return out
+}
+
 async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{ achados: Achado[]; reiniciarPendente: boolean; motivoReinicio?: string }> {
   const achados: Achado[] = []
   achados.push(garantirPasta(DIR_DADOS))
@@ -1046,6 +1118,7 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
   achados.push(...checarPipeline())
   achados.push(...checarBuild())
   achados.push(...checarIntegridadeCompleta())
+  achados.push(...checarTerminal())
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
