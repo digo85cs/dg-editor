@@ -49,7 +49,7 @@ import {
   killAllTerminals,
   shellAtivo
 } from './terminal'
-import { getShellCache } from './shell-detect'
+import { getShellCache, listarShells } from './shell-detect'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -151,13 +151,20 @@ ipcMain.handle('navegador:abrir', (_e, url?: string) => {
 })
 
 // ---------- Terminal embutido ----------
-ipcMain.handle('terminal:create', (e, id: string, opts?: { cwd?: string; cols?: number; rows?: number }) => {
-  try {
-    return createTerminal(String(id), opts || {}, e.sender)
-  } catch (err) {
-    return { ok: false, erro: String((err as Error)?.message || err) }
+ipcMain.handle(
+  'terminal:create',
+  (
+    e,
+    id: string,
+    opts?: { cwd?: string; cols?: number; rows?: number; shellExe?: string; shellId?: string }
+  ) => {
+    try {
+      return createTerminal(String(id), opts || {}, e.sender)
+    } catch (err) {
+      return { ok: false, erro: String((err as Error)?.message || err) }
+    }
   }
-})
+)
 ipcMain.handle('terminal:write', (_e, id: string, data: string) => {
   writeTerminal(String(id), String(data ?? ''))
 })
@@ -168,6 +175,13 @@ ipcMain.handle('terminal:kill', (_e, id: string) => {
   killTerminal(String(id))
 })
 ipcMain.handle('terminal:shell', () => shellAtivo() || getShellCache())
+ipcMain.handle('terminal:shells', () => {
+  try {
+    return listarShells()
+  } catch {
+    return []
+  }
+})
 
 // ---------- Arquivos (IDE) ----------
 ipcMain.handle(

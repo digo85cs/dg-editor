@@ -13,7 +13,17 @@ export interface ShellInfo {
   origem: string
 }
 
+export interface ShellOpcao {
+  id: string
+  rotulo: string
+  exe: string
+  args: string[]
+  tipo: 'pwsh' | 'pwsh-preview' | 'powershell' | 'cmd'
+}
+
 let cache: ShellInfo | null = null
+let listaShellsCache: { at: number; itens: ShellOpcao[] } | null = null
+const LISTA_SHELLS_TTL_MS = 60_000
 
 function compararSemver(a: string, b: string): number {
   const pa = a.split(/[^\d]+/).filter(Boolean).map((n) => parseInt(n, 10) || 0)
@@ -162,4 +172,112 @@ export function getShellCache(): ShellInfo {
 
 export function limparCacheShell(): void {
   cache = null
+  listaShellsCache = null
+}
+
+function slugShellId(tipo: ShellInfo['tipo'], versao: string | null): string {
+  if (tipo === 'cmd') return 'cmd'
+  if (tipo === 'powershell') return 'powershell-' + (versao || '5.1').replace(/\s+/g, '')
+  if (tipo === 'pwsh-preview') return 'pwsh-preview-' + (versao || 'x').replace(/\s+/g, '')
+  return 'pwsh-' + (versao || 'x').replace(/\s+/g, '')
+}
+
+function rotuloShell(tipo: ShellInfo['tipo'], versao: string | null): string {
+  if (tipo === 'cmd') return 'Prompt de Comando'
+  if (tipo === 'powershell') return 'Windows PowerShell ' + (versao || '5.1')
+  if (tipo === 'pwsh-preview') return ('PowerShell Preview ' + (versao || '')).trim()
+  return ('PowerShell ' + (versao || '')).trim()
+}
+
+function infoParaOpcao(info: ShellInfo): ShellOpcao {
+  return {
+    id: slugShellId(info.tipo, info.versao),
+    rotulo: rotuloShell(info.tipo, info.versao),
+    exe: info.exe,
+    args: info.args,
+    tipo: info.tipo
+  }
+}
+
+/**
+ * Lista todos os shells utilizáveis (sob demanda, TTL 60s).
+ * Ordem: pwsh ProgramFiles (maior→menor) → PATH/WindowsApps → preview → powershell → cmd.
+ */
+export function listarShells(): ShellOpcao[] {
+  try {
+    if (listaShellsCache && Date.now() - listaShellsCache.at < LISTA_SHELLS_TTL_MS) {
+      return listaShellsCache.itens
+    }
+    const out: ShellOpcao[] = []
+    const pathSeen = new Set<string>()
+    const verSeen = new Set<string>()
+
+    const push = (info: ShellInfo) => {
+      try {
+        const key = info.exe.toLowerCase()
+        if (pathSeen.has(key)) return
+        const aliasOk =
+          info.origem === 'PATH' ||
+          info.origem === 'WindowsApps' ||
+          key.includes('\\windowsapps\\')
+        if (!existsSync(info.exe) && !aliasOk) return
+        if (info.tipo === 'pwsh' || info.tipo === 'pwsh-preview') {
+          const vk = info.tipo + ':' + (info.versao || key)
+          if (verSeen.has(vk)) return
+          verSeen.add(vk)
+        }
+        pathSeen.add(key)
+        out.push(infoParaOpcao(info))
+      } catch {
+        /* ignora item */
+      }
+    }
+
+    for (const c of candidatosProgramFiles('pwsh.exe')) {
+      push(montar(c.exe, 'pwsh', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+    }
+
+    const pathPwsh = which('pwsh.exe') || which('pwsh')
+    if (pathPwsh) push(montar(pathPwsh, 'pwsh', 'PATH'))
+
+    const wa = join(
+      process.env.LOCALAPPDATA || '',
+      'Microsoft',
+      'WindowsApps',
+      'pwsh.exe'
+    )
+    if (wa) push(montar(wa, 'pwsh', 'WindowsApps'))
+
+    for (const c of candidatosProgramFiles('pwsh-preview.exe')) {
+      push(montar(c.exe, 'pwsh-preview', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+    }
+
+    const ps =
+      which('powershell.exe') ||
+      join(
+        process.env.SystemRoot || 'C:\\Windows',
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe'
+      )
+    if (ps) push(montar(ps, 'powershell', 'fallback', lerVersaoPwsh(ps)))
+
+    const cmd = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe')
+    push(montar(cmd, 'cmd', 'fallback', null))
+
+    listaShellsCache = { at: Date.now(), itens: out }
+    return out
+  } catch {
+    return listaShellsCache?.itens ? [...listaShellsCache.itens] : []
+  }
+}
+
+export function acharShellPorId(id: string): ShellOpcao | null {
+  if (!id) return null
+  try {
+    return listarShells().find((s) => s.id === id) || null
+  } catch {
+    return null
+  }
 }

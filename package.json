@@ -5,7 +5,7 @@
     "main": "out/main/index.js",
     "scripts": {
         "dev": "electron-vite preview",
-        "build": "electron-vite build",
+        "build": "electron-vite build && node scripts/emit-shell-detect.cjs",
         "preview": "electron-vite preview",
         "start": "electron-vite preview",
         "test": "node test/validator.cjs",

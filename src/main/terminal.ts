@@ -3,13 +3,20 @@
  */
 import type { WebContents } from 'electron'
 import { dglog } from './dglog'
-import { getShellCache, listarCandidatosShell, type ShellInfo } from './shell-detect'
+import {
+  acharShellPorId,
+  getShellCache,
+  listarCandidatosShell,
+  type ShellInfo
+} from './shell-detect'
 
 export interface TerminalOpts {
   cwd?: string
   cols?: number
   rows?: number
   shellExe?: string
+  /** Preferência sobre shellExe; resolve via listarShells/acharShellPorId. */
+  shellId?: string
 }
 
 type PtyProc = {
@@ -36,6 +43,21 @@ function carregarPty(): typeof import('node-pty') {
 
 function candidatosParaOpts(opts: TerminalOpts): ShellInfo[] {
   const todos = listarCandidatosShell()
+  if (opts.shellId) {
+    const op = acharShellPorId(opts.shellId)
+    if (op) {
+      const preferred: ShellInfo = {
+        exe: op.exe,
+        args: op.args,
+        versao: op.id.replace(/^pwsh-preview-|^pwsh-|^powershell-/, '') || null,
+        tipo: op.tipo,
+        origem: 'shellId'
+      }
+      if (op.tipo === 'cmd') preferred.versao = null
+      return [preferred, ...todos.filter((s) => s.exe.toLowerCase() !== preferred.exe.toLowerCase())]
+    }
+    dglog(`[terminal] shellId '${opts.shellId}' nao encontrado — fallback padrao`)
+  }
   if (opts.shellExe) {
     const hit = todos.find((s) => s.exe.toLowerCase() === opts.shellExe!.toLowerCase())
     const preferred = hit || {
@@ -45,10 +67,10 @@ function candidatosParaOpts(opts: TerminalOpts): ShellInfo[] {
       tipo: 'pwsh' as const,
       origem: 'opts'
     }
-    return [preferred, ...todos.filter((s) => s.exe !== preferred.exe)]
+    return [preferred, ...todos.filter((s) => s.exe.toLowerCase() !== preferred.exe.toLowerCase())]
   }
   const cache = getShellCache()
-  return [cache, ...todos.filter((s) => s.exe !== cache.exe)]
+  return [cache, ...todos.filter((s) => s.exe.toLowerCase() !== cache.exe.toLowerCase())]
 }
 
 export function createTerminal(
