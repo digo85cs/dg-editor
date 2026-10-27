@@ -227,6 +227,27 @@ async function main() {
   )
   assert('auto-auditoria tem checarTerminal', /checarTerminal/.test(audTs))
 
+  // ---------- 7. Terminal: contexto e resize ----------
+  section('7. Terminal: contexto e resize')
+  const appJs7 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+  const termJs7 = termJs
+  assert('terminal.js expoe abrirEm para a arvore', /abrirEm/.test(termJs7))
+  assert(
+    'abrirEm aceita cwd',
+    /async function abrirEm\s*\(\s*cwd[\s\S]{0,400}criarAba/.test(termJs7) ||
+      /function abrirEm\s*\(\s*cwd[\s\S]{0,400}cwd/.test(termJs7)
+  )
+  assert('divisor tem handler de dblclick', /dblclick/.test(termJs7))
+  assert(
+    'dblclick reseta para 300',
+    /dblclick[\s\S]{0,500}300|300[\s\S]{0,200}dblclick|alturaPadraoReset[\s\S]{0,80}300/.test(termJs7)
+  )
+  assert(
+    'drag so ativa apos mover mais de 3px',
+    /Math\.abs[\s\S]{0,120}3|dx\s*\+\s*dy[\s\S]{0,40}[<>]=?\s*3|[<>]=?\s*3[\s\S]{0,40}dx/.test(termJs7)
+  )
+  assert('app.js registra menu de contexto', /contextmenu/.test(appJs7))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
