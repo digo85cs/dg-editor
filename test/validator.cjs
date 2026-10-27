@@ -248,6 +248,46 @@ async function main() {
   )
   assert('app.js registra menu de contexto', /contextmenu/.test(appJs7))
 
+  // ---------- 8. Agente de QA: estrutura e contrato ----------
+  section('8. Agente de QA: estrutura e contrato')
+  const qaTipos = pathT.join(rootT, 'src', 'qa', 'tipos.ts')
+  const qaIpc = pathT.join(rootT, 'src', 'qa', 'runner-ipc.ts')
+  const qaE2e = pathT.join(rootT, 'src', 'qa', 'runner-e2e.ts')
+  const qaPerf = pathT.join(rootT, 'src', 'qa', 'runner-perf.ts')
+  const qaRel = pathT.join(rootT, 'src', 'qa', 'relatorio.ts')
+  const qaIa = pathT.join(rootT, 'src', 'qa', 'ia', 'README.md')
+  const pkgJson = JSON.parse(fsT.readFileSync(pathT.join(rootT, 'package.json'), 'utf-8'))
+  assert(
+    'src/qa/tipos.ts define RelatorioQA',
+    fsT.existsSync(qaTipos) && /RelatorioQA/.test(fsT.readFileSync(qaTipos, 'utf-8'))
+  )
+  const ipcSrc = fsT.readFileSync(qaIpc, 'utf-8')
+  assert(
+    'runner-ipc.ts exercita handlers sem abrir janela',
+    (/handler|ipc|executarSuiteIpc/i.test(ipcSrc)) && !/new BrowserWindow/.test(ipcSrc)
+  )
+  assert(
+    'runner-e2e.ts usa Playwright Electron',
+    fsT.existsSync(qaE2e) && /_electron|playwright/.test(fsT.readFileSync(qaE2e, 'utf-8'))
+  )
+  const perfSrc = fsT.readFileSync(qaPerf, 'utf-8')
+  const perfBoas = fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'cenarios', 'perf-boas.ts'), 'utf-8')
+  assert(
+    'runner-perf.ts mede com mediana de 3',
+    /median|mediana|sort/.test(perfSrc + perfBoas)
+  )
+  assert(
+    'relatorio.ts gera markdown',
+    fsT.existsSync(qaRel) && /\.md|markdown|montarMarkdown/.test(fsT.readFileSync(qaRel, 'utf-8'))
+  )
+  assert('package.json tem script qa', typeof pkgJson.scripts?.qa === 'string' && pkgJson.scripts.qa.length > 0)
+  assert(
+    'ia/README documenta o catalogo fechado',
+    fsT.existsSync(qaIa) &&
+      /typecheck/.test(fsT.readFileSync(qaIa, 'utf-8')) &&
+      /npm test/.test(fsT.readFileSync(qaIa, 'utf-8'))
+  )
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
