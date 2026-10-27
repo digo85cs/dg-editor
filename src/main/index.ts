@@ -41,6 +41,15 @@ import {
   listarDiretorio,
   arquivoExiste
 } from './arquivos'
+import {
+  createTerminal,
+  writeTerminal,
+  resizeTerminal,
+  killTerminal,
+  killAllTerminals,
+  shellAtivo
+} from './terminal'
+import { getShellCache } from './shell-detect'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -123,6 +132,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
+  killAllTerminals()
   removerTokenSessao()
 })
 
@@ -139,6 +149,25 @@ ipcMain.handle('navegador:abrir', (_e, url?: string) => {
   criarJanelaNavegador(dest, { mostrar: true })
   return { ok: true }
 })
+
+// ---------- Terminal embutido ----------
+ipcMain.handle('terminal:create', (e, id: string, opts?: { cwd?: string; cols?: number; rows?: number }) => {
+  try {
+    return createTerminal(String(id), opts || {}, e.sender)
+  } catch (err) {
+    return { ok: false, erro: String((err as Error)?.message || err) }
+  }
+})
+ipcMain.handle('terminal:write', (_e, id: string, data: string) => {
+  writeTerminal(String(id), String(data ?? ''))
+})
+ipcMain.handle('terminal:resize', (_e, id: string, cols: number, rows: number) => {
+  resizeTerminal(String(id), Number(cols) || 80, Number(rows) || 24)
+})
+ipcMain.handle('terminal:kill', (_e, id: string) => {
+  killTerminal(String(id))
+})
+ipcMain.handle('terminal:shell', () => shellAtivo() || getShellCache())
 
 // ---------- Arquivos (IDE) ----------
 ipcMain.handle(
