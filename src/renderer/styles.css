@@ -196,6 +196,11 @@ body {
 
 /* Tree */
 .tree-root { user-select: none; }
+.tree-root.selected > .tree-root-header {
+  background: var(--dg-active);
+  font-weight: 600;
+  color: var(--dg-text);
+}
 .tree-root-header {
   display: flex;
   align-items: center;

@@ -219,20 +219,48 @@ function carregarPastas() {
 }
 
 async function selecionarPasta(path) {
+  console.time('selecionarPasta')
   pastaAtual = path
   $('chat-title').textContent = nomeArquivo(path)
   $('empty-state')?.remove()
   $('chat-send').disabled = false
   $('btn-reanalyze').classList.remove('hidden')
 
-  if (!estadoArvore.has(path)) estadoArvore.set(path, { expandida: true, filhosCarregados: false })
-  else estadoArvore.get(path).expandida = true
-  await renderizarPastas()
+  // garantir estado no Map SEM re-renderizar
+  if (!estadoArvore.has(path)) {
+    estadoArvore.set(path, { expandida: true, filhosCarregados: false })
+  } else {
+    estadoArvore.get(path).expandida = true
+  }
 
-  const msgs = await window.api.invoke('chat:load', path)
+  // realce visual do item selecionado (SEM recriar DOM)
+  document.querySelectorAll('.tree-root.selected').forEach((el) => el.classList.remove('selected'))
+  const raizEl = document.querySelector('.tree-root[data-path="' + CSS.escape(path) + '"]')
+  if (raizEl) raizEl.classList.add('selected')
+
+  // se a raiz clicada ainda não tem filhos no DOM, carregar SÓ ela
+  if (raizEl) {
+    const children = raizEl.querySelector(':scope > .tree-children')
+    const chev = raizEl.querySelector('.chevron')
+    if (children && children.childElementCount === 0) {
+      chev?.classList.add('open')
+      children.classList.add('open')
+      await carregarFilhos(path, children, 1)
+    } else if (children) {
+      chev?.classList.add('open')
+      children.classList.add('open')
+    }
+  }
+
+  // 3 chamadas INDEPENDENTES em paralelo
+  const [msgs, cached, temRegras] = await Promise.all([
+    window.api.invoke('chat:load', path),
+    window.api.invoke('analysis:cached', path),
+    window.api.invoke('rules:exists', path)
+  ])
+
   renderizarChat(msgs)
 
-  const cached = await window.api.invoke('analysis:cached', path)
   if (cached) {
     renderizarAnalise(cached, true)
   } else {
@@ -240,8 +268,11 @@ async function selecionarPasta(path) {
       '<p class="muted">Pasta aberta. Clique em <strong>Analisar</strong> quando quiser a análise.</p>'
   }
 
-  const temRegras = await window.api.invoke('rules:exists', path)
-  if (!temRegras) await window.api.invoke('rules:create-template', path)
+  if (!temRegras) {
+    // fire-and-forget: não bloqueia o clique
+    window.api.invoke('rules:create-template', path).catch(() => {})
+  }
+  console.timeEnd('selecionarPasta')
 }
 
 // ---------- Árvore ----------
@@ -278,7 +309,7 @@ async function renderizarPastas() {
   }
   for (const p of pastasRecentes) {
     const root = document.createElement('div')
-    root.className = 'tree-root'
+    root.className = 'tree-root' + (p === pastaAtual ? ' selected' : '')
     root.dataset.path = p
     const st = estadoArvore.get(p) || { expandida: false, filhosCarregados: false }
     estadoArvore.set(p, st)
@@ -300,9 +331,9 @@ async function renderizarPastas() {
     header.addEventListener('click', async (e) => {
       if (carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
-      // Pasta já expandida + clique no nome/ícone → só contexto do chat (não retrai).
+      // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
       if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
-        definirContextoPasta(p)
+        selecionarPasta(p)
         return
       }
       // Expandir / retrair: só classe 'open'. NÃO limpar DOM. NÃO mudar chat.
@@ -322,7 +353,6 @@ async function renderizarPastas() {
     root.appendChild(children)
     lista.appendChild(root)
 
-    // Re-render completo (lista recriada): se estava expandida e container vazio, lazy load 1x.
     if (st.expandida && children.childElementCount === 0) {
       await carregarFilhos(p, children, 1)
     }
@@ -330,6 +360,7 @@ async function renderizarPastas() {
 }
 
 async function carregarFilhos(dir, container, nivel) {
+  console.time('carregarFilhos')
   try {
     const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
     container.innerHTML = ''
@@ -354,6 +385,8 @@ async function carregarFilhos(dir, container, nivel) {
       escapar(String(e && e.message ? e.message : e)) +
       '</div>'
     return false
+  } finally {
+    console.timeEnd('carregarFilhos')
   }
 }
 
