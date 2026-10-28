@@ -1224,6 +1224,73 @@ function atualizarBadgeProvedor(nome) {
   if (alvo) alvo.textContent = 'IA: ' + nome
 }
 
+/** Toast DOM simples (canto inferior direito, auto-dismiss 5s). */
+function mostrarToast(mensagem, tipo = 'aviso') {
+  let host = document.getElementById('dg-toast-host')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'dg-toast-host'
+    host.setAttribute('aria-live', 'polite')
+    host.style.cssText =
+      'position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none'
+    document.body.appendChild(host)
+  }
+  const el = document.createElement('div')
+  const cor =
+    tipo === 'erro' ? '#8b1e1e' : tipo === 'ok' ? '#1e5a32' : '#5a4a1e'
+  el.textContent = String(mensagem || '')
+  el.style.cssText =
+    'pointer-events:auto;padding:10px 14px;border-radius:6px;background:' +
+    cor +
+    ';color:#f5f5f0;font:13px/1.35 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);opacity:0;transition:opacity .2s'
+  host.appendChild(el)
+  requestAnimationFrame(() => {
+    el.style.opacity = '1'
+  })
+  setTimeout(() => {
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 250)
+  }, 5000)
+  return el
+}
+window.dgToast = mostrarToast
+
+async function atualizarBadgeProvedorReal(modeloForcado) {
+  try {
+    const ps = await window.api.invoke('brain:providers')
+    const ativo = Array.isArray(ps) ? ps.find((p) => p.available) : null
+    const nomeProv = ativo
+      ? ativo.name === 'ollama'
+        ? 'Ollama'
+        : String(ativo.name || 'IA')
+      : '—'
+    let modelo = modeloForcado || ''
+    if (!modelo) {
+      try {
+        const r = await window.api.invoke('modelos:listar')
+        modelo = (r && r.catalogo && r.catalogo.ativo) || ''
+      } catch {
+        /* ignora */
+      }
+    }
+    const texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
+    const alvo = document.getElementById('chat-provider')
+    if (alvo) alvo.textContent = texto
+  } catch {
+    /* ignora */
+  }
+}
+
+if (typeof window.api?.on === 'function') {
+  window.api.on('brain:fallback', (_e, payload) => {
+    const p = payload || {}
+    const de = p.de || '?'
+    const para = p.para || '?'
+    mostrarToast('IA trocou de modelo: ' + de + ' → ' + para, 'aviso')
+    void atualizarBadgeProvedorReal(para)
+  })
+}
+
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
 $('btn-empty-open')?.addEventListener('click', abrirPasta)
@@ -1608,10 +1675,7 @@ initMenuCtxArvore()
 renderizarPastas().then(() => restaurarAbas())
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
-window.api.invoke('brain:providers').then((ps) => {
-  const ativo = ps.find((p) => p.available)
-  if (ativo) $('chat-provider').textContent = 'IA: ' + ativo.name
-})
+void atualizarBadgeProvedorReal()
 
 document.addEventListener('DOMContentLoaded', function () {
   var btn = document.getElementById('btn-auditar')

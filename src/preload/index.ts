@@ -30,6 +30,7 @@ const invokeChannels = [
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
+const eventOnChannels = ['terminal:data', 'terminal:exit', 'brain:fallback'] as const
 
 const sendChannels = ['app:quit']
 
@@ -39,6 +40,9 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke(channel, ...args)
   },
   on: (channel: string, callback: (event: IpcRendererEvent, ...args: unknown[]) => void) => {
+    if (!(eventOnChannels as readonly string[]).includes(channel)) {
+      return () => {}
+    }
     const handler = (event: IpcRendererEvent, ...args: unknown[]) => callback(event, ...args)
     ipcRenderer.on(channel, handler)
     return () => ipcRenderer.removeListener(channel, handler)
