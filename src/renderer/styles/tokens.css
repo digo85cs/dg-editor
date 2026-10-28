@@ -69,9 +69,21 @@ body.tema-claro {
   --dg-editor-line-height: 1.6;
   --dg-tab-height: 36px;
   --dg-titlebar-height: 38px;
-  --dg-activitybar-width: 56px;
-  --dg-sidebar-width: 260px;
-  --dg-right-panel-width: 380px;
+
+  /* === ESTRUTURA (Prompt F / Etapa 1) === */
+  --dg-gap: 8px;
+  --dg-gap-sm: 6px;
+  --dg-iconbar-w: 48px;
+  --dg-sidebar-w: 260px;
+  --dg-panel-w: 320px;
+  --dg-statusbar-h: 24px;
+  --dg-tabbar-h: 34px;
+  /* --dg-radius-sm/md: mantidos em 6px/8px (acima). Cursor 4/6 = pendencia Etapa visual. */
+
+  /* Aliases legados → estrutura (drag/layout e CSS antigo) */
+  --dg-activitybar-width: var(--dg-iconbar-w);
+  --dg-sidebar-width: var(--dg-sidebar-w);
+  --dg-right-panel-width: var(--dg-panel-w);
 }
 
 body.tema-escuro {

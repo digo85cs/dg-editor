@@ -41,35 +41,37 @@ body {
 .tb-btn:hover { background: var(--dg-surface-raised); color: var(--dg-text); }
 .tb-close:hover { background: var(--dg-danger-close); color: #fff; }
 
-/* ---------- App grid ---------- */
+/* ---------- App grid (4 zonas + statusbar slot) ---------- */
 #app {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns:
-    var(--dg-activitybar-width)
-    var(--dg-sidebar-width)
+    var(--dg-iconbar-w)
+    var(--dg-sidebar-w)
     4px
     minmax(0, 1fr)
     4px
-    var(--dg-right-panel-width);
+    var(--dg-panel-w);
+  /* Linha 2 = 0px enquanto #statusbar está display:none (sem faixa vazia). Etapa 6: var(--dg-statusbar-h) */
+  grid-template-rows: minmax(0, 1fr) 0px;
   overflow: hidden;
 }
 #app.sidebar-collapsed {
   grid-template-columns:
-    var(--dg-activitybar-width)
+    var(--dg-iconbar-w)
     0
     0
     minmax(0, 1fr)
     4px
-    var(--dg-right-panel-width);
+    var(--dg-panel-w);
 }
 #app.sidebar-collapsed #sidebar,
 #app.sidebar-collapsed #resize-sidebar { display: none; }
 #app.right-collapsed {
   grid-template-columns:
-    var(--dg-activitybar-width)
-    var(--dg-sidebar-width)
+    var(--dg-iconbar-w)
+    var(--dg-sidebar-w)
     4px
     minmax(0, 1fr)
     0
@@ -78,7 +80,15 @@ body {
 #app.right-collapsed #exec-panel,
 #app.right-collapsed #resize-right { display: none; }
 #app.sidebar-collapsed.right-collapsed {
-  grid-template-columns: var(--dg-activitybar-width) 0 0 minmax(0, 1fr) 0 0;
+  grid-template-columns: var(--dg-iconbar-w) 0 0 minmax(0, 1fr) 0 0;
+}
+#statusbar {
+  display: none;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: var(--dg-statusbar-h);
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ---------- Activity bar ---------- */

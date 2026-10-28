@@ -72,8 +72,15 @@ function carregarLayout() {
     if (!raw) return
     const L = JSON.parse(raw)
     const app = $('app')
-    if (L.sidebarWidth) app.style.setProperty('--dg-sidebar-width', L.sidebarWidth + 'px')
-    if (L.rightWidth) app.style.setProperty('--dg-right-panel-width', L.rightWidth + 'px')
+    // Inline sobrepoe tokens; nomes novos (--dg-sidebar-w / --dg-panel-w) + aliases legados
+    if (L.sidebarWidth) {
+      app.style.setProperty('--dg-sidebar-w', L.sidebarWidth + 'px')
+      app.style.setProperty('--dg-sidebar-width', L.sidebarWidth + 'px')
+    }
+    if (L.rightWidth) {
+      app.style.setProperty('--dg-panel-w', L.rightWidth + 'px')
+      app.style.setProperty('--dg-right-panel-width', L.rightWidth + 'px')
+    }
     if (L.sidebarCollapsed) app.classList.add('sidebar-collapsed')
     if (L.rightCollapsed) app.classList.add('right-collapsed')
   } catch { /* ignora */ }
@@ -81,8 +88,8 @@ function carregarLayout() {
 
 function salvarLayout() {
   const app = $('app')
-  const sw = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-width'), 10) || 260
-  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-right-panel-width'), 10) || 380
+  const sw = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-w'), 10) || 260
+  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-panel-w'), 10) || 320
   localStorage.setItem(
     'dg-layout',
     JSON.stringify({
@@ -103,9 +110,11 @@ function initResizers() {
       const dx = e.clientX - startX
       if (kind === 'sidebar') {
         const w = Math.min(500, Math.max(200, startW + dx))
+        $('app').style.setProperty('--dg-sidebar-w', w + 'px')
         $('app').style.setProperty('--dg-sidebar-width', w + 'px')
       } else {
         const w = Math.min(600, Math.max(320, startW - dx))
+        $('app').style.setProperty('--dg-panel-w', w + 'px')
         $('app').style.setProperty('--dg-right-panel-width', w + 'px')
       }
     }
@@ -118,17 +127,20 @@ function initResizers() {
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
       startX = e.clientX
-      const prop = kind === 'sidebar' ? '--dg-sidebar-width' : '--dg-right-panel-width'
-      startW = parseInt(getComputedStyle($('app')).getPropertyValue(prop), 10) || (kind === 'sidebar' ? 260 : 380)
+      const prop = kind === 'sidebar' ? '--dg-sidebar-w' : '--dg-panel-w'
+      startW = parseInt(getComputedStyle($('app')).getPropertyValue(prop), 10) || (kind === 'sidebar' ? 260 : 320)
       el.classList.add('dragging')
       document.addEventListener('mousemove', onMove)
       document.addEventListener('mouseup', onUp)
     })
     el.addEventListener('dblclick', () => {
-      $('app').style.setProperty(
-        kind === 'sidebar' ? '--dg-sidebar-width' : '--dg-right-panel-width',
-        kind === 'sidebar' ? '260px' : '380px'
-      )
+      if (kind === 'sidebar') {
+        $('app').style.setProperty('--dg-sidebar-w', '260px')
+        $('app').style.setProperty('--dg-sidebar-width', '260px')
+      } else {
+        $('app').style.setProperty('--dg-panel-w', '320px')
+        $('app').style.setProperty('--dg-right-panel-width', '320px')
+      }
       salvarLayout()
     })
   }
