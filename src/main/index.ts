@@ -155,7 +155,10 @@ app.whenReady().then(() => {
       setTimeout(() => {
         void import('./brain/modelos-catalogo').then(async (mod) => {
           try {
-            await mod.detectarModelosLocais(raiz)
+            const cat = await mod.detectarModelosLocais(raiz)
+            const v = mod.validarCatalogo(cat)
+            if (!v.ok) dglog('[modelos] validarCatalogo: ' + v.problemas.join('; '))
+            else dglog('[modelos] validarCatalogo: ok')
             mod.iniciarHealthPeriodico(raiz, 30000)
           } catch (e) {
             dglog('[modelos] boot falhou: ' + String(e))
@@ -348,22 +351,27 @@ ipcMain.handle('brain:models', async () => {
 
 ipcMain.handle('modelos:listar', async () => {
   const { resolverRaizProjeto } = await import('./paths')
-  const { lerCatalogo, detectarModelosLocais } = await import('./brain/modelos-catalogo')
+  const { lerCatalogo, detectarModelosLocais, validarCatalogo } = await import('./brain/modelos-catalogo')
   const raiz = resolverRaizProjeto()
   try {
-    return { ok: true, catalogo: await detectarModelosLocais(raiz) }
+    const catalogo = await detectarModelosLocais(raiz)
+    const v = validarCatalogo(catalogo)
+    return { ok: true, catalogo, problemas: v.problemas }
   } catch {
-    return { ok: true, catalogo: lerCatalogo(raiz) }
+    const catalogo = lerCatalogo(raiz)
+    const v = validarCatalogo(catalogo)
+    return { ok: true, catalogo, problemas: v.problemas }
   }
 })
 
 ipcMain.handle('modelos:recarregar', async () => {
   const { resolverRaizProjeto } = await import('./paths')
-  const { detectarModelosLocais, healthCheckModelos } = await import('./brain/modelos-catalogo')
+  const { detectarModelosLocais, healthCheckModelos, validarCatalogo } = await import('./brain/modelos-catalogo')
   const raiz = resolverRaizProjeto()
   await detectarModelosLocais(raiz)
   const cat = await healthCheckModelos(raiz)
-  return { ok: true, catalogo: cat }
+  const v = validarCatalogo(cat)
+  return { ok: true, catalogo: cat, problemas: v.problemas }
 })
 
 ipcMain.handle('modelos:para-tarefa', async (_e, tarefa: unknown) => {
