@@ -630,6 +630,35 @@ async function main() {
     )
   }
 
+  // ---------- 29. Animacoes do chat (PRE-A) ----------
+  section('29. Animacoes do chat')
+  {
+    const chat29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'chat.js'), 'utf-8')
+    const css29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'styles.css'), 'utf-8')
+    const app29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const rend29 = chat29 + app29 + css29
+    assert('dg-loading-bubble existe no renderer', /dg-loading-bubble/.test(rend29))
+    assert('keyframes dos 3 dots existem', /dg-dot-pulse|dot-pulse/.test(css29))
+    assert(
+      'loading e removido apos retorno',
+      /\.remove\(\)/.test(chat29) && /removerLoadingChat|dg-loading-bubble/.test(chat29)
+    )
+    const ariaLiveOk =
+      /aria-live/.test(chat29) &&
+      /aria-atomic/.test(chat29) &&
+      /dg-dots[^]*aria-hidden="true"/.test(chat29.replace(/\s+/g, ' '))
+    // anti-padrão: aria-live dentro de dots/rotativo
+    const anti =
+      /dg-dots[^>]*(aria-live)|dg-loading-rotativo[^>]*(aria-live)/.test(chat29) ||
+      /class="dg-dots"[^>]*aria-live/.test(chat29)
+    assert('aria-live e aria-atomic no container (nao nos dots)', ariaLiveOk && !anti)
+    assert('prefers-reduced-motion presente', /prefers-reduced-motion/.test(css29))
+    assert(
+      'nao regride toast nem fallback (sprint 3)',
+      /mostrarToast/.test(app29) && /brain:fallback/.test(app29)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

@@ -2,7 +2,13 @@
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
 import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
-import { iniciarHistoricoChat } from './chat.js'
+import {
+  iniciarHistoricoChat,
+  mostrarLoadingChat,
+  removerLoadingChat,
+  marcarProviderFallback,
+  animarEntradaMsg
+} from './chat.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -1049,6 +1055,7 @@ function adicionarBolha(role, content, provider) {
     div.appendChild(tag)
   }
   area.appendChild(div)
+  animarEntradaMsg(div, role)
   area.scrollTop = area.scrollHeight
   return div
 }
@@ -1065,14 +1072,28 @@ async function enviarMensagem() {
   adicionarBolha('user', texto)
   histChat?.registrarMensagem('user', texto)
   $('chat-send').disabled = true
-  const bolhaProc = adicionarBolha('assistant', 'Pensando...')
+  // Loading dedicado (não usa bolha "Pensando..." órfã)
+  mostrarLoadingChat()
+  let falhou = false
   try {
     const r = await window.api.invoke('chat:send', pastaAtual, texto)
-    bolhaProc.querySelector('.msg-text').textContent = r.message.content
-    histChat?.registrarMensagem('assistant', r.message.content, r.message.provider)
-    if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
+    const ok = r && r.ok !== false && r.message && r.message.content
+    const conteudo = ok
+      ? r.message.content
+      : r?.message?.content || 'Não consegui responder.'
+    falhou = !ok || (r.message && r.message.provider === 'erro')
+    await removerLoadingChat({ erro: falhou })
+    const bolha = adicionarBolha('assistant', conteudo, r?.message?.provider)
+    if (!falhou) {
+      histChat?.registrarMensagem('assistant', conteudo, r.message.provider)
+      if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
+    }
+    void bolha
   } catch (err) {
-    bolhaProc.querySelector('.msg-text').textContent = 'Erro ao enviar: ' + String(err)
+    falhou = true
+    await removerLoadingChat({ erro: true })
+    adicionarBolha('assistant', 'Não consegui responder.')
+    console.info('[chat] erro invoke:', err)
   } finally {
     $('chat-send').disabled = false
     input.focus()
@@ -1607,6 +1628,7 @@ if (typeof window.api?.on === 'function') {
     const de = p.de || '?'
     const para = p.para || '?'
     mostrarToast('IA trocou de modelo: ' + de + ' → ' + para, 'aviso')
+    marcarProviderFallback()
     void atualizarBadgeProvedorReal(para)
     void window.api.invoke('brain:avaliar', para).then((r) => {
       const nota = r?.avaliacao?.nota
