@@ -274,9 +274,11 @@ async function selecionarPasta(path) {
 
   if (cached) {
     renderizarAnalise(cached, true)
+    $('analysis-content').dataset.jaAnalisou = '1'
   } else {
     $('analysis-content').innerHTML =
       '<p class="muted">Pasta aberta. Clique em <strong>Analisar</strong> quando quiser a análise.</p>'
+    delete $('analysis-content').dataset.jaAnalisou
   }
 
   if (!temRegras) {
@@ -984,6 +986,7 @@ async function rodarAnalise(root, force) {
   try {
     const r = await window.api.invoke('analysis:run', root, force)
     renderizarAnalise(r.report, r.fromCache)
+    $('analysis-content').dataset.jaAnalisou = '1'
   } catch (err) {
     $('analysis-content').innerHTML =
       '<p class="muted">Nao consegui analisar agora: ' +
@@ -1663,7 +1666,11 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
 $('btn-empty-open')?.addEventListener('click', abrirPasta)
-$('btn-reanalyze').addEventListener('click', () => pastaAtual && rodarAnalise(pastaAtual, true))
+$('btn-reanalyze').addEventListener('click', () => {
+  if (!pastaAtual) return
+  const jaAnalisou = $('analysis-content').dataset.jaAnalisou === '1'
+  rodarAnalise(pastaAtual, jaAnalisou)
+})
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
 $('btn-contas').addEventListener('click', abrirContas)
