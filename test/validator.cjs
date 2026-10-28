@@ -384,6 +384,15 @@ async function main() {
   assert('package.json tem script qa:ia', typeof pkgJson.scripts?.['qa:ia'] === 'string')
   assert('fixture typo-ui existe', fsT.existsSync(pathT.join(rootT, 'test', 'fixtures', 'typo-ui.txt')))
 
+
+  // ---------- 15. Regressao IA typo ----------
+  section('15. Regressao IA: typo UI corrigido')
+  const typoFix = pathT.join(rootT, 'test', 'fixtures', 'typo-ui.txt')
+  assert(
+    'regressao.ia.fixture.typo.salvarr',
+    fsT.existsSync(typoFix) && /Salvar/.test(fsT.readFileSync(typoFix, 'utf-8')) && !/salvarr/.test(fsT.readFileSync(typoFix, 'utf-8'))
+  )
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

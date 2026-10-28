@@ -1,1 +1,1 @@
-Botao: salvarr arquivo
+Botao: Salvar arquivo
