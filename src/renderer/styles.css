@@ -663,13 +663,35 @@ body {
 }
 #chat-header {
   display: flex;
-  align-items: center;
-  gap: var(--dg-space-2);
-  padding: var(--dg-space-3) var(--dg-space-4);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--dg-border-subtle);
   flex-shrink: 0;
 }
-#chat-title { flex: 1; font-size: var(--dg-fs-md); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+#chat-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--dg-fs-md);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .chat-history-bar {
   display: inline-flex;
   align-items: center;
@@ -677,13 +699,16 @@ body {
   flex-shrink: 0;
 }
 .chat-history-bar select {
-  max-width: 140px;
+  height: 26px;
+  max-width: 120px;
   font-size: var(--dg-fs-xs);
+  line-height: 1;
   background: var(--dg-surface-raised);
   color: var(--dg-text);
-  border: 1px solid var(--dg-border-subtle);
-  border-radius: 6px;
-  padding: 2px 4px;
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-sm);
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 .git-badge {
   margin-left: 6px;
@@ -765,12 +790,19 @@ body {
 .provider-badge, #chat-provider {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
+  max-width: min(220px, 55%);
+  min-width: 0;
   font-size: var(--dg-fs-xs);
+  line-height: 1.2;
   color: var(--dg-text-muted);
   background: var(--dg-surface-raised);
-  padding: 3px 9px;
+  padding: 4px 9px;
   border-radius: 10px;
   border: 1px solid var(--dg-border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .chat-messages {
   flex: 1;
@@ -1145,14 +1177,22 @@ body.tema-claro .msg.user { color: #333333; }
 .btn-icon:hover { background: var(--dg-surface-raised); color: var(--dg-text); }
 .btn-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   background: transparent;
   color: var(--dg-text-muted);
   border: 1px solid var(--dg-border);
   padding: 0 10px;
-  height: 24px;
+  height: 26px;
+  min-height: 26px;
   border-radius: var(--dg-radius-sm);
   font-size: var(--dg-fs-sm);
   font-family: var(--fonte);
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
   cursor: pointer;
 }
 .btn-small:hover { background: var(--dg-surface-raised); color: var(--dg-text); }

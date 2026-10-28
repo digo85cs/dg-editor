@@ -139,15 +139,19 @@
       <div id="pane-chat" class="right-pane active">
         <main id="chat-panel">
           <header id="chat-header">
-            <span id="chat-title">Nenhuma pasta aberta</span>
-            <span id="chat-provider" class="provider-badge"></span>
-            <div id="chat-history-bar" class="chat-history-bar">
-              <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova conversa</button>
-              <select id="chat-history-select" aria-label="Historico de chats"></select>
+            <div class="chat-header-meta">
+              <span id="chat-title">Nenhuma pasta aberta</span>
+              <span id="chat-provider" class="provider-badge"></span>
             </div>
-            <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar modelo</button>
-            <button id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
-            <button id="btn-auditar" class="btn-ghost" title="Auto auditoria do sistema">Auditar</button>
+            <div class="chat-header-actions">
+              <div id="chat-history-bar" class="chat-history-bar">
+                <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
+                <select id="chat-history-select" aria-label="Historico de chats"></select>
+              </div>
+              <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar</button>
+              <button type="button" id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
+              <button type="button" id="btn-auditar" class="btn-small" title="Auto auditoria do sistema">Auditar</button>
+            </div>
           </header>
           <div id="chat-messages" class="chat-messages">
             <div class="empty-state" id="empty-state">
