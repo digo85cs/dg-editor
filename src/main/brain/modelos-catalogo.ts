@@ -5,7 +5,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
-import { listarModelosOllama, ollamaPing, medirLatenciaModelo, consultarVersoesRemotas } from './ollama'
+import {
+  listarModelosOllama,
+  listarModelosResidentes,
+  ollamaPing,
+  medirLatenciaModelo,
+  consultarVersoesRemotas
+} from './ollama'
 import { dglog } from '../dglog'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo' | 'embedding'
@@ -25,7 +31,7 @@ export interface ModeloEntrada {
   latenciaMs?: number | null
   latenciaMedidaEm?: string | null
   atualizadoDisponivel?: boolean
-  status?: 'ok' | 'down' | 'desconhecido'
+  status?: 'ok' | 'down' | 'desconhecido' | 'lento' | 'offline'
 }
 
 export interface CatalogoModelos {
@@ -57,8 +63,8 @@ const PORTE_RANK: Record<string, number> = {
 export const CATALOGO_PADRAO: CatalogoModelos = {
   versao: 1,
   atualizadoEm: null,
-  ativo: 'llama3.2:latest',
-  secundario: 'qwen2.5-coder:3b',
+  ativo: 'qwen2.5-coder:7b',
+  secundario: 'qwen2.5-coder:7b',
   roteamento: {
     completar: 'pequeno',
     explicar: 'grande',
@@ -241,11 +247,41 @@ function mesclarCatalogos(base: CatalogoModelos, over: CatalogoModelos | null): 
   }
 }
 
+/** Corrige ativo/secundario em memoria se porte for incompativel com o roteamento. */
+function corrigirAtivoSecundarioEmMemoria(cat: CatalogoModelos): void {
+  const porteChat = cat.roteamento.chat || 'padrao'
+  const instaladoChat = (m: ModeloEntrada) =>
+    m.instalado !== false && m.tipo !== 'embedding' && m.provider === 'ollama'
+
+  if (cat.ativo) {
+    const a = cat.modelos.find((m) => m.id === cat.ativo)
+    if (!a || a.porte !== porteChat || a.instalado === false) {
+      const padraoInst =
+        cat.modelos.find((m) => instaladoChat(m) && m.porte === porteChat) ||
+        cat.modelos.find((m) => instaladoChat(m) && m.porte === 'padrao')
+      if (padraoInst) cat.ativo = padraoInst.id
+    }
+  }
+  if (cat.secundario) {
+    const s = cat.modelos.find((m) => m.id === cat.secundario)
+    // secundario nao pode ser porte menor que o ativo de chat (evita queda para 3b/1.5b)
+    const porteAtivo = cat.modelos.find((m) => m.id === cat.ativo)?.porte || porteChat
+    if (!s || s.instalado === false || (PORTE_RANK[s.porte] ?? 0) < (PORTE_RANK[porteAtivo] ?? 1)) {
+      const bom =
+        cat.modelos.find((m) => instaladoChat(m) && m.porte === porteAtivo) ||
+        cat.modelos.find((m) => instaladoChat(m) && m.porte === 'padrao')
+      if (bom) cat.secundario = bom.id
+    }
+  }
+}
+
 export function lerCatalogo(raiz: string): CatalogoModelos {
   const doArquivo = lerArquivoCatalogo(caminhoDefault(raiz))
   const padrao = doArquivo ? cloneCatalogo(doArquivo) : cloneCatalogo(CATALOGO_PADRAO)
   const runtime = lerArquivoCatalogo(caminhoCatalogo(raiz))
-  return mesclarCatalogos(padrao, runtime)
+  const cat = mesclarCatalogos(padrao, runtime)
+  corrigirAtivoSecundarioEmMemoria(cat)
+  return cat
 }
 
 export function salvarCatalogo(raiz: string, cat: CatalogoModelos): void {
@@ -435,44 +471,63 @@ export async function healthCheckModelos(raiz: string): Promise<CatalogoModelos>
   const ok = await ollamaPing()
   for (const m of cat.modelos) {
     if (m.provider !== 'ollama') continue
-    m.status = ok && m.instalado !== false ? 'ok' : 'down'
-    if (!ok || m.instalado === false) {
+    if (!ok) {
+      m.status = 'offline'
       m.latenciaMs = null
+    } else if (m.instalado === false) {
+      m.status = 'down'
+      m.latenciaMs = null
+    } else {
+      m.status = m.status === 'down' ? 'desconhecido' : m.status || 'desconhecido'
     }
   }
 
   if (ok) {
+    const residentes = await listarModelosResidentes()
     const alvos = cat.modelos.filter((m) => m.provider === 'ollama' && m.instalado !== false)
     await mapPool(alvos, 2, async (m) => {
-      const r = await medirLatenciaModelo(m.id, 8000)
-      if (r.ok) {
+      const residente = residentes.some((r) => r === m.id || r.startsWith(m.id) || m.id.startsWith(r))
+      // 90s cold load; 10s se ja residente — nunca 8s
+      const timeoutMs = residente ? 10_000 : 90_000
+      const r = await medirLatenciaModelo(m.id, timeoutMs)
+      m.latenciaMedidaEm = new Date().toISOString()
+      if (r.ok === true) {
         m.latenciaMs = r.ms
-        m.latenciaMedidaEm = new Date().toISOString()
         m.status = 'ok'
-      } else {
-        m.latenciaMs = r.ms ?? null
-        m.latenciaMedidaEm = new Date().toISOString()
-        // generate falhou (ex.: embedding) — mantém status ok se ollama está no ar
-        if (m.tipo === 'embedding') m.status = 'ok'
-        else m.status = 'down'
+        return
       }
+      // timeout: nunca gravar o valor do timeout como latencia medida
+      m.latenciaMs = null
+      const kind = 'kind' in r ? r.kind : 'outro'
+      if (m.tipo === 'embedding') m.status = 'ok'
+      else if (kind === 'offline') m.status = 'offline'
+      else if (kind === 'not_found') m.status = 'down'
+      else m.status = 'lento' // timeout/outro — instalado + ollama up
     })
   }
 
   if (cat.ativo) {
     const ativo = cat.modelos.find((m) => m.id === cat.ativo)
-    if (ativo && ativo.status === 'down' && cat.secundario && cat.ativo !== cat.secundario) {
+    // lento NAO dispara fallback; so down/offline
+    if (
+      ativo &&
+      (ativo.status === 'down' || ativo.status === 'offline') &&
+      cat.secundario &&
+      cat.ativo !== cat.secundario
+    ) {
       const sec = cat.modelos.find((m) => m.id === cat.secundario)
-      if (sec) {
-        const pode =
-          sec.status === 'ok' || (PORTE_RANK[sec.porte] ?? 1) <= (PORTE_RANK[ativo.porte] ?? 1)
-        if (pode) {
-          emitirFallback(cat.ativo, sec.id, ok ? 'primario_down' : 'ollama_down')
-          cat.ativo = sec.id
-        }
+      if (
+        sec &&
+        sec.status !== 'down' &&
+        sec.status !== 'offline' &&
+        sec.porte === ativo.porte
+      ) {
+        emitirFallback(cat.ativo, sec.id, ok ? 'primario_down' : 'ollama_down')
+        cat.ativo = sec.id
       }
     }
   }
+  corrigirAtivoSecundarioEmMemoria(cat)
   salvarCatalogo(raiz, cat)
   return cat
 }
@@ -495,13 +550,24 @@ export function modeloParaTarefa(raiz: string, tarefa: string): string | null {
       m.ativo &&
       m.instalado !== false &&
       m.status !== 'down' &&
+      m.status !== 'offline' &&
       m.porte === porte &&
       (!excluirEmbedding || m.tipo !== 'embedding')
   )
   if (cand) return cand.id
   if (cat.ativo) {
     const a = cat.modelos.find((m) => m.id === cat.ativo)
-    if (a && (!excluirEmbedding || a.tipo !== 'embedding')) return cat.ativo
+    const porteCompativel = !!a && a.porte === porte
+    if (
+      a &&
+      porteCompativel &&
+      a.instalado !== false &&
+      a.status !== 'down' &&
+      a.status !== 'offline' &&
+      (!excluirEmbedding || a.tipo !== 'embedding')
+    ) {
+      return cat.ativo
+    }
   }
   const qualquer = cat.modelos.find(
     (m) => m.instalado && (!excluirEmbedding || m.tipo !== 'embedding')

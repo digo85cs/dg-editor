@@ -255,18 +255,46 @@ export async function consultarVersoesRemotas(
   return out
 }
 
+export type ErroLatenciaKind = 'timeout' | 'offline' | 'not_found' | 'outro'
+
+/** Modelos carregados na RAM (/api/ps). */
+export async function listarModelosResidentes(): Promise<string[]> {
+  const { status, body } = await httpGet('/api/ps', 5000)
+  if (status !== 200) return []
+  try {
+    const json = JSON.parse(body) as { models?: { name?: string; model?: string }[] }
+    return (json.models || [])
+      .map((m) => String(m.name || m.model || '').trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function classificarErroLatencia(msg: string): ErroLatenciaKind {
+  const s = String(msg || '')
+  if (/ECONNREFUSED|ENOTFOUND|ECONNRESET|socket hang up|network/i.test(s)) return 'offline'
+  if (/HTTP 404|model ['"]?[\w.:-]+['"]? not found|not found/i.test(s)) return 'not_found'
+  if (/timeout|abort ollama/i.test(s)) return 'timeout'
+  return 'outro'
+}
+
 export async function medirLatenciaModelo(
   id: string,
-  timeoutMs = 8000
-): Promise<{ ok: true; ms: number } | { ok: false; erro: string; ms?: number }> {
+  timeoutMs = 90_000
+): Promise<
+  | { ok: true; ms: number }
+  | { ok: false; erro: string; kind: ErroLatenciaKind; ms: null }
+> {
   const t0 = Date.now()
   try {
     await ollamaHttpJson(
       OLLAMA_URL + '/api/generate',
       {
         model: id,
-        prompt: 'ping',
+        prompt: 'ok',
         stream: false,
+        keep_alive: '24h',
         options: { num_predict: 1 }
       },
       'POST',
@@ -274,7 +302,8 @@ export async function medirLatenciaModelo(
     )
     return { ok: true, ms: Date.now() - t0 }
   } catch (e) {
-    return { ok: false, erro: String((e as Error)?.message || e), ms: Date.now() - t0 }
+    const erro = String((e as Error)?.message || e)
+    return { ok: false, erro, kind: classificarErroLatencia(erro), ms: null }
   }
 }
 
