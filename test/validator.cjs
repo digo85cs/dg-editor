@@ -783,6 +783,73 @@ async function main() {
     )
   }
 
+  // ---------- 32. I/O nao bloqueante e boot ----------
+  section('32. I/O nao bloqueante e boot')
+  {
+    const arq32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'arquivos.ts'), 'utf-8')
+    const idx32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const hib32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
+    const keep32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ollama-keeper.ts'), 'utf-8')
+    assert(
+      'arquivos.ts nao usa mais *Sync',
+      !/\bstatSync\b/.test(arq32) && !/\breaddirSync\b/.test(arq32) && !/\bexistsSync\b/.test(arq32)
+    )
+    assert('listarDiretorio usa withFileTypes', /withFileTypes:\s*true/.test(arq32))
+    assert(
+      'handlers arquivo:* sao async',
+      /arquivo:ler['"],\s*async/.test(idx32) &&
+        /arquivo:listar['"],\s*async/.test(idx32) &&
+        /arquivo:salvar['"],\s*async/.test(idx32)
+    )
+    assert(
+      'hibrido.ts usa execFileSync com stdio ignore',
+      /stdio:\s*\['ignore',\s*'pipe',\s*'ignore'\]/.test(hib32)
+    )
+    assert(
+      'hibrido.ts tem try/catch no git',
+      /sem-commit/.test(hib32)
+    )
+    // nenhum execSync( sem stdio no mesmo bloco/linha
+    const mainFiles = []
+    const walk = (dir) => {
+      for (const n of fsT.readdirSync(dir)) {
+        const p = pathT.join(dir, n)
+        const st = fsT.statSync(p)
+        if (st.isDirectory() && n !== 'node_modules') walk(p)
+        else if (/\.(ts|js)$/.test(n)) mainFiles.push(p)
+      }
+    }
+    walk(pathT.join(rootT, 'src', 'main'))
+    let execSyncSujo = false
+    for (const p of mainFiles) {
+      const src = fsT.readFileSync(p, 'utf-8')
+      const re = /execSync\s*\(/g
+      let m
+      while ((m = re.exec(src))) {
+        const trecho = src.slice(m.index, m.index + 220)
+        if (!/stdio/.test(trecho)) {
+          execSyncSujo = true
+          break
+        }
+      }
+      if (execSyncSujo) break
+    }
+    assert('nenhum execSync sem stdio ignore no main', !execSyncSujo)
+    assert(
+      'warm-up com prompt nao vazio',
+      /prompt:\s*'ok'|prompt:\s*"ok"/.test(keep32) && !/prompt:\s*['"]\s*['"]/.test(keep32)
+    )
+    assert(
+      'warm-up com keep_alive 24h',
+      /keep_alive:\s*'24h'|keep_alive:\s*"24h"/.test(keep32)
+    )
+    assert(
+      'warm-up nao bloqueia boot (setTimeout)',
+      /setTimeout[\s\S]{0,80}(10_000|10000|atrasoMs)/.test(keep32) ||
+        /agendarWarmup7b\s*\(\s*10_000\s*\)/.test(idx32)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
