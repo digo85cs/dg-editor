@@ -9,7 +9,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
-import { detectarShell } from './shell-detect'
+import {
+  detectarShell,
+  listarShells,
+  lerShellPadrao,
+  acharShellPorId
+} from './shell-detect'
 
 const execFileP = promisify(execFile)
 
@@ -1115,7 +1120,6 @@ function checarTerminal(): Achado[] {
     })
   }
   try {
-    const { listarShells, lerShellPadrao, acharShellPorId } = require('./shell-detect') as typeof import('./shell-detect')
     const perfis = listarShells()
     const n = perfis.length
     out.push({
