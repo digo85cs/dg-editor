@@ -404,6 +404,64 @@ async function main() {
   assert('analyzer tem invalidarCacheAnalise', /invalidarCacheAnalise/.test(fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'analyzer.ts'), 'utf-8')))
   assert('preload expoe indice:iniciar', /indice:iniciar/.test(preNav))
 
+  // ---------- 17. Catalogo curado, tipos e fallback leve ----------
+  section('17. Catalogo curado, tipos e fallback leve')
+  const defPath = pathT.join(rootT, '.dg-editor', 'modelos.default.json')
+  const defRaw = fsT.existsSync(defPath) ? fsT.readFileSync(defPath, 'utf-8') : ''
+  let defJson = null
+  try { defJson = JSON.parse(defRaw) } catch { defJson = null }
+  assert(
+    'modelos.default.json existe e e curado',
+    !!defJson &&
+      defJson.versao === 1 &&
+      typeof defJson.ativo === 'string' &&
+      typeof defJson.secundario === 'string' &&
+      Array.isArray(defJson.modelos) &&
+      defJson.modelos.every((m) => m && typeof m.tipo === 'string')
+  )
+  const embedM = defJson && Array.isArray(defJson.modelos)
+    ? defJson.modelos.find((m) => /embed/i.test(String(m.id || '')))
+    : null
+  assert(
+    'nomic-embed-text classificado como embedding',
+    !!embedM &&
+      embedM.tipo === 'embedding' &&
+      !(Array.isArray(embedM.capacidades) && embedM.capacidades.includes('chat'))
+  )
+  const porteOrd = { pequeno: 0, padrao: 1, grande: 2, longo: 3 }
+  const ativoM = defJson && defJson.modelos
+    ? defJson.modelos.find((m) => m.id === defJson.ativo)
+    : null
+  const secM = defJson && defJson.modelos
+    ? defJson.modelos.find((m) => m.id === defJson.secundario)
+    : null
+  assert(
+    'secundario nao e mais pesado que ativo',
+    !!ativoM &&
+      !!secM &&
+      (porteOrd[secM.porte] ?? 99) <= (porteOrd[ativoM.porte] ?? -1)
+  )
+  const catSrc17 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+  assert('validarCatalogo detecta secundario pesado', /validarCatalogo/.test(catSrc17))
+  assert(
+    'modeloParaTarefa exclui embedding',
+    /embedding/.test(catSrc17) && /modeloParaTarefa/.test(catSrc17) && /tipo !== 'embedding'|tipo !== \"embedding\"|excluirEmbedding/.test(catSrc17)
+  )
+  const mainIdx17 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+  const preTs17 = fsT.readFileSync(pathT.join(rootT, 'src', 'preload', 'index.ts'), 'utf-8')
+  assert(
+    'canal brain:fallback existe',
+    /brain:fallback/.test(mainIdx17 + catSrc17) && (/brain:fallback/.test(preTs17) || /api\.on|window\.api\.on/.test(preTs17))
+  )
+
+  // ---------- 18. Toast de fallback ----------
+  section('18. Toast de fallback de modelo')
+  const appToast = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+  assert(
+    'toast do renderer existe',
+    /mostrarToast/.test(appToast) || /window\.dgToast/.test(appToast)
+  )
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
