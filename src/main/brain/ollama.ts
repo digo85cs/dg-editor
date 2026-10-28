@@ -203,7 +203,10 @@ export type VersaoRemotaInfo = {
   erro?: string
 }
 
-/** Consulta tags públicas no registry.ollama.ai (não baixa). */
+/**
+ * Consulta tags públicas no registry.ollama.ai (NÃO baixa modelo).
+ * Usado por modelos:versoes-remotas / badge "atualização disponível".
+ */
 export async function consultarVersoesRemotas(
   ids: string[]
 ): Promise<Record<string, VersaoRemotaInfo>> {
