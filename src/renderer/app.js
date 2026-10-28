@@ -272,13 +272,13 @@ async function selecionarPasta(path) {
   void ligarHistoricoChat(path)
   void atualizarGitStatusArvore()
 
+  // Trocar pasta: 1º clique volta a "Analisando..." (mesmo com cache)
+  delete $('analysis-content').dataset.jaAnalisou
   if (cached) {
     renderizarAnalise(cached, true)
-    $('analysis-content').dataset.jaAnalisou = '1'
   } else {
     $('analysis-content').innerHTML =
       '<p class="muted">Pasta aberta. Clique em <strong>Analisar</strong> quando quiser a análise.</p>'
-    delete $('analysis-content').dataset.jaAnalisou
   }
 
   if (!temRegras) {
@@ -296,6 +296,9 @@ async function selecionarPasta(path) {
  */
 function definirContextoPasta(p) {
   if (!p) return
+  if (pastaAtual && pastaAtual !== p) {
+    delete $('analysis-content')?.dataset.jaAnalisou
+  }
   pastaAtual = p
   $('chat-title').textContent = nomeArquivo(p)
   $('chat-send').disabled = false
