@@ -24,7 +24,8 @@ const invokeChannels = [
   'hibrido:analisar', 'hibrido:executar',
   'agente:executar', 'agente:modelo', 'agente:historico',
   'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
-  'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa'
+  'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa',
+  'config:backup', 'sistema:safe-mode'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

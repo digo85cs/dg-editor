@@ -221,5 +221,18 @@ export async function rodarCenariosIpc(temTTY = true): Promise<{
     }
   }
 
+  // --- config:backup ---
+  {
+    const t0 = Date.now()
+    try {
+      const { backupConfigs } = await import('../../main/config-backup')
+      const r = backupConfigs('qa-ipc')
+      if (!r.ok) throw new Error(r.erro || 'backup falhou')
+      resultados.push(ok('ipc.config.backup', 'config:backup', t0, 'n=' + (r.arquivos?.length || 0)))
+    } catch (e) {
+      resultados.push(erro('ipc.config.backup', 'config:backup', t0, e))
+    }
+  }
+
   return { resultados, stubs }
 }

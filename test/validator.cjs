@@ -363,6 +363,17 @@ async function main() {
   assert('modeloParaTarefa definido', /modeloParaTarefa/.test(catSrc))
   assert('preload expoe modelos:recarregar', /modelos:recarregar/.test(preNav))
 
+  // ---------- 13. Logs, backup, safe-mode ----------
+  section('13. Confiabilidade: logs, backup e safe-mode')
+  const logsTs = pathT.join(rootT, 'src', 'main', 'logs-estruturados.ts')
+  const bakTs = pathT.join(rootT, 'src', 'main', 'config-backup.ts')
+  const safeTs = pathT.join(rootT, 'src', 'main', 'safe-mode.ts')
+  assert('logs-estruturados.ts existe', fsT.existsSync(logsTs) && /logEstruturado/.test(fsT.readFileSync(logsTs, 'utf-8')))
+  assert('config-backup.ts existe', fsT.existsSync(bakTs) && /backupConfigs/.test(fsT.readFileSync(bakTs, 'utf-8')))
+  assert('safe-mode.ts existe', fsT.existsSync(safeTs) && /--safe-mode/.test(fsT.readFileSync(safeTs, 'utf-8')))
+  assert('preload expoe config:backup', /config:backup/.test(preNav))
+  assert('qa ipc cobre config.backup', /ipc\.config\.backup|config-backup/.test(fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'cenarios', 'ipc-main.ts'), 'utf-8')))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

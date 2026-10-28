@@ -115,6 +115,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  void import('./safe-mode').then(({ detectarSafeModeArgv, ativarSafeMode, emSafeMode }) => {
+    if (detectarSafeModeArgv()) {
+      ativarSafeMode()
+      dglog('[boot] SAFE MODE — sem agentes/MCP/watcher')
+    }
+    void import('./logs-estruturados').then(({ logEstruturado }) => {
+      logEstruturado('info', 'boot', emSafeMode() ? 'inicio safe-mode' : 'inicio normal')
+    })
+  })
   // Token de sessão ANTES do servidor de controle (sempre novo)
   garantirTokenSessao()
   installPtBrMenu({
@@ -124,23 +133,28 @@ app.whenReady().then(() => {
       criarJanelaNavegador(url, { mostrar: true })
     }
   })
-  bootSaudeIAs()
-  iniciarControleNavegador()
+  const safe = process.argv.includes('--safe-mode') || process.argv.includes('--safemode')
+  if (!safe) {
+    bootSaudeIAs()
+    iniciarControleNavegador()
+  }
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
-  void import('./paths').then(({ resolverRaizProjeto }) => {
-    const raiz = resolverRaizProjeto()
-    void import('./brain/modelos-catalogo').then(async (mod) => {
-      try {
-        await mod.detectarModelosLocais(raiz)
-        mod.iniciarHealthPeriodico(raiz, 10000)
-      } catch (e) {
-        dglog('[modelos] boot falhou: ' + String(e))
-      }
+  if (!safe) {
+    void import('./paths').then(({ resolverRaizProjeto }) => {
+      const raiz = resolverRaizProjeto()
+      void import('./brain/modelos-catalogo').then(async (mod) => {
+        try {
+          await mod.detectarModelosLocais(raiz)
+          mod.iniciarHealthPeriodico(raiz, 10000)
+        } catch (e) {
+          dglog('[modelos] boot falhou: ' + String(e))
+        }
+      })
     })
-  })
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -635,6 +649,17 @@ ipcMain.handle('busca:cancelar', (_e, id: unknown) => {
 })
 
 ipcMain.handle('comandos:listar', () => ({ ok: true, comandos: listarComandosMeta() }))
+
+ipcMain.handle('config:backup', async (_e, motivo?: unknown) => {
+  const { backupConfigs } = await import('./config-backup')
+  const m = typeof motivo === 'string' && motivo.trim() ? motivo.trim() : 'manual'
+  return backupConfigs(m)
+})
+
+ipcMain.handle('sistema:safe-mode', async () => {
+  const { emSafeMode } = await import('./safe-mode')
+  return { ok: true, safeMode: emSafeMode() }
+})
 
 // ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------
 ipcMain.handle('hibrido:analisar', async (_e, root: string, pedido?: string, pastaAberta?: string) => {
