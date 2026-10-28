@@ -927,7 +927,8 @@ function checarIntegridadeCompleta(): Achado[] {
       cwd: raiz,
       encoding: 'utf8',
       windowsHide: true,
-      timeout: 15000
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore']
     }).trim()
     out.push({
       id: 'integridade:git',

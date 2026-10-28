@@ -4,7 +4,7 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, basename } from 'path'
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import { dglog } from '../dglog'
 import { getCachedAnalysis } from '../analyzer'
 import { executarAgente, type RespostaAgente } from './agent'
@@ -60,15 +60,24 @@ const PEDIDO_EDICAO =
 const PEDIDO_LEITURA =
   /\b(ler|mostrar|listar|onde|explicar|o\s+que\s+é|analisar|inspecionar|status)\b/i
 
-function gitMeta(raiz: string): { branch: string; commit: string; treeSujo: boolean } {
+const gitProtegido = (args: string[], cwd: string): string | null => {
   try {
-    const commit = execSync('git rev-parse --short HEAD', { cwd: raiz, encoding: 'utf-8' }).trim()
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: raiz, encoding: 'utf-8' }).trim()
-    const st = execSync('git status --porcelain', { cwd: raiz, encoding: 'utf-8' }).trim()
-    return { commit, branch, treeSujo: st.length > 0 }
+    return execFileSync('git', args, {
+      cwd,
+      encoding: 'utf-8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'] // stderr descartado — sem "fatal:" no console
+    }).trim()
   } catch {
-    return { commit: 'n/a', branch: 'n/a', treeSujo: false }
+    return null
   }
+}
+
+function gitMeta(raiz: string): { branch: string; commit: string; treeSujo: boolean } {
+  const commit = gitProtegido(['rev-parse', '--short', 'HEAD'], raiz) || 'sem-commit'
+  const branch = gitProtegido(['rev-parse', '--abbrev-ref', 'HEAD'], raiz) || 'sem-branch'
+  const st = gitProtegido(['status', '--porcelain'], raiz)
+  return { commit, branch, treeSujo: !!(st && st.length > 0) }
 }
 
 function listarTop(raiz: string): string[] {
