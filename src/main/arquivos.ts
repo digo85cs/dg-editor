@@ -37,6 +37,16 @@ const EXT_EDITAVEIS = new Set([
   '.conf'
 ])
 
+const EXT_IMAGEM = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp'])
+
+export function extensoesImagem(): string[] {
+  return [...EXT_IMAGEM]
+}
+
+export function ehImagem(caminho: string): boolean {
+  return EXT_IMAGEM.has(extname(String(caminho || '')).toLowerCase())
+}
+
 export function validarCaminho(caminho: string, pastasPermitidas: string[]): boolean {
   return caminhoSeguro(caminho, pastasPermitidas).ok
 }
@@ -100,6 +110,42 @@ export function lerArquivo(
   }
   if (ehBinario(buf)) return { ok: false, erro: 'arquivo binario recusado' }
   return { ok: true, conteudo: buf.toString('utf8'), bytes: buf.length }
+}
+
+/** Lê imagem como data-URL (base64) — só EXT_IMAGEM. */
+export function lerArquivoBase64(
+  caminho: string,
+  pastas: string[]
+): { ok: boolean; dataUrl?: string; mime?: string; erro?: string } {
+  if (!validarCaminho(caminho, pastas)) {
+    return { ok: false, erro: 'caminho fora das pastas permitidas' }
+  }
+  const abs = resolve(caminho)
+  if (!existsSync(abs)) return { ok: false, erro: 'arquivo nao encontrado' }
+  const ext = extname(abs).toLowerCase()
+  if (!EXT_IMAGEM.has(ext)) return { ok: false, erro: 'nao e imagem suportada' }
+  let st
+  try {
+    st = statSync(abs)
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+  if (!st.isFile()) return { ok: false, erro: 'nao e arquivo' }
+  if (st.size > LIMITE_BYTES) return { ok: false, erro: 'arquivo maior que 5MB' }
+  const mime =
+    ext === '.png'
+      ? 'image/png'
+      : ext === '.gif'
+        ? 'image/gif'
+        : ext === '.webp'
+          ? 'image/webp'
+          : 'image/jpeg'
+  try {
+    const buf = readFileSync(abs)
+    return { ok: true, mime, dataUrl: 'data:' + mime + ';base64,' + buf.toString('base64') }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
 }
 
 export function salvarArquivo(
@@ -171,6 +217,7 @@ export async function listarDiretorio(
       const editavel =
         tipo === 'file' &&
         (EXT_EDITAVEIS.has(ext) ||
+          EXT_IMAGEM.has(ext) ||
           !ext ||
           nome.startsWith('.') ||
           nome === 'Dockerfile' ||

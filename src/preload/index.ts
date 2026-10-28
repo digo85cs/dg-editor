@@ -18,7 +18,7 @@ const invokeChannels = [
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
-  'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
   'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',

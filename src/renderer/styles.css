@@ -691,7 +691,43 @@ body {
   font-weight: 700;
   cursor: pointer;
 }
-#editor-host { position: relative; }
+.editor-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--dg-border-subtle);
+  flex-shrink: 0;
+}
+.editor-toolbar.hidden { display: none; }
+#editor-host { position: relative; display: flex; min-height: 0; flex: 1; }
+#editor-host.split-preview #editor-mount { width: 50%; }
+#editor-host.split-preview .md-preview { display: block; width: 50%; }
+.md-preview {
+  overflow: auto;
+  padding: 12px 16px;
+  border-left: 1px solid var(--dg-border-subtle);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.md-preview.hidden { display: none; }
+.md-preview h1, .md-preview h2, .md-preview h3 { margin: 0.6em 0 0.3em; }
+.md-preview pre { background: var(--dg-surface-raised); padding: 8px; overflow: auto; }
+.md-preview code { font-family: ui-monospace, Consolas, monospace; }
+.md-preview table { border-collapse: collapse; }
+.md-preview td { border: 1px solid var(--dg-border-subtle); padding: 4px 8px; }
+.image-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dg-bg);
+  z-index: 3;
+  overflow: auto;
+  padding: 16px;
+}
+.image-preview.hidden { display: none; }
+#editor-host.modo-imagem #editor-mount { visibility: hidden; }
 .diff-panel {
   position: absolute;
   top: 0;

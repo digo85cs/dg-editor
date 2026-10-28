@@ -661,10 +661,149 @@ function atualizarBreadcrumb() {
   bc.textContent = abaAtiva ? caminhoRelativo(abaAtiva) : ''
 }
 
+function extDe(caminho) {
+  const m = String(caminho || '')
+    .toLowerCase()
+    .match(/\.([a-z0-9]+)$/)
+  return m ? m[1] : ''
+}
+
+function ehMarkdown(caminho) {
+  const e = extDe(caminho)
+  return e === 'md' || e === 'markdown'
+}
+
+function ehImagemExt(caminho) {
+  return /^(png|jpe?g|gif|webp)$/.test(extDe(caminho))
+}
+
+/** Renderer markdown mínimo + sanitização (sem HTML arbitrário). */
+function sanitizarERenderMarkdown(src) {
+  let t = String(src || '')
+  t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  t = t.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>')
+  t = t.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>')
+  t = t.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>')
+  t = t.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+  t = t.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+  t = t.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<pre><code>' + code.trim() + '</code></pre>')
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>')
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  t = t.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>')
+  t = t.replace(/(<li>.*<\/li>\n?)+/g, (m) => '<ul>' + m + '</ul>')
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" rel="noopener noreferrer">$1</a>')
+  t = t.replace(/^\|(.+)\|$/gm, (line) => {
+    const cells = line
+      .slice(1, -1)
+      .split('|')
+      .map((c) => '<td>' + c.trim() + '</td>')
+      .join('')
+    return '<tr>' + cells + '</tr>'
+  })
+  t = t.replace(/(<tr>.*<\/tr>\n?)+/g, (m) => '<table>' + m + '</table>')
+  t = t.replace(/^(?!<[hupolt]|<li|<tr|<table|<pre)(.+)$/gm, '<p>$1</p>')
+  // remove on* / script / iframe mesmo se vazarem
+  t = t.replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  t = t.replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, '')
+  return t
+}
+
+let mdPreviewOn = false
+
+function atualizarToolbarPreview(caminho) {
+  const bar = $('editor-toolbar')
+  const btn = $('btn-md-preview')
+  const mdBox = $('md-preview')
+  const imgBox = $('image-preview')
+  if (!bar) return
+  const md = ehMarkdown(caminho)
+  const img = ehImagemExt(caminho)
+  bar.classList.toggle('hidden', !md && !img)
+  if (btn) btn.classList.toggle('hidden', !md)
+  if (!md) {
+    mdPreviewOn = false
+    mdBox?.classList.add('hidden')
+    mdBox?.setAttribute('aria-hidden', 'true')
+    $('editor-host')?.classList.remove('split-preview')
+  }
+  if (!img) {
+    imgBox?.classList.add('hidden')
+    imgBox?.setAttribute('aria-hidden', 'true')
+  }
+}
+
+function toggleMdPreview() {
+  const caminho = abaAtiva
+  if (!ehMarkdown(caminho) || !editor) return
+  mdPreviewOn = !mdPreviewOn
+  const host = $('editor-host')
+  const box = $('md-preview')
+  if (!box || !host) return
+  if (mdPreviewOn) {
+    box.innerHTML = sanitizarERenderMarkdown(editor.getConteudo ? editor.getConteudo() : '')
+    box.classList.remove('hidden')
+    box.setAttribute('aria-hidden', 'false')
+    host.classList.add('split-preview')
+  } else {
+    box.classList.add('hidden')
+    box.setAttribute('aria-hidden', 'true')
+    host.classList.remove('split-preview')
+  }
+}
+
+async function mostrarImagem(caminho) {
+  const host = $('editor-host')
+  const box = $('image-preview')
+  const img = $('image-preview-img')
+  const mount = $('editor-mount')
+  if (!box || !img) return
+  const r = await window.api.invoke('arquivo:ler-base64', caminho, pastasPermitidas())
+  if (!r?.ok || !r.dataUrl) {
+    alert('Não foi possível abrir imagem: ' + (r?.erro || 'erro'))
+    return
+  }
+  img.src = r.dataUrl
+  img.style.maxWidth = '100%'
+  img.style.maxHeight = '100%'
+  img.style.objectFit = 'contain'
+  box.classList.remove('hidden')
+  box.setAttribute('aria-hidden', 'false')
+  mount?.classList.add('hidden')
+  $('editor-empty')?.classList.add('hidden')
+  host?.classList.add('modo-imagem')
+}
+
+function esconderImagem() {
+  const box = $('image-preview')
+  const mount = $('editor-mount')
+  box?.classList.add('hidden')
+  box?.setAttribute('aria-hidden', 'true')
+  mount?.classList.remove('hidden')
+  $('editor-host')?.classList.remove('modo-imagem')
+}
+
+$('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
+
 async function abrirArquivoNaAba(caminho) {
   const existente = abas.find((a) => a.caminho === caminho)
   if (existente) {
     await ativarAba(caminho)
+    return
+  }
+  if (ehImagemExt(caminho)) {
+    syncDirtyAtiva()
+    abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
+    abaAtiva = caminho
+    if (!editor) initEditor()
+    esconderImagem()
+    await mostrarImagem(caminho)
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    atualizarToolbarPreview(caminho)
+    persistirAbas()
     return
   }
   const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
@@ -688,6 +827,17 @@ function syncDirtyAtiva() {
 async function ativarAba(caminho, conteudoPrevio) {
   syncDirtyAtiva()
   abaAtiva = caminho
+  if (ehImagemExt(caminho)) {
+    if (!editor) initEditor()
+    await mostrarImagem(caminho)
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    atualizarToolbarPreview(caminho)
+    persistirAbas()
+    return
+  }
+  esconderImagem()
   let conteudo = conteudoPrevio
   if (conteudo == null) {
     const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
@@ -704,6 +854,15 @@ async function ativarAba(caminho, conteudoPrevio) {
   renderizarAbas()
   atualizarBreadcrumb()
   atualizarEmpty()
+  atualizarToolbarPreview(caminho)
+  if (mdPreviewOn && ehMarkdown(caminho)) {
+    const box = $('md-preview')
+    if (box) box.innerHTML = sanitizarERenderMarkdown(conteudo)
+  } else {
+    mdPreviewOn = false
+    $('md-preview')?.classList.add('hidden')
+    $('editor-host')?.classList.remove('split-preview')
+  }
   editor.focar()
   persistirAbas()
 }

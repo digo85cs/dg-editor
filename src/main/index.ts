@@ -37,6 +37,7 @@ import { iniciarControleNavegador, pararControleNavegador } from './navegador/co
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
 import {
   lerArquivo,
+  lerArquivoBase64,
   salvarArquivo,
   listarDiretorio,
   arquivoExiste
@@ -256,6 +257,15 @@ ipcMain.handle('arquivo:ler', (_e, caminho: unknown, pastas: unknown) => {
   const seg = caminhoSeguro(c, p)
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return lerArquivo(seg.abs, p)
+})
+ipcMain.handle('arquivo:ler-base64', (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return lerArquivoBase64(seg.abs, p)
 })
 ipcMain.handle('arquivo:salvar', (_e, caminho: unknown, conteudo: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')

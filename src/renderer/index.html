@@ -79,8 +79,15 @@
     <section id="center-panel">
       <div id="editor-tabs" role="tablist"></div>
       <div id="editor-breadcrumb"></div>
+      <div id="editor-toolbar" class="editor-toolbar hidden">
+        <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+      </div>
       <div id="editor-host">
         <div id="editor-mount"></div>
+        <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
+        <div id="image-preview" class="image-preview hidden" aria-hidden="true">
+          <img id="image-preview-img" alt="preview" />
+        </div>
         <div id="editor-empty">
           <h2>DG Editor</h2>
           <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>

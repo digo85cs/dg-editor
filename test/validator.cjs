@@ -566,6 +566,25 @@ async function main() {
     )
   }
 
+  // ---------- 25. Preview markdown e imagens ----------
+  section('25. Preview markdown e imagens')
+  {
+    const html25 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
+    const app25 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    assert('renderer tem toggle preview', /btn-md-preview|Preview/.test(html25) && /toggleMdPreview|md-preview/.test(app25))
+    assert(
+      'preview sanitiza html (grep por sanitize/sanitizar/escape)',
+      /sanitizarERenderMarkdown|sanitizar/.test(app25) && /script|iframe|on\w+/.test(app25)
+    )
+    assert(
+      'extensoes de imagem suportadas',
+      /png|jpe?g|gif|webp/.test(app25) && /ler-base64|lerArquivoBase64/.test(
+        fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'arquivos.ts'), 'utf-8') +
+          fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+      )
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
