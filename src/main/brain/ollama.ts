@@ -219,10 +219,11 @@ export async function consultarVersoesRemotas(
       continue
     }
     try {
-      const url = 'https://registry.ollama.ai/v2/library/' + encodeURIComponent(nome) + '/tags/list'
+      // Página pública de tags (HTML) — registry v2 /tags/list responde 404 para library/*
+      const url = 'https://ollama.com/library/' + encodeURIComponent(nome) + '/tags'
       const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), 8000)
-      const res = await fetch(url, { signal: ac.signal, headers: { Accept: 'application/json' } })
+      const timer = setTimeout(() => ac.abort(), 10000)
+      const res = await fetch(url, { signal: ac.signal, headers: { Accept: 'text/html' } })
       clearTimeout(timer)
       if (!res.ok) {
         out[id] = {
@@ -233,12 +234,15 @@ export async function consultarVersoesRemotas(
         }
         continue
       }
-      const json = (await res.json()) as { tags?: string[] }
-      const remotas = Array.isArray(json.tags) ? json.tags.map(String) : []
-      // Marca atualização se a tag local não aparece no registry (tag nova disponível).
+      const html = await res.text()
+      const remotasSet = new Set<string>()
+      const re = new RegExp('/library/' + nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':([a-zA-Z0-9._-]+)', 'g')
+      let m: RegExpExecArray | null
+      while ((m = re.exec(html))) remotasSet.add(m[1])
+      const remotas = [...remotasSet]
       const temLocal = remotas.includes(localTag)
       const atualizadoDisponivel = remotas.length > 0 && !temLocal
-      out[id] = { localTag, remotas: remotas.slice(0, 30), atualizadoDisponivel }
+      out[id] = { localTag, remotas: remotas.slice(0, 40), atualizadoDisponivel }
     } catch (e) {
       out[id] = {
         localTag,
