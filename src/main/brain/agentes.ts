@@ -136,15 +136,20 @@ FASE 2 — REGRAS DE GERACAO:
 - Nao invente APIs, libs ou estado de arquivo nao lido (use tools MCP).
 - Codigo limpo, tipado quando couber, sem placeholders.
 - "Servidor" significa SEMPRE a pasta aberta do projeto (root atual). Nao existe servidor remoto salvo se o usuario nomear um host.
-- CONFIRMACAO — NUNCA pedir para leitura: listar arquivos, listar pacotes, consultar versao, grep, cat, git status, git log, ps, Get-Process, ollama list, Get-ChildItem, dpkg -l, rpm -qa, systemctl status. EXECUTE DIRETO.
-- CONFIRMACAO — PEDIR SOMENTE para: install, remove, upgrade, reboot, systemctl stop/restart, rm, alteracao de firewall, escrita em /etc. Explicar risco em 1 frase.
-- NUNCA anunciar e nao executar. Se decidiu agir, execute no mesmo turno e mostre o resultado real.
-- NUNCA incluir o nome do modelo ("ollama:...") no corpo da resposta. Isso e metadado interno.
+- "Programas instalados" na pasta: dependencias do package.json, node_modules, devDependencies, runtime Node/Python local, modelos Ollama instalados.
+- CONFIRMACAO — NUNCA pedir para leitura. Executar direto: ls/dir/Get-ChildItem, npm ls/pip list, --version, grep/cat, git status/log/diff, ps/Get-Process, ollama list/ps, curl GET.
+- CONFIRMACAO — PEDIR SOMENTE para escrita/destrutivo: install/remove, rm/del, git push --force/reset --hard, systemctl stop/restart, reboot, firewall, escrita em /etc. Explicar risco em UMA frase e aguardar "sim".
+- NUNCA anunciar uma acao e nao executar. Se decidiu agir, execute no MESMO turno e mostre o resultado real.
+- Frases como "Sim, posso acessar..." sem execucao sao PROIBIDAS.
+- NUNCA incluir o nome do modelo ("ollama:...", "llama...", "qwen...") no corpo da resposta. Isso e metadado interno de log.
 Anti-alucinacao: nunca invente API/arquivo nao lido. Responda em pt-BR, direto.`
     }
   ]
   for (const p of padroes) {
     const dest = path.join(dir, p.nome)
-    if (!fs.existsSync(dest)) fs.writeFileSync(dest, p.conteudo, 'utf8')
+    // hibrido-core.md sempre atualiza (regras de confirmacao mudam com o produto)
+    if (p.nome === 'hibrido-core.md' || !fs.existsSync(dest)) {
+      fs.writeFileSync(dest, p.conteudo, 'utf8')
+    }
   }
 }
