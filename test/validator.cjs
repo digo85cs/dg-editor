@@ -532,6 +532,25 @@ async function main() {
     )
   }
 
+  // ---------- 23. Historico de chat ----------
+  section('23. Historico de chat')
+  {
+    const chatsTs = pathT.join(rootT, 'src', 'main', 'chats.ts')
+    const main23 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const gi23 = fsT.readFileSync(pathT.join(rootT, '.gitignore'), 'utf-8')
+    const html23 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
+    assert('chats.ts existe', fsT.existsSync(chatsTs))
+    assert(
+      'handlers chat:salvar/listar/carregar/apagar existem',
+      /chat:salvar/.test(main23) &&
+        /chat:listar/.test(main23) &&
+        /chat:carregar/.test(main23) &&
+        /chat:apagar/.test(main23)
+    )
+    assert('.dg-editor/chats no gitignore', /\.dg-editor\/chats/.test(gi23))
+    assert('renderer tem botao Nova conversa', /btn-chat-nova|Nova conversa/.test(html23))
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

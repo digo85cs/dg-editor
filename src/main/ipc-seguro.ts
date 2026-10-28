@@ -73,6 +73,13 @@ export function exigirArrayStrings(v: unknown, campo: string): string[] | ErroPa
   return v as string[]
 }
 
+export function exigirObjeto(v: unknown, campo: string): Record<string, unknown> | ErroPayload {
+  if (v == null || typeof v !== 'object' || Array.isArray(v)) {
+    return { ok: false, erro: `payload invalido: ${campo} deve ser objeto` }
+  }
+  return v as Record<string, unknown>
+}
+
 export function isErroPayload(v: unknown): v is ErroPayload {
   return !!v && typeof v === 'object' && (v as ErroPayload).ok === false && 'erro' in (v as object)
 }

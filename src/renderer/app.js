@@ -2,6 +2,7 @@
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
 import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
+import { iniciarHistoricoChat } from './chat.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -262,6 +263,7 @@ async function selecionarPasta(path) {
   ])
 
   renderizarChat(msgs)
+  void ligarHistoricoChat(path)
 
   if (cached) {
     renderizarAnalise(cached, true)
@@ -773,6 +775,9 @@ function adicionarBolha(role, content, provider) {
   return div
 }
 
+/** @type {Awaited<ReturnType<typeof iniciarHistoricoChat>> | null} */
+let histChat = null
+
 async function enviarMensagem() {
   if (!pastaAtual) return
   const input = $('chat-input')
@@ -780,11 +785,13 @@ async function enviarMensagem() {
   if (!texto) return
   input.value = ''
   adicionarBolha('user', texto)
+  histChat?.registrarMensagem('user', texto)
   $('chat-send').disabled = true
   const bolhaProc = adicionarBolha('assistant', 'Pensando...')
   try {
     const r = await window.api.invoke('chat:send', pastaAtual, texto)
     bolhaProc.querySelector('.msg-text').textContent = r.message.content
+    histChat?.registrarMensagem('assistant', r.message.content, r.message.provider)
     if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
   } catch (err) {
     bolhaProc.querySelector('.msg-text').textContent = 'Erro ao enviar: ' + String(err)
@@ -792,6 +799,21 @@ async function enviarMensagem() {
     $('chat-send').disabled = false
     input.focus()
   }
+}
+
+async function ligarHistoricoChat(raiz) {
+  histChat = await iniciarHistoricoChat(raiz, {
+    onRender: (msgs) => {
+      const empty = $('empty-state')
+      if (empty) empty.classList.add('hidden')
+      renderizarChat(msgs || [])
+    },
+    onNova: () => {
+      const empty = $('empty-state')
+      if (empty) empty.classList.add('hidden')
+      renderizarChat([])
+    }
+  })
 }
 
 // ---------- Config / Contas ----------

@@ -63,3 +63,6 @@ qa-artifacts/*
 
 # Provas isoladas de QA IA (scripts/qa-ia-teste.cjs)
 tmp/
+
+# Historico de chats (runtime)
+.dg-editor/chats/

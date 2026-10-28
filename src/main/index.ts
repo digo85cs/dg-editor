@@ -46,6 +46,7 @@ import {
   exigirString,
   exigirBoolean,
   exigirArrayStrings,
+  exigirObjeto,
   isErroPayload
 } from './ipc-seguro'
 import { ativarSafeMode, emSafeMode, detectarSafeModeArgv } from './safe-mode'
@@ -522,6 +523,52 @@ ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown) => {
 ipcMain.handle('chat:clear', (_e, root: string) => {
   clearChat(root)
   return { ok: true }
+})
+
+// ---------- Historico multi-chat (.dg-editor/chats/) ----------
+ipcMain.handle('chat:salvar', async (_e, raiz: unknown, doc: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const o = exigirObjeto(doc, 'doc')
+  if (isErroPayload(o)) return o
+  const id = exigirString(o.id, 'id')
+  if (isErroPayload(id)) return id
+  const titulo = typeof o.titulo === 'string' ? o.titulo : 'Sem titulo'
+  const mensagens = Array.isArray(o.mensagens) ? o.mensagens : []
+  const { salvarChat } = await import('./chats')
+  const salvo = salvarChat(r, {
+    id,
+    titulo,
+    mensagens: mensagens as { role: string; content: string; provider?: string; em?: string }[],
+    criadoEm: typeof o.criadoEm === 'string' ? o.criadoEm : undefined
+  })
+  return { ok: true, chat: salvo }
+})
+
+ipcMain.handle('chat:listar', async (_e, raiz: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const { listarChats } = await import('./chats')
+  return { ok: true, chats: listarChats(r) }
+})
+
+ipcMain.handle('chat:carregar', async (_e, raiz: unknown, id: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  const { carregarChat } = await import('./chats')
+  const chat = carregarChat(r, i)
+  return chat ? { ok: true, chat } : { ok: false, erro: 'chat nao encontrado' }
+})
+
+ipcMain.handle('chat:apagar', async (_e, raiz: unknown, id: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  const { apagarChat } = await import('./chats')
+  return { ok: true, apagado: apagarChat(r, i) }
 })
 
 // ---------- Fase 2: contas, guardiao, tema ----------

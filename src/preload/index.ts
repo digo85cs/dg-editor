@@ -9,6 +9,7 @@ const invokeChannels = [
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template',
   'chat:load', 'chat:send', 'chat:clear',
+  'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',

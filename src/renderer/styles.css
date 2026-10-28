@@ -670,6 +670,21 @@ body {
   flex-shrink: 0;
 }
 #chat-title { flex: 1; font-size: var(--dg-fs-md); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.chat-history-bar select {
+  max-width: 140px;
+  font-size: var(--dg-fs-xs);
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
 .provider-badge, #chat-provider {
   display: inline-flex;
   align-items: center;
