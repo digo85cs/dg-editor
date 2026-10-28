@@ -1008,6 +1008,23 @@ button:focus-visible { outline: 2px solid var(--dg-accent-brand); outline-offset
 .palette-item:hover, .palette-item.selecionado { background: var(--dg-active); }
 .palette-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .palette-hint { font-size: var(--dg-fs-xs); color: var(--dg-text-faint); margin-left: 10px; flex-shrink: 0; }
+.busca-box { position: relative; }
+.busca-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 8px;
+  font-size: var(--dg-fs-xs);
+  color: var(--dg-muted);
+}
+.busca-hit {
+  font-size: var(--dg-fs-xs);
+  color: var(--dg-text-faint);
+  padding: 2px 0 2px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .palette-group {
   font-size: 10px;
   font-weight: 700;

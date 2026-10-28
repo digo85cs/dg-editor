@@ -22,7 +22,8 @@ const invokeChannels = [
   'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',
   'qa:run',
   'hibrido:analisar', 'hibrido:executar',
-  'agente:executar', 'agente:modelo', 'agente:historico'
+  'agente:executar', 'agente:modelo', 'agente:historico',
+  'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

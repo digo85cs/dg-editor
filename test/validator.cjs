@@ -340,6 +340,19 @@ async function main() {
   assert('CSP do renderer existe', csp.length > 10)
   assert('CSP nao libera unsafe-eval', csp.length > 0 && !/unsafe-eval/i.test(csp))
 
+  // ---------- 11. Navegacao: busca e paleta ----------
+  section('11. Navegacao: Quick Open, busca global e paleta')
+  const buscaTs = pathT.join(rootT, 'src', 'main', 'busca.ts')
+  const cmdMeta = pathT.join(rootT, 'src', 'main', 'comandos-meta.ts')
+  const cmdJs = pathT.join(rootT, 'src', 'renderer', 'comandos.js')
+  const appNav = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+  const preNav = fsT.readFileSync(pathT.join(rootT, 'src', 'preload', 'index.ts'), 'utf-8')
+  assert('busca.ts existe', fsT.existsSync(buscaTs) && /buscaArquivos|buscaConteudo/.test(fsT.readFileSync(buscaTs, 'utf-8')))
+  assert('comandos-meta.ts lista comandos', fsT.existsSync(cmdMeta) && /COMANDOS_META/.test(fsT.readFileSync(cmdMeta, 'utf-8')))
+  assert('comandos.js tem registrarComando', fsT.existsSync(cmdJs) && /registrarComando/.test(fsT.readFileSync(cmdJs, 'utf-8')))
+  assert('preload expoe busca:arquivos', /busca:arquivos/.test(preNav) && /comandos:listar/.test(preNav))
+  assert('app.js trata Ctrl+Shift+F', /shiftKey && key === 'f'|Shift\+F/.test(appNav) || /abrirBuscaGlobal/.test(appNav))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

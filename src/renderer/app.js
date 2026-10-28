@@ -1,6 +1,7 @@
 // DG Editor - renderer (IDE Opção B)
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
+import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -953,28 +954,51 @@ async function carregarTema() {
   }
 }
 
-// ---------- Paleta ----------
-const COMANDOS = [
-  { id: 'abrir-pasta', label: 'Abrir pasta de trabalho', hint: 'Ctrl+O' },
-  { id: 'analisar', label: 'Analisar sistema aberto', hint: 'IA' },
-  { id: 'reanalisar', label: 'Analisar novamente', hint: 'IA' },
-  { id: 'limpar-chat', label: 'Limpar chat desta pasta', hint: 'chat' },
-  { id: 'contas', label: 'Abrir Contas e saude do sistema', hint: 'Fase 2' },
-  { id: 'config', label: 'Abrir Configuracoes', hint: 'sistema' },
-  { id: 'tema', label: 'Alternar tema claro/escuro', hint: 'visual' },
-  { id: 'guardian', label: 'Ver guardiao de recursos', hint: 'RAM/CPU' },
-  { id: 'salvar', label: 'Salvar arquivo ativo', hint: 'Ctrl+S' },
-  { id: 'fechar-aba', label: 'Fechar aba ativa', hint: 'Ctrl+W' },
-  { id: 'toggle-sidebar', label: 'Alternar Explorer', hint: 'Ctrl+B' },
-  { id: 'toggle-right', label: 'Alternar painel direito', hint: 'Ctrl+Alt+B' },
-  { id: 'navegador', label: 'Abrir navegador embutido', hint: 'Ctrl+Shift+N' }
-]
-
+// ---------- Paleta / Quick Open / Busca ----------
 let paletaItens = []
 let paletaSel = 0
+let buscaAbortId = null
+
+function bootstrapComandos() {
+  const defs = [
+    { id: 'abrir-pasta', titulo: 'Abrir pasta de trabalho', atalho: 'Ctrl+O', fn: () => abrirPasta() },
+    { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
+    { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
+    { id: 'paleta-comandos', titulo: 'Paleta de comandos', atalho: 'Ctrl+Shift+P', fn: () => abrirPaletaComandos() },
+    { id: 'analisar', titulo: 'Analisar sistema aberto', fn: () => pastaAtual && rodarAnalise(pastaAtual, false) },
+    { id: 'reanalisar', titulo: 'Analisar novamente', fn: () => pastaAtual && rodarAnalise(pastaAtual, true) },
+    {
+      id: 'limpar-chat',
+      titulo: 'Limpar chat',
+      fn: () => pastaAtual && window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([]))
+    },
+    { id: 'contas', titulo: 'Contas e saude', fn: () => abrirContas() },
+    { id: 'config', titulo: 'Configuracoes', fn: () => abrirConfig() },
+    { id: 'tema', titulo: 'Alternar tema', fn: () => alternarTema() },
+    { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
+    { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
+    { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
+    { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
+    {
+      id: 'toggle-terminal',
+      titulo: 'Alternar terminal',
+      atalho: 'Ctrl+`',
+      fn: () => document.getElementById('btn-terminal-toggle')?.click()
+    },
+    {
+      id: 'navegador',
+      titulo: 'Navegador embutido',
+      atalho: 'Ctrl+Shift+N',
+      fn: () => window.api.invoke('navegador:abrir').catch(() => {})
+    }
+  ]
+  for (const d of defs) registrarComando(d)
+}
 
 function abrirPaletaComandos() {
   modoPaleta = 'comandos'
+  fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
   $('palette-input').placeholder = 'Digite um comando...'
@@ -984,9 +1008,10 @@ function abrirPaletaComandos() {
 
 function abrirPaletaArquivos() {
   modoPaleta = 'arquivos'
+  fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Buscar arquivo nas pastas...'
+  $('palette-input').placeholder = 'Quick Open — nome do arquivo...'
   renderizarPaleta('')
   $('palette-input').focus()
 }
@@ -995,13 +1020,23 @@ function fecharPaleta() {
   $('palette').classList.add('hidden')
 }
 
-async function coletarArquivos(dir, acc, profundidade) {
-  if (profundidade > 6 || acc.length > 800) return
-  const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
-  if (!r.ok) return
-  for (const e of r.entradas || []) {
-    if (e.tipo === 'dir') await coletarArquivos(e.caminho, acc, profundidade + 1)
-    else if (e.editavel) acc.push(e)
+function abrirBuscaGlobal() {
+  fecharPaleta()
+  $('busca-global')?.classList.remove('hidden')
+  const inp = $('busca-input')
+  if (inp) {
+    inp.value = ''
+    inp.focus()
+  }
+  const box = $('busca-resultados')
+  if (box) box.innerHTML = '<div class="palette-item muted">Digite para buscar no projeto</div>'
+}
+
+function fecharBuscaGlobal() {
+  $('busca-global')?.classList.add('hidden')
+  if (buscaAbortId) {
+    window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
+    buscaAbortId = null
   }
 }
 
@@ -1009,31 +1044,46 @@ async function renderizarPaleta(filtro) {
   const lista = $('palette-list')
   lista.innerHTML = ''
   paletaSel = 0
-  const f = filtro.toLowerCase().trim()
+  const f = (filtro || '').trim()
   paletaItens = []
 
   if (modoPaleta === 'comandos') {
-    const cmds = COMANDOS.filter((c) => !f || c.label.toLowerCase().includes(f))
+    let cmds = listarComandosLocais()
+    try {
+      const remoto = await window.api.invoke('comandos:listar')
+      if (remoto?.ok && Array.isArray(remoto.comandos)) {
+        for (const c of remoto.comandos) {
+          if (!cmds.find((x) => x.id === c.id)) {
+            cmds.push({ id: c.id, titulo: c.titulo, atalho: c.atalho })
+          }
+        }
+      }
+    } catch {
+      /* offline meta */
+    }
+    const fl = f.toLowerCase()
+    cmds = cmds.filter((c) => !fl || (c.titulo || '').toLowerCase().includes(fl) || c.id.includes(fl))
     for (const c of cmds) {
-      paletaItens.push({ tipo: 'cmd', id: c.id, label: c.label, hint: c.hint })
+      paletaItens.push({ tipo: 'cmd', id: c.id, label: c.titulo, hint: c.atalho || '' })
     }
   } else {
-    const acc = []
-    for (const p of pastasRecentes) await coletarArquivos(p, acc, 0)
-    const filtrados = acc.filter(
-      (e) =>
-        !f ||
-        e.nome.toLowerCase().includes(f) ||
-        e.caminho.toLowerCase().includes(f) ||
-        caminhoRelativo(e.caminho).toLowerCase().includes(f)
-    )
-    for (const e of filtrados.slice(0, 80)) {
-      paletaItens.push({
-        tipo: 'file',
-        caminho: e.caminho,
-        label: caminhoRelativo(e.caminho),
-        hint: e.nome
-      })
+    const raiz = pastaAtual || pastasRecentes[0]
+    if (raiz) {
+      try {
+        const r = await window.api.invoke('busca:arquivos', raiz, f, 80)
+        if (r?.ok && Array.isArray(r.itens)) {
+          for (const e of r.itens) {
+            paletaItens.push({
+              tipo: 'file',
+              caminho: e.caminho,
+              label: e.rel || e.nome,
+              hint: e.nome
+            })
+          }
+        }
+      } catch {
+        /* fallback vazio */
+      }
     }
   }
 
@@ -1064,6 +1114,7 @@ function executarItemPaleta(c) {
 }
 
 function executarComando(id) {
+  if (executarComandoLocal(id)) return
   if (id === 'abrir-pasta') abrirPasta()
   else if (id === 'analisar') {
     if (pastaAtual) rodarAnalise(pastaAtual, false)
@@ -1081,6 +1132,68 @@ function executarComando(id) {
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
   else if (id === 'navegador') window.api.invoke('navegador:abrir').catch(() => {})
+}
+
+async function rodarBuscaGlobal() {
+  const raiz = pastaAtual || pastasRecentes[0]
+  const q = ($('busca-input')?.value || '').trim()
+  const box = $('busca-resultados')
+  if (!box) return
+  if (!raiz) {
+    box.innerHTML = '<div class="palette-item muted">Abra uma pasta primeiro</div>'
+    return
+  }
+  if (!q) {
+    box.innerHTML = '<div class="palette-item muted">Digite para buscar</div>'
+    return
+  }
+  if (buscaAbortId) await window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
+  buscaAbortId = 'ui-' + Date.now()
+  box.innerHTML = '<div class="palette-item muted">Buscando...</div>'
+  const regex = !!$('busca-regex')?.checked
+  try {
+    const r = await window.api.invoke('busca:conteudo', raiz, q, {
+      regex,
+      limite: 50,
+      id: buscaAbortId
+    })
+    box.innerHTML = ''
+    if (!r?.ok) {
+      box.innerHTML = '<div class="palette-item muted">' + escapar(r?.erro || 'falha') + '</div>'
+      return
+    }
+    if (r.cancelado) {
+      box.innerHTML = '<div class="palette-item muted">Cancelado</div>'
+      return
+    }
+    const grupos = r.grupos || []
+    if (!grupos.length) {
+      box.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
+      return
+    }
+    for (const g of grupos) {
+      const head = document.createElement('div')
+      head.className = 'palette-item'
+      head.innerHTML = '<span class="palette-label">' + escapar(g.rel) + '</span>'
+      head.addEventListener('click', () => {
+        fecharBuscaGlobal()
+        abrirArquivoNaAba(g.arquivo)
+      })
+      box.appendChild(head)
+      for (const h of g.hits || []) {
+        const hit = document.createElement('div')
+        hit.className = 'busca-hit'
+        hit.textContent = h.linha + ': ' + h.texto
+        hit.addEventListener('click', () => {
+          fecharBuscaGlobal()
+          abrirArquivoNaAba(g.arquivo)
+        })
+        box.appendChild(hit)
+      }
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="palette-item muted">' + escapar(String(e)) + '</div>'
+  }
 }
 
 function destacarPaleta(itens) {
@@ -1160,6 +1273,11 @@ document.addEventListener('keydown', (e) => {
     abrirPaletaComandos()
     return
   }
+  if (mod && e.shiftKey && key === 'f') {
+    e.preventDefault()
+    abrirBuscaGlobal()
+    return
+  }
   if (mod && key === 'p' && !e.shiftKey) {
     e.preventDefault()
     abrirPaletaArquivos()
@@ -1206,6 +1324,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     fecharPaleta()
+    fecharBuscaGlobal()
     $('modal-config').classList.add('hidden')
     $('modal-contas').classList.add('hidden')
   }
@@ -1214,6 +1333,22 @@ document.addEventListener('keydown', (e) => {
 $('palette').addEventListener('click', (e) => {
   if (e.target === $('palette')) fecharPaleta()
 })
+$('busca-global')?.addEventListener('click', (e) => {
+  if (e.target === $('busca-global')) fecharBuscaGlobal()
+})
+let buscaTimer = null
+$('busca-input')?.addEventListener('input', () => {
+  clearTimeout(buscaTimer)
+  buscaTimer = setTimeout(() => void rodarBuscaGlobal(), 280)
+})
+$('busca-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') fecharBuscaGlobal()
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    void rodarBuscaGlobal()
+  }
+})
+$('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
 $('modal-config').addEventListener('click', (e) => {
   if (e.target === $('modal-config')) $('modal-config').classList.add('hidden')
 })
@@ -1441,6 +1576,7 @@ carregarLayout()
 carregarPastas()
 initResizers()
 initActivityBar()
+bootstrapComandos()
 carregarTema()
 initTerminalPanel()
 initMenuCtxArvore()

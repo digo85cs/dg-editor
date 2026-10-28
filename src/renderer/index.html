@@ -161,6 +161,14 @@
   </div>
 
   <!-- Paleta de comandos (Ctrl+Shift+P) / arquivos (Ctrl+P) -->
+  <div id="busca-global" class="modal hidden" aria-label="Busca no projeto">
+    <div class="palette-box busca-box">
+      <input id="busca-input" type="text" placeholder="Buscar no projeto (Ctrl+Shift+F)..." autocomplete="off" />
+      <label class="busca-opt"><input type="checkbox" id="busca-regex" /> Regex</label>
+      <div id="busca-resultados" class="palette-list"></div>
+    </div>
+  </div>
+
   <div id="palette" class="modal hidden">
     <div class="palette-box">
       <input id="palette-input" type="text" placeholder="Digite um comando ou arquivo..." autocomplete="off" />

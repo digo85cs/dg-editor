@@ -48,6 +48,8 @@ import {
   exigirArrayStrings,
   isErroPayload
 } from './ipc-seguro'
+import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from './busca'
+import { listarComandosMeta } from './comandos-meta'
 import {
   createTerminal,
   writeTerminal,
@@ -564,6 +566,36 @@ ipcMain.handle('agente:historico', async (_e, root: string) => {
   try { return { ok: true, mensagens: await historico(root) } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
+
+// ---------- Busca / comandos (Quick Open, busca global, paleta) ----------
+ipcMain.handle('busca:arquivos', (_e, root: unknown, query: unknown, limite?: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const q = exigirString(query, 'query')
+  if (isErroPayload(q)) return q
+  const lim = typeof limite === 'number' ? limite : 80
+  return buscaArquivos(r, q, lim)
+})
+
+ipcMain.handle(
+  'busca:conteudo',
+  async (_e, root: unknown, query: unknown, opcoes?: { regex?: boolean; limite?: number; id?: string }) => {
+    const r = exigirString(root, 'root')
+    if (isErroPayload(r)) return r
+    const q = exigirString(query, 'query')
+    if (isErroPayload(q)) return q
+    return buscaConteudo(r, q, opcoes)
+  }
+)
+
+ipcMain.handle('busca:cancelar', (_e, id: unknown) => {
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  cancelarBuscaConteudo(i)
+  return { ok: true }
+})
+
+ipcMain.handle('comandos:listar', () => ({ ok: true, comandos: listarComandosMeta() }))
 
 // ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------
 ipcMain.handle('hibrido:analisar', async (_e, root: string, pedido?: string, pastaAberta?: string) => {
