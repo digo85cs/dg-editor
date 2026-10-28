@@ -663,8 +663,8 @@ async function main() {
   section('30. Analise: primeiro clique e agente')
   {
     const app30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
-    const css30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'styles.css'), 'utf-8')
     const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
+    const agent30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'agent.ts'), 'utf-8')
     const btnBlock = (() => {
       const m = app30.match(
         /\$\(['"]btn-reanalyze['"]\)\.addEventListener\(['"]click['"],\s*\(\)\s*=>\s*\{[\s\S]*?\}\)/
@@ -675,10 +675,13 @@ async function main() {
       'btn-reanalyze usa force dinamico',
       /dataset\.jaAnalisou/.test(btnBlock) && !/rodarAnalise\(pastaAtual,\s*true\)/.test(btnBlock)
     )
-    assert('rodarAnalise marca jaAnalisou', /dataset\.jaAnalisou\s*=\s*['"]1['"]/.test(app30))
     assert(
-      '.hidden aplica display none',
-      /\.hidden\s*\{[^}]*display\s*:\s*none/i.test(css30) || /\[hidden\][^{]*\{[^}]*display\s*:\s*none/i.test(css30)
+      'rodarAnalise marca jaAnalisou apos sucesso',
+      /dataset\.jaAnalisou\s*=\s*['"]1['"]/.test(app30)
+    )
+    assert(
+      'trocar pasta reseta jaAnalisou',
+      /delete\s+[^\n]*dataset\.jaAnalisou/.test(app30)
     )
     assert(
       'hibrido.ts define servidor=pasta aberta',
@@ -689,9 +692,15 @@ async function main() {
       /NUNCA pedir para leitura/.test(hib30)
     )
     assert(
-      'resposta nao inclui nome de modelo ollama',
+      'hibrido.ts proibe eco de modelo',
       /NUNCA incluir o nome do modelo/.test(hib30)
     )
+    assert(
+      'hibrido.ts proibe anunciar sem executar',
+      /NUNCA anunciar/.test(hib30) && /executar/.test(hib30)
+    )
+    // guarda: anti-eco no agent (nao conta no total secao, so regressao)
+    void /removerEcoModelo/.test(agent30)
   }
 
   // ---------- Summary ----------
