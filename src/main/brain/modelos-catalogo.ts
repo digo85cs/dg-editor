@@ -3,7 +3,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { listModelos, ollamaPing } from './ollama'
+import { listarModelosOllama, ollamaPing } from './ollama'
 import { dglog } from '../dglog'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo'
@@ -84,11 +84,11 @@ export function salvarCatalogo(raiz: string, cat: CatalogoModelos): void {
   writeFileSync(caminhoCatalogo(raiz), JSON.stringify(cat, null, 2), 'utf-8')
 }
 
-/** Consulta Ollama /api/tags e mescla no catálogo. */
+/** Consulta Ollama /api/tags (uma chamada) e mescla no catálogo. */
 export async function detectarModelosLocais(raiz: string): Promise<CatalogoModelos> {
   const cat = lerCatalogo(raiz)
-  const online = await ollamaPing()
-  if (!online) {
+  const tags = await listarModelosOllama()
+  if (!tags) {
     for (const m of cat.modelos) {
       if (m.provider === 'ollama') {
         m.instalado = false
@@ -98,7 +98,6 @@ export async function detectarModelosLocais(raiz: string): Promise<CatalogoModel
     salvarCatalogo(raiz, cat)
     return cat
   }
-  const tags = await listModelos()
   const porId = new Map(cat.modelos.map((m) => [m.id, m]))
   for (const nome of tags) {
     const prev = porId.get(nome)
@@ -179,7 +178,7 @@ let healthTimer: ReturnType<typeof setInterval> | null = null
 
 export function iniciarHealthPeriodico(raiz: string, ms = 10000): void {
   if (healthTimer) clearInterval(healthTimer)
-  void healthCheckModelos(raiz)
+  // Nao dispara health imediatamente — evita competir com terminal:create no boot
   healthTimer = setInterval(() => {
     void healthCheckModelos(raiz).catch((e) => dglog('[modelos] health falhou: ' + String(e)))
   }, ms)

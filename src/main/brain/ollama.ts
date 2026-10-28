@@ -189,6 +189,18 @@ export async function listModelos(): Promise<string[]> {
   }
 }
 
+/** Uma única GET /api/tags (timeout curto) — via preferida do catálogo. null = Ollama down. */
+export async function listarModelosOllama(): Promise<string[] | null> {
+  const { status, body } = await httpGet('/api/tags', 1500)
+  if (status !== 200) return null
+  try {
+    const json = JSON.parse(body) as { models?: { name: string }[] }
+    return (json.models || []).map((m) => m.name)
+  } catch {
+    return null
+  }
+}
+
 export async function getOllamaStatus(): Promise<OllamaStatus> {
   const installed = ollamaInstalado()
   if (!installed) return { installed: false, reachable: false, models: [], error: 'Ollama nao instalado' }

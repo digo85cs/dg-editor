@@ -56,6 +56,7 @@ export async function executarSuiteE2e(
       env: {
         ...process.env,
         DG_NAV_SMOKE: '',
+        DG_QA_E2E: '1',
         ELECTRON_DISABLE_SECURITY_WARNINGS: '1'
       },
       timeout: 30000

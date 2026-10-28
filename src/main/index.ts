@@ -134,25 +134,34 @@ app.whenReady().then(() => {
     }
   })
   const safe = process.argv.includes('--safe-mode') || process.argv.includes('--safemode')
+  const qaE2e = process.env.DG_QA_E2E === '1'
   if (!safe) {
-    bootSaudeIAs()
+    // Nao competir com terminal:create no boot — Ollama sobe depois
+    if (!qaE2e) {
+      setTimeout(() => {
+        void bootSaudeIAs()
+      }, 15000)
+    }
     iniciarControleNavegador()
   }
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
-  if (!safe) {
+  if (!safe && !qaE2e) {
+    // Detecção de modelos NÃO no boot — libera o event loop para terminal:create.
     void import('./paths').then(({ resolverRaizProjeto }) => {
       const raiz = resolverRaizProjeto()
-      void import('./brain/modelos-catalogo').then(async (mod) => {
-        try {
-          await mod.detectarModelosLocais(raiz)
-          mod.iniciarHealthPeriodico(raiz, 10000)
-        } catch (e) {
-          dglog('[modelos] boot falhou: ' + String(e))
-        }
-      })
+      setTimeout(() => {
+        void import('./brain/modelos-catalogo').then(async (mod) => {
+          try {
+            await mod.detectarModelosLocais(raiz)
+            mod.iniciarHealthPeriodico(raiz, 30000)
+          } catch (e) {
+            dglog('[modelos] boot falhou: ' + String(e))
+          }
+        })
+      }, 15000)
     })
   }
   app.on('activate', () => {
@@ -761,14 +770,17 @@ ipcMain.handle('qa:run', async (_e, opcoes?: { suite?: string }) => {
 })
 
 // ---------- Auto auditoria no boot + periodica ----------
-setTimeout(async () => {
-  try {
-    const mod = await import('./auto-auditoria')
-    const r = await mod.rodarAuditoria({ autoAtualizar: false })
-    console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
-    mod.iniciarAuditoriaPeriodica(1800000)
-    console.log('[auditoria:boot] periodica ativa (30 min)')
-  } catch (e: any) {
-    console.warn('[auditoria:boot] falhou:', String(e?.message || e))
-  }
-}, 4000)
+// Adiada: checarOllama/listarShells no boot competiam com terminal:create (spawnSync).
+if (process.env.DG_QA_E2E !== '1') {
+  setTimeout(async () => {
+    try {
+      const mod = await import('./auto-auditoria')
+      const r = await mod.rodarAuditoria({ autoAtualizar: false })
+      console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
+      mod.iniciarAuditoriaPeriodica(1800000)
+      console.log('[auditoria:boot] periodica ativa (30 min)')
+    } catch (e: any) {
+      console.warn('[auditoria:boot] falhou:', String(e?.message || e))
+    }
+  }, 30000)
+}
