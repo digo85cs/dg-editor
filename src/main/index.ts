@@ -718,9 +718,11 @@ ipcMain.on('app:quit', () => {
 ipcMain.handle('auditoria:rodar', async (_e, opcoes?: any) => {
   try {
     const mod = await import('./auto-auditoria')
+    // Mesma regua do boot (OPCOES_AUDITORIA_PADRAO). autoAtualizar so se UI pedir explicitamente.
     return await mod.rodarAuditoria({
-      autoAtualizar: !!opcoes?.autoAtualizar,
-      reiniciarAoFim: opcoes?.reiniciarAoFim !== false
+      ...mod.OPCOES_AUDITORIA_PADRAO,
+      autoAtualizar: opcoes?.autoAtualizar === true,
+      reiniciarAoFim: opcoes?.reiniciarAoFim === true
     })
   } catch (e: any) {
     return { erro: String(e?.message || e) }
@@ -919,8 +921,23 @@ if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
   setTimeout(async () => {
     try {
       const mod = await import('./auto-auditoria')
-      const r = await mod.rodarAuditoria({ autoAtualizar: false })
-      console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
+      // Mesma regua que o botao Auditar (OPCOES_AUDITORIA_PADRAO / autoAtualizar=false)
+      const r = await mod.rodarAuditoria({ ...mod.OPCOES_AUDITORIA_PADRAO })
+      console.log(
+        '[auditoria:boot] ok=' +
+          r.resumo.ok +
+          ' warn=' +
+          r.resumo.warn +
+          ' erro=' +
+          r.resumo.erro +
+          ' corrigidos=' +
+          r.resumo.corrigidos
+      )
+      if (r.resumo.pendencias && r.resumo.pendencias.length > 0) {
+        console.log(
+          '[auditoria:boot] pendencias: ' + r.resumo.pendencias.map((p) => p.id).join(', ')
+        )
+      }
       mod.iniciarAuditoriaPeriodica(1800000)
       console.log('[auditoria:boot] periodica ativa (30 min)')
     } catch (e: any) {

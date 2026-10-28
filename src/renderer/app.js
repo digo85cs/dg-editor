@@ -1814,13 +1814,18 @@ async function rodarAutoAuditoria() {
     btn.textContent = 'Auditando...'
   }
   try {
-    const r = await window.api.invoke('auditoria:rodar', { autoAtualizar: true, reiniciarAoFim: false })
+    // Mesma regua do boot (autoAtualizar=false) — numeros OK/warn/erro identicos
+    const r = await window.api.invoke('auditoria:rodar', {
+      autoAtualizar: false,
+      reiniciarAoFim: false
+    })
     if (!r || r.erro) {
       console.warn('[auditoria] erro:', r && r.erro)
     } else {
-      const falhas = r.achados.filter(function (a) {
+      const falhas = (r.achados || []).filter(function (a) {
         return a.status === 'falhou'
       })
+      const pend = (r.resumo && r.resumo.pendencias) || []
       var msg =
         'Auditoria concluida\n' +
         'OK: ' +
@@ -1834,10 +1839,23 @@ async function rodarAutoAuditoria() {
         r.resumo.corrigidos +
         ' | Falhas: ' +
         r.resumo.falhas
+      if (pend.length) {
+        msg +=
+          '\n\nPendencias:\n' +
+          pend
+            .map(function (p) {
+              return '- [' + p.severidade + '] ' + p.id + ' — ' + p.titulo
+            })
+            .join('\n')
+      }
       if (falhas.length) {
-        msg += '\n\nFalhas:\n' + falhas.map(function (a) {
-          return '- ' + a.titulo
-        }).join('\n')
+        msg +=
+          '\n\nFalhas:\n' +
+          falhas
+            .map(function (a) {
+              return '- ' + a.titulo
+            })
+            .join('\n')
       }
       if (!r.reiniciarPendente) {
         alert(msg)
