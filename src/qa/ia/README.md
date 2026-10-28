@@ -1,7 +1,6 @@
 # Contrato de autocorreção por IA (catálogo fechado)
 
-Este diretório é o **hook** para a próxima etapa. O agente determinístico
-(`npm run qa`) já identifica falhas; a IA **não** aplica patches nesta fase.
+Implementação: `autocorrigir.ts` + `npm run qa:ia` (`--dry-run` / real).
 
 ## Quando `corrigivel: true`
 
@@ -14,20 +13,20 @@ Somente se a falha estiver nesta lista fechada:
 
 Qualquer outro tipo → `pendente_manual`.
 
-## Fluxo (futuro)
+## Fluxo
 
-1. `brain.ask()` recebe `ResultadoCenario` + trecho de código.
-2. A IA propõe um patch.
+1. Classifica a falha no catálogo.
+2. Propõe patch (fixture determinística ou `brain.ask()`).
 3. Aplicar **somente** se:
-   - (a) tipo ∈ catálogo acima  
+   - (a) tipo ∈ catálogo  
    - (b) mudança ≤ 20 linhas em **1** arquivo  
    - (c) `npm run typecheck` passa  
-   - (d) `npm test` passa (todos os testes atuais)  
-   - (e) um teste de regressão **novo** entra na seção 8+ do `validator.cjs`
-4. Cada correção = **um commit** `fix(qa):` citando `cenarioId` e o teste.
-5. Se qualquer critério falhar: **não** aplicar; marcar `pendente_manual`.
+   - (d) `npm test` passa  
+   - (e) `npm run qa:ipc` passa  
+   - (f) teste de regressão novo no validator  
+4. Cada correção = **um commit** `fix(qa):` citando `cenarioId`.
+5. `--dry-run`: imprime o patch e **não** aplica.
 
 ## Offline
 
-Se o brain/Ollama estiver offline, o catálogo não é consumido e tudo permanece
-`pendente_manual`.
+Se o brain/Ollama estiver offline, usa fixture do catálogo quando possível; senão `pendente_manual`.

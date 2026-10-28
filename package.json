@@ -20,7 +20,9 @@
         "qa:e2e": "node scripts/run-qa.cjs --suite=e2e",
         "qa:perf": "node scripts/run-qa.cjs --suite=perf",
         "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
-        "qa:report": "node scripts/run-qa.cjs --report-only"
+        "qa:report": "node scripts/run-qa.cjs --report-only",
+        "qa:ia": "node scripts/qa-autocorrigir.cjs",
+        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run"
     },
     "dependencies": {
         "@codemirror/lang-css": "^6.3.1",

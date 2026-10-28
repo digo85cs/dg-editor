@@ -374,6 +374,16 @@ async function main() {
   assert('preload expoe config:backup', /config:backup/.test(preNav))
   assert('qa ipc cobre config.backup', /ipc\.config\.backup|config-backup/.test(fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'cenarios', 'ipc-main.ts'), 'utf-8')))
 
+  // ---------- 14. Autocorrecao IA (contrato + codigo) ----------
+  section('14. Autocorrecao IA: catalogo e dry-run')
+  const iaAuto = pathT.join(rootT, 'src', 'qa', 'ia', 'autocorrigir.ts')
+  const iaReadme = fsT.readFileSync(pathT.join(rootT, 'src', 'qa', 'ia', 'README.md'), 'utf-8')
+  assert('autocorrigir.ts existe', fsT.existsSync(iaAuto) && /tentarAutocorrecao|dryRun/.test(fsT.readFileSync(iaAuto, 'utf-8')))
+  assert('README menciona dry-run', /dry-run|dryRun/.test(iaReadme))
+  assert('catalogo menciona typecheck e npm test', /typecheck/.test(iaReadme) && /npm test/.test(iaReadme))
+  assert('package.json tem script qa:ia', typeof pkgJson.scripts?.['qa:ia'] === 'string')
+  assert('fixture typo-ui existe', fsT.existsSync(pathT.join(rootT, 'test', 'fixtures', 'typo-ui.txt')))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
