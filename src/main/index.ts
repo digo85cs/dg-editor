@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
@@ -923,9 +923,6 @@ if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
       console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
       mod.iniciarAuditoriaPeriodica(1800000)
       console.log('[auditoria:boot] periodica ativa (30 min)')
-      // Warm-up 7b 10s apos auditoria — nao compete com terminal/UI no boot
-      const { agendarWarmup7b } = await import('./ollama-keeper')
-      agendarWarmup7b(10_000)
     } catch (e: any) {
       console.warn('[auditoria:boot] falhou:', String(e?.message || e))
     }
