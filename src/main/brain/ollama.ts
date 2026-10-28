@@ -196,6 +196,58 @@ export async function ollamaPing(): Promise<boolean> {
 }
 
 /** Latência real de um modelo (POST /api/generate num_predict=1), não do endpoint. */
+export type VersaoRemotaInfo = {
+  localTag: string
+  remotas: string[]
+  atualizadoDisponivel: boolean
+  erro?: string
+}
+
+/** Consulta tags públicas no registry.ollama.ai (não baixa). */
+export async function consultarVersoesRemotas(
+  ids: string[]
+): Promise<Record<string, VersaoRemotaInfo>> {
+  const out: Record<string, VersaoRemotaInfo> = {}
+  for (const id of ids) {
+    const [nome, tag = 'latest'] = String(id).split(':')
+    const localTag = tag || 'latest'
+    if (!nome) {
+      out[id] = { localTag, remotas: [], atualizadoDisponivel: false, erro: 'id invalido' }
+      continue
+    }
+    try {
+      const url = 'https://registry.ollama.ai/v2/library/' + encodeURIComponent(nome) + '/tags/list'
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), 8000)
+      const res = await fetch(url, { signal: ac.signal, headers: { Accept: 'application/json' } })
+      clearTimeout(timer)
+      if (!res.ok) {
+        out[id] = {
+          localTag,
+          remotas: [],
+          atualizadoDisponivel: false,
+          erro: 'http ' + res.status
+        }
+        continue
+      }
+      const json = (await res.json()) as { tags?: string[] }
+      const remotas = Array.isArray(json.tags) ? json.tags.map(String) : []
+      // Marca atualização se a tag local não aparece no registry (tag nova disponível).
+      const temLocal = remotas.includes(localTag)
+      const atualizadoDisponivel = remotas.length > 0 && !temLocal
+      out[id] = { localTag, remotas: remotas.slice(0, 30), atualizadoDisponivel }
+    } catch (e) {
+      out[id] = {
+        localTag,
+        remotas: [],
+        atualizadoDisponivel: false,
+        erro: String((e as Error)?.message || e).slice(0, 200)
+      }
+    }
+  }
+  return out
+}
+
 export async function medirLatenciaModelo(
   id: string,
   timeoutMs = 8000

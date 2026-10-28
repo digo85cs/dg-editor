@@ -4,7 +4,7 @@ const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
   'system:get-profile', 'system:profile-strength',
   'folder:scan', 'folder:format-summary', 'folder:select',
-  'brain:ask', 'brain:providers', 'brain:ollama-status', 'brain:models',
+  'brain:ask', 'brain:providers', 'brain:ollama-status', 'brain:models', 'brain:avaliar',
   'analysis:run', 'analysis:cached',
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template',
@@ -26,7 +26,7 @@ const invokeChannels = [
   'hibrido:analisar', 'hibrido:executar',
   'agente:executar', 'agente:modelo', 'agente:historico',
   'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
-  'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa',
+  'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa', 'modelos:versoes-remotas',
   'config:backup', 'sistema:safe-mode', 'app:is-safe-mode',
   'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar'
 ]

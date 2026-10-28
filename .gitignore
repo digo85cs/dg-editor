@@ -66,3 +66,6 @@ tmp/
 
 # Historico de chats (runtime)
 .dg-editor/chats/
+
+# Avaliacoes de modelo (runtime)
+.dg-editor/avaliacoes/

@@ -396,6 +396,29 @@ ipcMain.handle('modelos:para-tarefa', async (_e, tarefa: unknown) => {
   return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t) }
 })
 
+ipcMain.handle('modelos:versoes-remotas', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { marcarVersoesRemotas, validarCatalogo } = await import('./brain/modelos-catalogo')
+  const cat = await marcarVersoesRemotas(resolverRaizProjeto())
+  const v = validarCatalogo(cat)
+  return { ok: true, catalogo: cat, problemas: v.problemas }
+})
+
+ipcMain.handle('brain:avaliar', async (_e, modeloId?: unknown) => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { lerCatalogo } = await import('./brain/modelos-catalogo')
+  const { rodarAvaliacao } = await import('./brain/avaliacao')
+  const raiz = resolverRaizProjeto()
+  const cat = lerCatalogo(raiz)
+  const id =
+    typeof modeloId === 'string' && modeloId.trim()
+      ? modeloId.trim()
+      : cat.ativo || ''
+  if (!id) return { ok: false, erro: 'nenhum modelo ativo' }
+  const r = await rodarAvaliacao(raiz, id)
+  return { ok: true, avaliacao: r }
+})
+
 // ---------- Fase 1: analise, onde-esta, regras, chat ----------
 ipcMain.handle('analysis:run', async (_e, root: unknown, force: unknown) => {
   const r = exigirString(root, 'root')

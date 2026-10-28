@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
-import { listarModelosOllama, ollamaPing, medirLatenciaModelo } from './ollama'
+import { listarModelosOllama, ollamaPing, medirLatenciaModelo, consultarVersoesRemotas } from './ollama'
 import { dglog } from '../dglog'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo' | 'embedding'
@@ -24,6 +24,7 @@ export interface ModeloEntrada {
   instalado?: boolean
   latenciaMs?: number | null
   latenciaMedidaEm?: string | null
+  atualizadoDisponivel?: boolean
   status?: 'ok' | 'down' | 'desconhecido'
 }
 
@@ -178,8 +179,23 @@ function normalizarModelo(raw: Partial<ModeloEntrada> & { id: string }): ModeloE
     instalado: raw.instalado,
     latenciaMs: raw.latenciaMs ?? null,
     latenciaMedidaEm: raw.latenciaMedidaEm ?? null,
+    atualizadoDisponivel: raw.atualizadoDisponivel === true,
     status: raw.status || 'desconhecido'
   }
+}
+
+/** Marca atualizadoDisponivel no catálogo (não baixa). */
+export async function marcarVersoesRemotas(raiz: string): Promise<CatalogoModelos> {
+  const cat = lerCatalogo(raiz)
+  const ids = cat.modelos.filter((m) => m.provider === 'ollama').map((m) => m.id)
+  if (ids.length === 0) return cat
+  const infos = await consultarVersoesRemotas(ids)
+  for (const m of cat.modelos) {
+    const info = infos[m.id]
+    if (info) m.atualizadoDisponivel = !!info.atualizadoDisponivel
+  }
+  salvarCatalogo(raiz, cat)
+  return cat
 }
 
 function cloneCatalogo(src: CatalogoModelos): CatalogoModelos {

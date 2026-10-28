@@ -605,6 +605,31 @@ async function main() {
     )
   }
 
+  // ---------- 27. Avaliacao de modelo ----------
+  section('27. Avaliacao de modelo')
+  {
+    const av27 = pathT.join(rootT, 'src', 'main', 'brain', 'avaliacao.ts')
+    const main27 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const app27 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    assert('avaliacao.ts existe', fsT.existsSync(av27))
+    assert('brain:avaliar handler existe', /brain:avaliar/.test(main27))
+    assert('nota < 6 dispara toast', /nota < 6/.test(app27) && /abaixo do esperado/.test(app27))
+  }
+
+  // ---------- 28. Deteccao de versao remota ----------
+  section('28. Deteccao de versao remota')
+  {
+    const ollama28 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
+    const cat28 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+    const app28 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    assert('consultarVersoesRemotas existe', /consultarVersoesRemotas/.test(ollama28))
+    assert('modelo tem flag atualizadoDisponivel', /atualizadoDisponivel/.test(cat28))
+    assert(
+      'badge mostra atualizacao disponivel',
+      /atualiza[cç][aã]o dispon[ií]vel|atualizadoDisponivel/.test(app28)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

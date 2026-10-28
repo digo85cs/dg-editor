@@ -1565,21 +1565,41 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
         : String(ativo.name || 'IA')
       : '—'
     let modelo = modeloForcado || ''
+    let flagUpdate = false
     if (!modelo) {
       try {
         const r = await window.api.invoke('modelos:listar')
         modelo = (r && r.catalogo && r.catalogo.ativo) || ''
+        const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+        flagUpdate = !!(m && m.atualizadoDisponivel)
       } catch {
         /* ignora */
       }
+    } else {
+      try {
+        const r = await window.api.invoke('modelos:listar')
+        const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+        flagUpdate = !!(m && m.atualizadoDisponivel)
+      } catch {
+        /* */
+      }
     }
-    const texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
+    let texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
+    if (flagUpdate) texto += ' ⚠ atualização disponível'
     const alvo = document.getElementById('chat-provider')
     if (alvo) alvo.textContent = texto
   } catch {
     /* ignora */
   }
 }
+
+// Checagem ocasional de versões remotas (não bloqueia UI)
+setTimeout(() => {
+  void window.api
+    .invoke('modelos:versoes-remotas')
+    .then(() => atualizarBadgeProvedorReal())
+    .catch(() => {})
+}, 20000)
 
 if (typeof window.api?.on === 'function') {
   window.api.on('brain:fallback', (_e, payload) => {
@@ -1588,8 +1608,35 @@ if (typeof window.api?.on === 'function') {
     const para = p.para || '?'
     mostrarToast('IA trocou de modelo: ' + de + ' → ' + para, 'aviso')
     void atualizarBadgeProvedorReal(para)
+    void window.api.invoke('brain:avaliar', para).then((r) => {
+      const nota = r?.avaliacao?.nota
+      if (typeof nota === 'number' && nota < 6) {
+        mostrarToast(
+          'Modelo ' + para + ' respondeu abaixo do esperado (nota ' + nota + '/10) — verifique',
+          'aviso'
+        )
+      }
+    }).catch(() => {})
   })
 }
+
+$('btn-brain-avaliar')?.addEventListener('click', async () => {
+  mostrarToast('Avaliando modelo ativo…', 'aviso')
+  try {
+    const r = await window.api.invoke('brain:avaliar')
+    if (!r?.ok) {
+      mostrarToast('Avaliação falhou: ' + (r?.erro || 'erro'), 'erro')
+      return
+    }
+    const a = r.avaliacao
+    mostrarToast(
+      'Nota ' + a.nota + '/10 (' + a.acertos + '/' + a.total + ') — ' + a.modelo,
+      a.nota < 6 ? 'aviso' : 'ok'
+    )
+  } catch (e) {
+    mostrarToast('Avaliação falhou: ' + String(e), 'erro')
+  }
+})
 
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
