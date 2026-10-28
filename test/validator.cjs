@@ -789,7 +789,8 @@ async function main() {
     const arq32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'arquivos.ts'), 'utf-8')
     const idx32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
     const hib32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
-    const keep32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ollama-keeper.ts'), 'utf-8')
+    // Warm-up dedicado foi revertido (0db01d4); keep_alive+prompt vivem no health probe
+    const ollama32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
     assert(
       'arquivos.ts nao usa mais *Sync',
       !/\bstatSync\b/.test(arq32) && !/\breaddirSync\b/.test(arq32) && !/\bexistsSync\b/.test(arq32)
@@ -837,16 +838,72 @@ async function main() {
     assert('nenhum execSync sem stdio ignore no main', !execSyncSujo)
     assert(
       'warm-up com prompt nao vazio',
-      /prompt:\s*'ok'|prompt:\s*"ok"/.test(keep32) && !/prompt:\s*['"]\s*['"]/.test(keep32)
+      /prompt:\s*'ok'|prompt:\s*"ok"/.test(ollama32) && !/prompt:\s*['"]\s*['"]/.test(ollama32)
     )
     assert(
       'warm-up com keep_alive 24h',
-      /keep_alive:\s*'24h'|keep_alive:\s*"24h"/.test(keep32)
+      /keep_alive:\s*'24h'|keep_alive:\s*"24h"/.test(ollama32)
     )
     assert(
       'warm-up nao bloqueia boot (setTimeout)',
-      /setTimeout[\s\S]{0,80}(10_000|10000|atrasoMs)/.test(keep32) ||
-        /agendarWarmup7b\s*\(\s*10_000\s*\)/.test(idx32)
+      /setTimeout[\s\S]{0,200}rodarAuditoria|auditoria:boot/.test(idx32)
+    )
+  }
+
+  // ---------- 33. Auditoria deterministica e limpeza ----------
+  section('33. Auditoria deterministica e limpeza')
+  {
+    const aud33 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'auto-auditoria.ts'), 'utf-8')
+    const idx33 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const smoke33 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'navegador', 'smoke.ts'), 'utf-8')
+    assert(
+      'resumo expoe pendencias',
+      /pendencias:\s*PendenciaAuditoria\[\]/.test(aud33) ||
+        (/interface ResumoAuditoria[\s\S]*pendencias/.test(aud33) &&
+          /id:\s*string[\s\S]*severidade[\s\S]*titulo/.test(aud33))
+    )
+    assert(
+      'boot loga pendencias quando existirem',
+      /auditoria:boot\] pendencias/.test(idx33) && /resumo\.pendencias/.test(idx33)
+    )
+    const limpezaBloco = (() => {
+      const i = aud33.indexOf('async function limparTemporarios')
+      return i >= 0 ? aud33.slice(i, i + 3500) : ''
+    })()
+    assert(
+      'auto-auditoria nao usa mais *Sync na limpeza',
+      limpezaBloco.length > 0 &&
+        !/\breaddirSync\b/.test(limpezaBloco) &&
+        !/\bstatSync\b/.test(limpezaBloco) &&
+        !/\brmSync\b/.test(limpezaBloco)
+    )
+    assert('limpeza usa allSettled', /Promise\.allSettled/.test(limpezaBloco))
+    assert(
+      'arquivo travado nao vira warn',
+      /EBUSY/.test(limpezaBloco) &&
+        /EPERM/.test(limpezaBloco) &&
+        /travado/.test(limpezaBloco)
+    )
+    assert(
+      'terminal:perfis aceita 1 shell',
+      !/n\s*>=\s*2\s*\?\s*['"]ok['"]\s*:\s*['"]warn['"]/.test(aud33) &&
+        /n\s*>=\s*1\s*\?\s*['"]ok['"]/.test(aud33)
+    )
+    // ramo else de indice ausente
+    const idxAusente = aud33.match(
+      /Indice de simbolos ainda nao gerado[\s\S]{0,200}severidade:\s*['"]ok['"]/
+    )
+    assert('integridade:indice nao é warn quando ausente', !!idxAusente)
+    assert(
+      'modelos:14b-parado nao é warn',
+      /id:\s*['"]modelos:14b-parado['"][\s\S]{0,280}severidade:\s*['"]ok['"]/.test(aud33) &&
+        !/id:\s*['"]modelos:14b-parado['"][\s\S]{0,280}severidade:\s*['"]warn['"]/.test(aud33)
+    )
+    assert('smoke imprime total e passed', /\[smoke\] total=/.test(smoke33))
+    assert(
+      'smoke tem contagem deterministica',
+      /ordenados\.length|porId\.values\(\)|total = ordenados/.test(smoke33) &&
+        !/filter\(\(r\)\s*=>\s*r\.id\s*>\s*0\)/.test(smoke33)
     )
   }
 
