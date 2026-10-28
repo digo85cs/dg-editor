@@ -25,7 +25,8 @@ const invokeChannels = [
   'agente:executar', 'agente:modelo', 'agente:historico',
   'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
   'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa',
-  'config:backup', 'sistema:safe-mode'
+  'config:backup', 'sistema:safe-mode',
+  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

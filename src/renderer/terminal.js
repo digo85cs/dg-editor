@@ -340,11 +340,15 @@ export function initTerminalPanel() {
     g.tabsEl.appendChild(tabBtn)
 
     const fit = new FitAddon()
+    const scrollbackCfg = Math.min(
+      50000,
+      Math.max(500, parseInt(localStorage.getItem('dg-terminal-scrollback') || '5000', 10) || 5000)
+    )
     const xterm = new Terminal({
       cursorBlink: true,
       fontFamily: 'Cascadia Code, Consolas, monospace',
       fontSize: 13,
-      scrollback: 5000,
+      scrollback: scrollbackCfg,
       theme: temaXterm(),
       allowProposedApi: true
     })

@@ -14,7 +14,7 @@ import { ensureOllama } from './ollama-keeper'
 import { dglog } from './dglog'
 import { installPtBrMenu } from './menu'
 
-import { runAnalysis, getCachedAnalysis } from './analyzer'
+import { runAnalysis, getCachedAnalysis, invalidarCacheAnalise } from './analyzer'
 import { whereIs, formatWhereIs } from './whereis'
 import { readRules, rulesExist, createRulesTemplate } from './dgrules'
 import { loadChat, appendChat, clearChat } from './chatstore'
@@ -659,6 +659,30 @@ ipcMain.handle('config:backup', async (_e, motivo?: unknown) => {
 ipcMain.handle('sistema:safe-mode', async () => {
   const { emSafeMode } = await import('./safe-mode')
   return { ok: true, safeMode: emSafeMode() }
+})
+
+ipcMain.handle('indice:iniciar', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  return import('./indice-arquivos').then((m) => m.iniciarIndice(r))
+})
+
+ipcMain.handle('indice:listar', (_e, filtro?: unknown) => {
+  const f = filtro == null ? '' : typeof filtro === 'string' ? filtro : ''
+  return import('./indice-arquivos').then((m) => ({ ok: true, itens: m.listarIndice(f), ...m.statusIndice() }))
+})
+
+ipcMain.handle('indice:status', () =>
+  import('./indice-arquivos').then((m) => ({ ok: true, ...m.statusIndice() }))
+)
+
+ipcMain.handle('analysis:invalidar', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  invalidarCacheAnalise(seg.abs)
+  return { ok: true }
 })
 
 // ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------

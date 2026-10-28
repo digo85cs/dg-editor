@@ -1519,8 +1519,10 @@ function abrirMenuCtxArvore(x, y, cwd) {
     e.stopPropagation()
     fecharMenuCtxArvore()
     const api = window.dgTerminal
-    if (api && typeof api.abrirEm === 'function') {
-      void api.abrirEm(cwd)
+    if (typeof garantirTerminal === 'function') garantirTerminal()
+    const api2 = window.dgTerminal
+    if (api2 && typeof api2.abrirEm === 'function') {
+      void api2.abrirEm(cwd)
     } else {
       console.warn('[arvore] dgTerminal.abrirEm indisponivel')
     }
@@ -1578,7 +1580,30 @@ initResizers()
 initActivityBar()
 bootstrapComandos()
 carregarTema()
-initTerminalPanel()
+// Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
+let terminalIniciado = false
+function garantirTerminal() {
+  if (terminalIniciado) return
+  terminalIniciado = true
+  initTerminalPanel()
+}
+document.getElementById('btn-terminal-toggle')?.addEventListener(
+  'click',
+  () => garantirTerminal(),
+  { once: true, capture: true }
+)
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '`') garantirTerminal()
+  },
+  true
+)
+// placeholder até primeiro uso
+const termPanel = document.getElementById('terminal-panel')
+if (termPanel && !termPanel.dataset.lazyReady) {
+  termPanel.dataset.lazyReady = '0'
+}
 initMenuCtxArvore()
 renderizarPastas().then(() => restaurarAbas())
 atualizarGuardiao()

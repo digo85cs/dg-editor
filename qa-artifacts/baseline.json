@@ -1,9 +1,9 @@
 {
-  "atualizadoEm": "2026-10-27T21:11:32.282Z",
+  "atualizadoEm": "2026-10-28T11:55:55.374Z",
   "metricas": {
     "perf.shell.listar": {
       "limite": 5000,
-      "ultimoValor": 1245
+      "ultimoValor": 1308
     },
     "perf.brain.provider": {
       "limite": 50,

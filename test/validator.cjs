@@ -393,6 +393,17 @@ async function main() {
     fsT.existsSync(typoFix) && /Salvar/.test(fsT.readFileSync(typoFix, 'utf-8')) && !/salvarr/.test(fsT.readFileSync(typoFix, 'utf-8'))
   )
 
+  // ---------- 16. Desempenho: indice e lazy ----------
+  section('16. Desempenho: indice, cache e lazy loading')
+  const indTs = pathT.join(rootT, 'src', 'main', 'indice-arquivos.ts')
+  const termLazy = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'terminal.js'), 'utf-8')
+  const appLazy = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+  assert('indice-arquivos.ts usa chokidar', fsT.existsSync(indTs) && /chokidar/.test(fsT.readFileSync(indTs, 'utf-8')))
+  assert('scrollback configuravel', /dg-terminal-scrollback/.test(termLazy))
+  assert('app.js tem garantirTerminal lazy', /garantirTerminal|terminalIniciado/.test(appLazy))
+  assert('analyzer tem invalidarCacheAnalise', /invalidarCacheAnalise/.test(fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'analyzer.ts'), 'utf-8')))
+  assert('preload expoe indice:iniciar', /indice:iniciar/.test(preNav))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

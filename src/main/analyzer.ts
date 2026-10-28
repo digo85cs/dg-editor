@@ -1,5 +1,5 @@
 ﻿import { createHash } from 'crypto'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { scanFolder } from './scanner'
 import { readRules } from './dgrules'
@@ -173,4 +173,14 @@ export async function runAnalysis(root: string, force = false): Promise<Analysis
 export function getCachedAnalysis(root: string): AnalysisReport | null {
   const cached = loadCache(root)
   return cached ? cached.report : null
+}
+
+/** Invalida cache de análise (ex.: após edição). */
+export function invalidarCacheAnalise(root: string): void {
+  const p = cachePath(root)
+  try {
+    if (existsSync(p)) unlinkSync(p)
+  } catch {
+    /* */
+  }
 }
