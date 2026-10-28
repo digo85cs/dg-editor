@@ -275,11 +275,25 @@ function corrigirAtivoSecundarioEmMemoria(cat: CatalogoModelos): void {
   }
 }
 
+/** Status 'down' legado (timeout 8s) nao deve excluir modelo instalado ate o health novo. */
+function limparDownObsoletoInstalado(cat: CatalogoModelos): void {
+  for (const m of cat.modelos) {
+    if (m.provider !== 'ollama' || m.instalado === false) continue
+    if (m.status !== 'down') continue
+    m.status = 'desconhecido'
+    // latencia == valor do timeout antigo (~8s) nao e medicao real
+    if (m.latenciaMs != null && m.latenciaMs >= 7500 && m.latenciaMs <= 9500) {
+      m.latenciaMs = null
+    }
+  }
+}
+
 export function lerCatalogo(raiz: string): CatalogoModelos {
   const doArquivo = lerArquivoCatalogo(caminhoDefault(raiz))
   const padrao = doArquivo ? cloneCatalogo(doArquivo) : cloneCatalogo(CATALOGO_PADRAO)
   const runtime = lerArquivoCatalogo(caminhoCatalogo(raiz))
   const cat = mesclarCatalogos(padrao, runtime)
+  limparDownObsoletoInstalado(cat)
   corrigirAtivoSecundarioEmMemoria(cat)
   return cat
 }
