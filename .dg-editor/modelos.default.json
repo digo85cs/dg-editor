@@ -1,8 +1,8 @@
 {
   "versao": 1,
   "atualizadoEm": null,
-  "ativo": "llama3.2:latest",
-  "secundario": "qwen2.5-coder:3b",
+  "ativo": "qwen2.5-coder:7b",
+  "secundario": "qwen2.5-coder:7b",
   "roteamento": {
     "completar": "pequeno",
     "explicar": "grande",
