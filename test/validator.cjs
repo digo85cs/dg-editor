@@ -520,6 +520,18 @@ async function main() {
     )
   }
 
+  // ---------- 22. Autocorrecao em arquivo real ----------
+  section('22. Autocorrecao em arquivo real')
+  {
+    const script22 = pathT.join(rootT, 'scripts', 'qa-ia-teste.cjs')
+    const src22 = fsT.existsSync(script22) ? fsT.readFileSync(script22, 'utf-8') : ''
+    assert('script --alvo existe', fsT.existsSync(script22) && /--alvo=/.test(src22))
+    assert(
+      'pipeline reverter funciona',
+      /reverter|limparTudo|rmSync/.test(src22) && /tmp\/qa-ia-teste/.test(src22)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

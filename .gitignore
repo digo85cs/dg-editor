@@ -60,3 +60,6 @@ qa-artifacts/*
 
 # Catalogo de modelos e estado de runtime (o default versionado fica em modelos.default.json)
 .dg-editor/modelos.json
+
+# Provas isoladas de QA IA (scripts/qa-ia-teste.cjs)
+tmp/
