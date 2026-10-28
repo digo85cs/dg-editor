@@ -249,7 +249,7 @@ ipcMain.handle('terminal:setShellPadrao', (_e, id: string | null) => {
 })
 
 // ---------- Arquivos (IDE) — path sanitizado + payload tipado ----------
-ipcMain.handle('arquivo:ler', (_e, caminho: unknown, pastas: unknown) => {
+ipcMain.handle('arquivo:ler', async (_e, caminho: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')
   if (isErroPayload(c)) return c
   const p = exigirArrayStrings(pastas, 'pastas')
@@ -258,7 +258,7 @@ ipcMain.handle('arquivo:ler', (_e, caminho: unknown, pastas: unknown) => {
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return lerArquivo(seg.abs, p)
 })
-ipcMain.handle('arquivo:ler-base64', (_e, caminho: unknown, pastas: unknown) => {
+ipcMain.handle('arquivo:ler-base64', async (_e, caminho: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')
   if (isErroPayload(c)) return c
   const p = exigirArrayStrings(pastas, 'pastas')
@@ -267,7 +267,7 @@ ipcMain.handle('arquivo:ler-base64', (_e, caminho: unknown, pastas: unknown) => 
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return lerArquivoBase64(seg.abs, p)
 })
-ipcMain.handle('arquivo:salvar', (_e, caminho: unknown, conteudo: unknown, pastas: unknown) => {
+ipcMain.handle('arquivo:salvar', async (_e, caminho: unknown, conteudo: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')
   if (isErroPayload(c)) return c
   const body = exigirString(conteudo, 'conteudo')
@@ -278,7 +278,7 @@ ipcMain.handle('arquivo:salvar', (_e, caminho: unknown, conteudo: unknown, pasta
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return salvarArquivo(seg.abs, body, p)
 })
-ipcMain.handle('arquivo:listar', (_e, dir: unknown, pastas: unknown) => {
+ipcMain.handle('arquivo:listar', async (_e, dir: unknown, pastas: unknown) => {
   const d = exigirString(dir, 'dir')
   if (isErroPayload(d)) return d
   const p = exigirArrayStrings(pastas, 'pastas')
@@ -287,7 +287,7 @@ ipcMain.handle('arquivo:listar', (_e, dir: unknown, pastas: unknown) => {
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return listarDiretorio(seg.abs, p)
 })
-ipcMain.handle('arquivo:existe', (_e, caminho: unknown, pastas: unknown) => {
+ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')
   if (isErroPayload(c)) return c
   const p = exigirArrayStrings(pastas, 'pastas')
@@ -923,6 +923,9 @@ if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
       console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
       mod.iniciarAuditoriaPeriodica(1800000)
       console.log('[auditoria:boot] periodica ativa (30 min)')
+      // Warm-up 7b 10s apos auditoria — nao compete com terminal/UI no boot
+      const { agendarWarmup7b } = await import('./ollama-keeper')
+      agendarWarmup7b(10_000)
     } catch (e: any) {
       console.warn('[auditoria:boot] falhou:', String(e?.message || e))
     }
