@@ -130,6 +130,17 @@ app.whenReady().then(() => {
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
+  void import('./paths').then(({ resolverRaizProjeto }) => {
+    const raiz = resolverRaizProjeto()
+    void import('./brain/modelos-catalogo').then(async (mod) => {
+      try {
+        await mod.detectarModelosLocais(raiz)
+        mod.iniciarHealthPeriodico(raiz, 10000)
+      } catch (e) {
+        dglog('[modelos] boot falhou: ' + String(e))
+      }
+    })
+  })
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -310,6 +321,34 @@ ipcMain.handle('brain:ollama-status', async () => {
 
 ipcMain.handle('brain:models', async () => {
   return getBrain().listActiveModels()
+})
+
+ipcMain.handle('modelos:listar', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { lerCatalogo, detectarModelosLocais } = await import('./brain/modelos-catalogo')
+  const raiz = resolverRaizProjeto()
+  try {
+    return { ok: true, catalogo: await detectarModelosLocais(raiz) }
+  } catch {
+    return { ok: true, catalogo: lerCatalogo(raiz) }
+  }
+})
+
+ipcMain.handle('modelos:recarregar', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { detectarModelosLocais, healthCheckModelos } = await import('./brain/modelos-catalogo')
+  const raiz = resolverRaizProjeto()
+  await detectarModelosLocais(raiz)
+  const cat = await healthCheckModelos(raiz)
+  return { ok: true, catalogo: cat }
+})
+
+ipcMain.handle('modelos:para-tarefa', async (_e, tarefa: unknown) => {
+  const t = exigirString(tarefa, 'tarefa')
+  if (isErroPayload(t)) return t
+  const { resolverRaizProjeto } = await import('./paths')
+  const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+  return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t) }
 })
 
 // ---------- Fase 1: analise, onde-esta, regras, chat ----------

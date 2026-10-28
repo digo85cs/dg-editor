@@ -1,0 +1,13 @@
+{
+  "atualizadoEm": null,
+  "ativo": null,
+  "secundario": null,
+  "roteamento": {
+    "completar": "pequeno",
+    "explicar": "grande",
+    "analisar": "longo",
+    "chat": "padrao",
+    "codigo": "padrao"
+  },
+  "modelos": []
+}

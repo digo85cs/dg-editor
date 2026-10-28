@@ -353,6 +353,16 @@ async function main() {
   assert('preload expoe busca:arquivos', /busca:arquivos/.test(preNav) && /comandos:listar/.test(preNav))
   assert('app.js trata Ctrl+Shift+F', /shiftKey && key === 'f'|Shift\+F/.test(appNav) || /abrirBuscaGlobal/.test(appNav))
 
+  // ---------- 12. Brain catalogo de modelos ----------
+  section('12. Brain: catalogo, deteccao e fallback')
+  const catTs = pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts')
+  const catSrc = fsT.existsSync(catTs) ? fsT.readFileSync(catTs, 'utf-8') : ''
+  assert('modelos-catalogo.ts existe', catSrc.length > 40)
+  assert('detectarModelosLocais definido', /detectarModelosLocais/.test(catSrc))
+  assert('healthCheckModelos definido', /healthCheckModelos/.test(catSrc))
+  assert('modeloParaTarefa definido', /modeloParaTarefa/.test(catSrc))
+  assert('preload expoe modelos:recarregar', /modelos:recarregar/.test(preNav))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
