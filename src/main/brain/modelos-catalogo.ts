@@ -56,7 +56,7 @@ export const CATALOGO_PADRAO: CatalogoModelos = {
   versao: 1,
   atualizadoEm: null,
   ativo: 'llama3.2:latest',
-  secundario: 'qwen2.5-coder:1.5b',
+  secundario: 'qwen2.5-coder:3b',
   roteamento: {
     completar: 'pequeno',
     explicar: 'grande',
