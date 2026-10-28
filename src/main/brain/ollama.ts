@@ -153,6 +153,23 @@ export async function escolherModelo(
   tarefa: string = 'codigo',
   opts: EscolherModeloOpts = {}
 ): Promise<string> {
+  try {
+    const { resolverRaizProjeto } = await import('../paths')
+    const { modeloParaTarefa, lerCatalogo } = await import('./modelos-catalogo')
+    const raiz = resolverRaizProjeto()
+    const doCat = modeloParaTarefa(raiz, tarefa)
+    if (doCat) {
+      dglog('[ollama] escolherModelo(' + tarefa + ') = ' + doCat + ' via=modeloParaTarefa')
+      return doCat
+    }
+    const cat = lerCatalogo(raiz)
+    const temChat = cat.modelos.some((m) => m.instalado !== false && m.tipo !== 'embedding')
+    if (!temChat && cat.modelos.some((m) => m.tipo === 'embedding')) {
+      throw new Error('Nenhum modelo de chat instalado')
+    }
+  } catch (e) {
+    if (e instanceof Error && /Nenhum modelo de chat/.test(e.message)) throw e
+  }
   const { escolherModeloPorTarefa } = await import('./registry')
   const escolhido = await escolherModeloPorTarefa(tarefa, opts)
   dglog('[ollama] escolherModelo(' + tarefa + ') = ' + escolhido +
@@ -246,10 +263,21 @@ export async function askOllama(
   opts: EscolherModeloOpts = {}
 ): Promise<BrainResponse> {
   const { limitesPorTarefa } = await import('./registry')
-  const model = await escolherModelo(tarefa, opts)
+  // Roteamento real do catálogo (nunca embedding em chat/analise/completar/codigo)
+  let model: string | null = null
+  try {
+    const { resolverRaizProjeto } = await import('../paths')
+    const { modeloParaTarefa } = await import('./modelos-catalogo')
+    model = modeloParaTarefa(resolverRaizProjeto(), tarefa)
+  } catch {
+    model = null
+  }
+  if (!model) {
+    throw new Error('Nenhum modelo de chat instalado')
+  }
   const lim = limitesPorTarefa(tarefa)
   dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
-    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs)
+    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs + ' via=modeloParaTarefa')
   const cfg = loadDgConfig()
   const r = (await ollamaHttpJson(
     OLLAMA_URL + '/api/chat',

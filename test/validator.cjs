@@ -585,6 +585,26 @@ async function main() {
     )
   }
 
+  // ---------- 26. Roteamento consumido ----------
+  section('26. Roteamento consumido')
+  {
+    const ollama26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
+    const main26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const cat26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+    assert(
+      'Nenhum call site hardcoded de modelo',
+      /modeloParaTarefa/.test(ollama26) && /modeloParaTarefa/.test(main26) && /askOllama/.test(main26)
+    )
+    assert(
+      'modeloParaTarefa retorna null quando so embedding',
+      /tipo !== 'embedding'|excluirEmbedding/.test(cat26) && /return null|:\s*null/.test(cat26)
+    )
+    assert(
+      'chat retorna erro quando sem modelo de chat',
+      /Nenhum modelo de chat instalado/.test(main26 + ollama26)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

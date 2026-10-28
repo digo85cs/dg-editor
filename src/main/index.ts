@@ -515,14 +515,36 @@ ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown) => {
     }
 
     await ensureOllama()
+    const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+    const { resolverRaizProjeto } = await import('./paths')
+    const modeloChat = modeloParaTarefa(resolverRaizProjeto(), 'chat')
+    if (!modeloChat) {
+      const msg = {
+        role: 'assistant' as const,
+        content: 'Nenhum modelo de chat instalado',
+        at: Date.now(),
+        provider: 'erro'
+      }
+      appendChat(rootOk, msg)
+      return { ok: false, message: msg }
+    }
     const response = await askOllama(texto, context, 'chat')
-    const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
+    const assistantMsg = {
+      role: 'assistant' as const,
+      content: response.text,
+      at: Date.now(),
+      provider: response.provider + ':' + modeloChat
+    }
     appendChat(rootOk, assistantMsg)
     await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
     return { ok: true, message: assistantMsg }
   } catch (err) {
-    const fallback = { role: 'assistant' as const, content: `Nao consegui responder agora: ${err instanceof Error ? err.message : String(err)}`, at: Date.now(), provider: 'erro' }
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const friendly = /Nenhum modelo de chat/.test(errMsg)
+      ? 'Nenhum modelo de chat instalado'
+      : `Nao consegui responder agora: ${errMsg}`
+    const fallback = { role: 'assistant' as const, content: friendly, at: Date.now(), provider: 'erro' }
     appendChat(rootOk, fallback)
     await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
