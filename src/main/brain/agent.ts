@@ -290,6 +290,9 @@ function removerEcoModelo(texto: string, modelo?: string): string {
     const esc = modelo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     t = t.replace(new RegExp('\\b' + esc + '\\b', 'gi'), '')
   }
+  // linha propria: "ollama:qwen2.5-coder:3b"
+  t = t.replace(/^\s*(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+\s*$/gim, '')
+  // inline provider:modelo
   t = t.replace(/\b(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+/gi, '')
   t = t.replace(/\b(?:modelo|provider)\s*[:=]\s*[\w./:+-]+/gi, '')
   return t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
