@@ -703,6 +703,86 @@ async function main() {
     void /removerEcoModelo/.test(agent30)
   }
 
+  // ---------- 31. Roteamento de modelos ----------
+  section('31. Roteamento de modelos')
+  {
+    const cat31 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+    const ollama31 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
+    const reg31 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'registry.ts'), 'utf-8')
+    const agent31 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'agent.ts'), 'utf-8')
+    const aud31 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'auto-auditoria.ts'), 'utf-8')
+    const healthFn = (() => {
+      const i = cat31.indexOf('export async function healthCheckModelos')
+      return i >= 0 ? cat31.slice(i, i + 2200) : cat31
+    })()
+    assert(
+      'health nao marca instalado como down por timeout',
+      /status = 'lento'/.test(healthFn) &&
+        !/kind === 'timeout'[\s\S]{0,40}status = 'down'/.test(healthFn) &&
+        /not_found[\s\S]{0,40}status = 'down'/.test(healthFn)
+    )
+    assert(
+      'health usa timeout >= 90s no primeiro load',
+      /90_000|90000/.test(healthFn + ollama31)
+    )
+    assert(
+      'health envia keep_alive',
+      /keep_alive/.test(ollama31)
+    )
+    assert(
+      'health nao grava o timeout como latencia',
+      /latenciaMs = null/.test(healthFn) &&
+        /ms: null/.test(ollama31) &&
+        /classificarErroLatencia|kind === 'timeout'|ErroLatenciaKind/.test(ollama31)
+    )
+    assert(
+      'modeloParaTarefa aceita lento',
+      /status !== 'offline'/.test(cat31) && /'lento'/.test(cat31)
+    )
+    assert(
+      'cat.ativo exige porte compativel',
+      /porteCompativel|a\.porte === porte/.test(cat31)
+    )
+    const chatFila = (() => {
+      const m = reg31.match(/if\s*\(\s*t\s*===\s*['"]chat['"]\s*\)\s*\{[\s\S]*?return\s*\[[\s\S]*?\]/)
+      return m ? m[0] : ''
+    })()
+    assert(
+      'fila chat comeca com 7b',
+      /qwen2\.5-coder:7b/.test(chatFila) &&
+        chatFila.indexOf('qwen2.5-coder:7b') < (chatFila.indexOf('qwen2.5-coder:14b') >= 0
+          ? chatFila.indexOf('qwen2.5-coder:14b')
+          : chatFila.length)
+    )
+    assert(
+      'fila chat nao contem 1.5b',
+      !/qwen2\.5-coder:1\.5b/.test(chatFila)
+    )
+    assert(
+      'fallback duro e 7b',
+      /const fb = 'qwen2\.5-coder:7b'/.test(reg31)
+    )
+    assert(
+      'catalogo padrao ativo e 7b',
+      /ativo:\s*'qwen2\.5-coder:7b'/.test(cat31)
+    )
+    assert(
+      'catalogo padrao secundario e 7b',
+      /secundario:\s*'qwen2\.5-coder:7b'/.test(cat31)
+    )
+    assert(
+      'removerEcoModelo cobre provider:modelo',
+      /ollama/.test(agent31) &&
+        /openrouter/.test(agent31) &&
+        /removerEcoModelo/.test(agent31) &&
+        /(?:ollama\|openrouter|ollama.*openrouter)/.test(agent31)
+    )
+    assert(
+      'auto-auditoria sem require de modulo local',
+      !/require\('\.\//.test(aud31)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
