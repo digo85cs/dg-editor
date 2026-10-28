@@ -69,3 +69,6 @@ tmp/
 
 # Avaliacoes de modelo (runtime)
 .dg-editor/avaliacoes/
+
+.dg-editor/_backups/
+.dg-editor/modelos.json.bak-*
