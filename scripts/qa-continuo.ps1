@@ -25,7 +25,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root 'package.json'))) {
 $ContDir = Join-Path $Root 'qa-artifacts\continuo'
 New-Item -ItemType Directory -Force -Path $ContDir | Out-Null
 $stamp = Get-Date -Format 'yyyy-MM-dd'
-$mdPath = Join-Path $ContDir "relatorio-$stamp.md"
+$mdPath = Join-Path $ContDir 'relatorio-continuo.md'
 $jsonlPath = Join-Path $ContDir 'ciclos.jsonl'
 
 if (-not (Test-Path -LiteralPath $mdPath)) {
