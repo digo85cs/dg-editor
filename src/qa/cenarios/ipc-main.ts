@@ -202,5 +202,24 @@ export async function rodarCenariosIpc(temTTY = true): Promise<{
     )
   )
 
+  // --- caminhoSeguro + payload tipado ---
+  {
+    const t0 = Date.now()
+    try {
+      const { caminhoSeguro, exigirString, isErroPayload } = await import('../../main/ipc-seguro')
+      const { join } = await import('path')
+      const raiz = process.cwd()
+      const fora = caminhoSeguro(join(raiz, '..', 'fora-qa-ipc'), [raiz])
+      if (fora.ok) throw new Error('deveria rejeitar path fora da raiz')
+      const dentro = caminhoSeguro(join(raiz, 'package.json'), [raiz])
+      if (!dentro.ok) throw new Error('deveria aceitar path dentro: ' + dentro.erro)
+      const bad = exigirString(123 as unknown, 'campo')
+      if (!isErroPayload(bad)) throw new Error('exigirString deveria falhar com number')
+      resultados.push(ok('ipc.seguro.caminho-payload', 'caminhoSeguro + payload', t0, fora.erro))
+    } catch (e) {
+      resultados.push(erro('ipc.seguro.caminho-payload', 'ipc-seguro', t0, e))
+    }
+  }
+
   return { resultados, stubs }
 }

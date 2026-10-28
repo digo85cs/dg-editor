@@ -318,6 +318,28 @@ async function main() {
   }
   assert('baseline nao contem metricas zeradas', baselineOk9)
 
+  // ---------- 10. Hardening IPC + CSP ----------
+  section('10. Hardening IPC: path seguro e CSP sem unsafe-eval')
+  const ipcSeguro = pathT.join(rootT, 'src', 'main', 'ipc-seguro.ts')
+  const indexMain = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+  const htmlRend = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
+  assert(
+    'ipc-seguro.ts define caminhoSeguro',
+    fsT.existsSync(ipcSeguro) && /export function caminhoSeguro/.test(fsT.readFileSync(ipcSeguro, 'utf-8'))
+  )
+  assert(
+    'index.ts usa caminhoSeguro nos handlers de arquivo',
+    /caminhoSeguro/.test(indexMain) && /arquivo:ler/.test(indexMain)
+  )
+  assert(
+    'index.ts valida payload com exigirString',
+    /exigirString/.test(indexMain)
+  )
+  const cspMatch = htmlRend.match(/Content-Security-Policy[^>]*content="([^"]+)"/i)
+  const csp = cspMatch ? cspMatch[1] : ''
+  assert('CSP do renderer existe', csp.length > 10)
+  assert('CSP nao libera unsafe-eval', csp.length > 0 && !/unsafe-eval/i.test(csp))
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

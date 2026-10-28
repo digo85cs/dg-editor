@@ -1,10 +1,11 @@
 /**
  * IPC de arquivos do DG Editor — nunca expor fs cru ao renderer.
- * Validação: relative() + isAbsolute() (não path.startsWith).
+ * Validação: caminhoSeguro (relative + isAbsolute).
  */
 import { existsSync, readFileSync, writeFileSync, statSync } from 'fs'
 import { readdir } from 'fs/promises'
-import { join, resolve, relative, isAbsolute, extname, basename, dirname } from 'path'
+import { join, resolve, extname, basename, dirname } from 'path'
+import { caminhoSeguro } from './ipc-seguro'
 
 const LIMITE_BYTES = 5 * 1024 * 1024
 const EXT_EDITAVEIS = new Set([
@@ -37,22 +38,11 @@ const EXT_EDITAVEIS = new Set([
 ])
 
 export function validarCaminho(caminho: string, pastasPermitidas: string[]): boolean {
-  if (!caminho || typeof caminho !== 'string') return false
-  let abs: string
-  try {
-    abs = resolve(caminho)
-  } catch {
-    return false
-  }
-  for (const pasta of pastasPermitidas || []) {
-    if (!pasta) continue
-    const raiz = resolve(pasta)
-    const rel = relative(raiz, abs)
-    if (rel === '') return true
-    if (!rel.startsWith('..') && !isAbsolute(rel)) return true
-  }
-  return false
+  return caminhoSeguro(caminho, pastasPermitidas).ok
 }
+
+/** Alias explícito pedido pelo hardening IPC. */
+export { caminhoSeguro }
 
 function ehBinario(buf: Buffer): boolean {
   const n = Math.min(512, buf.length)

@@ -42,6 +42,13 @@ import {
   arquivoExiste
 } from './arquivos'
 import {
+  caminhoSeguro,
+  exigirString,
+  exigirBoolean,
+  exigirArrayStrings,
+  isErroPayload
+} from './ipc-seguro'
+import {
   createTerminal,
   writeTerminal,
   resizeTerminal,
@@ -197,24 +204,45 @@ ipcMain.handle('terminal:setShellPadrao', (_e, id: string | null) => {
   }
 })
 
-// ---------- Arquivos (IDE) ----------
-ipcMain.handle(
-  'arquivo:ler',
-  (_e, caminho: string, pastas: string[]) => lerArquivo(caminho, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:salvar',
-  (_e, caminho: string, conteudo: string, pastas: string[]) =>
-    salvarArquivo(caminho, conteudo, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:listar',
-  (_e, dir: string, pastas: string[]) => listarDiretorio(dir, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:existe',
-  (_e, caminho: string, pastas: string[]) => arquivoExiste(caminho, pastas || [])
-)
+// ---------- Arquivos (IDE) — path sanitizado + payload tipado ----------
+ipcMain.handle('arquivo:ler', (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return lerArquivo(seg.abs, p)
+})
+ipcMain.handle('arquivo:salvar', (_e, caminho: unknown, conteudo: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const body = exigirString(conteudo, 'conteudo')
+  if (isErroPayload(body)) return body
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return salvarArquivo(seg.abs, body, p)
+})
+ipcMain.handle('arquivo:listar', (_e, dir: unknown, pastas: unknown) => {
+  const d = exigirString(dir, 'dir')
+  if (isErroPayload(d)) return d
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(d, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return listarDiretorio(seg.abs, p)
+})
+ipcMain.handle('arquivo:existe', (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return arquivoExiste(seg.abs, p)
+})
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {
@@ -240,8 +268,12 @@ ipcMain.handle('system:profile-strength', () => {
 })
 
 // ---------- Folder scan IPC ----------
-ipcMain.handle('folder:scan', async (_e, root: string) => {
-  return scanFolder(root)
+ipcMain.handle('folder:scan', async (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return scanFolder(seg.abs)
 })
 
 ipcMain.handle('folder:format-summary', (_e, result: ReturnType<typeof scanFolder>) => {
@@ -279,46 +311,85 @@ ipcMain.handle('brain:models', async () => {
 })
 
 // ---------- Fase 1: analise, onde-esta, regras, chat ----------
-ipcMain.handle('analysis:run', async (_e, root: string, force: boolean) => {
+ipcMain.handle('analysis:run', async (_e, root: unknown, force: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const f = exigirBoolean(force, 'force', false)
+  if (isErroPayload(f)) return f
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
   dglog('[analysis] handler acionado')
   await ensureOllama()
-  return runAnalysis(root, force === true)
+  return runAnalysis(seg.abs, f === true)
 })
 
-ipcMain.handle('analysis:cached', (_e, root: string) => {
-  return getCachedAnalysis(root)
+ipcMain.handle('analysis:cached', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return getCachedAnalysis(seg.abs)
 })
 
-ipcMain.handle('whereis:ask', async (_e, root: string, query: string) => {
-  const result = whereIs(root, query)
+ipcMain.handle('whereis:ask', async (_e, root: unknown, query: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const q = exigirString(query, 'query')
+  if (isErroPayload(q)) return q
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  const result = whereIs(seg.abs, q)
   return { result, formatted: formatWhereIs(result) }
 })
 
-ipcMain.handle('rules:exists', (_e, root: string) => {
-  return rulesExist(root)
+ipcMain.handle('rules:exists', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return rulesExist(seg.abs)
 })
 
-ipcMain.handle('rules:read', (_e, root: string) => {
-  return readRules(root)
+ipcMain.handle('rules:read', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return readRules(seg.abs)
 })
 
-ipcMain.handle('rules:create-template', (_e, root: string) => {
-  return createRulesTemplate(root)
+ipcMain.handle('rules:create-template', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return createRulesTemplate(seg.abs)
 })
 
-ipcMain.handle('chat:load', (_e, root: string) => {
-  return loadChat(root)
+ipcMain.handle('chat:load', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return loadChat(seg.abs)
 })
 
-ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
-  const userMsg = { role: 'user' as const, content, at: Date.now() }
-  appendChat(root, userMsg)
+ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return { ok: false, message: { role: 'assistant', content: r.erro, at: Date.now(), provider: 'erro' } }
+  const texto = exigirString(content, 'content')
+  if (isErroPayload(texto)) return { ok: false, message: { role: 'assistant', content: texto.erro, at: Date.now(), provider: 'erro' } }
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, message: { role: 'assistant', content: seg.erro, at: Date.now(), provider: 'erro' } }
+  const rootOk = seg.abs
+  const userMsg = { role: 'user' as const, content: texto, at: Date.now() }
+  appendChat(rootOk, userMsg)
 
   const { readRules: rr } = await import('./dgrules')
   const { getCachedAnalysis: gca } = await import('./analyzer')
   const { contextoChatHibrido, executarHibrido } = await import('./brain/hibrido')
-  const rules = rr(root)
-  const analysis = gca(root)
+  const rules = rr(rootOk)
+  const analysis = gca(rootOk)
 
   let context = ''
   if (analysis) {
@@ -329,45 +400,45 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
   }
   // Fase 1 hibrida (sempre): predicao factual no contexto do chat
   try {
-    context += '\n' + contextoChatHibrido(root, content) + '\n'
+    context += '\n' + contextoChatHibrido(rootOk, texto) + '\n'
   } catch {
     /* briefing opcional */
   }
 
-  const trim = (content || '').trim()
+  const trim = texto.trim()
   const forceHibrido = /^\/hibrido\b/i.test(trim)
   const forceOk = /\bconfirmo\b/i.test(trim)
   const pedidoHibrido = forceHibrido ? trim.replace(/^\/hibrido\b/i, '').trim() || trim : trim
 
   try {
     if (forceHibrido) {
-      const r = await executarHibrido(root, pedidoHibrido, {
-        pastaAberta: analysis?.root || root,
+      const h = await executarHibrido(rootOk, pedidoHibrido, {
+        pastaAberta: analysis?.root || rootOk,
         force: forceOk
       })
       const assistantMsg = {
         role: 'assistant' as const,
-        content: r.texto,
+        content: h.texto,
         at: Date.now(),
-        provider: 'hibrido:' + (r.modelo || 'core')
+        provider: 'hibrido:' + (h.modelo || 'core')
       }
-      appendChat(root, assistantMsg)
-      await gravarDossie(loadChat(root), { root })
+      appendChat(rootOk, assistantMsg)
+      await gravarDossie(loadChat(rootOk), { root: rootOk })
       gerarContinuidade(dossieDirDoApp())
-      return { ok: r.ok !== false, message: assistantMsg, hibrido: r.briefing }
+      return { ok: h.ok !== false, message: assistantMsg, hibrido: h.briefing }
     }
 
     await ensureOllama()
-    const response = await askOllama(content, context, 'chat')
+    const response = await askOllama(texto, context, 'chat')
     const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
-    appendChat(root, assistantMsg)
-    await gravarDossie(loadChat(root), { root })
+    appendChat(rootOk, assistantMsg)
+    await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
     return { ok: true, message: assistantMsg }
   } catch (err) {
     const fallback = { role: 'assistant' as const, content: `Nao consegui responder agora: ${err instanceof Error ? err.message : String(err)}`, at: Date.now(), provider: 'erro' }
-    appendChat(root, fallback)
-    await gravarDossie(loadChat(root), { root })
+    appendChat(rootOk, fallback)
+    await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
     return { ok: false, message: fallback }
   }
