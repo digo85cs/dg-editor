@@ -490,6 +490,16 @@ async function main() {
     void defJson19
   }
 
+  // ---------- 20. Latencia por modelo ----------
+  section('20. Latencia por modelo')
+  {
+    const ollamaSrc20 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
+    const catSrc20 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+    assert('medirLatenciaModelo existe', /export async function medirLatenciaModelo/.test(ollamaSrc20))
+    assert('healthCheckModelos chama medirLatenciaModelo', /medirLatenciaModelo/.test(catSrc20))
+    assert('latenciaMedidaEm no ModeloEntrada', /latenciaMedidaEm/.test(catSrc20))
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

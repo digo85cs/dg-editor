@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
-import { listarModelosOllama, ollamaPing } from './ollama'
+import { listarModelosOllama, ollamaPing, medirLatenciaModelo } from './ollama'
 import { dglog } from '../dglog'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo' | 'embedding'
@@ -23,6 +23,7 @@ export interface ModeloEntrada {
   ativo: boolean
   instalado?: boolean
   latenciaMs?: number | null
+  latenciaMedidaEm?: string | null
   status?: 'ok' | 'down' | 'desconhecido'
 }
 
@@ -176,6 +177,7 @@ function normalizarModelo(raw: Partial<ModeloEntrada> & { id: string }): ModeloE
     ativo: raw.ativo !== false,
     instalado: raw.instalado,
     latenciaMs: raw.latenciaMs ?? null,
+    latenciaMedidaEm: raw.latenciaMedidaEm ?? null,
     status: raw.status || 'desconhecido'
   }
 }
@@ -401,16 +403,46 @@ export async function detectarModelosLocais(raiz: string): Promise<CatalogoModel
   return cat
 }
 
+async function mapPool<T>(itens: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let idx = 0
+  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, itens.length || 1)) }, async () => {
+    while (idx < itens.length) {
+      const i = idx++
+      await fn(itens[i])
+    }
+  })
+  await Promise.all(workers)
+}
+
 export async function healthCheckModelos(raiz: string): Promise<CatalogoModelos> {
   const cat = lerCatalogo(raiz)
-  const t0 = Date.now()
   const ok = await ollamaPing()
-  const lat = Date.now() - t0
   for (const m of cat.modelos) {
     if (m.provider !== 'ollama') continue
-    m.latenciaMs = ok ? lat : null
     m.status = ok && m.instalado !== false ? 'ok' : 'down'
+    if (!ok || m.instalado === false) {
+      m.latenciaMs = null
+    }
   }
+
+  if (ok) {
+    const alvos = cat.modelos.filter((m) => m.provider === 'ollama' && m.instalado !== false)
+    await mapPool(alvos, 2, async (m) => {
+      const r = await medirLatenciaModelo(m.id, 8000)
+      if (r.ok) {
+        m.latenciaMs = r.ms
+        m.latenciaMedidaEm = new Date().toISOString()
+        m.status = 'ok'
+      } else {
+        m.latenciaMs = r.ms ?? null
+        m.latenciaMedidaEm = new Date().toISOString()
+        // generate falhou (ex.: embedding) — mantém status ok se ollama está no ar
+        if (m.tipo === 'embedding') m.status = 'ok'
+        else m.status = 'down'
+      }
+    })
+  }
+
   if (cat.ativo) {
     const ativo = cat.modelos.find((m) => m.id === cat.ativo)
     if (ativo && ativo.status === 'down' && cat.secundario && cat.ativo !== cat.secundario) {

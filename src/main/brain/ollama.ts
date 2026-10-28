@@ -178,6 +178,30 @@ export async function ollamaPing(): Promise<boolean> {
   return status === 200
 }
 
+/** Latência real de um modelo (POST /api/generate num_predict=1), não do endpoint. */
+export async function medirLatenciaModelo(
+  id: string,
+  timeoutMs = 8000
+): Promise<{ ok: true; ms: number } | { ok: false; erro: string; ms?: number }> {
+  const t0 = Date.now()
+  try {
+    await ollamaHttpJson(
+      OLLAMA_URL + '/api/generate',
+      {
+        model: id,
+        prompt: 'ping',
+        stream: false,
+        options: { num_predict: 1 }
+      },
+      'POST',
+      timeoutMs
+    )
+    return { ok: true, ms: Date.now() - t0 }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error)?.message || e), ms: Date.now() - t0 }
+  }
+}
+
 export async function listModelos(): Promise<string[]> {
   const { status, body } = await httpGet('/api/tags', 5000)
   if (status !== 200) return []
