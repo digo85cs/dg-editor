@@ -237,6 +237,52 @@ export function salvarCatalogo(raiz: string, cat: CatalogoModelos): void {
   writeFileSync(caminhoCatalogo(raiz), JSON.stringify(cat, null, 2), 'utf-8')
 }
 
+/** Compara CATALOGO_PADRAO (constante) com .dg-editor/modelos.default.json. */
+export function compararPadraoComArquivo(raiz: string): { igual: boolean; diff: string[] } {
+  const diff: string[] = []
+  const p = caminhoDefault(raiz)
+  if (!existsSync(p)) {
+    return { igual: false, diff: ['arquivo ausente: modelos.default.json'] }
+  }
+  let arquivo: CatalogoModelos
+  try {
+    arquivo = JSON.parse(readFileSync(p, 'utf-8')) as CatalogoModelos
+  } catch {
+    return { igual: false, diff: ['JSON invalido em modelos.default.json'] }
+  }
+  const emb = JSON.parse(JSON.stringify(CATALOGO_PADRAO)) as CatalogoModelos
+
+  const cmp = (chave: string, a: unknown, b: unknown) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) {
+      diff.push(chave + ': padrao=' + JSON.stringify(a) + ' arquivo=' + JSON.stringify(b))
+    }
+  }
+  cmp('versao', emb.versao ?? 1, arquivo.versao ?? 1)
+  cmp('atualizadoEm', emb.atualizadoEm, arquivo.atualizadoEm)
+  cmp('ativo', emb.ativo, arquivo.ativo)
+  cmp('secundario', emb.secundario, arquivo.secundario)
+  cmp('roteamento', emb.roteamento || {}, arquivo.roteamento || {})
+
+  const embIds = new Set((emb.modelos || []).map((m) => m.id))
+  const arqIds = new Set((arquivo.modelos || []).map((m) => m.id))
+  for (const id of embIds) {
+    if (!arqIds.has(id)) diff.push('modelo so no padrao: ' + id)
+  }
+  for (const id of arqIds) {
+    if (!embIds.has(id)) diff.push('modelo so no arquivo: ' + id)
+  }
+  const campos = ['provider', 'endpoint', 'tipo', 'contexto', 'capacidades', 'porte', 'ativo'] as const
+  for (const id of embIds) {
+    if (!arqIds.has(id)) continue
+    const a = (emb.modelos || []).find((m) => m.id === id)!
+    const b = (arquivo.modelos || []).find((m) => m.id === id)!
+    for (const c of campos) {
+      cmp('modelo[' + id + '].' + c, a[c], b[c])
+    }
+  }
+  return { igual: diff.length === 0, diff }
+}
+
 export function validarCatalogo(cat: CatalogoModelos): { ok: boolean; problemas: string[] } {
   const problemas: string[] = []
   const porId = new Map(cat.modelos.map((m) => [m.id, m]))

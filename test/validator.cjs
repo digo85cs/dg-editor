@@ -29,7 +29,7 @@ function loadModule(relPath) {
           whenReady: () => Promise.resolve(),
           quit: () => {}
         },
-        BrowserWindow: class { constructor() {} on() {} webContents = { setWindowOpenHandler() {} } },
+        BrowserWindow: Object.assign(class { constructor() {} on() {} webContents = { setWindowOpenHandler() {}, send() {} } }, { getAllWindows: () => [] }),
         ipcMain: { on() {}, handle() {} },
         dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
         shell: { openExternal() {} }
@@ -461,6 +461,34 @@ async function main() {
     'toast do renderer existe',
     /mostrarToast/.test(appToast) || /window\.dgToast/.test(appToast)
   )
+
+  // ---------- 19. Sincronia do catalogo padrao ----------
+  section('19. Sincronia do catalogo padrao')
+  {
+    const defPath19 = pathT.join(rootT, '.dg-editor', 'modelos.default.json')
+    const defJson19 = JSON.parse(fsT.readFileSync(defPath19, 'utf-8'))
+    const catMod19 = loadModule('main/brain/modelos-catalogo.ts')
+    const cmp19 = catMod19.compararPadraoComArquivo(rootT)
+    assert(
+      'CATALOGO_PADRAO bate com modelos.default.json',
+      cmp19.igual === true,
+      (cmp19.diff || []).slice(0, 5).join(' | ')
+    )
+    const tipos19 = { chat: 0, codigo: 0, embedding: 0 }
+    for (const m of catMod19.CATALOGO_PADRAO.modelos || []) {
+      if (m.tipo === 'chat') tipos19.chat++
+      if (m.tipo === 'codigo') tipos19.codigo++
+      if (m.tipo === 'embedding') tipos19.embedding++
+    }
+    assert(
+      'CATALOGO_PADRAO tem ao menos 1 modelo de cada tipo',
+      tipos19.chat >= 1 && tipos19.codigo >= 1 && tipos19.embedding >= 1,
+      JSON.stringify(tipos19)
+    )
+    const src19 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
+    assert('compararPadraoComArquivo detecta divergencia', /compararPadraoComArquivo/.test(src19))
+    void defJson19
+  }
 
   // ---------- Summary ----------
   console.log('\n==============================')
