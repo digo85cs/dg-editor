@@ -264,6 +264,7 @@ async function selecionarPasta(path) {
 
   renderizarChat(msgs)
   void ligarHistoricoChat(path)
+  void atualizarGitStatusArvore()
 
   if (cached) {
     renderizarAnalise(cached, true)
@@ -440,33 +441,151 @@ function criarNoDir(ent, nivel) {
   return wrap
 }
 
+/** @type {Map<string, string>} caminho relativo (posix) -> status git */
+const gitStatusMap = new Map()
+
+function relPosix(abs, raiz) {
+  const a = String(abs || '').replace(/\\/g, '/')
+  const r = String(raiz || '').replace(/\\/g, '/').replace(/\/$/, '')
+  if (a.toLowerCase().startsWith(r.toLowerCase() + '/')) return a.slice(r.length + 1)
+  return a.split('/').pop() || a
+}
+
+function badgeGitHtml(st) {
+  if (!st) return ''
+  const cor =
+    st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
+  return (
+    '<span class="git-badge" data-git="' +
+    escapar(st) +
+    '" style="color:' +
+    cor +
+    '" title="git ' +
+    escapar(st) +
+    '">' +
+    escapar(st) +
+    '</span>'
+  )
+}
+
+function renderDiffHtml(diffText) {
+  const lines = String(diffText || '').split(/\r?\n/)
+  return lines
+    .map((ln) => {
+      let cls = 'diff-ctx'
+      if (ln.startsWith('+') && !ln.startsWith('+++')) cls = 'diff-add'
+      else if (ln.startsWith('-') && !ln.startsWith('---')) cls = 'diff-del'
+      else if (ln.startsWith('@@')) cls = 'diff-hunk'
+      return '<span class="' + cls + '">' + escapar(ln) + '</span>'
+    })
+    .join('\n')
+}
+
+async function abrirPainelDiff(absPath) {
+  const raiz = raizWorkspaceDe(absPath) || pastaAtual
+  if (!raiz) return
+  const rel = relPosix(absPath, raiz)
+  const panel = $('diff-panel')
+  const body = $('diff-panel-body')
+  const title = $('diff-panel-title')
+  if (!panel || !body) return
+  title.textContent = 'Diff: ' + rel
+  body.textContent = 'Carregando…'
+  panel.classList.remove('hidden')
+  panel.setAttribute('aria-hidden', 'false')
+  try {
+    const r = await window.api.invoke('git:diff', raiz, rel)
+    body.innerHTML = renderDiffHtml(r?.diff || r?.erro || '(vazio)')
+  } catch (e) {
+    body.textContent = String(e)
+  }
+}
+
+function fecharPainelDiff() {
+  const panel = $('diff-panel')
+  if (!panel) return
+  panel.classList.add('hidden')
+  panel.setAttribute('aria-hidden', 'true')
+}
+
+async function atualizarGitStatusArvore() {
+  const raiz = pastaAtual
+  if (!raiz) return
+  try {
+    const r = await window.api.invoke('git:status', raiz)
+    gitStatusMap.clear()
+    if (r?.ok && Array.isArray(r.itens)) {
+      for (const it of r.itens) {
+        gitStatusMap.set(String(it.path).replace(/\\/g, '/'), it.status)
+      }
+    }
+    document.querySelectorAll('.tree-item[data-tipo="file"]').forEach((row) => {
+      const abs = row.dataset.path || ''
+      const rel = relPosix(abs, raiz)
+      const st = gitStatusMap.get(rel)
+      let badge = row.querySelector('.git-badge')
+      if (!st) {
+        badge?.remove()
+        return
+      }
+      if (!badge) {
+        badge = document.createElement('span')
+        badge.className = 'git-badge'
+        row.appendChild(badge)
+      }
+      badge.dataset.git = st
+      badge.textContent = st
+      badge.title = 'git ' + st
+      badge.style.color =
+        st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
+    })
+  } catch {
+    /* */
+  }
+}
+
 function criarNoFile(ent, nivel) {
   const row = document.createElement('div')
   row.className = 'tree-item'
   row.style.paddingLeft = 8 + nivel * 16 + 16 + 'px'
-  row.innerHTML = extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>'
+  const raiz = raizWorkspaceDe(ent.caminho) || pastaAtual
+  const rel = raiz ? relPosix(ent.caminho, raiz) : ''
+  const st = rel ? gitStatusMap.get(rel) : null
+  row.innerHTML =
+    extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>' + badgeGitHtml(st)
   row.title = ent.caminho
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'file'
   row.addEventListener('click', (e) => {
     e.stopPropagation()
+    if (e.target?.closest?.('.git-badge')) {
+      void abrirPainelDiff(ent.caminho)
+      return
+    }
     if (!ent.editavel) {
       alert('Extensão não editável: ' + ent.nome)
       return
     }
     document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'))
     row.classList.add('active')
-    const raiz = raizWorkspaceDe(ent.caminho)
-    if (raiz) definirContextoPasta(raiz)
+    const rz = raizWorkspaceDe(ent.caminho)
+    if (rz) definirContextoPasta(rz)
     abrirArquivoNaAba(ent.caminho)
+    if (st) void abrirPainelDiff(ent.caminho)
   })
   return row
 }
 
 $('btn-refresh-tree')?.addEventListener('click', () => {
   for (const [, st] of estadoArvore) st.filhosCarregados = false
-  renderizarPastas()
+  renderizarPastas().then(() => atualizarGitStatusArvore())
 })
+$('btn-git-refresh')?.addEventListener('click', () => void atualizarGitStatusArvore())
+$('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
+setInterval(() => {
+  if (document.hidden || !pastaAtual) return
+  void atualizarGitStatusArvore()
+}, 5000)
 
 // ---------- Abas + editor ----------
 function persistirAbas() {

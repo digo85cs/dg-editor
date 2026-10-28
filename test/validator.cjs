@@ -551,6 +551,21 @@ async function main() {
     assert('renderer tem botao Nova conversa', /btn-chat-nova|Nova conversa/.test(html23))
   }
 
+  // ---------- 24. Diff visual ----------
+  section('24. Diff visual')
+  {
+    const gitTs = pathT.join(rootT, 'src', 'main', 'git.ts')
+    const main24 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const html24 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
+    const app24 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    assert('git.ts existe', fsT.existsSync(gitTs))
+    assert('git:status e git:diff handlers', /git:status/.test(main24) && /git:diff/.test(main24))
+    assert(
+      'renderer tem painel de diff',
+      /diff-panel/.test(html24) && /abrirPainelDiff|diff-panel/.test(app24)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

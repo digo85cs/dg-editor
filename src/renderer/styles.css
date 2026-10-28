@@ -685,6 +685,47 @@ body {
   border-radius: 6px;
   padding: 2px 4px;
 }
+.git-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#editor-host { position: relative; }
+.diff-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(420px, 48%);
+  height: 100%;
+  background: var(--dg-surface, #1e1e1e);
+  border-left: 1px solid var(--dg-border-subtle);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+}
+.diff-panel.hidden { display: none; }
+.diff-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--dg-border-subtle);
+  flex-shrink: 0;
+}
+.diff-panel-header span { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-panel-body {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, Consolas, monospace;
+  white-space: pre-wrap;
+}
+.diff-add { color: #3dd68c; display: block; }
+.diff-del { color: #f07178; display: block; }
+.diff-hunk { color: #82aaff; display: block; }
+.diff-ctx { color: var(--dg-text-muted, #aaa); display: block; }
 .provider-badge, #chat-provider {
   display: inline-flex;
   align-items: center;

@@ -58,6 +58,9 @@
           <button id="btn-refresh-tree" class="btn-icon" title="Atualizar árvore">
             <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
           </button>
+          <button id="btn-git-refresh" class="btn-icon" title="Atualizar status git">
+            <svg viewBox="0 0 24 24"><path d="M6 3v12M6 15l-3-3M6 15l3-3M12 6h9M12 12h7M12 18h5"/></svg>
+          </button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -89,6 +92,13 @@
             <div><kbd>Ctrl+`</kbd> Terminal</div>
           </div>
         </div>
+        <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
+          <header class="diff-panel-header">
+            <span id="diff-panel-title">Diff</span>
+            <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
+          </header>
+          <pre id="diff-panel-body" class="diff-panel-body"></pre>
+        </aside>
       </div>
       <div id="terminal-panel" class="terminal-panel" aria-hidden="true">
         <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>

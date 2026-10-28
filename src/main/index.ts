@@ -525,6 +525,23 @@ ipcMain.handle('chat:clear', (_e, root: string) => {
   return { ok: true }
 })
 
+// ---------- Git status / diff ----------
+ipcMain.handle('git:status', async (_e, raiz: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const { gitStatus } = await import('./git')
+  return gitStatus(r)
+})
+
+ipcMain.handle('git:diff', async (_e, raiz: unknown, caminho: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const { gitDiff } = await import('./git')
+  return gitDiff(r, c)
+})
+
 // ---------- Historico multi-chat (.dg-editor/chats/) ----------
 ipcMain.handle('chat:salvar', async (_e, raiz: unknown, doc: unknown) => {
   const r = exigirString(raiz, 'raiz')
