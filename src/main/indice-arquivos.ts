@@ -68,6 +68,14 @@ function scheduleRebuild(raiz: string): void {
 }
 
 export function iniciarIndice(raiz: string): { ok: boolean; total: number; erro?: string } {
+  // chokidar / watcher so inicia se !SAFE_MODE
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { emSafeMode } = require('./safe-mode') as typeof import('./safe-mode')
+    if (emSafeMode()) return { ok: false, total: 0, erro: 'safe-mode' }
+  } catch {
+    /* ignora se modulo indisponivel em testes */
+  }
   const seg = caminhoSeguro(raiz, raiz)
   if (!seg.ok) return { ok: false, total: 0, erro: seg.erro }
   if (!existsSync(seg.abs)) return { ok: false, total: 0, erro: 'raiz inexistente' }

@@ -48,6 +48,11 @@ import {
   exigirArrayStrings,
   isErroPayload
 } from './ipc-seguro'
+import { ativarSafeMode, emSafeMode, detectarSafeModeArgv } from './safe-mode'
+
+/** Flag de processo — safe-mode desliga watcher, health, agentes e MCP. */
+const SAFE_MODE = detectarSafeModeArgv(process.argv)
+if (SAFE_MODE) ativarSafeMode()
 import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from './busca'
 import { listarComandosMeta } from './comandos-meta'
 import {
@@ -115,14 +120,11 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  void import('./safe-mode').then(({ detectarSafeModeArgv, ativarSafeMode, emSafeMode }) => {
-    if (detectarSafeModeArgv()) {
-      ativarSafeMode()
-      dglog('[boot] SAFE MODE — sem agentes/MCP/watcher')
-    }
-    void import('./logs-estruturados').then(({ logEstruturado }) => {
-      logEstruturado('info', 'boot', emSafeMode() ? 'inicio safe-mode' : 'inicio normal')
-    })
+  if (SAFE_MODE) {
+    dglog('[boot] SAFE MODE — sem agentes/MCP/watcher/health')
+  }
+  void import('./logs-estruturados').then(({ logEstruturado }) => {
+    logEstruturado('info', 'boot', emSafeMode() || SAFE_MODE ? 'inicio safe-mode' : 'inicio normal')
   })
   // Token de sessão ANTES do servidor de controle (sempre novo)
   garantirTokenSessao()
@@ -133,9 +135,8 @@ app.whenReady().then(() => {
       criarJanelaNavegador(url, { mostrar: true })
     }
   })
-  const safe = process.argv.includes('--safe-mode') || process.argv.includes('--safemode')
   const qaE2e = process.env.DG_QA_E2E === '1'
-  if (!safe) {
+  if (!SAFE_MODE) {
     // Nao competir com terminal:create no boot — Ollama sobe depois
     if (!qaE2e) {
       setTimeout(() => {
@@ -143,12 +144,14 @@ app.whenReady().then(() => {
       }, 15000)
     }
     iniciarControleNavegador()
+  } else {
+    dglog('[safe-mode] watcher=off health=off agentes=off mcp-controle=off')
   }
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
-  if (!safe && !qaE2e) {
+  if (!SAFE_MODE && !qaE2e) {
     // Detecção de modelos NÃO no boot — libera o event loop para terminal:create.
     void import('./paths').then(({ resolverRaizProjeto }) => {
       const raiz = resolverRaizProjeto()
@@ -159,7 +162,7 @@ app.whenReady().then(() => {
             const v = mod.validarCatalogo(cat)
             if (!v.ok) dglog('[modelos] validarCatalogo: ' + v.problemas.join('; '))
             else dglog('[modelos] validarCatalogo: ok')
-            mod.iniciarHealthPeriodico(raiz, 30000)
+            if (!SAFE_MODE) mod.iniciarHealthPeriodico(raiz, 30000)
           } catch (e) {
             dglog('[modelos] boot falhou: ' + String(e))
           }
@@ -617,6 +620,7 @@ ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
 
 // ---------- Agente com MCP + memoria generativa ----------
 ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, modelo?: string) => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   try {
     const r = await executarAgente(root, pergunta, modelo)
     return { ok: true, texto: r.texto, modelo: r.modelo, passos: r.passos }
@@ -628,11 +632,13 @@ ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, mod
 })
 
 ipcMain.handle('agente:modelo', async () => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   try { return { ok: true, modelo: await escolherModelo() } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
 
 ipcMain.handle('agente:historico', async (_e, root: string) => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   try { return { ok: true, mensagens: await historico(root) } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
@@ -674,11 +680,18 @@ ipcMain.handle('config:backup', async (_e, motivo?: unknown) => {
 })
 
 ipcMain.handle('sistema:safe-mode', async () => {
-  const { emSafeMode } = await import('./safe-mode')
-  return { ok: true, safeMode: emSafeMode() }
+  return { ok: true, safeMode: emSafeMode() || SAFE_MODE }
+})
+
+ipcMain.handle('app:is-safe-mode', () => {
+  return { ok: true, safeMode: emSafeMode() || SAFE_MODE }
 })
 
 ipcMain.handle('indice:iniciar', (_e, root: unknown) => {
+  if (SAFE_MODE || emSafeMode()) {
+    dglog('[safe-mode] indice/watcher bloqueado')
+    return { ok: false, total: 0, erro: 'safe-mode' }
+  }
   const r = exigirString(root, 'root')
   if (isErroPayload(r)) return r
   return import('./indice-arquivos').then((m) => m.iniciarIndice(r))
@@ -704,6 +717,7 @@ ipcMain.handle('analysis:invalidar', (_e, root: unknown) => {
 
 // ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------
 ipcMain.handle('hibrido:analisar', async (_e, root: string, pedido?: string, pastaAberta?: string) => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   const { prepararBriefing } = await import('./brain/hibrido')
   return prepararBriefing(root || process.cwd(), pedido || 'status do workspace', pastaAberta)
 })
@@ -716,6 +730,9 @@ ipcMain.handle(
     pedido: string,
     opcoes?: { force?: boolean; modeloForcado?: string; pastaAberta?: string }
   ) => {
+    if (SAFE_MODE || emSafeMode()) {
+      return { ok: false, texto: 'safe-mode', modelo: '', passos: [], briefing: null }
+    }
     try {
       const { executarHibrido } = await import('./brain/hibrido')
       return await executarHibrido(root, pedido, opcoes)
@@ -779,7 +796,7 @@ ipcMain.handle('qa:run', async (_e, opcoes?: { suite?: string }) => {
 
 // ---------- Auto auditoria no boot + periodica ----------
 // Adiada: checarOllama/listarShells no boot competiam com terminal:create (spawnSync).
-if (process.env.DG_QA_E2E !== '1') {
+if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
   setTimeout(async () => {
     try {
       const mod = await import('./auto-auditoria')
@@ -791,4 +808,6 @@ if (process.env.DG_QA_E2E !== '1') {
       console.warn('[auditoria:boot] falhou:', String(e?.message || e))
     }
   }, 30000)
+} else if (SAFE_MODE) {
+  console.log('[safe-mode] auditoria=off health=off watcher=off')
 }

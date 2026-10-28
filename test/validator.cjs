@@ -500,6 +500,26 @@ async function main() {
     assert('latenciaMedidaEm no ModeloEntrada', /latenciaMedidaEm/.test(catSrc20))
   }
 
+  // ---------- 21. Safe-mode efetivo ----------
+  section('21. Safe-mode efetivo')
+  {
+    const main21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const ind21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'indice-arquivos.ts'), 'utf-8')
+    const pre21 = fsT.readFileSync(pathT.join(rootT, 'src', 'preload', 'index.ts'), 'utf-8')
+    assert(
+      'safe-mode desliga watcher',
+      /SAFE_MODE/.test(main21) && (/emSafeMode|safe-mode/.test(ind21) || /indice\/watcher bloqueado/.test(main21))
+    )
+    assert(
+      'safe-mode desliga health check periodico',
+      /iniciarHealthPeriodico/.test(main21) && /!SAFE_MODE|SAFE_MODE/.test(main21)
+    )
+    assert(
+      'IPC app:is-safe-mode existe',
+      /app:is-safe-mode/.test(main21) && /app:is-safe-mode/.test(pre21)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
