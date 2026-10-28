@@ -659,6 +659,41 @@ async function main() {
     )
   }
 
+  // ---------- 30. Analise: primeiro clique e agente ----------
+  section('30. Analise: primeiro clique e agente')
+  {
+    const app30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const css30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'styles.css'), 'utf-8')
+    const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
+    const btnBlock = (() => {
+      const m = app30.match(
+        /\$\(['"]btn-reanalyze['"]\)\.addEventListener\(['"]click['"],\s*\(\)\s*=>\s*\{[\s\S]*?\}\)/
+      )
+      return m ? m[0] : ''
+    })()
+    assert(
+      'btn-reanalyze usa force dinamico',
+      /dataset\.jaAnalisou/.test(btnBlock) && !/rodarAnalise\(pastaAtual,\s*true\)/.test(btnBlock)
+    )
+    assert('rodarAnalise marca jaAnalisou', /dataset\.jaAnalisou\s*=\s*['"]1['"]/.test(app30))
+    assert(
+      '.hidden aplica display none',
+      /\.hidden\s*\{[^}]*display\s*:\s*none/i.test(css30) || /\[hidden\][^{]*\{[^}]*display\s*:\s*none/i.test(css30)
+    )
+    assert(
+      'hibrido.ts define servidor=pasta aberta',
+      /Servidor/.test(hib30) && /(pasta aberta|root atual)/.test(hib30)
+    )
+    assert(
+      'hibrido.ts lista comandos de leitura sem confirmacao',
+      /NUNCA pedir para leitura/.test(hib30)
+    )
+    assert(
+      'resposta nao inclui nome de modelo ollama',
+      /NUNCA incluir o nome do modelo/.test(hib30)
+    )
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')
