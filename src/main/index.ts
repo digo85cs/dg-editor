@@ -31,7 +31,9 @@ import { lerTema, salvarTema } from './tema'
 import {
   criarJanelaNavegador,
   fecharJanelaNavegador,
-  lerUltimaUrlNavegador
+  lerUltimaUrlNavegador,
+  getJanelaNavegador,
+  onNavegadorEventos
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
@@ -84,6 +86,53 @@ function resolvePreload(): string {
 
 let mainWindow: BrowserWindow | null = null
 
+function emSmokeNav(): boolean {
+  return process.env.DG_NAV_SMOKE === '1'
+}
+
+/** Posiciona a BaseWindow do navegador ao lado direito do editor. Sem loop: só move a do nav. */
+function reposicionarNavegador(): void {
+  if (emSmokeNav()) return
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const nav = getJanelaNavegador()
+  if (!nav || nav.isDestroyed()) return
+  try {
+    const mb = mainWindow.getBounds()
+    nav.setBounds({
+      x: mb.x + mb.width,
+      y: mb.y,
+      width: Math.max(800, Math.round(mb.width * 0.5)),
+      height: mb.height
+    })
+  } catch (e) {
+    dglog('[navegador] reposicionar falhou: ' + String((e as Error)?.message || e))
+  }
+}
+
+function abrirNavegadorAncorado(url?: string): { ok: boolean } {
+  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
+  dglog('[navegador] abrir ancorado url=' + dest)
+  criarJanelaNavegador(dest, { mostrar: true })
+  if (!emSmokeNav()) {
+    reposicionarNavegador()
+    const nav = getJanelaNavegador()
+    if (nav && !nav.isDestroyed()) {
+      try {
+        nav.show()
+        nav.focus()
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      mainWindow?.webContents?.send('navegador:aberto')
+    } catch {
+      /* ignore */
+    }
+  }
+  return { ok: true }
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -111,6 +160,32 @@ function createWindow(): void {
     mainWindow.once('ready-to-show', () => { mainWindow?.show() })
   }
 
+  // Ancoragem: só a janela principal dispara move/resize → navegador acompanha (sem listener na do nav)
+  mainWindow.on('move', () => reposicionarNavegador())
+  mainWindow.on('resize', () => reposicionarNavegador())
+  mainWindow.on('minimize', () => {
+    if (emSmokeNav()) return
+    const nav = getJanelaNavegador()
+    if (nav && !nav.isDestroyed()) {
+      try {
+        nav.hide()
+      } catch {
+        /* ignore */
+      }
+    }
+  })
+  mainWindow.on('restore', () => {
+    if (emSmokeNav()) return
+    const nav = getJanelaNavegador()
+    if (nav && !nav.isDestroyed()) {
+      try {
+        nav.show()
+      } catch {
+        /* ignore */
+      }
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -134,7 +209,16 @@ app.whenReady().then(() => {
     onAbrirNavegador: () => {
       const url = lerUltimaUrlNavegador() || 'about:blank'
       dglog('[navegador] menu abrir url=' + url)
-      criarJanelaNavegador(url, { mostrar: true })
+      abrirNavegadorAncorado(url)
+    }
+  })
+  onNavegadorEventos({
+    onClose: () => {
+      try {
+        mainWindow?.webContents?.send('navegador:fechado')
+      } catch {
+        /* ignore */
+      }
     }
   })
   const qaE2e = process.env.DG_QA_E2E === '1'
@@ -194,11 +278,7 @@ app.on('window-all-closed', () => {
 })
 
 ipcMain.handle('navegador:abrir', (_e, url?: string) => {
-  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
-  dglog('[navegador] ipc abrir url=' + dest)
-  // singleton: criarJanelaNavegador não cria segunda instância
-  criarJanelaNavegador(dest, { mostrar: true })
-  return { ok: true }
+  return abrirNavegadorAncorado(url)
 })
 
 // ---------- Terminal embutido ----------

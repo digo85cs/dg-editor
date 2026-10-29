@@ -32,7 +32,13 @@ const invokeChannels = [
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
-const eventOnChannels = ['terminal:data', 'terminal:exit', 'brain:fallback'] as const
+const eventOnChannels = [
+  'terminal:data',
+  'terminal:exit',
+  'brain:fallback',
+  'navegador:aberto',
+  'navegador:fechado'
+] as const
 
 const sendChannels = ['app:quit']
 

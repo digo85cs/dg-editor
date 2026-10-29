@@ -151,6 +151,7 @@ type Listeners = {
   onNavigate?: (url: string) => void
   onFinish?: (url: string) => void
   onTitle?: (titulo: string) => void
+  onClose?: () => void
 }
 
 let janela: BaseWindow | null = null
@@ -298,6 +299,12 @@ export function focarJanela(): void {
     if (janela.isMinimized()) janela.restore()
     janela.focus()
   }
+}
+
+/** Getter da BaseWindow do navegador (null se fechada/destruída). */
+export function getJanelaNavegador(): BaseWindow | null {
+  if (!janela || janela.isDestroyed()) return null
+  return janela
 }
 
 export async function navegarPara(url: string, timeoutMs = 30_000): Promise<{ ok: boolean; url: string; erro?: string }> {
@@ -453,6 +460,11 @@ export function criarJanelaNavegador(
     contentView = null
     carregando = false
     dglog('[navegador] painel fechado (refs null)')
+    try {
+      listeners.onClose?.()
+    } catch {
+      /* ignore */
+    }
   })
 
   const urlLoad = destino || 'about:blank'

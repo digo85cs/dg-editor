@@ -188,7 +188,9 @@ function initActivityBar() {
         ativarAbaCentro('chat')
         setTimeout(() => $('chat-input')?.focus(), 0)
       } else if (a === 'navegador') {
-        window.api.invoke('navegador:abrir').catch((e) => console.warn('[navegador]', e))
+        toggleRight(true)
+        ativarAbaDireita('browser')
+        void abrirNavegadorUi()
       } else if (a === 'config') {
         abrirConfig()
       } else if (a === 'tema') {
@@ -196,6 +198,27 @@ function initActivityBar() {
       }
     })
   })
+}
+
+function setBrowserStatus(aberto) {
+  const st = $('browser-status')
+  const btn = $('browser-abrir')
+  if (st) {
+    st.textContent = aberto
+      ? 'Navegador aberto em janela ao lado.'
+      : 'Navegador fechado.'
+  }
+  if (btn) btn.classList.toggle('hidden', !!aberto)
+}
+
+async function abrirNavegadorUi() {
+  try {
+    await window.api.invoke('navegador:abrir')
+    setBrowserStatus(true)
+  } catch (e) {
+    console.warn('[navegador]', e)
+    setBrowserStatus(false)
+  }
 }
 
 function ativarAbaDireita(pane) {
@@ -232,6 +255,18 @@ function ativarAbaDireita(pane) {
   } else if (pane === 'files') {
     void renderizarArvoreEm($('files-list'))
   }
+}
+
+$('browser-abrir')?.addEventListener('click', () => {
+  toggleRight(true)
+  ativarAbaDireita('browser')
+  void abrirNavegadorUi()
+})
+try {
+  window.api.on?.('navegador:aberto', () => setBrowserStatus(true))
+  window.api.on?.('navegador:fechado', () => setBrowserStatus(false))
+} catch {
+  /* preload antigo */
 }
 
 function ativarAbaCentro(pane) {
@@ -1550,7 +1585,11 @@ function bootstrapComandos() {
       id: 'navegador',
       titulo: 'Navegador embutido',
       atalho: 'Ctrl+Shift+N',
-      fn: () => window.api.invoke('navegador:abrir').catch(() => {})
+      fn: () => {
+        toggleRight(true)
+        ativarAbaDireita('browser')
+        void abrirNavegadorUi()
+      }
     }
   ]
   for (const d of defs) registrarComando(d)
@@ -1691,7 +1730,11 @@ function executarComando(id) {
     if (abaAtiva) fecharAba(abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
-  else if (id === 'navegador') window.api.invoke('navegador:abrir').catch(() => {})
+  else if (id === 'navegador') {
+    toggleRight(true)
+    ativarAbaDireita('browser')
+    void abrirNavegadorUi()
+  }
 }
 
 async function rodarBuscaGlobal() {

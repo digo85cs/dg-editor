@@ -172,6 +172,7 @@
         <button type="button" class="right-tab" data-pane="analise">Análise</button>
         <button type="button" class="right-tab active" data-pane="terminal">Terminal</button>
         <button type="button" class="right-tab" data-pane="files">Files</button>
+        <button type="button" class="right-tab" data-pane="browser">Browser</button>
       </div>
 
       <div id="pane-analise" class="right-pane">
@@ -211,6 +212,13 @@
       <div id="pane-files" class="right-pane">
         <div class="section-label" style="padding:8px 12px 4px">Pastas</div>
         <div id="files-list" class="folder-list files-panel-list"></div>
+      </div>
+
+      <div id="pane-browser" class="right-pane">
+        <div class="browser-pane-content">
+          <p class="browser-status" id="browser-status">Navegador fechado.</p>
+          <button type="button" id="browser-abrir" class="btn-primary">Abrir navegador</button>
+        </div>
       </div>
     </section>
 
