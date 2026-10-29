@@ -375,6 +375,44 @@ body {
   text-transform: uppercase;
   padding: var(--dg-space-2) var(--dg-space-3) var(--dg-space-1);
 }
+.vault-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.vault-status {
+  padding: 0 var(--dg-space-3) var(--dg-space-2);
+  font-size: var(--dg-fs-sm);
+  font-style: normal;
+}
+.vault-list {
+  padding: 0 var(--dg-space-2) var(--dg-space-2);
+  max-height: 160px;
+  overflow: auto;
+  font-size: var(--dg-fs-sm);
+}
+.vault-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--dg-text);
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: inherit;
+}
+.vault-list button:hover {
+  background: var(--dg-active);
+}
+.md-preview a.wiki-link {
+  color: var(--dg-accent, #6cb6ff);
+  text-decoration: none;
+  border-bottom: 1px dashed currentColor;
+  cursor: pointer;
+}
 
 /* Tree */
 .tree-root { user-select: none; }

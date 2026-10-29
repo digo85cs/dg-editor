@@ -29,7 +29,9 @@ const invokeChannels = [
   'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
   'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa', 'modelos:versoes-remotas',
   'config:backup', 'sistema:safe-mode', 'app:is-safe-mode',
-  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar'
+  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar',
+  'vault:abrir', 'vault:fechar', 'vault:estado', 'vault:listar',
+  'vault:resolver-link', 'vault:backlinks', 'vault:tags', 'vault:nota', 'vault:salvar'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

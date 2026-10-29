@@ -910,6 +910,76 @@ async function main() {
     )
   }
 
+  // ---------- Vault Markdown ----------
+  section('Vault Markdown')
+  {
+    const fsAtom = loadModule('main/fs-atomico.ts')
+    assert('detectarEol crlf', fsAtom.detectarEol('a\r\nb') === 'crlf')
+    assert('detectarEol lf', fsAtom.detectarEol('a\nb') === 'lf')
+    assert(
+      'aplicarEol preserva crlf',
+      fsAtom.aplicarEol('a\nb\n', 'crlf') === 'a\r\nb\r\n'
+    )
+    const tmpV = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-vault-'))
+    const dest = path.join(tmpV, 'nota.md')
+    await fsAtom.escreverAtomico(dest, 'hello\r\nworld\r\n')
+    assert('escrita atomica existe', fs.existsSync(dest))
+    assert(
+      'escrita atomica conteudo',
+      fs.readFileSync(dest, 'utf8') === 'hello\r\nworld\r\n'
+    )
+
+    const links = loadModule('main/vault/links.ts')
+    assert(
+      'extrairWikiLinks',
+      JSON.stringify(links.extrairWikiLinks('x [[Foo|bar]] y [[Baz]]')) ===
+        JSON.stringify(['Foo', 'Baz'])
+    )
+    const notas = [
+      { path: 'C:/v/a/Foo.md', rel: 'a/Foo.md', basename: 'Foo.md', aliases: [] },
+      { path: 'C:/v/Foo.md', rel: 'Foo.md', basename: 'Foo.md', aliases: ['Alt'] }
+    ]
+    assert(
+      'resolver basename',
+      links.resolverLink('Foo', notas, 'a/Outra.md') === 'C:/v/a/Foo.md'
+    )
+    assert('resolver alias', links.resolverLink('Alt', notas) === 'C:/v/Foo.md')
+    assert(
+      'resolver path relativo',
+      links.resolverLink('a/Foo', notas) === 'C:/v/a/Foo.md'
+    )
+
+    const fm = loadModule('main/vault/frontmatter.ts')
+    const parsed = fm.extrairFrontmatter(
+      '---\ntitle: T1\ntags: [a, b]\n---\ncorpo #c\n'
+    )
+    assert('fm titulo', parsed.frontmatter.titulo === 'T1')
+    assert(
+      'fm tags',
+      parsed.frontmatter.tags.includes('a') && parsed.frontmatter.tags.includes('b')
+    )
+    assert('fm corpo', parsed.corpo.trim() === 'corpo #c')
+    const remount = fm.montarDocumento(parsed.frontmatter.raw, parsed.corpo)
+    assert('fm round-trip tem delimitadores', remount.startsWith('---\n'))
+    assert('fm round-trip corpo', remount.includes('corpo #c'))
+
+    const tags = loadModule('main/vault/tags.ts')
+    assert(
+      'tags inline',
+      tags.extrairTagsInline('ola #proj/x e #y\n```\n#no\n```').includes('proj/x')
+    )
+    assert(
+      'tags ignora fence',
+      !tags.extrairTagsInline('```\n#no\n```').includes('no')
+    )
+
+    const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload vault:abrir', /vault:abrir/.test(pre))
+    assert('preload vault:salvar', /vault:salvar/.test(pre))
+    const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    assert('index registra vault ipc', /registerVaultIpc/.test(idxMain))
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

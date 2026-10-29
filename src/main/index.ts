@@ -71,6 +71,7 @@ import {
   shellAtivo
 } from './terminal'
 import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
+import { registerVaultIpc } from './vault/ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -370,6 +371,9 @@ ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) =
   if (!seg.ok) return { ok: false, erro: seg.erro }
   return arquivoExiste(seg.abs, p)
 })
+
+// ---------- Vault Markdown (Obsidian-compat) ----------
+registerVaultIpc()
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {

@@ -70,6 +70,9 @@
           <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           </button>
+          <button id="btn-open-vault" class="btn-icon" title="Abrir vault Markdown">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 6V4h8v2"/></svg>
+          </button>
           <button id="btn-refresh-tree" class="btn-icon" title="Atualizar árvore">
             <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
           </button>
@@ -82,6 +85,17 @@
       <div class="sidebar-section">
         <div class="section-label">Pastas</div>
         <div id="folder-list" class="folder-list"></div>
+      </div>
+      <div class="sidebar-section" id="vault-section" hidden>
+        <div class="section-label vault-section-header">
+          <span>Vault</span>
+          <button type="button" id="btn-close-vault" class="btn-icon" title="Fechar vault">×</button>
+        </div>
+        <div id="vault-status" class="vault-status muted">Nenhum vault</div>
+        <div class="section-label">Backlinks</div>
+        <div id="vault-backlinks" class="vault-list"></div>
+        <div class="section-label">Tags</div>
+        <div id="vault-tags" class="vault-list"></div>
       </div>
       <div class="sidebar-footer">
         <button id="btn-contas" class="btn-ghost" title="Contas e saúde do sistema">Contas</button>

@@ -30,12 +30,21 @@ let filesListaSuja = false
 /** Histórico de navegação de abas (tb-voltar / tb-avancar). */
 let histAbas = []
 let histIdx = -1
+/** Raiz do vault Markdown aberto (null = fechado). */
+let vaultRaiz = null
 
 const CHEV =
   '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
 
 function pastasPermitidas() {
-  return [...pastasRecentes]
+  const s = new Set(pastasRecentes)
+  if (vaultRaiz) s.add(vaultRaiz)
+  return [...s]
+}
+
+function caminhoNoVault(caminho) {
+  if (!vaultRaiz || !caminho) return false
+  return caminhoSobPasta(caminho, vaultRaiz)
 }
 
 function nomeArquivo(p) {
@@ -378,6 +387,98 @@ async function abrirPasta() {
   if (r.canceled) return
   adicionarPasta(r.path)
   await selecionarPasta(r.path)
+}
+
+async function abrirVault() {
+  const r = await window.api.invoke('vault:abrir')
+  if (r?.canceled) return
+  if (!r?.ok) {
+    alert('Não foi possível abrir o vault: ' + (r?.erro || 'erro'))
+    return
+  }
+  vaultRaiz = r.raiz
+  adicionarPasta(r.raiz)
+  await selecionarPasta(r.raiz)
+  const sec = $('vault-section')
+  if (sec) sec.hidden = false
+  const st = $('vault-status')
+  if (st) st.textContent = nomeArquivo(r.raiz) + ' · ' + (r.total || 0) + ' notas'
+  await atualizarPainelVault(abaAtiva)
+}
+
+async function fecharVault() {
+  await window.api.invoke('vault:fechar')
+  vaultRaiz = null
+  const sec = $('vault-section')
+  if (sec) sec.hidden = true
+  const st = $('vault-status')
+  if (st) st.textContent = 'Nenhum vault'
+  const bl = $('vault-backlinks')
+  if (bl) bl.innerHTML = ''
+  const tg = $('vault-tags')
+  if (tg) tg.innerHTML = ''
+}
+
+async function atualizarPainelVault(caminho) {
+  if (!vaultRaiz) return
+  const bl = $('vault-backlinks')
+  const tg = $('vault-tags')
+  if (bl) {
+    bl.innerHTML = ''
+    if (caminho && caminhoNoVault(caminho) && ehMarkdown(caminho)) {
+      const r = await window.api.invoke('vault:backlinks', caminho)
+      const itens = r?.backlinks || []
+      if (!itens.length) {
+        bl.innerHTML = '<span class="muted">Nenhum backlink</span>'
+      } else {
+        for (const n of itens) {
+          const b = document.createElement('button')
+          b.type = 'button'
+          b.textContent = n.titulo || n.rel
+          b.title = n.rel
+          b.addEventListener('click', () => void abrirArquivoNaAba(n.path))
+          bl.appendChild(b)
+        }
+      }
+    } else {
+      bl.innerHTML = '<span class="muted">Abra uma nota do vault</span>'
+    }
+  }
+  if (tg) {
+    tg.innerHTML = ''
+    const r = await window.api.invoke('vault:tags')
+    const tags = r?.tags || {}
+    const keys = Object.keys(tags).sort((a, b) => a.localeCompare(b))
+    if (!keys.length) {
+      tg.innerHTML = '<span class="muted">Sem tags</span>'
+    } else {
+      for (const k of keys.slice(0, 40)) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = '#' + k + ' (' + tags[k].length + ')'
+        b.title = tags[k].map((x) => x.rel).join(', ')
+        b.addEventListener('click', () => {
+          const first = tags[k][0]
+          if (first) void abrirArquivoNaAba(first.path)
+        })
+        tg.appendChild(b)
+      }
+    }
+  }
+}
+
+async function abrirWikiLink(alvo) {
+  if (!vaultRaiz) {
+    alert('Abra um vault para resolver [[links]].')
+    return
+  }
+  const r = await window.api.invoke('vault:resolver-link', alvo, abaAtiva || undefined)
+  if (!r?.path) {
+    alert('Nota não encontrada: [[' + alvo + ']]')
+    return
+  }
+  await abrirArquivoNaAba(r.path)
+  void atualizarPainelVault(r.path)
 }
 
 function adicionarPasta(path) {
@@ -1161,6 +1262,23 @@ function sanitizarERenderMarkdown(src) {
   t = t.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>')
   t = t.replace(/(<li>.*<\/li>\n?)+/g, (m) => '<ul>' + m + '</ul>')
   t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" rel="noopener noreferrer">$1</a>')
+  t = t.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
+    const parts = String(inner).split('|')
+    const alvo = parts[0].trim()
+    const label = (parts[1] || parts[0]).trim()
+    const esc = (s) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+    return (
+      '<a href="#" class="wiki-link" data-wiki-target="' +
+      esc(alvo) +
+      '">' +
+      esc(label) +
+      '</a>'
+    )
+  })
   t = t.replace(/^\|(.+)\|$/gm, (line) => {
     const cells = line
       .slice(1, -1)
@@ -1390,6 +1508,7 @@ async function ativarAba(caminho, conteudoPrevio) {
   }
   editor.focar()
   persistirAbas()
+  void atualizarPainelVault(caminho)
 }
 
 function perguntarDirty(caminho) {
@@ -1459,7 +1578,13 @@ async function fecharAba(caminho) {
 async function salvarArquivoAtivo() {
   if (!abaAtiva || !editor) return false
   const conteudo = editor.getConteudo()
-  const r = await window.api.invoke('arquivo:salvar', abaAtiva, conteudo, pastasPermitidas())
+  let r
+  if (vaultRaiz && caminhoNoVault(abaAtiva) && ehMarkdown(abaAtiva)) {
+    r = await window.api.invoke('vault:salvar', abaAtiva, conteudo, pastasPermitidas())
+    if (r?.ok) void atualizarPainelVault(abaAtiva)
+  } else {
+    r = await window.api.invoke('arquivo:salvar', abaAtiva, conteudo, pastasPermitidas())
+  }
   if (!r.ok) {
     alert('Erro ao salvar: ' + (r.erro || 'erro'))
     return false
@@ -1818,6 +1943,8 @@ let buscaAbortId = null
 function bootstrapComandos() {
   const defs = [
     { id: 'abrir-pasta', titulo: 'Abrir pasta de trabalho', atalho: 'Ctrl+O', fn: () => abrirPasta() },
+    { id: 'abrir-vault', titulo: 'Abrir vault Markdown', fn: () => abrirVault() },
+    { id: 'fechar-vault', titulo: 'Fechar vault', fn: () => fecharVault() },
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
     { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
     { id: 'paleta-comandos', titulo: 'Paleta de comandos', atalho: 'Ctrl+Shift+P', fn: () => abrirPaletaComandos() },
@@ -2205,6 +2332,15 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
 
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
+$('btn-open-vault')?.addEventListener('click', () => void abrirVault())
+$('btn-close-vault')?.addEventListener('click', () => void fecharVault())
+$('md-preview')?.addEventListener('click', (ev) => {
+  const a = ev.target?.closest?.('a.wiki-link')
+  if (!a) return
+  ev.preventDefault()
+  const alvo = a.getAttribute('data-wiki-target')
+  if (alvo) void abrirWikiLink(alvo)
+})
 $('btn-empty-open')?.addEventListener('click', abrirPasta)
 $('btn-reanalyze').addEventListener('click', () => {
   if (!pastaAtual) return
