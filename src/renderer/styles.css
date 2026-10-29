@@ -93,6 +93,8 @@ body {
 
 /* ---------- Activity bar ---------- */
 #activity-bar {
+  width: var(--dg-iconbar-w);
+  min-width: var(--dg-iconbar-w);
   background: var(--dg-sidebar);
   border-right: 1px solid var(--dg-border-subtle);
   display: flex;
@@ -181,11 +183,82 @@ body {
   color: var(--dg-text-muted);
   text-transform: uppercase;
 }
+.sidebar-modes {
+  display: flex;
+  align-items: center;
+  gap: var(--dg-gap-sm);
+  min-width: 0;
+}
+.sidebar-mode {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  font-size: var(--dg-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  color: var(--dg-text-muted);
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: var(--dg-radius-sm);
+}
+.sidebar-mode:hover { color: var(--dg-text); background: var(--dg-surface-raised); }
+.sidebar-mode.active { color: var(--dg-text); }
 .sidebar-actions { display: flex; gap: 2px; }
 .folder-list {
   flex: 1;
   overflow-y: auto;
   padding: var(--dg-space-2) 0;
+}
+.projects-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--dg-space-2) 0;
+  min-height: 0;
+}
+.projects-list[hidden] { display: none !important; }
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: var(--dg-gap-sm);
+  padding: 4px 8px;
+  font-size: var(--dg-fs-sm);
+  color: var(--dg-text);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--dg-radius-sm);
+}
+.project-item:hover { background: var(--dg-surface-raised); }
+.project-item.selected { background: var(--dg-active); }
+.project-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-branch {
+  color: var(--dg-text-muted);
+  flex-shrink: 0;
+}
+.project-time {
+  margin-left: auto;
+  color: var(--dg-text-muted);
+  font-size: var(--dg-fs-xs);
+  flex-shrink: 0;
+}
+.project-dirty {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--verde-status);
+  flex-shrink: 0;
+}
+.projects-empty {
+  padding: 12px;
+  color: var(--dg-text-muted);
+  font-size: var(--dg-fs-sm);
 }
 .tree-ctx-menu {
   position: fixed;

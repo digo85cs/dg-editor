@@ -224,6 +224,7 @@ function adicionarPasta(path) {
   if (!pastasRecentes.includes(path)) pastasRecentes.push(path)
   renderizarPastas()
   salvarPastas()
+  void renderizarProjects()
 }
 
 function salvarPastas() {
@@ -602,8 +603,115 @@ function criarNoFile(ent, nivel) {
 $('btn-refresh-tree')?.addEventListener('click', () => {
   for (const [, st] of estadoArvore) st.filhosCarregados = false
   renderizarPastas().then(() => atualizarGitStatusArvore())
+  void renderizarProjects()
 })
-$('btn-git-refresh')?.addEventListener('click', () => void atualizarGitStatusArvore())
+$('btn-git-refresh')?.addEventListener('click', () => {
+  void atualizarGitStatusArvore()
+  void renderizarProjects()
+})
+
+// ---------- Sidebar modos: Projects / Explorer ----------
+let sidebarMode = 'explorer'
+
+function tempoRelativoCommit(ts) {
+  if (!ts || !Number.isFinite(ts)) return ''
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts))
+  if (s < 60) return 'agora'
+  if (s < 3600) return Math.floor(s / 60) + 'm'
+  if (s < 86400) return Math.floor(s / 3600) + 'h'
+  return Math.floor(s / 86400) + 'd'
+}
+
+function setSidebarMode(mode) {
+  sidebarMode = mode === 'projects' ? 'projects' : 'explorer'
+  const projects = $('projects-list')
+  const folders = $('folder-list')
+  const btnP = $('sidebar-mode-projects')
+  const btnE = $('sidebar-mode-explorer')
+  const isProjects = sidebarMode === 'projects'
+  if (projects) projects.hidden = !isProjects
+  if (folders) folders.hidden = isProjects
+  btnP?.classList.toggle('active', isProjects)
+  btnE?.classList.toggle('active', !isProjects)
+  btnP?.setAttribute('aria-selected', isProjects ? 'true' : 'false')
+  btnE?.setAttribute('aria-selected', isProjects ? 'false' : 'true')
+  if (isProjects) void renderizarProjects()
+}
+
+async function renderizarProjects() {
+  const lista = $('projects-list')
+  if (!lista) return
+  const t0 = performance.now()
+  let itens = []
+  try {
+    const r = await window.api.invoke('git:repos', { pastas: [...pastasRecentes] })
+    itens = Array.isArray(r) ? r : []
+  } catch (e) {
+    console.warn('[projects] git:repos', e)
+    itens = []
+  }
+  const ms = Math.round(performance.now() - t0)
+  // Deduplicar por nome de repo (basename do toplevel); pastas sem repo somem
+  const porRepo = new Map()
+  for (const it of itens) {
+    if (!it || !it.repo) continue
+    if (!porRepo.has(it.repo)) porRepo.set(it.repo, it)
+  }
+  const unicos = [...porRepo.values()]
+  lista.innerHTML = ''
+  if (unicos.length === 0) {
+    lista.innerHTML =
+      '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
+    console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + pastasRecentes.length)
+    return
+  }
+  for (const it of unicos) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'project-item' + (it.pasta === pastaAtual ? ' selected' : '')
+    btn.dataset.path = it.pasta
+    btn.title = it.pasta
+    const nome = document.createElement('span')
+    nome.className = 'project-name'
+    nome.textContent = it.repo
+    const branch = document.createElement('span')
+    branch.className = 'project-branch'
+    branch.textContent = '(' + (it.branch || '?') + ')'
+    btn.appendChild(nome)
+    btn.appendChild(branch)
+    if (it.dirty) {
+      const dot = document.createElement('span')
+      dot.className = 'project-dirty'
+      dot.title = 'Alterações não commitadas'
+      btn.appendChild(dot)
+    }
+    const tempo = tempoRelativoCommit(it.ultimoCommitTs)
+    if (tempo) {
+      const t = document.createElement('span')
+      t.className = 'project-time'
+      t.textContent = tempo
+      btn.appendChild(t)
+    }
+    btn.addEventListener('click', () => {
+      void selecionarPasta(it.pasta)
+      setSidebarMode('explorer')
+    })
+    lista.appendChild(btn)
+  }
+  console.log(
+    '[projects] git:repos ' +
+      ms +
+      'ms repos=' +
+      unicos.length +
+      ' pastas=' +
+      pastasRecentes.length +
+      ' dedup=' +
+      (itens.filter((i) => i && i.repo).length - unicos.length)
+  )
+}
+
+$('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
+$('sidebar-mode-explorer')?.addEventListener('click', () => setSidebarMode('explorer'))
 $('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
 setInterval(() => {
   if (document.hidden || !pastaAtual) return
@@ -2081,7 +2189,9 @@ if (termPanel && !termPanel.dataset.lazyReady) {
   termPanel.dataset.lazyReady = '0'
 }
 initMenuCtxArvore()
+setSidebarMode('explorer')
 renderizarPastas().then(() => restaurarAbas())
+void renderizarProjects()
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
 void atualizarBadgeProvedorReal()

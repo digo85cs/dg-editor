@@ -1,12 +1,82 @@
 /**
  * Status e diff git (estado controlado se git ausente / fora de repo).
  */
-import { execFile } from 'child_process'
+import { execFile, execFileSync } from 'child_process'
 import { promisify } from 'util'
 import { existsSync } from 'fs'
-import { join, normalize } from 'path'
+import { basename, join, normalize } from 'path'
 
 const execFileP = promisify(execFile)
+
+/** Cache 30s por pasta de entrada (git:repos). */
+const reposCache = new Map<string, { dados: GitRepoInfo; ts: number }>()
+const REPOS_CACHE_MS = 30_000
+
+export interface GitRepoInfo {
+  pasta: string
+  repo: string | null
+  branch?: string
+  ultimoCommitTs?: number
+  dirty?: boolean
+}
+
+/** execFileSync protegido (Fix C1): timeout 3000, stdio ignore/pipe/ignore. */
+function gitSyncProtegido(pasta: string, args: string[]): string | null {
+  try {
+    const out = execFileSync('git', ['-C', pasta, ...args], {
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      encoding: 'utf8'
+    })
+    return String(out || '').trim()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Detecta repos git a partir de pastas abertas.
+ * Nunca lança — pasta quebrada / sem git → { pasta, repo: null }.
+ */
+export function gitRepos(pastas: string[]): GitRepoInfo[] {
+  const agora = Date.now()
+  const saida: GitRepoInfo[] = []
+  for (const pasta of pastas) {
+    if (!pasta || typeof pasta !== 'string') {
+      saida.push({ pasta: String(pasta || ''), repo: null })
+      continue
+    }
+    const hit = reposCache.get(pasta)
+    if (hit && agora - hit.ts <= REPOS_CACHE_MS) {
+      saida.push(hit.dados)
+      continue
+    }
+    let dados: GitRepoInfo = { pasta, repo: null }
+    try {
+      const toplevel = gitSyncProtegido(pasta, ['rev-parse', '--show-toplevel'])
+      if (toplevel) {
+        const branch = gitSyncProtegido(pasta, ['rev-parse', '--abbrev-ref', 'HEAD']) || 'HEAD'
+        const tsRaw = gitSyncProtegido(pasta, ['log', '-1', '--format=%ct'])
+        const porcelain = gitSyncProtegido(pasta, ['status', '--porcelain'])
+        const linhas = porcelain ? porcelain.split(/\r?\n/).filter((l) => l.length > 0) : []
+        const ts = tsRaw ? parseInt(tsRaw, 10) : NaN
+        dados = {
+          pasta,
+          repo: basename(toplevel.replace(/[/\\]+$/, '')),
+          branch,
+          ultimoCommitTs: Number.isFinite(ts) ? ts : undefined,
+          dirty: linhas.length > 0
+        }
+      }
+    } catch {
+      dados = { pasta, repo: null }
+    }
+    reposCache.set(pasta, { dados, ts: agora })
+    saida.push(dados)
+  }
+  return saida
+}
 
 export type GitStatusCode = 'M' | 'A' | 'D' | '??' | 'R' | 'C' | 'U'
 

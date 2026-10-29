@@ -580,7 +580,7 @@ ipcMain.handle('chat:clear', (_e, root: string) => {
   return { ok: true }
 })
 
-// ---------- Git status / diff ----------
+// ---------- Git status / diff / repos ----------
 ipcMain.handle('git:status', async (_e, raiz: unknown) => {
   const r = exigirString(raiz, 'raiz')
   if (isErroPayload(r)) return r
@@ -595,6 +595,19 @@ ipcMain.handle('git:diff', async (_e, raiz: unknown, caminho: unknown) => {
   if (isErroPayload(c)) return c
   const { gitDiff } = await import('./git')
   return gitDiff(r, c)
+})
+
+ipcMain.handle('git:repos', async (_e, payload: unknown) => {
+  try {
+    const o = exigirObjeto(payload, 'payload')
+    if (isErroPayload(o)) return []
+    const pastas = exigirArrayStrings(o.pastas, 'pastas')
+    if (isErroPayload(pastas)) return []
+    const { gitRepos } = await import('./git')
+    return gitRepos(pastas)
+  } catch {
+    return []
+  }
 })
 
 // ---------- Historico multi-chat (.dg-editor/chats/) ----------
