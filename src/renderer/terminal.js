@@ -90,8 +90,11 @@ export function initTerminalPanel() {
     value: Math.min(0.8, Math.max(0.2, parseFloat(localStorage.getItem(LS_SPLIT_RATIO) || '0.5') || 0.5))
   }
 
+  const docked = panel.classList.contains('terminal-panel--docked')
   const alturaSalva = parseInt(localStorage.getItem(LS_HEIGHT) || '220', 10)
-  panel.style.height = Math.max(120, alturaSalva) + 'px'
+  // Docked: altura vem do painel direito (CSS 100%). Inline height só no layout inferior legado.
+  if (!docked) panel.style.height = Math.max(120, alturaSalva) + 'px'
+  else panel.style.height = ''
 
   function grupoAtivo() {
     return grupos.get(grupoAtivoKey) || null
@@ -837,8 +840,20 @@ export function initTerminalPanel() {
   }
 
   function toggle() {
-    if (aberto) void fecharPainel(true)
-    else void abrirPainel()
+    if (aberto) {
+      void fecharPainel(true)
+      return
+    }
+    // Docked: abrir painel direito na aba Terminal (Ctrl+` / icon-bar)
+    try {
+      window.dgUi?.toggleRight?.(true)
+      window.dgUi?.ativarAbaDireita?.('terminal')
+    } catch {
+      /* app ainda nao expoe dgUi */
+    }
+    void abrirPainel().then(() => {
+      requestAnimationFrame(() => fitTodos())
+    })
   }
 
   selectEl?.addEventListener('focus', () => {
@@ -1001,7 +1016,16 @@ export function initTerminalPanel() {
     }
   }
 
-  window.dgTerminal = { abrirEm, bufferTexto }
+  window.dgTerminal = {
+    abrirEm,
+    bufferTexto,
+    abrir: () =>
+      abrirPainel().then(() => {
+        requestAnimationFrame(() => fitTodos())
+      }),
+    fit: fitTodos,
+    isOpen: () => aberto
+  }
 
   if (handle) {
     let startY = 0

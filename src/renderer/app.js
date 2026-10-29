@@ -206,11 +206,39 @@ function ativarAbaDireita(pane) {
   document.querySelectorAll('.right-pane').forEach((p) => {
     p.classList.toggle('active', p.id === 'pane-' + pane)
   })
+  if (pane === 'terminal') {
+    garantirTerminal()
+    const fit = () => {
+      window.dgTerminal?.fit?.()
+    }
+    const open = window.dgTerminal?.abrir
+    if (typeof open === 'function') {
+      Promise.resolve(open()).then(() => {
+        requestAnimationFrame(() => {
+          fit()
+          requestAnimationFrame(fit)
+        })
+      })
+    } else {
+      requestAnimationFrame(() => {
+        fit()
+        requestAnimationFrame(fit)
+      })
+    }
+  } else if (pane === 'files') {
+    void renderizarArvoreEm($('files-list'))
+  }
 }
 
 document.querySelectorAll('.right-tab').forEach((t) => {
   t.addEventListener('click', () => ativarAbaDireita(t.dataset.pane))
 })
+
+// Bridge para terminal.js (toggle Ctrl+` / icon-bar) sem import circular
+window.dgUi = {
+  toggleRight,
+  ativarAbaDireita
+}
 
 // ---------- Pastas ----------
 async function abrirPasta() {
@@ -329,8 +357,8 @@ function raizWorkspaceDe(caminho) {
   return pastaAtual
 }
 
-async function renderizarPastas() {
-  const lista = $('folder-list')
+async function renderizarArvoreEm(lista) {
+  if (!lista) return
   lista.innerHTML = ''
   if (pastasRecentes.length === 0) {
     lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
@@ -396,6 +424,14 @@ async function renderizarPastas() {
     }
   }
   if (promessasFilhos.length) await Promise.all(promessasFilhos)
+}
+
+async function renderizarPastas() {
+  await renderizarArvoreEm($('folder-list'))
+  const filesPane = $('pane-files')
+  if (filesPane && filesPane.classList.contains('active')) {
+    await renderizarArvoreEm($('files-list'))
+  }
 }
 
 async function carregarFilhos(dir, container, nivel) {

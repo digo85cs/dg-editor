@@ -574,7 +574,7 @@ body {
   margin-right: 8px;
 }
 
-/* ---------- Terminal inferior ---------- */
+/* ---------- Terminal (docked no painel direito) ---------- */
 .terminal-panel {
   display: none;
   flex-direction: column;
@@ -588,6 +588,24 @@ body {
   z-index: 3;
 }
 .terminal-panel.open { display: flex; }
+/* Docked em #pane-terminal: preenche a coluna; altura via #resize-right */
+.terminal-panel.terminal-panel--docked {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100% !important;
+  min-height: 0;
+  max-height: none;
+  border-top: none;
+}
+.terminal-panel.terminal-panel--docked.open { display: flex; }
+#pane-terminal {
+  min-height: 0;
+}
+#pane-terminal #terminal-resize-handle,
+.terminal-panel--docked > #terminal-resize-handle {
+  display: none !important;
+  pointer-events: none !important;
+}
 .terminal-resize-handle {
   position: absolute;
   top: -3px;
@@ -620,6 +638,16 @@ body {
   border: 1px solid var(--dg-border);
   border-radius: var(--dg-radius-sm);
   padding: 0 var(--dg-space-1);
+}
+.terminal-panel--docked .terminal-shell-select {
+  max-width: none;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.files-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .terminal-shell-select:focus {
   outline: 1px solid var(--dg-accent);

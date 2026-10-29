@@ -122,33 +122,17 @@
           <pre id="diff-panel-body" class="diff-panel-body"></pre>
         </aside>
       </div>
-      <div id="terminal-panel" class="terminal-panel" aria-hidden="true">
-        <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
-        <header class="terminal-header">
-          <button type="button" id="terminal-btn-split" class="btn-icon" title="Dividir painel" aria-label="Dividir">⧉</button>
-          <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
-          <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
-          <span class="terminal-header-spacer"></span>
-          <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
-          <button type="button" id="terminal-btn-padrao" class="terminal-btn-padrao btn-icon" title="Definir shell atual como padrão" aria-label="Definir como padrão" hidden>☆</button>
-          <button type="button" id="terminal-btn-padrao-clear" class="btn-icon" title="Restaurar padrão (automático)" aria-label="Restaurar padrão" hidden>↺</button>
-          <span id="terminal-shell-label" class="terminal-shell-label"></span>
-          <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
-          <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
-        </header>
-        <div class="terminal-body">
-          <div id="terminal-split" class="terminal-split single horizontal"></div>
-        </div>
-      </div>
     </section>
 
     <div id="resize-right" class="resizer" data-resize="right" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Direita: Chat/IA + análise -->
+    <!-- Direita: Chat/IA + análise + terminal + files -->
     <section id="exec-panel">
       <div class="right-tabs">
         <button type="button" class="right-tab active" data-pane="chat">Chat / IA</button>
         <button type="button" class="right-tab" data-pane="analise">Análise</button>
+        <button type="button" class="right-tab" data-pane="terminal">Terminal</button>
+        <button type="button" class="right-tab" data-pane="files">Files</button>
       </div>
 
       <div id="pane-chat" class="right-pane active">
@@ -193,6 +177,32 @@
         <div id="analysis-progress" class="analysis-progress hidden">
           <span class="spinner"></span> <span id="progress-text">Analisando...</span>
         </div>
+      </div>
+
+      <div id="pane-terminal" class="right-pane">
+        <div id="terminal-panel" class="terminal-panel terminal-panel--docked" aria-hidden="true">
+          <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
+          <header class="terminal-header">
+            <button type="button" id="terminal-btn-split" class="btn-icon" title="Dividir painel" aria-label="Dividir">⧉</button>
+            <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
+            <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
+            <span class="terminal-header-spacer"></span>
+            <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
+            <button type="button" id="terminal-btn-padrao" class="terminal-btn-padrao btn-icon" title="Definir shell atual como padrão" aria-label="Definir como padrão" hidden>☆</button>
+            <button type="button" id="terminal-btn-padrao-clear" class="btn-icon" title="Restaurar padrão (automático)" aria-label="Restaurar padrão" hidden>↺</button>
+            <span id="terminal-shell-label" class="terminal-shell-label"></span>
+            <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
+            <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
+          </header>
+          <div class="terminal-body">
+            <div id="terminal-split" class="terminal-split single horizontal"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-files" class="right-pane">
+        <div class="section-label" style="padding:8px 12px 4px">Pastas</div>
+        <div id="files-list" class="folder-list files-panel-list"></div>
       </div>
 
       <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
