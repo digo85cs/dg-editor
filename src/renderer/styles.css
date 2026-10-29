@@ -278,6 +278,34 @@ body {
 }
 .project-item:hover { background: var(--dg-surface-raised); }
 .project-item.selected { background: var(--dg-active); }
+.pasta-remover {
+  display: none;
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--dg-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: var(--dg-radius-sm);
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.tree-root-header:hover .pasta-remover,
+.project-item:hover .pasta-remover {
+  display: inline-flex;
+}
+.pasta-remover:hover {
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+}
+.project-item .project-time + .pasta-remover {
+  margin-left: 4px;
+}
 .project-name {
   font-weight: 600;
   overflow: hidden;
@@ -367,6 +395,7 @@ body {
   color: var(--dg-text);
 }
 .tree-root-header:hover { background: var(--dg-surface-raised); }
+.tree-root-header .tab-name { flex: 1; min-width: 0; }
 .tree-root-header .chevron {
   width: 16px; height: 16px;
   display: flex; align-items: center; justify-content: center;

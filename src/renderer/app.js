@@ -318,8 +318,107 @@ function adicionarPasta(path) {
   void atualizarStatusBar(path)
 }
 
+function caminhoSobPasta(caminho, raiz) {
+  const n = (s) => String(s || '').replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+  const root = n(raiz)
+  const c = n(caminho)
+  if (!root || !c) return false
+  return c === root || c.startsWith(root + '\\')
+}
+
+function criarBotaoRemoverPasta(path) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'pasta-remover'
+  btn.title = 'Remover da lista'
+  btn.setAttribute('aria-label', 'Remover pasta ' + nomeArquivo(path))
+  btn.textContent = '\u00D7'
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    void removerPasta(path)
+  })
+  return btn
+}
+
+function garantirEmptyStateChat() {
+  const area = $('chat-messages')
+  if (!area) return
+  let empty = $('empty-state')
+  if (!empty) {
+    empty = document.createElement('div')
+    empty.className = 'empty-state'
+    empty.id = 'empty-state'
+    empty.innerHTML =
+      '<h2>Bem-vindo ao DG Editor</h2>' +
+      '<p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>' +
+      '<button id="btn-empty-open" class="btn-primary">Abrir pasta</button>'
+    area.innerHTML = ''
+    area.appendChild(empty)
+    $('btn-empty-open')?.addEventListener('click', abrirPasta)
+  } else {
+    empty.classList.remove('hidden')
+  }
+}
+
+async function removerPasta(path) {
+  if (!path || !pastasRecentes.includes(path)) return
+  const nome = nomeArquivo(path)
+  if (
+    !window.confirm(
+      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
+    )
+  ) {
+    return
+  }
+  const idx = pastasRecentes.indexOf(path)
+  if (idx === -1) return
+  pastasRecentes.splice(idx, 1)
+  salvarPastas()
+
+  // Fechar abas cujos arquivos estavam sob a pasta removida
+  const paraFechar = abas.filter((a) => caminhoSobPasta(a.caminho, path)).map((a) => a.caminho)
+  for (const c of paraFechar) {
+    const i = abas.findIndex((x) => x.caminho === c)
+    if (i >= 0) abas.splice(i, 1)
+  }
+  if (paraFechar.length) {
+    if (!abaAtiva || !abas.some((a) => a.caminho === abaAtiva)) {
+      abaAtiva = null
+      editor?.limpar()
+      histAbas = []
+      histIdx = -1
+      atualizarBotoesHist()
+    }
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    persistirAbas()
+  }
+
+  if (pastaAtual === path) {
+    pastaAtual = null
+    const titulo = $('chat-title')
+    if (titulo) titulo.textContent = 'Nenhuma pasta aberta'
+    $('chat-send') && ($('chat-send').disabled = true)
+    $('btn-reanalyze')?.classList.add('hidden')
+    garantirEmptyStateChat()
+    histChat = null
+  }
+
+  await renderizarPastas()
+  void renderizarProjects(true)
+  if (typeof atualizarStatusBar === 'function') {
+    void atualizarStatusBar(pastaAtual)
+  }
+}
+
 function salvarPastas() {
-  localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
+  try {
+    localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
+  } catch (e) {
+    console.warn('[pastas] falha ao salvar localStorage:', e)
+  }
 }
 
 function carregarPastas() {
@@ -447,6 +546,7 @@ async function renderizarArvoreEm(lista) {
       escapar(nomeArquivo(p)) +
       '</span>'
     header.title = p
+    header.appendChild(criarBotaoRemoverPasta(p))
     const chev = header.querySelector('.chevron')
     if (st.expandida) chev.classList.add('open')
 
@@ -454,6 +554,7 @@ async function renderizarArvoreEm(lista) {
     children.className = 'tree-children' + (st.expandida ? ' open' : '')
 
     header.addEventListener('click', async (e) => {
+      if (e.target.closest('.pasta-remover')) return
       if (carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
       // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
@@ -851,7 +952,9 @@ async function renderizarProjects(force) {
       t.textContent = tempo
       btn.appendChild(t)
     }
-    btn.addEventListener('click', () => {
+    btn.appendChild(criarBotaoRemoverPasta(it.pasta))
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('.pasta-remover')) return
       void selecionarPasta(it.pasta)
       setSidebarMode('explorer')
     })
