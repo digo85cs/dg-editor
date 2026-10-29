@@ -27,6 +27,9 @@ let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
 /** #files-list precisa re-render quando a aba Files for ativada. */
 let filesListaSuja = false
+/** Histórico de navegação de abas (tb-voltar / tb-avancar). */
+let histAbas = []
+let histIdx = -1
 
 const CHEV =
   '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
@@ -1077,6 +1080,60 @@ function esconderImagem() {
 
 $('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
 
+function atualizarBotoesHist() {
+  const v = document.getElementById('tb-voltar')
+  const a = document.getElementById('tb-avancar')
+  const canBack = histIdx > 0
+  const canFwd = histIdx >= 0 && histIdx < histAbas.length - 1
+  if (v) {
+    v.disabled = !canBack
+    v.setAttribute('aria-disabled', canBack ? 'false' : 'true')
+  }
+  if (a) {
+    a.disabled = !canFwd
+    a.setAttribute('aria-disabled', canFwd ? 'false' : 'true')
+  }
+}
+
+/** Empurra no histórico só se o caminho for diferente da posição atual (evita loop com irHistAbas). */
+function registrarHistAba(caminho) {
+  if (!caminho) return
+  if (histAbas[histIdx] === caminho) {
+    atualizarBotoesHist()
+    return
+  }
+  histAbas = histAbas.slice(0, histIdx + 1)
+  histAbas.push(caminho)
+  histIdx = histAbas.length - 1
+  if (histAbas.length > 100) {
+    histAbas.shift()
+    histIdx--
+  }
+  atualizarBotoesHist()
+}
+
+async function irHistAbas(delta) {
+  const novo = histIdx + delta
+  if (novo < 0 || novo >= histAbas.length) return
+  const alvo = histAbas[novo]
+  histIdx = novo
+  try {
+    await abrirArquivoNaAba(alvo)
+    // arquivo apagado / falha de IPC: não ficou em abas
+    if (!abas.some((a) => a.caminho === alvo)) {
+      histAbas.splice(novo, 1)
+      histIdx = Math.min(novo, histAbas.length - 1)
+      if (histAbas.length === 0) histIdx = -1
+    }
+  } catch (e) {
+    console.warn('[hist-abas]', e)
+    histAbas.splice(novo, 1)
+    histIdx = Math.min(novo, histAbas.length - 1)
+    if (histAbas.length === 0) histIdx = -1
+  }
+  atualizarBotoesHist()
+}
+
 async function abrirArquivoNaAba(caminho) {
   ativarAbaCentro('editor')
   const existente = abas.find((a) => a.caminho === caminho)
@@ -1088,6 +1145,7 @@ async function abrirArquivoNaAba(caminho) {
     syncDirtyAtiva()
     abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
     abaAtiva = caminho
+    registrarHistAba(caminho)
     if (!editor) initEditor()
     esconderImagem()
     await mostrarImagem(caminho)
@@ -1119,6 +1177,7 @@ function syncDirtyAtiva() {
 async function ativarAba(caminho, conteudoPrevio) {
   syncDirtyAtiva()
   abaAtiva = caminho
+  registrarHistAba(caminho)
   ativarAbaCentro('editor')
   if (ehImagemExt(caminho)) {
     if (!editor) initEditor()
@@ -1211,6 +1270,9 @@ async function fecharAba(caminho) {
       await ativarAba(next.caminho)
     } else {
       editor?.limpar()
+      histAbas = []
+      histIdx = -1
+      atualizarBotoesHist()
       atualizarBreadcrumb()
       atualizarEmpty()
       renderizarAbas()
@@ -2057,6 +2119,16 @@ document.addEventListener('keydown', (e) => {
     if (abaAtiva) fecharAba(abaAtiva)
     return
   }
+  if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'Left')) {
+    e.preventDefault()
+    void irHistAbas(-1)
+    return
+  }
+  if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowRight' || e.key === 'Right')) {
+    e.preventDefault()
+    void irHistAbas(1)
+    return
+  }
   if (mod && key === 'tab') {
     e.preventDefault()
     ciclarAbas()
@@ -2392,6 +2464,15 @@ document.addEventListener('DOMContentLoaded', function () {
   var bMin = document.getElementById('tb-min')
   var bMax = document.getElementById('tb-max')
   var bClose = document.getElementById('tb-close')
+  var bVoltar = document.getElementById('tb-voltar')
+  var bAvancar = document.getElementById('tb-avancar')
+  if (bVoltar) bVoltar.addEventListener('click', function () {
+    void irHistAbas(-1)
+  })
+  if (bAvancar) bAvancar.addEventListener('click', function () {
+    void irHistAbas(1)
+  })
+  atualizarBotoesHist()
   if (bMin) bMin.addEventListener('click', function () {
     window.api.invoke('janela:minimizar')
   })
