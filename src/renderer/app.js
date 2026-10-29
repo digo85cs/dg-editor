@@ -777,6 +777,9 @@ function renderizarAbas() {
     })
     bar.appendChild(btn)
   }
+  // #tabbar fora de #app: esconde quando não há abas (Cursor)
+  const tabbar = $('tabbar')
+  if (tabbar) tabbar.style.display = abas.length ? 'flex' : 'none'
   atualizarEmpty()
 }
 

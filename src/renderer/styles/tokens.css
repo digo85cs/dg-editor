@@ -67,10 +67,9 @@ body.tema-claro {
   --dg-lh-normal: 1.5;
   --dg-lh-relaxed: 1.7;
   --dg-editor-line-height: 1.6;
-  --dg-tab-height: 36px;
   --dg-titlebar-height: 38px;
 
-  /* === ESTRUTURA (Prompt F / Etapa 1) === */
+  /* === ESTRUTURA (Prompt F / Etapa 1+3) === */
   --dg-gap: 8px;
   --dg-gap-sm: 6px;
   --dg-iconbar-w: 48px;
@@ -78,6 +77,8 @@ body.tema-claro {
   --dg-panel-w: 320px;
   --dg-statusbar-h: 24px;
   --dg-tabbar-h: 34px;
+  /* Alias legado: 36 → 34 (tabbar Cursor). Manter nome para CSS antigo. */
+  --dg-tab-height: var(--dg-tabbar-h);
   /* --dg-radius-sm/md: mantidos em 6px/8px (acima). Cursor 4/6 = pendencia Etapa visual. */
 
   /* Aliases legados → estrutura (drag/layout e CSS antigo) */

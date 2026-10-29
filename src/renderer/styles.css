@@ -29,9 +29,25 @@ body {
   position: relative;
   z-index: 100;
 }
-.tb-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; height: 100%; }
+.tb-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; height: 100%; gap: 4px; }
 .tb-marca { font-size: 12.5px; font-weight: 700; letter-spacing: 0.4px; color: var(--dg-text); opacity: 0.9; }
 .tb-marca-acento { color: var(--dg-accent-brand); margin-left: 4px; font-weight: 500; }
+.tb-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  -webkit-app-region: no-drag;
+}
+.tb-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--dg-radius-sm);
+  opacity: 0.55;
+  cursor: default;
+}
+.tb-nav-btn svg { width: 16px; height: 16px; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tb-nav-btn:disabled { pointer-events: none; }
 .tb-controles { display: flex; -webkit-app-region: no-drag; height: 100%; }
 .tb-btn {
   width: 44px; height: 100%; border: 0; background: transparent; color: var(--dg-text-muted);
@@ -40,6 +56,18 @@ body {
 .tb-btn svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.3; }
 .tb-btn:hover { background: var(--dg-surface-raised); color: var(--dg-text); }
 .tb-close:hover { background: var(--dg-danger-close); color: #fff; }
+
+/* Tabbar dedicada (entre titlebar e #app) */
+#tabbar {
+  height: var(--dg-tabbar-h);
+  flex: 0 0 var(--dg-tabbar-h);
+  display: none;
+  align-items: stretch;
+  border-bottom: 1px solid var(--dg-border);
+  background: var(--dg-sidebar);
+  min-width: 0;
+  overflow: hidden;
+}
 
 /* ---------- App grid (4 zonas + statusbar slot) ---------- */
 #app {
@@ -397,14 +425,12 @@ body {
   min-width: 0;
 }
 #editor-tabs {
-  height: var(--dg-tab-height);
-  flex: 0 0 var(--dg-tab-height);
+  height: 100%;
+  width: 100%;
   display: flex;
   align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--dg-surface);
-  border-bottom: 1px solid var(--dg-border-subtle);
   white-space: nowrap;
 }
 .editor-tab {
@@ -412,13 +438,13 @@ body {
   align-items: center;
   gap: 6px;
   height: 100%;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 0;
-  border-right: 1px solid var(--dg-border-subtle);
-  background: var(--dg-surface);
+  border-right: 1px solid var(--dg-border);
+  background: transparent;
   color: var(--dg-text-muted);
   font-family: var(--fonte);
-  font-size: var(--dg-fs-sm);
+  font-size: 12px;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;

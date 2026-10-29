@@ -12,6 +12,14 @@
   <header id="titlebar">
     <div class="tb-drag">
       <span class="tb-marca">DG<span class="tb-marca-acento">Editor</span></span>
+      <div class="tb-nav" aria-label="Navegação de abas">
+        <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
+        <button type="button" id="tb-avancar" class="tb-btn tb-nav-btn" title="Avançar (Alt+Setas)" disabled aria-disabled="true">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+      </div>
     </div>
     <div class="tb-controles">
       <button id="tb-min" class="tb-btn" title="Minimizar"><svg viewBox="0 0 10 10"><path d="M2 5h6"/></svg></button>
@@ -19,6 +27,10 @@
       <button id="tb-close" class="tb-btn tb-close" title="Fechar"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2l-6 6"/></svg></button>
     </div>
   </header>
+
+  <div id="tabbar" role="tablist" aria-label="Abas de arquivo" style="display:none">
+    <div id="editor-tabs"></div>
+  </div>
 
   <div id="app">
     <!-- Activity bar (ordem Cursor: chat/busca/explorer · spacer · terminal/navegador · config/tema) -->
@@ -79,9 +91,8 @@
 
     <div id="resize-sidebar" class="resizer" data-resize="sidebar" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Centro: editor + terminal -->
+    <!-- Centro: editor + terminal (#editor-tabs vive em #tabbar acima de #app) -->
     <section id="center-panel">
-      <div id="editor-tabs" role="tablist"></div>
       <div id="editor-breadcrumb"></div>
       <div id="editor-toolbar" class="editor-toolbar hidden">
         <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
