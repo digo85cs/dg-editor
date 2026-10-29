@@ -29,7 +29,11 @@ const invokeChannels = [
   'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
   'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa', 'modelos:versoes-remotas',
   'config:backup', 'sistema:safe-mode', 'app:is-safe-mode',
-  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar'
+  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar',
+  'openclaw:config-get', 'openclaw:config-set',
+  'openclaw:token-set', 'openclaw:token-clear', 'openclaw:token-status',
+  'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',
+  'openclaw:auditoria-listar'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
