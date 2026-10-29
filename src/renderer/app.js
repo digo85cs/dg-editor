@@ -121,6 +121,7 @@ function initResizers() {
         const w = Math.min(600, Math.max(320, startW - dx))
         $('app').style.setProperty('--dg-panel-w', w + 'px')
         $('app').style.setProperty('--dg-right-panel-width', w + 'px')
+        if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
       }
     }
     const onUp = () => {
@@ -128,6 +129,7 @@ function initResizers() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       salvarLayout()
+      if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
     }
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
@@ -205,24 +207,63 @@ function initActivityBar() {
   })
 }
 
+let browserAberto = false
+let browserMountObserver = null
+
 function setBrowserStatus(aberto) {
+  browserAberto = !!aberto
   const st = $('browser-status')
-  const btn = $('browser-abrir')
+  const overlay = $('browser-overlay')
   if (st) {
     st.textContent = aberto
-      ? 'Navegador aberto em janela ao lado.'
+      ? 'Navegador ativo nesta aba.'
       : 'Navegador fechado.'
   }
-  if (btn) btn.classList.toggle('hidden', !!aberto)
+  if (overlay) overlay.classList.toggle('hidden', !!aberto)
+}
+
+function enviarBoundsBrowser() {
+  const m = $('browser-mount')
+  const pane = $('pane-browser')
+  if (!m || !pane || !pane.classList.contains('active')) return
+  const r = m.getBoundingClientRect()
+  if (r.width < 2 || r.height < 2) return
+  try {
+    window.api.send('navegador:bounds', {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height)
+    })
+  } catch (e) {
+    console.warn('[navegador] bounds', e)
+  }
+}
+
+function setBrowserVisivel(mostrar) {
+  try {
+    window.api.send('navegador:mostrar', !!mostrar)
+  } catch {
+    /* preload antigo */
+  }
+  if (mostrar) {
+    requestAnimationFrame(() => {
+      enviarBoundsBrowser()
+      requestAnimationFrame(enviarBoundsBrowser)
+    })
+  }
 }
 
 async function abrirNavegadorUi() {
   try {
     await window.api.invoke('navegador:abrir')
     setBrowserStatus(true)
+    setBrowserVisivel(true)
+    enviarBoundsBrowser()
   } catch (e) {
     console.warn('[navegador]', e)
     setBrowserStatus(false)
+    setBrowserVisivel(false)
   }
 }
 
@@ -232,12 +273,19 @@ function ativarAbaDireita(pane) {
     ativarAbaCentro('chat')
     return
   }
+  const eraBrowser = $('pane-browser')?.classList.contains('active')
   document.querySelectorAll('.right-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.pane === pane)
   })
   document.querySelectorAll('.right-pane').forEach((p) => {
     p.classList.toggle('active', p.id === 'pane-' + pane)
   })
+  if (pane === 'browser') {
+    if (browserAberto) setBrowserVisivel(true)
+    else setBrowserVisivel(false)
+  } else if (eraBrowser || pane !== 'browser') {
+    setBrowserVisivel(false)
+  }
   if (pane === 'terminal') {
     garantirTerminal()
     const fit = () => {
@@ -269,11 +317,33 @@ $('browser-abrir')?.addEventListener('click', () => {
   void abrirNavegadorUi()
 })
 try {
-  window.api.on?.('navegador:aberto', () => setBrowserStatus(true))
-  window.api.on?.('navegador:fechado', () => setBrowserStatus(false))
+  window.api.on?.('navegador:aberto', () => {
+    setBrowserStatus(true)
+    setBrowserVisivel($('pane-browser')?.classList.contains('active'))
+  })
+  window.api.on?.('navegador:fechado', () => {
+    setBrowserStatus(false)
+    setBrowserVisivel(false)
+  })
 } catch {
   /* preload antigo */
 }
+
+window.addEventListener('resize', () => {
+  if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+    enviarBoundsBrowser()
+  }
+})
+;(() => {
+  const m = $('browser-mount')
+  if (!m || typeof ResizeObserver === 'undefined') return
+  browserMountObserver = new ResizeObserver(() => {
+    if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+      enviarBoundsBrowser()
+    }
+  })
+  browserMountObserver.observe(m)
+})()
 
 function ativarAbaCentro(pane) {
   const alvo = pane === 'editor' ? 'editor' : 'chat'

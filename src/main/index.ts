@@ -31,8 +31,11 @@ import { lerTema, salvarTema } from './tema'
 import {
   criarJanelaNavegador,
   fecharJanelaNavegador,
+  destruirJanelaNavegador,
   lerUltimaUrlNavegador,
-  getJanelaNavegador,
+  definirJanelaPrincipalNavegador,
+  layoutNavegador,
+  mostrarNavegadorEmbutido,
   onNavegadorEventos
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
@@ -90,47 +93,28 @@ function emSmokeNav(): boolean {
   return process.env.DG_NAV_SMOKE === '1'
 }
 
-/** Posiciona a BaseWindow do navegador ao lado direito do editor. Sem loop: só move a do nav. */
-function reposicionarNavegador(): void {
-  if (emSmokeNav()) return
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  const nav = getJanelaNavegador()
-  if (!nav || nav.isDestroyed()) return
-  try {
-    const mb = mainWindow.getBounds()
-    nav.setBounds({
-      x: mb.x + mb.width,
-      y: mb.y,
-      width: Math.max(800, Math.round(mb.width * 0.5)),
-      height: mb.height
-    })
-  } catch (e) {
-    dglog('[navegador] reposicionar falhou: ' + String((e as Error)?.message || e))
-  }
-}
-
+/** Abre/garante o navegador embutido (ou BaseWindow no smoke). */
 function abrirNavegadorAncorado(url?: string): { ok: boolean } {
   const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
-  dglog('[navegador] abrir ancorado url=' + dest)
-  criarJanelaNavegador(dest, { mostrar: true })
-  if (!emSmokeNav()) {
-    reposicionarNavegador()
-    const nav = getJanelaNavegador()
-    if (nav && !nav.isDestroyed()) {
+  dglog('[navegador] abrir embutido url=' + dest)
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      definirJanelaPrincipalNavegador(mainWindow)
+    }
+    criarJanelaNavegador(dest, { mostrar: true })
+    if (!emSmokeNav()) {
+      mostrarNavegadorEmbutido(true)
       try {
-        nav.show()
-        nav.focus()
+        mainWindow?.webContents?.send('navegador:aberto')
       } catch {
         /* ignore */
       }
     }
-    try {
-      mainWindow?.webContents?.send('navegador:aberto')
-    } catch {
-      /* ignore */
-    }
+    return { ok: true }
+  } catch (e) {
+    dglog('[navegador] abrir falhou: ' + String((e as Error)?.message || e))
+    return { ok: false }
   }
-  return { ok: true }
 }
 
 function createWindow(): void {
@@ -160,33 +144,10 @@ function createWindow(): void {
     mainWindow.once('ready-to-show', () => { mainWindow?.show() })
   }
 
-  // Ancoragem: só a janela principal dispara move/resize → navegador acompanha (sem listener na do nav)
-  mainWindow.on('move', () => reposicionarNavegador())
-  mainWindow.on('resize', () => reposicionarNavegador())
-  mainWindow.on('minimize', () => {
-    if (emSmokeNav()) return
-    const nav = getJanelaNavegador()
-    if (nav && !nav.isDestroyed()) {
-      try {
-        nav.hide()
-      } catch {
-        /* ignore */
-      }
-    }
-  })
-  mainWindow.on('restore', () => {
-    if (emSmokeNav()) return
-    const nav = getJanelaNavegador()
-    if (nav && !nav.isDestroyed()) {
-      try {
-        nav.show()
-      } catch {
-        /* ignore */
-      }
-    }
-  })
+  definirJanelaPrincipalNavegador(mainWindow)
 
   mainWindow.on('closed', () => {
+    definirJanelaPrincipalNavegador(null)
     mainWindow = null
   })
 
@@ -273,12 +234,45 @@ app.on('before-quit', () => {
 
 app.on('window-all-closed', () => {
   pararControleNavegador()
-  fecharJanelaNavegador()
+  destruirJanelaNavegador()
   if (process.platform !== 'darwin') app.quit()
 })
 
 ipcMain.handle('navegador:abrir', (_e, url?: string) => {
   return abrirNavegadorAncorado(url)
+})
+
+ipcMain.on('navegador:bounds', (_e, b: unknown) => {
+  if (!b || typeof b !== 'object') return
+  const o = b as Record<string, unknown>
+  if (
+    typeof o.x !== 'number' ||
+    typeof o.y !== 'number' ||
+    typeof o.width !== 'number' ||
+    typeof o.height !== 'number'
+  ) {
+    return
+  }
+  layoutNavegador({
+    x: o.x,
+    y: o.y,
+    width: o.width,
+    height: o.height
+  })
+})
+
+ipcMain.on('navegador:mostrar', (_e, mostrar: unknown) => {
+  mostrarNavegadorEmbutido(mostrar === true || mostrar === 'true' || mostrar === 1)
+})
+
+ipcMain.handle('navegador:fechar', () => {
+  fecharJanelaNavegador()
+  try {
+    mainWindow?.webContents?.send('navegador:fechado')
+  } catch {
+    /* ignore */
+  }
+  return { ok: true }
 })
 
 // ---------- Terminal embutido ----------

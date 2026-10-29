@@ -20,6 +20,7 @@ const invokeChannels = [
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
+  'navegador:fechar',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
   'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',
   'qa:run',
@@ -40,7 +41,7 @@ const eventOnChannels = [
   'navegador:fechado'
 ] as const
 
-const sendChannels = ['app:quit']
+const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']
 
 contextBridge.exposeInMainWorld('api', {
   invoke: (channel: string, ...args: unknown[]) => {
