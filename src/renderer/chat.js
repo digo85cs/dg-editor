@@ -85,14 +85,6 @@ export async function iniciarHistoricoChat(raiz, { onRender, onNova }) {
     }, 500)
   }
 
-  document.getElementById('btn-chat-nova')?.addEventListener('click', () => {
-    chatAtivoId = novoId()
-    mensagensLocais = []
-    onNova?.()
-    onRender?.([])
-    agendarSave()
-  })
-
   document.getElementById('chat-history-select')?.addEventListener('change', (e) => {
     const id = e.target.value
     if (id) void carregar(id)
@@ -105,6 +97,14 @@ export async function iniciarHistoricoChat(raiz, { onRender, onNova }) {
     }
   }
 
+  function nova() {
+    chatAtivoId = novoId()
+    mensagensLocais = []
+    onNova?.()
+    onRender?.([])
+    agendarSave()
+  }
+
   return {
     registrarMensagem(role, content, provider) {
       mensagensLocais.push({ role, content, provider, em: new Date().toISOString() })
@@ -112,7 +112,8 @@ export async function iniciarHistoricoChat(raiz, { onRender, onNova }) {
       agendarSave()
     },
     refrescarLista,
-    agendarSave
+    agendarSave,
+    nova
   }
 }
 

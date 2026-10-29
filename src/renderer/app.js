@@ -1389,6 +1389,18 @@ async function ligarHistoricoChat(raiz) {
   })
 }
 
+/** Nova conversa: limpa UI e reseta estado do histórico (chat.js). */
+function novaConversaUi() {
+  if (histChat && typeof histChat.nova === 'function') {
+    histChat.nova()
+    return
+  }
+  $('empty-state')?.classList.add('hidden')
+  renderizarChat([])
+}
+
+$('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
+
 // ---------- Config / Contas ----------
 async function abrirConfig() {
   $('modal-config').classList.remove('hidden')
