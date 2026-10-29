@@ -25,6 +25,8 @@ let abaAtiva = null
 let editor = null
 let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
+/** #files-list precisa re-render quando a aba Files for ativada. */
+let filesListaSuja = false
 
 const CHEV =
   '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
@@ -252,7 +254,8 @@ function ativarAbaDireita(pane) {
         requestAnimationFrame(fit)
       })
     }
-  } else if (pane === 'files') {
+  } else if (pane === 'files' && filesListaSuja) {
+    filesListaSuja = false
     void renderizarArvoreEm($('files-list'))
   }
 }
@@ -485,11 +488,22 @@ async function renderizarArvoreEm(lista) {
   if (promessasFilhos.length) await Promise.all(promessasFilhos)
 }
 
+function abaFilesVisivel() {
+  return !!$('pane-files')?.classList.contains('active')
+}
+
 async function renderizarPastas() {
-  await renderizarArvoreEm($('folder-list'))
-  const filesPane = $('pane-files')
-  if (filesPane && filesPane.classList.contains('active')) {
-    await renderizarArvoreEm($('files-list'))
+  console.time('renderizarPastas')
+  try {
+    await renderizarArvoreEm($('folder-list'))
+    if (abaFilesVisivel()) {
+      await renderizarArvoreEm($('files-list'))
+      filesListaSuja = false
+    } else {
+      filesListaSuja = true
+    }
+  } finally {
+    console.timeEnd('renderizarPastas')
   }
 }
 
