@@ -212,14 +212,22 @@
         <div class="section-label" style="padding:8px 12px 4px">Pastas</div>
         <div id="files-list" class="folder-list files-panel-list"></div>
       </div>
-
-      <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
-        <span id="guardian-text">Guardião: medindo...</span>
-      </div>
     </section>
 
-    <!-- Slot status bar (Etapa 6); oculto nesta etapa -->
-    <footer id="statusbar" aria-hidden="true"></footer>
+    <footer id="statusbar">
+      <div class="sb-left">
+        <span id="sb-branch" title="Branch do repositório">—</span>
+        <span id="sb-pasta" title="Projeto aberto">—</span>
+      </div>
+      <div class="sb-center">
+        <span id="sb-ambiente">This PC</span>
+      </div>
+      <div class="sb-right">
+        <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
+          <span id="guardian-text">Guardião: medindo...</span>
+        </div>
+      </div>
+    </footer>
   </div>
 
   <!-- Paleta de comandos (Ctrl+Shift+P) / arquivos (Ctrl+P) -->

@@ -81,8 +81,8 @@ body {
     minmax(0, 1fr)
     4px
     var(--dg-panel-w);
-  /* Linha 2 = 0px enquanto #statusbar está display:none (sem faixa vazia). Etapa 6: var(--dg-statusbar-h) */
-  grid-template-rows: minmax(0, 1fr) 0px;
+  /* Linha 2 = status bar (--dg-statusbar-h) */
+  grid-template-rows: minmax(0, 1fr) var(--dg-statusbar-h);
   overflow: hidden;
 }
 #app.sidebar-collapsed {
@@ -111,12 +111,30 @@ body {
   grid-template-columns: var(--dg-iconbar-w) 0 0 minmax(0, 1fr) 0 0;
 }
 #statusbar {
-  display: none;
+  display: flex;
+  align-items: center;
   grid-column: 1 / -1;
   grid-row: 2;
   height: var(--dg-statusbar-h);
-  min-height: 0;
+  font-size: 11px;
+  line-height: var(--dg-statusbar-h);
+  padding: 0 10px;
+  gap: 12px;
+  border-top: 1px solid var(--dg-border);
+  background: var(--dg-sidebar);
+  color: var(--dg-text-muted);
   overflow: hidden;
+  min-height: 0;
+  white-space: nowrap;
+}
+.sb-left { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.sb-center { display: flex; align-items: center; flex-shrink: 0; }
+.sb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; min-width: 0; }
+#sb-branch, #sb-pasta, #sb-ambiente {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
 }
 
 /* ---------- Activity bar ---------- */
@@ -1183,7 +1201,7 @@ body.tema-claro .msg.user { color: #333333; }
   flex: 1;
   padding: 10px 14px;
   border: 1px solid var(--dg-border);
-  border-radius: var(--dg-radius-md);
+  border-radius: var(--dg-radius-lg);
   background: var(--dg-surface);
   font-family: var(--fonte);
   font-size: var(--dg-fs-md);
@@ -1275,12 +1293,20 @@ body.tema-claro .msg.user { color: #333333; }
 .analysis-section { margin-bottom: 14px; }
 .muted { color: var(--dg-text-faint); font-style: italic; }
 .guardian-bar {
-  padding: 10px 18px;
-  border-top: 1px solid var(--dg-border-subtle);
-  font-size: var(--dg-fs-xs);
+  height: var(--dg-statusbar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
   color: var(--dg-text-muted);
   font-family: var(--fonte-mono);
+  border-radius: var(--dg-radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
   flex-shrink: 0;
+  border-top: none;
 }
 .guardian-bar.guardian-alerta { color: var(--dg-danger); background: rgba(217, 83, 79, 0.08); }
 .analysis-progress {

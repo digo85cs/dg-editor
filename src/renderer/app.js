@@ -273,7 +273,8 @@ function adicionarPasta(path) {
   if (!pastasRecentes.includes(path)) pastasRecentes.push(path)
   renderizarPastas()
   salvarPastas()
-  void renderizarProjects()
+  void renderizarProjects(true)
+  void atualizarStatusBar(path)
 }
 
 function salvarPastas() {
@@ -293,6 +294,7 @@ async function selecionarPasta(path) {
   console.time('selecionarPasta')
   pastaAtual = path
   ativarAbaCentro('chat')
+  void atualizarStatusBar(path)
   $('chat-title').textContent = nomeArquivo(path)
   $('empty-state')?.remove()
   $('chat-send').disabled = false
@@ -661,11 +663,13 @@ function criarNoFile(ent, nivel) {
 $('btn-refresh-tree')?.addEventListener('click', () => {
   for (const [, st] of estadoArvore) st.filhosCarregados = false
   renderizarPastas().then(() => atualizarGitStatusArvore())
-  void renderizarProjects()
+  void renderizarProjects(true)
+  void atualizarStatusBar(pastaAtual)
 })
 $('btn-git-refresh')?.addEventListener('click', () => {
   void atualizarGitStatusArvore()
-  void renderizarProjects()
+  void renderizarProjects(true)
+  void atualizarStatusBar(pastaAtual)
 })
 
 // ---------- Sidebar modos: Projects / Explorer ----------
@@ -696,18 +700,62 @@ function setSidebarMode(mode) {
   if (isProjects) void renderizarProjects()
 }
 
-async function renderizarProjects() {
+/** Cache local do ultimo git:repos (main tambem cacheia 30s). */
+let reposCacheLocal = { ts: 0, itens: [] }
+const REPOS_CACHE_LOCAL_MS = 30000
+
+async function obterReposGit(force) {
+  if (
+    !force &&
+    reposCacheLocal.ts &&
+    Date.now() - reposCacheLocal.ts <= REPOS_CACHE_LOCAL_MS
+  ) {
+    return reposCacheLocal.itens
+  }
+  try {
+    const r = await window.api.invoke('git:repos', { pastas: [...pastasRecentes] })
+    reposCacheLocal = { ts: Date.now(), itens: Array.isArray(r) ? r : [] }
+  } catch (e) {
+    console.warn('[projects] git:repos', e)
+    reposCacheLocal = { ts: Date.now(), itens: [] }
+  }
+  return reposCacheLocal.itens
+}
+
+async function atualizarStatusBar(pasta) {
+  const elBranch = $('sb-branch')
+  const elPasta = $('sb-pasta')
+  if (!elBranch || !elPasta) return
+  if (!pasta) {
+    elBranch.textContent = '—'
+    elPasta.textContent = '—'
+    return
+  }
+  const itens = await obterReposGit(false)
+  const hit =
+    itens.find((it) => it && it.pasta === pasta) ||
+    itens.find(
+      (it) =>
+        it &&
+        it.repo &&
+        (pasta === it.pasta ||
+          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '\\') ||
+          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '/'))
+    )
+  if (hit && hit.repo) {
+    elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' ●' : '')
+    elPasta.textContent = hit.repo
+  } else {
+    elBranch.textContent = '—'
+    elPasta.textContent = nomeArquivo(pasta)
+  }
+}
+
+async function renderizarProjects(force) {
   const lista = $('projects-list')
   if (!lista) return
   const t0 = performance.now()
-  let itens = []
-  try {
-    const r = await window.api.invoke('git:repos', { pastas: [...pastasRecentes] })
-    itens = Array.isArray(r) ? r : []
-  } catch (e) {
-    console.warn('[projects] git:repos', e)
-    itens = []
-  }
+  const itens = await obterReposGit(!!force)
   const ms = Math.round(performance.now() - t0)
   // Deduplicar por nome de repo (basename do toplevel); pastas sem repo somem
   const porRepo = new Map()
@@ -721,6 +769,7 @@ async function renderizarProjects() {
     lista.innerHTML =
       '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
     console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + pastasRecentes.length)
+    void atualizarStatusBar(pastaAtual)
     return
   }
   for (const it of unicos) {
@@ -766,6 +815,7 @@ async function renderizarProjects() {
       ' dedup=' +
       (itens.filter((i) => i && i.repo).length - unicos.length)
   )
+  void atualizarStatusBar(pastaAtual)
 }
 
 $('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
@@ -2261,7 +2311,8 @@ setSidebarMode('explorer')
   ativarAbaCentro(temConversa ? 'chat' : 'editor')
 }
 renderizarPastas().then(() => restaurarAbas())
-void renderizarProjects()
+void renderizarProjects().then(() => atualizarStatusBar(pastaAtual || pastasRecentes[0] || null))
+void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
 void atualizarBadgeProvedorReal()
