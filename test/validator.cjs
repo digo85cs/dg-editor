@@ -237,14 +237,17 @@ async function main() {
     /async function abrirEm\s*\(\s*cwd[\s\S]{0,400}criarAba/.test(termJs7) ||
       /function abrirEm\s*\(\s*cwd[\s\S]{0,400}cwd/.test(termJs7)
   )
-  assert('divisor tem handler de dblclick', /dblclick/.test(termJs7))
+  // drag vertical do terminal foi removido na Etapa P6 — o terminal agora é
+  // docked no painel direito (Etapa 4 do Prompt F). Asserções antigas
+  // (dblclick→300 / limiar dx+dy<=3) substituídas pelo contrato docked.
+  assert('terminal docked no painel direito', /terminal-panel--docked/.test(termJs7))
   assert(
-    'dblclick reseta para 300',
-    /dblclick[\s\S]{0,500}300|300[\s\S]{0,200}dblclick|alturaPadraoReset[\s\S]{0,80}300/.test(termJs7)
+    'divisor de split horizontal existe',
+    /montarDivisor|terminal-split-divisor/.test(termJs7)
   )
   assert(
-    'drag so ativa apos mover mais de 3px',
-    /Math\.abs[\s\S]{0,120}3|dx\s*\+\s*dy[\s\S]{0,40}[<>]=?\s*3|[<>]=?\s*3[\s\S]{0,40}dx/.test(termJs7)
+    'sem drag vertical legado (startH/limiar 3px)',
+    !/startH\s*=/.test(termJs7) && !/dx\s*\+\s*dy[\s\S]{0,40}<=\s*3/.test(termJs7)
   )
   assert('app.js registra menu de contexto', /contextmenu/.test(appJs7))
 

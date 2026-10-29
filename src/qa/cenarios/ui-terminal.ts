@@ -166,30 +166,51 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
   }
 
   {
+    // layout docked (Etapa 4 / P6): handle oculto; dblclick não redimensiona altura
     const t0 = Date.now()
     try {
-      await page.evaluate(() => {
-        const h = document.getElementById('terminal-resize-handle')
-        h?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+      const info = await page.evaluate(() => {
+        const panel = document.getElementById('terminal-panel')
+        const handle = document.getElementById('terminal-resize-handle')
+        const hBefore = panel ? panel.style.height : ''
+        handle?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+        const hAfter = panel ? panel.style.height : ''
+        const body = panel?.querySelector('.terminal-body') as HTMLElement | null
+        const bodyH = body?.clientHeight || panel?.clientHeight || 0
+        const hasXterm = !!panel?.querySelector('.xterm')
+        return {
+          docked: !!panel?.classList.contains('terminal-panel--docked'),
+          heightUnchanged: hBefore === hAfter,
+          bodyH,
+          hasXterm,
+          open: !!panel?.classList.contains('open')
+        }
       })
-      await page.waitForTimeout(300)
-      const h = await page.evaluate(() => {
-        const p = document.getElementById('terminal-panel')
-        return p ? parseInt(p.style.height, 10) || 0 : -1
-      })
+      const ok =
+        info.docked && info.heightUnchanged && info.open && (info.hasXterm || info.bodyH > 0)
       out.push({
         id: 'ui.terminal.dblclick300',
         area: 'ui',
-        titulo: 'duplo-clique altura 300',
-        severidade: h === 300 ? 'ok' : 'warn',
+        titulo: 'handle docked: dblclick nao altera altura',
+        severidade: ok ? 'ok' : 'warn',
         duracaoMs: Date.now() - t0,
-        detalhe: 'height=' + h
+        detalhe:
+          'docked=' +
+          info.docked +
+          ' heightUnchanged=' +
+          info.heightUnchanged +
+          ' open=' +
+          info.open +
+          ' hasXterm=' +
+          info.hasXterm +
+          ' bodyH=' +
+          info.bodyH
       })
     } catch (e) {
       out.push({
         id: 'ui.terminal.dblclick300',
         area: 'ui',
-        titulo: 'duplo-clique altura',
+        titulo: 'handle docked dblclick',
         severidade: 'erro',
         duracaoMs: Date.now() - t0,
         erro: String(e)
