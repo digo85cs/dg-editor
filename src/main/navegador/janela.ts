@@ -3,6 +3,20 @@
  * App: View host filha da BrowserWindow principal (aba Browser).
  * Smoke (DG_NAV_SMOKE=1): BaseWindow temporária (host com bounds controláveis).
  * Partition persist:dgnav = sessão (cookies/localStorage) em disco.
+ *
+ * DÍVIDA DE ARQUITETURA — DOIS CAMINHOS
+ *
+ * DG_NAV_SMOKE=1 -> BaseWindow oculta (arquitetura antiga).
+ *   22 cenários do smoke testam essa bifurcação.
+ *   Views chrome/content são filhas do BaseWindow.
+ *
+ * Modo normal -> View host na BrowserWindow principal.
+ *   Renderer envia bounds via 'navegador:bounds'.
+ *
+ * CONSEQUÊNCIA: o smoke NÃO cobre o caminho de produção.
+ * Se a arquitetura de embed quebrar, o smoke continua verde.
+ * Fechar essa dívida exige reescrever os cenários com um
+ * host injetável. Não fazer sem decisão explícita.
  */
 import {
   BaseWindow,
@@ -30,6 +44,9 @@ let chamadasCriacao = 0
 const timestampsCriacao: number[] = []
 
 function emSmokeNav(): boolean {
+  // ver DÍVIDA DE ARQUITETURA no topo do arquivo:
+  // smoke usa BaseWindow; produção usa host na janela
+  // principal. Caminhos coexistem por design.
   return process.env.DG_NAV_SMOKE === '1'
 }
 
