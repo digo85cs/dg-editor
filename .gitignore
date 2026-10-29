@@ -52,3 +52,23 @@ dossie-tecnico.md
 
 # telemetria de runtime (nao versionar)
 .dg-editor/modelos-stats.json
+
+# Agente QA (versionar so baseline e keep)
+qa-artifacts/*
+!qa-artifacts/baseline.json
+!qa-artifacts/.gitkeep
+
+# Catalogo de modelos e estado de runtime (o default versionado fica em modelos.default.json)
+.dg-editor/modelos.json
+
+# Provas isoladas de QA IA (scripts/qa-ia-teste.cjs)
+tmp/
+
+# Historico de chats (runtime)
+.dg-editor/chats/
+
+# Avaliacoes de modelo (runtime)
+.dg-editor/avaliacoes/
+
+.dg-editor/_backups/
+.dg-editor/modelos.json.bak-*

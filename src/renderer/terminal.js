@@ -71,7 +71,6 @@ export function initTerminalPanel() {
   const btnOrient = document.getElementById('terminal-btn-orient')
   const btnUnsplit = document.getElementById('terminal-btn-unsplit')
   const btnToggle = document.getElementById('btn-terminal-toggle')
-  const handle = document.getElementById('terminal-resize-handle')
   if (!panel || !splitEl || !apiTerm()) return
 
   /** @type {Map<string, Grupo>} */
@@ -90,8 +89,11 @@ export function initTerminalPanel() {
     value: Math.min(0.8, Math.max(0.2, parseFloat(localStorage.getItem(LS_SPLIT_RATIO) || '0.5') || 0.5))
   }
 
+  const docked = panel.classList.contains('terminal-panel--docked')
   const alturaSalva = parseInt(localStorage.getItem(LS_HEIGHT) || '220', 10)
-  panel.style.height = Math.max(120, alturaSalva) + 'px'
+  // Docked: altura vem do painel direito (CSS 100%). Inline height só no layout inferior legado.
+  if (!docked) panel.style.height = Math.max(120, alturaSalva) + 'px'
+  else panel.style.height = ''
 
   function grupoAtivo() {
     return grupos.get(grupoAtivoKey) || null
@@ -340,11 +342,15 @@ export function initTerminalPanel() {
     g.tabsEl.appendChild(tabBtn)
 
     const fit = new FitAddon()
+    const scrollbackCfg = Math.min(
+      50000,
+      Math.max(500, parseInt(localStorage.getItem('dg-terminal-scrollback') || '5000', 10) || 5000)
+    )
     const xterm = new Terminal({
       cursorBlink: true,
       fontFamily: 'Cascadia Code, Consolas, monospace',
       fontSize: 13,
-      scrollback: 5000,
+      scrollback: scrollbackCfg,
       theme: temaXterm(),
       allowProposedApi: true
     })
@@ -833,8 +839,20 @@ export function initTerminalPanel() {
   }
 
   function toggle() {
-    if (aberto) void fecharPainel(true)
-    else void abrirPainel()
+    if (aberto) {
+      void fecharPainel(true)
+      return
+    }
+    // Docked: abrir painel direito na aba Terminal (Ctrl+` / icon-bar)
+    try {
+      window.dgUi?.toggleRight?.(true)
+      window.dgUi?.ativarAbaDireita?.('terminal')
+    } catch {
+      /* app ainda nao expoe dgUi */
+    }
+    void abrirPainel().then(() => {
+      requestAnimationFrame(() => fitTodos())
+    })
   }
 
   selectEl?.addEventListener('focus', () => {
@@ -922,34 +940,6 @@ export function initTerminalPanel() {
     }
   })
 
-  function alturaUtilMax() {
-    return Math.floor(window.innerHeight * 0.6)
-  }
-
-  function alturaPadraoReset() {
-    const max = alturaUtilMax()
-    return Math.max(120, Math.min(300, max))
-  }
-
-  function aplicarAlturaPainel(px, comTransicao) {
-    const max = alturaUtilMax()
-    const h = Math.min(max, Math.max(120, px))
-    if (comTransicao) {
-      panel.style.transition = 'height 120ms ease'
-      const limpar = () => {
-        panel.style.transition = ''
-        panel.removeEventListener('transitionend', limpar)
-      }
-      panel.addEventListener('transitionend', limpar)
-      setTimeout(limpar, 200)
-    } else {
-      panel.style.transition = ''
-    }
-    panel.style.height = h + 'px'
-    localStorage.setItem(LS_HEIGHT, String(h))
-    fitTodos()
-  }
-
   /**
    * Abre o painel (se colapsado), cria aba no grupo ativo com cwd opcional e foca.
    * Exposto como window.dgTerminal.abrirEm para a árvore (app.js).
@@ -965,50 +955,51 @@ export function initTerminalPanel() {
     return entry
   }
 
-  window.dgTerminal = { abrirEm }
-
-  if (handle) {
-    let startY = 0
-    let startH = 0
-    let startX = 0
-    let dragging = false
-    const onMove = (e) => {
-      const dx = Math.abs(e.clientX - startX)
-      const dy = Math.abs(e.clientY - startY)
-      if (!dragging) {
-        if (dx + dy <= 3) return
-        dragging = true
-        panel.style.transition = ''
+  /**
+   * Lê o buffer do xterm (canvas nao expoe texto no DOM).
+   * @param {string} [abaId] id da aba; se omitido, usa a aba ativa do grupo ativo
+   * @returns {string}
+   */
+  function acharAba(abaId) {
+    if (abaId) {
+      for (const g of grupos.values()) {
+        if (g.abas.has(abaId)) return g.abas.get(abaId)
       }
-      const max = alturaUtilMax()
-      const h = Math.min(max, Math.max(120, startH + (startY - e.clientY)))
-      panel.style.height = h + 'px'
-      fitTodos()
     }
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      if (dragging) {
-        localStorage.setItem(LS_HEIGHT, String(parseInt(panel.style.height, 10) || 220))
-      }
-      dragging = false
-    }
-    handle.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return
-      e.preventDefault()
-      startY = e.clientY
-      startX = e.clientX
-      startH = panel.getBoundingClientRect().height
-      dragging = false
-      document.addEventListener('mousemove', onMove)
-      document.addEventListener('mouseup', onUp)
-    })
-    handle.addEventListener('dblclick', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      aplicarAlturaPainel(alturaPadraoReset(), true)
-    })
+    return abaAtivaDoGrupo(grupoAtivo())
   }
+
+  function bufferTexto(abaId) {
+    const aba = acharAba(abaId)
+    if (!aba || !aba.xterm) return ''
+    try {
+      const buf = aba.xterm.buffer.active
+      const linhas = []
+      // baseY..baseY+rows cobre o viewport; length cobre scrollback
+      const fim = Math.max(buf.length, (buf.baseY || 0) + (aba.xterm.rows || 0))
+      for (let i = 0; i < fim; i++) {
+        const l = buf.getLine(i)
+        if (l) linhas.push(l.translateToString(true))
+      }
+      return linhas.join('\n')
+    } catch {
+      return ''
+    }
+  }
+
+  window.dgTerminal = {
+    abrirEm,
+    bufferTexto,
+    abrir: () =>
+      abrirPainel().then(() => {
+        requestAnimationFrame(() => fitTodos())
+      }),
+    fit: fitTodos,
+    isOpen: () => aberto
+  }
+
+  // Drag vertical / dblclick de altura removidos (P6): terminal docked no painel direito.
+  // #terminal-resize-handle permanece no HTML (oculto via CSS). window.resize → fitTodos mantido.
 
   const mo = new MutationObserver(() => aplicarTema())
   mo.observe(document.body, { attributes: true, attributeFilter: ['class'] })

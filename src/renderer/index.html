@@ -12,6 +12,14 @@
   <header id="titlebar">
     <div class="tb-drag">
       <span class="tb-marca">DG<span class="tb-marca-acento">Editor</span></span>
+      <div class="tb-nav" aria-label="Navegação de abas">
+        <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
+        <button type="button" id="tb-avancar" class="tb-btn tb-nav-btn" title="Avançar (Alt+Setas)" disabled aria-disabled="true">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+      </div>
     </div>
     <div class="tb-controles">
       <button id="tb-min" class="tb-btn" title="Minimizar"><svg viewBox="0 0 10 10"><path d="M2 5h6"/></svg></button>
@@ -20,25 +28,29 @@
     </div>
   </header>
 
+  <div id="tabbar" role="tablist" aria-label="Abas de arquivo" style="display:none">
+    <div id="editor-tabs"></div>
+  </div>
+
   <div id="app">
-    <!-- Activity bar -->
+    <!-- Activity bar (ordem Cursor: chat/busca/explorer · spacer · terminal/navegador · config/tema) -->
     <nav id="activity-bar" aria-label="Activity bar">
-      <button type="button" class="ab-btn active" data-action="explorer" data-tip="Explorer (Ctrl+Shift+E)" aria-label="Explorer">
-        <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"/></svg>
+      <button type="button" class="ab-btn" data-action="chat" data-tip="Chat / IA (Ctrl+Alt+B)" aria-label="Chat">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3V5z"/></svg>
       </button>
       <button type="button" class="ab-btn" data-action="busca" data-tip="Buscar em arquivos" aria-label="Busca">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       </button>
-      <button type="button" class="ab-btn" data-action="chat" data-tip="Chat / IA (Ctrl+Alt+B)" aria-label="Chat">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3V5z"/></svg>
+      <button type="button" class="ab-btn active" data-action="explorer" data-tip="Explorer (Ctrl+Shift+E)" aria-label="Explorer">
+        <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"/></svg>
+      </button>
+      <div class="ab-spacer"></div>
+      <button type="button" class="ab-btn" id="btn-terminal-toggle" data-action="terminal" data-tip="Terminal (Ctrl+`)" aria-label="Terminal">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
       </button>
       <button type="button" class="ab-btn" data-action="navegador" data-tip="Navegador (Ctrl+Shift+N)" aria-label="Navegador">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
       </button>
-      <button type="button" class="ab-btn" id="btn-terminal-toggle" data-action="terminal" data-tip="Terminal (Ctrl+`)" aria-label="Terminal">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
-      </button>
-      <div class="ab-spacer"></div>
       <button type="button" class="ab-btn" data-action="config" data-tip="Configurações" aria-label="Configurações">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
       </button>
@@ -50,7 +62,10 @@
     <!-- Sidebar explorer -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <span class="sidebar-title">Explorer</span>
+        <div class="sidebar-modes" role="tablist" aria-label="Modo da sidebar">
+          <button type="button" id="sidebar-mode-projects" class="sidebar-mode" role="tab" aria-selected="false">Projects</button>
+          <button type="button" id="sidebar-mode-explorer" class="sidebar-mode active" role="tab" aria-selected="true">Explorer</button>
+        </div>
         <div class="sidebar-actions">
           <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -58,8 +73,12 @@
           <button id="btn-refresh-tree" class="btn-icon" title="Atualizar árvore">
             <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
           </button>
+          <button id="btn-git-refresh" class="btn-icon" title="Atualizar status git">
+            <svg viewBox="0 0 24 24"><path d="M6 3v12M6 15l-3-3M6 15l3-3M12 6h9M12 12h7M12 18h5"/></svg>
+          </button>
         </div>
       </div>
+      <div id="projects-list" class="projects-list" hidden></div>
       <div class="sidebar-section">
         <div class="section-label">Pastas</div>
         <div id="folder-list" class="folder-list"></div>
@@ -72,73 +91,93 @@
 
     <div id="resize-sidebar" class="resizer" data-resize="sidebar" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Centro: editor + terminal -->
+    <!-- Centro: abas Chat | Editor (#editor-tabs vive em #tabbar acima de #app) -->
     <section id="center-panel">
-      <div id="editor-tabs" role="tablist"></div>
-      <div id="editor-breadcrumb"></div>
-      <div id="editor-host">
-        <div id="editor-mount"></div>
-        <div id="editor-empty">
-          <h2>DG Editor</h2>
-          <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>
-          <div class="atalhos">
-            <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
-            <div><kbd>Ctrl+B</kbd> Alternar sidebar</div>
-            <div><kbd>Ctrl+Shift+P</kbd> Paleta de comandos</div>
-            <div><kbd>Ctrl+S</kbd> Salvar</div>
-            <div><kbd>Ctrl+`</kbd> Terminal</div>
-          </div>
+      <div class="center-tabs" role="tablist" aria-label="Área central">
+        <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
+        <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
+      </div>
+
+      <div id="center-pane-chat" class="center-pane active">
+        <div id="pane-chat" class="center-pane-inner">
+          <main id="chat-panel">
+            <header id="chat-header">
+              <div class="chat-header-meta">
+                <span id="chat-title">Nenhuma pasta aberta</span>
+                <span id="chat-provider" class="provider-badge"></span>
+              </div>
+              <div class="chat-header-actions">
+                <div id="chat-history-bar" class="chat-history-bar">
+                  <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
+                  <select id="chat-history-select" aria-label="Historico de chats"></select>
+                </div>
+                <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar</button>
+                <button type="button" id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
+                <button type="button" id="btn-auditar" class="btn-small" title="Auto auditoria do sistema">Auditar</button>
+              </div>
+            </header>
+            <div id="chat-messages" class="chat-messages">
+              <div class="empty-state" id="empty-state">
+                <h2>Bem-vindo ao DG Editor</h2>
+                <p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>
+                <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
+              </div>
+            </div>
+            <footer id="chat-input-bar">
+              <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
+              <button id="chat-send" class="btn-primary" disabled>Enviar</button>
+            </footer>
+          </main>
         </div>
       </div>
-      <div id="terminal-panel" class="terminal-panel" aria-hidden="true">
-        <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
-        <header class="terminal-header">
-          <button type="button" id="terminal-btn-split" class="btn-icon" title="Dividir painel" aria-label="Dividir">⧉</button>
-          <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
-          <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
-          <span class="terminal-header-spacer"></span>
-          <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
-          <button type="button" id="terminal-btn-padrao" class="terminal-btn-padrao btn-icon" title="Definir shell atual como padrão" aria-label="Definir como padrão" hidden>☆</button>
-          <button type="button" id="terminal-btn-padrao-clear" class="btn-icon" title="Restaurar padrão (automático)" aria-label="Restaurar padrão" hidden>↺</button>
-          <span id="terminal-shell-label" class="terminal-shell-label"></span>
-          <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
-          <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
-        </header>
-        <div class="terminal-body">
-          <div id="terminal-split" class="terminal-split single horizontal"></div>
+
+      <div id="center-pane-editor" class="center-pane">
+        <div id="editor-breadcrumb"></div>
+        <div id="editor-toolbar" class="editor-toolbar hidden">
+          <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+        </div>
+        <div id="editor-host">
+          <div id="editor-mount"></div>
+          <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
+          <div id="image-preview" class="image-preview hidden" aria-hidden="true">
+            <img id="image-preview-img" alt="preview" />
+          </div>
+          <div id="editor-empty">
+            <h2>DG Editor</h2>
+            <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>
+            <div class="atalhos">
+              <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
+              <div><kbd>Ctrl+B</kbd> Alternar sidebar</div>
+              <div><kbd>Ctrl+Shift+P</kbd> Paleta de comandos</div>
+              <div><kbd>Ctrl+S</kbd> Salvar</div>
+              <div><kbd>Ctrl+`</kbd> Terminal</div>
+            </div>
+          </div>
+          <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
+            <header class="diff-panel-header">
+              <span id="diff-panel-title">Diff</span>
+              <div class="diff-panel-actions" id="diff-panel-actions" hidden>
+                <button type="button" id="btn-oc-aplicar" class="btn-small">Aplicar</button>
+                <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar</button>
+              </div>
+              <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
+            </header>
+            <div id="oc-pendentes-lista" class="oc-pendentes-lista" hidden></div>
+            <pre id="diff-panel-body" class="diff-panel-body"></pre>
+          </aside>
         </div>
       </div>
     </section>
 
     <div id="resize-right" class="resizer" data-resize="right" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Direita: Chat/IA + análise -->
+    <!-- Direita: Análise + Terminal + Files (Chat moveu para o centro) -->
     <section id="exec-panel">
       <div class="right-tabs">
-        <button type="button" class="right-tab active" data-pane="chat">Chat / IA</button>
         <button type="button" class="right-tab" data-pane="analise">Análise</button>
-      </div>
-
-      <div id="pane-chat" class="right-pane active">
-        <main id="chat-panel">
-          <header id="chat-header">
-            <span id="chat-title">Nenhuma pasta aberta</span>
-            <span id="chat-provider" class="provider-badge"></span>
-            <button id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
-            <button id="btn-auditar" class="btn-ghost" title="Auto auditoria do sistema">Auditar</button>
-          </header>
-          <div id="chat-messages" class="chat-messages">
-            <div class="empty-state" id="empty-state">
-              <h2>Bem-vindo ao DG Editor</h2>
-              <p>Abra uma pasta no Explorer. Chat e análise ficam neste painel direito; o código edita no centro.</p>
-              <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
-            </div>
-          </div>
-          <footer id="chat-input-bar">
-            <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
-            <button id="chat-send" class="btn-primary" disabled>Enviar</button>
-          </footer>
-        </main>
+        <button type="button" class="right-tab active" data-pane="terminal">Terminal</button>
+        <button type="button" class="right-tab" data-pane="files">Files</button>
+        <button type="button" class="right-tab" data-pane="browser">Browser</button>
       </div>
 
       <div id="pane-analise" class="right-pane">
@@ -154,13 +193,66 @@
         </div>
       </div>
 
-      <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
-        <span id="guardian-text">Guardião: medindo...</span>
+      <div id="pane-terminal" class="right-pane active">
+        <div id="terminal-panel" class="terminal-panel terminal-panel--docked" aria-hidden="true">
+          <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
+          <header class="terminal-header">
+            <button type="button" id="terminal-btn-split" class="btn-icon" title="Dividir painel" aria-label="Dividir">⧉</button>
+            <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
+            <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
+            <span class="terminal-header-spacer"></span>
+            <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
+            <button type="button" id="terminal-btn-padrao" class="terminal-btn-padrao btn-icon" title="Definir shell atual como padrão" aria-label="Definir como padrão" hidden>☆</button>
+            <button type="button" id="terminal-btn-padrao-clear" class="btn-icon" title="Restaurar padrão (automático)" aria-label="Restaurar padrão" hidden>↺</button>
+            <span id="terminal-shell-label" class="terminal-shell-label"></span>
+            <button type="button" id="terminal-btn-clear" class="btn-icon" title="Limpar">⌫</button>
+            <button type="button" id="terminal-btn-close" class="btn-icon" title="Fechar">×</button>
+          </header>
+          <div class="terminal-body">
+            <div id="terminal-split" class="terminal-split single horizontal"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pane-files" class="right-pane">
+        <div class="section-label" style="padding:8px 12px 4px">Pastas</div>
+        <div id="files-list" class="folder-list files-panel-list"></div>
+      </div>
+
+      <div id="pane-browser" class="right-pane">
+        <div id="browser-mount" aria-label="Navegador embutido"></div>
+        <div class="browser-pane-overlay" id="browser-overlay">
+          <p class="browser-status" id="browser-status">Navegador fechado.</p>
+          <button type="button" id="browser-abrir" class="btn-primary">Abrir navegador</button>
+        </div>
       </div>
     </section>
+
+    <footer id="statusbar">
+      <div class="sb-left">
+        <span id="sb-branch" title="Branch do repositório">—</span>
+        <span id="sb-pasta" title="Projeto aberto">—</span>
+      </div>
+      <div class="sb-center">
+        <span id="sb-ambiente">This PC</span>
+      </div>
+      <div class="sb-right">
+        <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
+          <span id="guardian-text">Guardião: medindo...</span>
+        </div>
+      </div>
+    </footer>
   </div>
 
   <!-- Paleta de comandos (Ctrl+Shift+P) / arquivos (Ctrl+P) -->
+  <div id="busca-global" class="modal hidden" aria-label="Busca no projeto">
+    <div class="palette-box busca-box">
+      <input id="busca-input" type="text" placeholder="Buscar no projeto (Ctrl+Shift+F)..." autocomplete="off" />
+      <label class="busca-opt"><input type="checkbox" id="busca-regex" /> Regex</label>
+      <div id="busca-resultados" class="palette-list"></div>
+    </div>
+  </div>
+
   <div id="palette" class="modal hidden">
     <div class="palette-box">
       <input id="palette-input" type="text" placeholder="Digite um comando ou arquivo..." autocomplete="off" />
@@ -173,6 +265,23 @@
       <h3>Configurações</h3>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
+      <div id="config-openclaw" class="config-section">
+        <h4>OpenClaw</h4>
+        <label class="config-field">Endpoint<br>
+          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" />
+        </label>
+        <label class="config-field">Model<br>
+          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" />
+        </label>
+        <label class="config-field">Token (Gateway Bearer)<br>
+          <input type="password" id="oc-token" placeholder="colar token — nao fica em texto plano" style="width:100%" autocomplete="off" />
+        </label>
+        <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
+          <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
+        </div>
+      </div>
       <button id="btn-config-close" class="btn-primary">Fechar</button>
     </div>
   </div>

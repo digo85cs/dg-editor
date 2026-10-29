@@ -70,7 +70,9 @@ Regras:
 - Use as tools para ler e escrever arquivos do projeto, consultar o dossie e a arvore.
 - Nunca invente conteudo de arquivo: leia antes de afirmar.
 - Respostas curtas, tecnicas, em portugues do Brasil.
-- Se a tool falhar, relate o erro e proponha alternativa.`
+- Se a tool falhar, relate o erro e proponha alternativa.
+- NUNCA anunciar acao sem executar no mesmo turno.
+- NUNCA incluir o nome do modelo (ollama:/qwen/llama) no corpo da resposta.`
 
 /**
  * Modelos pequenos em CPU confundem o schema da tool com os argumentos,
@@ -281,6 +283,21 @@ function sintetizarDeTools(passos: PassoAgente[]): string {
   return partes.join('\n\n')
 }
 
+/** Remove eco de id de modelo no corpo (metadado só em dglog/provider). */
+function removerEcoModelo(texto: string, modelo?: string): string {
+  let t = String(texto || '')
+  if (modelo) {
+    const esc = modelo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    t = t.replace(new RegExp('\\b' + esc + '\\b', 'gi'), '')
+  }
+  // linha propria: "ollama:qwen2.5-coder:3b"
+  t = t.replace(/^\s*(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+\s*$/gim, '')
+  // inline provider:modelo
+  t = t.replace(/\b(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+/gi, '')
+  t = t.replace(/\b(?:modelo|provider)\s*[:=]\s*[\w./:+-]+/gi, '')
+  return t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 async function finalizarAgente(
   raiz: string,
   pergunta: string,
@@ -292,6 +309,7 @@ async function finalizarAgente(
   if (pareceJsonTool(final) || !final.trim()) {
     final = sintetizarDeTools(passos)
   }
+  final = removerEcoModelo(final, modelo)
   passos.push({ tipo: 'texto', texto: final })
   appendChat(raiz, { role: 'user', content: pergunta, at: Date.now(), provider: modelo })
   appendChat(raiz, { role: 'assistant', content: final, at: Date.now(), provider: modelo })

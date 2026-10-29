@@ -1,6 +1,11 @@
 /**
- * Smoke DG_NAV_SMOKE=1 — valida endpoints locais e sai com código.
- * Não imprime o token completo.
+ * Smoke do navegador embutido.
+ *
+ * Ativacao: DG_NAV_SMOKE=1 npx electron out/main/index.js
+ * (ou: DG_NAV_SMOKE=1 node_modules/electron/dist/electron.exe out/main/index.js)
+ *
+ * Contagem oficial: 22 cenarios com ids 0..21 (derivados do array resultados).
+ * Nao imprime o token completo.
  */
 import { app } from 'electron'
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs'
@@ -421,13 +426,15 @@ export async function rodarSmokeESair(): Promise<void> {
     } catch {
       urlRealDepois = null
     }
-    if (urlRealAntes !== urlRealDepois) {
-      resultados.push({
-        id: 0,
-        ok: false,
-        detalhe: 'nav-ultima-url real foi alterado pelo smoke'
-      })
-    }
+    // 0: nav-ultima-url real inalterado (cenario oficial, sempre conta)
+    resultados.push({
+      id: 0,
+      ok: urlRealAntes === urlRealDepois,
+      detalhe:
+        urlRealAntes === urlRealDepois
+          ? 'nav-ultima-url real inalterado'
+          : 'nav-ultima-url real foi alterado pelo smoke'
+    })
 
     // 20: fallback debugger — força CDP (_forceDebugger) num iframe data: (sem sandbox
     // opaco: sandbox real bloqueia createIsolatedWorld no Electron 33 offline)
@@ -572,7 +579,11 @@ export async function rodarSmokeESair(): Promise<void> {
       })
     })
   } catch (e) {
-    resultados.push({ id: 0, ok: false, detalhe: String((e as Error).message || e) })
+    // Falha fatal do harness — marca cenario 0 se ainda nao registrado
+    if (!resultados.some((r) => r.id === 0)) {
+      resultados.push({ id: 0, ok: false, detalhe: String((e as Error).message || e) })
+    }
+    dglog('[nav-smoke] excecao: ' + String((e as Error).message || e))
   } finally {
     // P3: limpar só _smoke
     try {
@@ -587,11 +598,21 @@ export async function rodarSmokeESair(): Promise<void> {
     }
   }
 
-  const falhas = resultados.filter((r) => !r.ok)
-  for (const r of resultados) {
+  // Contagem deterministica: sempre 22 cenarios (ids 0..21), derivados do array
+  const IDS_ESPERADOS = Array.from({ length: 22 }, (_, i) => i)
+  const porId = new Map<number, { id: number; ok: boolean; detalhe: string }>()
+  for (const r of resultados) porId.set(r.id, r)
+  for (const id of IDS_ESPERADOS) {
+    if (!porId.has(id)) {
+      porId.set(id, { id, ok: false, detalhe: 'cenario nao executado' })
+    }
+  }
+  const ordenados = IDS_ESPERADOS.map((id) => porId.get(id)!)
+  const falhas = ordenados.filter((r) => !r.ok)
+  for (const r of ordenados) {
     dglog(`[nav-smoke] #${r.id} ${r.ok ? 'PASS' : 'FAIL'} ${r.detalhe}`)
     // eslint-disable-next-line no-console
-    console.log(JSON.stringify(r))
+    console.log(`[smoke] id=${r.id} ok=${r.ok} detalhe=${r.detalhe}`)
   }
   // resíduo em downloads (fora _smoke)
   let residuo = false
@@ -604,9 +625,12 @@ export async function rodarSmokeESair(): Promise<void> {
   } catch {
     /* ignore */
   }
-  const total = resultados.filter((r) => r.id > 0).length
-  const pass = resultados.filter((r) => r.id > 0 && r.ok).length
-  dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${falhas.length} residuoSmoke=${residuo}`)
+  const total = ordenados.length
+  const pass = ordenados.filter((r) => r.ok).length
+  const failed = falhas.length
+  dglog(`[nav-smoke] fim ${pass}/${total} PASS falhas=${failed} residuoSmoke=${residuo}`)
+  // eslint-disable-next-line no-console
+  console.log(`[smoke] total=${total} passed=${pass} failed=${failed}`)
   // eslint-disable-next-line no-console
   console.log(`SMOKE=${pass}/${total}`)
   // before-quit não roda com app.exit — remover token aqui (espelha before-quit)

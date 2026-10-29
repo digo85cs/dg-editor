@@ -1,6 +1,14 @@
 // DG Editor - renderer (IDE Opção B)
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
+import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
+import {
+  iniciarHistoricoChat,
+  mostrarLoadingChat,
+  removerLoadingChat,
+  marcarProviderFallback,
+  animarEntradaMsg
+} from './chat.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -17,6 +25,11 @@ let abaAtiva = null
 let editor = null
 let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
+/** #files-list precisa re-render quando a aba Files for ativada. */
+let filesListaSuja = false
+/** Histórico de navegação de abas (tb-voltar / tb-avancar). */
+let histAbas = []
+let histIdx = -1
 
 const CHEV =
   '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
@@ -64,8 +77,15 @@ function carregarLayout() {
     if (!raw) return
     const L = JSON.parse(raw)
     const app = $('app')
-    if (L.sidebarWidth) app.style.setProperty('--dg-sidebar-width', L.sidebarWidth + 'px')
-    if (L.rightWidth) app.style.setProperty('--dg-right-panel-width', L.rightWidth + 'px')
+    // Inline sobrepoe tokens; nomes novos (--dg-sidebar-w / --dg-panel-w) + aliases legados
+    if (L.sidebarWidth) {
+      app.style.setProperty('--dg-sidebar-w', L.sidebarWidth + 'px')
+      app.style.setProperty('--dg-sidebar-width', L.sidebarWidth + 'px')
+    }
+    if (L.rightWidth) {
+      app.style.setProperty('--dg-panel-w', L.rightWidth + 'px')
+      app.style.setProperty('--dg-right-panel-width', L.rightWidth + 'px')
+    }
     if (L.sidebarCollapsed) app.classList.add('sidebar-collapsed')
     if (L.rightCollapsed) app.classList.add('right-collapsed')
   } catch { /* ignora */ }
@@ -73,8 +93,8 @@ function carregarLayout() {
 
 function salvarLayout() {
   const app = $('app')
-  const sw = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-width'), 10) || 260
-  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-right-panel-width'), 10) || 380
+  const sw = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-w'), 10) || 260
+  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-panel-w'), 10) || 320
   localStorage.setItem(
     'dg-layout',
     JSON.stringify({
@@ -95,10 +115,13 @@ function initResizers() {
       const dx = e.clientX - startX
       if (kind === 'sidebar') {
         const w = Math.min(500, Math.max(200, startW + dx))
+        $('app').style.setProperty('--dg-sidebar-w', w + 'px')
         $('app').style.setProperty('--dg-sidebar-width', w + 'px')
       } else {
         const w = Math.min(600, Math.max(320, startW - dx))
+        $('app').style.setProperty('--dg-panel-w', w + 'px')
         $('app').style.setProperty('--dg-right-panel-width', w + 'px')
+        if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
       }
     }
     const onUp = () => {
@@ -106,21 +129,25 @@ function initResizers() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       salvarLayout()
+      if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
     }
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
       startX = e.clientX
-      const prop = kind === 'sidebar' ? '--dg-sidebar-width' : '--dg-right-panel-width'
-      startW = parseInt(getComputedStyle($('app')).getPropertyValue(prop), 10) || (kind === 'sidebar' ? 260 : 380)
+      const prop = kind === 'sidebar' ? '--dg-sidebar-w' : '--dg-panel-w'
+      startW = parseInt(getComputedStyle($('app')).getPropertyValue(prop), 10) || (kind === 'sidebar' ? 260 : 320)
       el.classList.add('dragging')
       document.addEventListener('mousemove', onMove)
       document.addEventListener('mouseup', onUp)
     })
     el.addEventListener('dblclick', () => {
-      $('app').style.setProperty(
-        kind === 'sidebar' ? '--dg-sidebar-width' : '--dg-right-panel-width',
-        kind === 'sidebar' ? '260px' : '380px'
-      )
+      if (kind === 'sidebar') {
+        $('app').style.setProperty('--dg-sidebar-w', '260px')
+        $('app').style.setProperty('--dg-sidebar-width', '260px')
+      } else {
+        $('app').style.setProperty('--dg-panel-w', '320px')
+        $('app').style.setProperty('--dg-right-panel-width', '320px')
+      }
       salvarLayout()
     })
   }
@@ -165,11 +192,12 @@ function initActivityBar() {
       } else if (a === 'busca') {
         abrirPaletaArquivos()
       } else if (a === 'chat') {
-        toggleRight(true)
-        ativarAbaDireita('chat')
+        ativarAbaCentro('chat')
         setTimeout(() => $('chat-input')?.focus(), 0)
       } else if (a === 'navegador') {
-        window.api.invoke('navegador:abrir').catch((e) => console.warn('[navegador]', e))
+        toggleRight(true)
+        ativarAbaDireita('browser')
+        void abrirNavegadorUi()
       } else if (a === 'config') {
         abrirConfig()
       } else if (a === 'tema') {
@@ -179,18 +207,170 @@ function initActivityBar() {
   })
 }
 
+let browserAberto = false
+let browserMountObserver = null
+
+function setBrowserStatus(aberto) {
+  browserAberto = !!aberto
+  const st = $('browser-status')
+  const overlay = $('browser-overlay')
+  if (st) {
+    st.textContent = aberto
+      ? 'Navegador ativo nesta aba.'
+      : 'Navegador fechado.'
+  }
+  if (overlay) overlay.classList.toggle('hidden', !!aberto)
+}
+
+function enviarBoundsBrowser() {
+  const m = $('browser-mount')
+  const pane = $('pane-browser')
+  if (!m || !pane || !pane.classList.contains('active')) return
+  const r = m.getBoundingClientRect()
+  if (r.width < 2 || r.height < 2) return
+  try {
+    window.api.send('navegador:bounds', {
+      x: Math.round(r.left),
+      y: Math.round(r.top),
+      width: Math.round(r.width),
+      height: Math.round(r.height)
+    })
+  } catch (e) {
+    console.warn('[navegador] bounds', e)
+  }
+}
+
+function setBrowserVisivel(mostrar) {
+  try {
+    window.api.send('navegador:mostrar', !!mostrar)
+  } catch {
+    /* preload antigo */
+  }
+  if (mostrar) {
+    requestAnimationFrame(() => {
+      enviarBoundsBrowser()
+      requestAnimationFrame(enviarBoundsBrowser)
+    })
+  }
+}
+
+async function abrirNavegadorUi() {
+  try {
+    await window.api.invoke('navegador:abrir')
+    setBrowserStatus(true)
+    setBrowserVisivel(true)
+    enviarBoundsBrowser()
+  } catch (e) {
+    console.warn('[navegador]', e)
+    setBrowserStatus(false)
+    setBrowserVisivel(false)
+  }
+}
+
 function ativarAbaDireita(pane) {
+  // Chat saiu do painel direito (Etapa 5) — redirecionar
+  if (pane === 'chat') {
+    ativarAbaCentro('chat')
+    return
+  }
+  const eraBrowser = $('pane-browser')?.classList.contains('active')
   document.querySelectorAll('.right-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.pane === pane)
   })
   document.querySelectorAll('.right-pane').forEach((p) => {
     p.classList.toggle('active', p.id === 'pane-' + pane)
   })
+  if (pane === 'browser') {
+    if (browserAberto) setBrowserVisivel(true)
+    else setBrowserVisivel(false)
+  } else if (eraBrowser || pane !== 'browser') {
+    setBrowserVisivel(false)
+  }
+  if (pane === 'terminal') {
+    garantirTerminal()
+    const fit = () => {
+      window.dgTerminal?.fit?.()
+    }
+    const open = window.dgTerminal?.abrir
+    if (typeof open === 'function') {
+      Promise.resolve(open()).then(() => {
+        requestAnimationFrame(() => {
+          fit()
+          requestAnimationFrame(fit)
+        })
+      })
+    } else {
+      requestAnimationFrame(() => {
+        fit()
+        requestAnimationFrame(fit)
+      })
+    }
+  } else if (pane === 'files' && filesListaSuja) {
+    filesListaSuja = false
+    void renderizarArvoreEm($('files-list'))
+  }
+}
+
+$('browser-abrir')?.addEventListener('click', () => {
+  toggleRight(true)
+  ativarAbaDireita('browser')
+  void abrirNavegadorUi()
+})
+try {
+  window.api.on?.('navegador:aberto', () => {
+    setBrowserStatus(true)
+    setBrowserVisivel($('pane-browser')?.classList.contains('active'))
+  })
+  window.api.on?.('navegador:fechado', () => {
+    setBrowserStatus(false)
+    setBrowserVisivel(false)
+  })
+} catch {
+  /* preload antigo */
+}
+
+window.addEventListener('resize', () => {
+  if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+    enviarBoundsBrowser()
+  }
+})
+;(() => {
+  const m = $('browser-mount')
+  if (!m || typeof ResizeObserver === 'undefined') return
+  browserMountObserver = new ResizeObserver(() => {
+    if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+      enviarBoundsBrowser()
+    }
+  })
+  browserMountObserver.observe(m)
+})()
+
+function ativarAbaCentro(pane) {
+  const alvo = pane === 'editor' ? 'editor' : 'chat'
+  document.querySelectorAll('.center-tab').forEach((t) => {
+    const on = t.dataset.centerPane === alvo
+    t.classList.toggle('active', on)
+    t.setAttribute('aria-selected', on ? 'true' : 'false')
+  })
+  document.querySelectorAll('.center-pane').forEach((p) => {
+    p.classList.toggle('active', p.id === 'center-pane-' + alvo)
+  })
 }
 
 document.querySelectorAll('.right-tab').forEach((t) => {
   t.addEventListener('click', () => ativarAbaDireita(t.dataset.pane))
 })
+
+document.querySelectorAll('.center-tab').forEach((t) => {
+  t.addEventListener('click', () => ativarAbaCentro(t.dataset.centerPane))
+})
+
+// Bridge para terminal.js (toggle Ctrl+` / icon-bar) sem import circular
+window.dgUi = {
+  toggleRight,
+  ativarAbaDireita,
+  ativarAbaCentro
+}
 
 // ---------- Pastas ----------
 async function abrirPasta() {
@@ -204,10 +384,111 @@ function adicionarPasta(path) {
   if (!pastasRecentes.includes(path)) pastasRecentes.push(path)
   renderizarPastas()
   salvarPastas()
+  void renderizarProjects(true)
+  void atualizarStatusBar(path)
+}
+
+function caminhoSobPasta(caminho, raiz) {
+  const n = (s) => String(s || '').replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+  const root = n(raiz)
+  const c = n(caminho)
+  if (!root || !c) return false
+  return c === root || c.startsWith(root + '\\')
+}
+
+function criarBotaoRemoverPasta(path) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'pasta-remover'
+  btn.title = 'Remover da lista'
+  btn.setAttribute('aria-label', 'Remover pasta ' + nomeArquivo(path))
+  btn.textContent = '\u00D7'
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    void removerPasta(path)
+  })
+  return btn
+}
+
+function garantirEmptyStateChat() {
+  const area = $('chat-messages')
+  if (!area) return
+  let empty = $('empty-state')
+  if (!empty) {
+    empty = document.createElement('div')
+    empty.className = 'empty-state'
+    empty.id = 'empty-state'
+    empty.innerHTML =
+      '<h2>Bem-vindo ao DG Editor</h2>' +
+      '<p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>' +
+      '<button id="btn-empty-open" class="btn-primary">Abrir pasta</button>'
+    area.innerHTML = ''
+    area.appendChild(empty)
+    $('btn-empty-open')?.addEventListener('click', abrirPasta)
+  } else {
+    empty.classList.remove('hidden')
+  }
+}
+
+async function removerPasta(path) {
+  if (!path || !pastasRecentes.includes(path)) return
+  const nome = nomeArquivo(path)
+  if (
+    !window.confirm(
+      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
+    )
+  ) {
+    return
+  }
+  const idx = pastasRecentes.indexOf(path)
+  if (idx === -1) return
+  pastasRecentes.splice(idx, 1)
+  salvarPastas()
+
+  // Fechar abas cujos arquivos estavam sob a pasta removida
+  const paraFechar = abas.filter((a) => caminhoSobPasta(a.caminho, path)).map((a) => a.caminho)
+  for (const c of paraFechar) {
+    const i = abas.findIndex((x) => x.caminho === c)
+    if (i >= 0) abas.splice(i, 1)
+  }
+  if (paraFechar.length) {
+    if (!abaAtiva || !abas.some((a) => a.caminho === abaAtiva)) {
+      abaAtiva = null
+      editor?.limpar()
+      histAbas = []
+      histIdx = -1
+      atualizarBotoesHist()
+    }
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    persistirAbas()
+  }
+
+  if (pastaAtual === path) {
+    pastaAtual = null
+    const titulo = $('chat-title')
+    if (titulo) titulo.textContent = 'Nenhuma pasta aberta'
+    $('chat-send') && ($('chat-send').disabled = true)
+    $('btn-reanalyze')?.classList.add('hidden')
+    garantirEmptyStateChat()
+    histChat = null
+  }
+
+  await renderizarPastas()
+  void renderizarProjects(true)
+  if (typeof atualizarStatusBar === 'function') {
+    void atualizarStatusBar(pastaAtual)
+  }
 }
 
 function salvarPastas() {
-  localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
+  try {
+    localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
+  } catch (e) {
+    console.warn('[pastas] falha ao salvar localStorage:', e)
+  }
 }
 
 function carregarPastas() {
@@ -222,6 +503,8 @@ function carregarPastas() {
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
   pastaAtual = path
+  ativarAbaCentro('chat')
+  void atualizarStatusBar(path)
   $('chat-title').textContent = nomeArquivo(path)
   $('empty-state')?.remove()
   $('chat-send').disabled = false
@@ -261,7 +544,11 @@ async function selecionarPasta(path) {
   ])
 
   renderizarChat(msgs)
+  void ligarHistoricoChat(path)
+  void atualizarGitStatusArvore()
 
+  // Trocar pasta: 1º clique volta a "Analisando..." (mesmo com cache)
+  delete $('analysis-content').dataset.jaAnalisou
   if (cached) {
     renderizarAnalise(cached, true)
   } else {
@@ -284,6 +571,9 @@ async function selecionarPasta(path) {
  */
 function definirContextoPasta(p) {
   if (!p) return
+  if (pastaAtual && pastaAtual !== p) {
+    delete $('analysis-content')?.dataset.jaAnalisou
+  }
   pastaAtual = p
   $('chat-title').textContent = nomeArquivo(p)
   $('chat-send').disabled = false
@@ -301,8 +591,8 @@ function raizWorkspaceDe(caminho) {
   return pastaAtual
 }
 
-async function renderizarPastas() {
-  const lista = $('folder-list')
+async function renderizarArvoreEm(lista) {
+  if (!lista) return
   lista.innerHTML = ''
   if (pastasRecentes.length === 0) {
     lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
@@ -326,6 +616,7 @@ async function renderizarPastas() {
       escapar(nomeArquivo(p)) +
       '</span>'
     header.title = p
+    header.appendChild(criarBotaoRemoverPasta(p))
     const chev = header.querySelector('.chevron')
     if (st.expandida) chev.classList.add('open')
 
@@ -333,6 +624,7 @@ async function renderizarPastas() {
     children.className = 'tree-children' + (st.expandida ? ' open' : '')
 
     header.addEventListener('click', async (e) => {
+      if (e.target.closest('.pasta-remover')) return
       if (carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
       // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
@@ -368,6 +660,25 @@ async function renderizarPastas() {
     }
   }
   if (promessasFilhos.length) await Promise.all(promessasFilhos)
+}
+
+function abaFilesVisivel() {
+  return !!$('pane-files')?.classList.contains('active')
+}
+
+async function renderizarPastas() {
+  console.time('renderizarPastas')
+  try {
+    await renderizarArvoreEm($('folder-list'))
+    if (abaFilesVisivel()) {
+      await renderizarArvoreEm($('files-list'))
+      filesListaSuja = false
+    } else {
+      filesListaSuja = true
+    }
+  } finally {
+    console.timeEnd('renderizarPastas')
+  }
 }
 
 async function carregarFilhos(dir, container, nivel) {
@@ -437,33 +748,471 @@ function criarNoDir(ent, nivel) {
   return wrap
 }
 
+/** @type {Map<string, string>} caminho relativo (posix) -> status git */
+const gitStatusMap = new Map()
+
+function relPosix(abs, raiz) {
+  const a = String(abs || '').replace(/\\/g, '/')
+  const r = String(raiz || '').replace(/\\/g, '/').replace(/\/$/, '')
+  if (a.toLowerCase().startsWith(r.toLowerCase() + '/')) return a.slice(r.length + 1)
+  return a.split('/').pop() || a
+}
+
+function badgeGitHtml(st) {
+  if (!st) return ''
+  const cor =
+    st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
+  return (
+    '<span class="git-badge" data-git="' +
+    escapar(st) +
+    '" style="color:' +
+    cor +
+    '" title="git ' +
+    escapar(st) +
+    '">' +
+    escapar(st) +
+    '</span>'
+  )
+}
+
+function renderDiffHtml(diffText) {
+  const lines = String(diffText || '').split(/\r?\n/)
+  return lines
+    .map((ln) => {
+      let cls = 'diff-ctx'
+      if (ln.startsWith('+') && !ln.startsWith('+++')) cls = 'diff-add'
+      else if (ln.startsWith('-') && !ln.startsWith('---')) cls = 'diff-del'
+      else if (ln.startsWith('@@')) cls = 'diff-hunk'
+      return '<span class="' + cls + '">' + escapar(ln) + '</span>'
+    })
+    .join('\n')
+}
+
+async function abrirPainelDiff(absPath) {
+  const raiz = raizWorkspaceDe(absPath) || pastaAtual
+  if (!raiz) return
+  const rel = relPosix(absPath, raiz)
+  const panel = $('diff-panel')
+  const body = $('diff-panel-body')
+  const title = $('diff-panel-title')
+  if (!panel || !body) return
+  title.textContent = 'Diff: ' + rel
+  body.textContent = 'Carregando…'
+  panel.classList.remove('hidden')
+  panel.setAttribute('aria-hidden', 'false')
+  try {
+    const r = await window.api.invoke('git:diff', raiz, rel)
+    body.innerHTML = renderDiffHtml(r?.diff || r?.erro || '(vazio)')
+  } catch (e) {
+    body.textContent = String(e)
+  }
+}
+
+function fecharPainelDiff() {
+  const panel = $('diff-panel')
+  if (!panel) return
+  panel.classList.add('hidden')
+  panel.setAttribute('aria-hidden', 'true')
+  ocPendenteAtivoId = null
+  const acoes = $('diff-panel-actions')
+  if (acoes) acoes.hidden = true
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    lista.hidden = true
+    lista.innerHTML = ''
+  }
+}
+
+/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string }[]} */
+let ocPendentes = []
+/** @type {string | null} */
+let ocPendenteAtivoId = null
+
+function mostrarDiffOpenClaw(pendente) {
+  const panel = $('diff-panel')
+  const body = $('diff-panel-body')
+  const title = $('diff-panel-title')
+  const acoes = $('diff-panel-actions')
+  if (!panel || !body || !pendente) return
+  ocPendenteAtivoId = pendente.id
+  if (title) title.textContent = 'OpenClaw: ' + (pendente.path || pendente.absPath)
+  body.innerHTML = renderDiffHtml(pendente.unifiedDiff)
+  if (acoes) acoes.hidden = false
+  panel.classList.remove('hidden')
+  panel.setAttribute('aria-hidden', 'false')
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    for (const btn of lista.querySelectorAll('button')) {
+      btn.classList.toggle('active', btn.dataset.id === pendente.id)
+    }
+  }
+}
+
+function renderListaPendentesOc() {
+  const lista = $('oc-pendentes-lista')
+  if (!lista) return
+  lista.innerHTML = ''
+  if (!ocPendentes.length) {
+    lista.hidden = true
+    return
+  }
+  lista.hidden = false
+  for (const p of ocPendentes) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.dataset.id = p.id
+    b.textContent = nomeArquivo(p.path || p.absPath)
+    b.title = p.absPath || p.path
+    if (p.id === ocPendenteAtivoId) b.classList.add('active')
+    b.addEventListener('click', () => mostrarDiffOpenClaw(p))
+    lista.appendChild(b)
+  }
+}
+
+async function pedirOpenClawUi() {
+  const prompt = window.prompt('Pedido para o OpenClaw (edicoes voltam como diff para aprovacao):')
+  if (prompt == null || !String(prompt).trim()) return
+  const arquivosAbertos = []
+  for (const a of abas) {
+    const item = { path: a.caminho }
+    if (a.caminho === abaAtiva && editor) {
+      item.conteudo = editor.getConteudo()
+      if (editor.getSelecao) {
+        const sel = editor.getSelecao()
+        if (sel) item.selecao = sel
+      }
+    }
+    arquivosAbertos.push(item)
+  }
+  const r = await window.api.invoke('openclaw:pedir', {
+    prompt: String(prompt).trim(),
+    pastas: pastasPermitidas(),
+    arquivosAbertos
+  })
+  if (!r?.ok) {
+    alert('OpenClaw: ' + (r?.erro || 'erro'))
+    return
+  }
+  ocPendentes = r.pendentes || []
+  if (r.rejeitados?.length) {
+    console.warn('[openclaw] paths rejeitados:', r.rejeitados)
+  }
+  if (!ocPendentes.length) {
+    alert(r.mensagem || 'Nenhum diff proposto.')
+    return
+  }
+  renderListaPendentesOc()
+  mostrarDiffOpenClaw(ocPendentes[0])
+}
+
+async function aplicarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  if (!window.confirm('Aplicar este diff no disco? Acao irreversivel sem git.')) return
+  const r = await window.api.invoke('openclaw:aplicar', ocPendenteAtivoId, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
+    return
+  }
+  const id = ocPendenteAtivoId
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (r.absPath && abaAtiva === r.absPath && editor) {
+    const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
+    if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
+  }
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+    alert('Diff aplicado.')
+  }
+}
+
+async function rejeitarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  await window.api.invoke('openclaw:rejeitar', ocPendenteAtivoId)
+  const id = ocPendenteAtivoId
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+  }
+}
+
+async function carregarConfigOpenClawUi() {
+  const cfg = await window.api.invoke('openclaw:config-get')
+  const st = await window.api.invoke('openclaw:token-status')
+  if (cfg?.config) {
+    const ep = $('oc-endpoint')
+    const md = $('oc-model')
+    if (ep) ep.value = cfg.config.endpoint || ''
+    if (md) md.value = cfg.config.model || ''
+  }
+  const tok = $('oc-token')
+  if (tok) tok.value = ''
+  const status = $('oc-token-status')
+  if (status) {
+    status.textContent = st?.configurado
+      ? 'Token gravado no cofre do SO (safeStorage).'
+      : 'Nenhum token configurado.'
+  }
+}
+
+async function salvarConfigOpenClawUi() {
+  const endpoint = $('oc-endpoint')?.value?.trim()
+  const model = $('oc-model')?.value?.trim()
+  await window.api.invoke('openclaw:config-set', { endpoint, model })
+  const token = $('oc-token')?.value
+  if (token && token.trim()) {
+    const r = await window.api.invoke('openclaw:token-set', token.trim())
+    if (!r?.ok) {
+      alert('Token nao salvo: ' + (r?.erro || 'erro'))
+      return
+    }
+    const tok = $('oc-token')
+    if (tok) tok.value = ''
+  }
+  await carregarConfigOpenClawUi()
+  alert('OpenClaw salvo.')
+}
+
+async function atualizarGitStatusArvore() {
+  const raiz = pastaAtual
+  if (!raiz) return
+  try {
+    const r = await window.api.invoke('git:status', raiz)
+    gitStatusMap.clear()
+    if (r?.ok && Array.isArray(r.itens)) {
+      for (const it of r.itens) {
+        gitStatusMap.set(String(it.path).replace(/\\/g, '/'), it.status)
+      }
+    }
+    document.querySelectorAll('.tree-item[data-tipo="file"]').forEach((row) => {
+      const abs = row.dataset.path || ''
+      const rel = relPosix(abs, raiz)
+      const st = gitStatusMap.get(rel)
+      let badge = row.querySelector('.git-badge')
+      if (!st) {
+        badge?.remove()
+        return
+      }
+      if (!badge) {
+        badge = document.createElement('span')
+        badge.className = 'git-badge'
+        row.appendChild(badge)
+      }
+      badge.dataset.git = st
+      badge.textContent = st
+      badge.title = 'git ' + st
+      badge.style.color =
+        st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
+    })
+  } catch {
+    /* */
+  }
+}
+
 function criarNoFile(ent, nivel) {
   const row = document.createElement('div')
   row.className = 'tree-item'
   row.style.paddingLeft = 8 + nivel * 16 + 16 + 'px'
-  row.innerHTML = extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>'
+  const raiz = raizWorkspaceDe(ent.caminho) || pastaAtual
+  const rel = raiz ? relPosix(ent.caminho, raiz) : ''
+  const st = rel ? gitStatusMap.get(rel) : null
+  row.innerHTML =
+    extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>' + badgeGitHtml(st)
   row.title = ent.caminho
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'file'
   row.addEventListener('click', (e) => {
     e.stopPropagation()
+    if (e.target?.closest?.('.git-badge')) {
+      void abrirPainelDiff(ent.caminho)
+      return
+    }
     if (!ent.editavel) {
       alert('Extensão não editável: ' + ent.nome)
       return
     }
     document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'))
     row.classList.add('active')
-    const raiz = raizWorkspaceDe(ent.caminho)
-    if (raiz) definirContextoPasta(raiz)
+    const rz = raizWorkspaceDe(ent.caminho)
+    if (rz) definirContextoPasta(rz)
     abrirArquivoNaAba(ent.caminho)
+    if (st) void abrirPainelDiff(ent.caminho)
   })
   return row
 }
 
 $('btn-refresh-tree')?.addEventListener('click', () => {
   for (const [, st] of estadoArvore) st.filhosCarregados = false
-  renderizarPastas()
+  renderizarPastas().then(() => atualizarGitStatusArvore())
+  void renderizarProjects(true)
+  void atualizarStatusBar(pastaAtual)
 })
+$('btn-git-refresh')?.addEventListener('click', () => {
+  void atualizarGitStatusArvore()
+  void renderizarProjects(true)
+  void atualizarStatusBar(pastaAtual)
+})
+
+// ---------- Sidebar modos: Projects / Explorer ----------
+let sidebarMode = 'explorer'
+
+function tempoRelativoCommit(ts) {
+  if (!ts || !Number.isFinite(ts)) return ''
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts))
+  if (s < 60) return 'agora'
+  if (s < 3600) return Math.floor(s / 60) + 'm'
+  if (s < 86400) return Math.floor(s / 3600) + 'h'
+  return Math.floor(s / 86400) + 'd'
+}
+
+function setSidebarMode(mode) {
+  sidebarMode = mode === 'projects' ? 'projects' : 'explorer'
+  const projects = $('projects-list')
+  const folders = $('folder-list')
+  const btnP = $('sidebar-mode-projects')
+  const btnE = $('sidebar-mode-explorer')
+  const isProjects = sidebarMode === 'projects'
+  if (projects) projects.hidden = !isProjects
+  if (folders) folders.hidden = isProjects
+  btnP?.classList.toggle('active', isProjects)
+  btnE?.classList.toggle('active', !isProjects)
+  btnP?.setAttribute('aria-selected', isProjects ? 'true' : 'false')
+  btnE?.setAttribute('aria-selected', isProjects ? 'false' : 'true')
+  if (isProjects) void renderizarProjects()
+}
+
+/** Cache local do ultimo git:repos (main tambem cacheia 30s). */
+let reposCacheLocal = { ts: 0, itens: [] }
+const REPOS_CACHE_LOCAL_MS = 30000
+
+async function obterReposGit(force) {
+  if (
+    !force &&
+    reposCacheLocal.ts &&
+    Date.now() - reposCacheLocal.ts <= REPOS_CACHE_LOCAL_MS
+  ) {
+    return reposCacheLocal.itens
+  }
+  try {
+    const r = await window.api.invoke('git:repos', { pastas: [...pastasRecentes] })
+    reposCacheLocal = { ts: Date.now(), itens: Array.isArray(r) ? r : [] }
+  } catch (e) {
+    console.warn('[projects] git:repos', e)
+    reposCacheLocal = { ts: Date.now(), itens: [] }
+  }
+  return reposCacheLocal.itens
+}
+
+async function atualizarStatusBar(pasta) {
+  const elBranch = $('sb-branch')
+  const elPasta = $('sb-pasta')
+  if (!elBranch || !elPasta) return
+  if (!pasta) {
+    elBranch.textContent = '—'
+    elPasta.textContent = '—'
+    return
+  }
+  const itens = await obterReposGit(false)
+  const hit =
+    itens.find((it) => it && it.pasta === pasta) ||
+    itens.find(
+      (it) =>
+        it &&
+        it.repo &&
+        (pasta === it.pasta ||
+          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '\\') ||
+          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '/'))
+    )
+  if (hit && hit.repo) {
+    elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' ●' : '')
+    elPasta.textContent = hit.repo
+  } else {
+    elBranch.textContent = '—'
+    elPasta.textContent = nomeArquivo(pasta)
+  }
+}
+
+async function renderizarProjects(force) {
+  const lista = $('projects-list')
+  if (!lista) return
+  const t0 = performance.now()
+  const itens = await obterReposGit(!!force)
+  const ms = Math.round(performance.now() - t0)
+  // Deduplicar por nome de repo (basename do toplevel); pastas sem repo somem
+  const porRepo = new Map()
+  for (const it of itens) {
+    if (!it || !it.repo) continue
+    if (!porRepo.has(it.repo)) porRepo.set(it.repo, it)
+  }
+  const unicos = [...porRepo.values()]
+  lista.innerHTML = ''
+  if (unicos.length === 0) {
+    lista.innerHTML =
+      '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
+    console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + pastasRecentes.length)
+    void atualizarStatusBar(pastaAtual)
+    return
+  }
+  for (const it of unicos) {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'project-item' + (it.pasta === pastaAtual ? ' selected' : '')
+    btn.dataset.path = it.pasta
+    btn.title = it.pasta
+    const nome = document.createElement('span')
+    nome.className = 'project-name'
+    nome.textContent = it.repo
+    const branch = document.createElement('span')
+    branch.className = 'project-branch'
+    branch.textContent = '(' + (it.branch || '?') + ')'
+    btn.appendChild(nome)
+    btn.appendChild(branch)
+    if (it.dirty) {
+      const dot = document.createElement('span')
+      dot.className = 'project-dirty'
+      dot.title = 'Alterações não commitadas'
+      btn.appendChild(dot)
+    }
+    const tempo = tempoRelativoCommit(it.ultimoCommitTs)
+    if (tempo) {
+      const t = document.createElement('span')
+      t.className = 'project-time'
+      t.textContent = tempo
+      btn.appendChild(t)
+    }
+    btn.appendChild(criarBotaoRemoverPasta(it.pasta))
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('.pasta-remover')) return
+      void selecionarPasta(it.pasta)
+      setSidebarMode('explorer')
+    })
+    lista.appendChild(btn)
+  }
+  console.log(
+    '[projects] git:repos ' +
+      ms +
+      'ms repos=' +
+      unicos.length +
+      ' pastas=' +
+      pastasRecentes.length +
+      ' dedup=' +
+      (itens.filter((i) => i && i.repo).length - unicos.length)
+  )
+  void atualizarStatusBar(pastaAtual)
+}
+
+$('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
+$('sidebar-mode-explorer')?.addEventListener('click', () => setSidebarMode('explorer'))
+$('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
+setInterval(() => {
+  if (document.hidden || !pastaAtual) return
+  void atualizarGitStatusArvore()
+}, 5000)
 
 // ---------- Abas + editor ----------
 function persistirAbas() {
@@ -524,6 +1273,9 @@ function renderizarAbas() {
     })
     bar.appendChild(btn)
   }
+  // #tabbar fora de #app: esconde quando não há abas (Cursor)
+  const tabbar = $('tabbar')
+  if (tabbar) tabbar.style.display = abas.length ? 'flex' : 'none'
   atualizarEmpty()
 }
 
@@ -539,10 +1291,205 @@ function atualizarBreadcrumb() {
   bc.textContent = abaAtiva ? caminhoRelativo(abaAtiva) : ''
 }
 
+function extDe(caminho) {
+  const m = String(caminho || '')
+    .toLowerCase()
+    .match(/\.([a-z0-9]+)$/)
+  return m ? m[1] : ''
+}
+
+function ehMarkdown(caminho) {
+  const e = extDe(caminho)
+  return e === 'md' || e === 'markdown'
+}
+
+function ehImagemExt(caminho) {
+  return /^(png|jpe?g|gif|webp)$/.test(extDe(caminho))
+}
+
+/** Renderer markdown mínimo + sanitização (sem HTML arbitrário). */
+function sanitizarERenderMarkdown(src) {
+  let t = String(src || '')
+  t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  t = t.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>')
+  t = t.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>')
+  t = t.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>')
+  t = t.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+  t = t.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+  t = t.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
+  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<pre><code>' + code.trim() + '</code></pre>')
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>')
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  t = t.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>')
+  t = t.replace(/(<li>.*<\/li>\n?)+/g, (m) => '<ul>' + m + '</ul>')
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" rel="noopener noreferrer">$1</a>')
+  t = t.replace(/^\|(.+)\|$/gm, (line) => {
+    const cells = line
+      .slice(1, -1)
+      .split('|')
+      .map((c) => '<td>' + c.trim() + '</td>')
+      .join('')
+    return '<tr>' + cells + '</tr>'
+  })
+  t = t.replace(/(<tr>.*<\/tr>\n?)+/g, (m) => '<table>' + m + '</table>')
+  t = t.replace(/^(?!<[hupolt]|<li|<tr|<table|<pre)(.+)$/gm, '<p>$1</p>')
+  // remove on* / script / iframe mesmo se vazarem
+  t = t.replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  t = t.replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, '')
+  return t
+}
+
+let mdPreviewOn = false
+
+function atualizarToolbarPreview(caminho) {
+  const bar = $('editor-toolbar')
+  const btn = $('btn-md-preview')
+  const mdBox = $('md-preview')
+  const imgBox = $('image-preview')
+  if (!bar) return
+  const md = ehMarkdown(caminho)
+  const img = ehImagemExt(caminho)
+  bar.classList.toggle('hidden', !md && !img)
+  if (btn) btn.classList.toggle('hidden', !md)
+  if (!md) {
+    mdPreviewOn = false
+    mdBox?.classList.add('hidden')
+    mdBox?.setAttribute('aria-hidden', 'true')
+    $('editor-host')?.classList.remove('split-preview')
+  }
+  if (!img) {
+    imgBox?.classList.add('hidden')
+    imgBox?.setAttribute('aria-hidden', 'true')
+  }
+}
+
+function toggleMdPreview() {
+  const caminho = abaAtiva
+  if (!ehMarkdown(caminho) || !editor) return
+  mdPreviewOn = !mdPreviewOn
+  const host = $('editor-host')
+  const box = $('md-preview')
+  if (!box || !host) return
+  if (mdPreviewOn) {
+    box.innerHTML = sanitizarERenderMarkdown(editor.getConteudo ? editor.getConteudo() : '')
+    box.classList.remove('hidden')
+    box.setAttribute('aria-hidden', 'false')
+    host.classList.add('split-preview')
+  } else {
+    box.classList.add('hidden')
+    box.setAttribute('aria-hidden', 'true')
+    host.classList.remove('split-preview')
+  }
+}
+
+async function mostrarImagem(caminho) {
+  const host = $('editor-host')
+  const box = $('image-preview')
+  const img = $('image-preview-img')
+  const mount = $('editor-mount')
+  if (!box || !img) return
+  const r = await window.api.invoke('arquivo:ler-base64', caminho, pastasPermitidas())
+  if (!r?.ok || !r.dataUrl) {
+    alert('Não foi possível abrir imagem: ' + (r?.erro || 'erro'))
+    return
+  }
+  img.src = r.dataUrl
+  img.style.maxWidth = '100%'
+  img.style.maxHeight = '100%'
+  img.style.objectFit = 'contain'
+  box.classList.remove('hidden')
+  box.setAttribute('aria-hidden', 'false')
+  mount?.classList.add('hidden')
+  $('editor-empty')?.classList.add('hidden')
+  host?.classList.add('modo-imagem')
+}
+
+function esconderImagem() {
+  const box = $('image-preview')
+  const mount = $('editor-mount')
+  box?.classList.add('hidden')
+  box?.setAttribute('aria-hidden', 'true')
+  mount?.classList.remove('hidden')
+  $('editor-host')?.classList.remove('modo-imagem')
+}
+
+$('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
+
+function atualizarBotoesHist() {
+  const v = document.getElementById('tb-voltar')
+  const a = document.getElementById('tb-avancar')
+  const canBack = histIdx > 0
+  const canFwd = histIdx >= 0 && histIdx < histAbas.length - 1
+  if (v) {
+    v.disabled = !canBack
+    v.setAttribute('aria-disabled', canBack ? 'false' : 'true')
+  }
+  if (a) {
+    a.disabled = !canFwd
+    a.setAttribute('aria-disabled', canFwd ? 'false' : 'true')
+  }
+}
+
+/** Empurra no histórico só se o caminho for diferente da posição atual (evita loop com irHistAbas). */
+function registrarHistAba(caminho) {
+  if (!caminho) return
+  if (histAbas[histIdx] === caminho) {
+    atualizarBotoesHist()
+    return
+  }
+  histAbas = histAbas.slice(0, histIdx + 1)
+  histAbas.push(caminho)
+  histIdx = histAbas.length - 1
+  if (histAbas.length > 100) {
+    histAbas.shift()
+    histIdx--
+  }
+  atualizarBotoesHist()
+}
+
+async function irHistAbas(delta) {
+  const novo = histIdx + delta
+  if (novo < 0 || novo >= histAbas.length) return
+  const alvo = histAbas[novo]
+  histIdx = novo
+  try {
+    await abrirArquivoNaAba(alvo)
+    // arquivo apagado / falha de IPC: não ficou em abas
+    if (!abas.some((a) => a.caminho === alvo)) {
+      histAbas.splice(novo, 1)
+      histIdx = Math.min(novo, histAbas.length - 1)
+      if (histAbas.length === 0) histIdx = -1
+    }
+  } catch (e) {
+    console.warn('[hist-abas]', e)
+    histAbas.splice(novo, 1)
+    histIdx = Math.min(novo, histAbas.length - 1)
+    if (histAbas.length === 0) histIdx = -1
+  }
+  atualizarBotoesHist()
+}
+
 async function abrirArquivoNaAba(caminho) {
+  ativarAbaCentro('editor')
   const existente = abas.find((a) => a.caminho === caminho)
   if (existente) {
     await ativarAba(caminho)
+    return
+  }
+  if (ehImagemExt(caminho)) {
+    syncDirtyAtiva()
+    abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
+    abaAtiva = caminho
+    registrarHistAba(caminho)
+    if (!editor) initEditor()
+    esconderImagem()
+    await mostrarImagem(caminho)
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    atualizarToolbarPreview(caminho)
+    persistirAbas()
     return
   }
   const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
@@ -566,6 +1513,19 @@ function syncDirtyAtiva() {
 async function ativarAba(caminho, conteudoPrevio) {
   syncDirtyAtiva()
   abaAtiva = caminho
+  registrarHistAba(caminho)
+  ativarAbaCentro('editor')
+  if (ehImagemExt(caminho)) {
+    if (!editor) initEditor()
+    await mostrarImagem(caminho)
+    renderizarAbas()
+    atualizarBreadcrumb()
+    atualizarEmpty()
+    atualizarToolbarPreview(caminho)
+    persistirAbas()
+    return
+  }
+  esconderImagem()
   let conteudo = conteudoPrevio
   if (conteudo == null) {
     const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
@@ -582,6 +1542,15 @@ async function ativarAba(caminho, conteudoPrevio) {
   renderizarAbas()
   atualizarBreadcrumb()
   atualizarEmpty()
+  atualizarToolbarPreview(caminho)
+  if (mdPreviewOn && ehMarkdown(caminho)) {
+    const box = $('md-preview')
+    if (box) box.innerHTML = sanitizarERenderMarkdown(conteudo)
+  } else {
+    mdPreviewOn = false
+    $('md-preview')?.classList.add('hidden')
+    $('editor-host')?.classList.remove('split-preview')
+  }
   editor.focar()
   persistirAbas()
 }
@@ -637,6 +1606,9 @@ async function fecharAba(caminho) {
       await ativarAba(next.caminho)
     } else {
       editor?.limpar()
+      histAbas = []
+      histIdx = -1
+      atualizarBotoesHist()
       atualizarBreadcrumb()
       atualizarEmpty()
       renderizarAbas()
@@ -697,6 +1669,7 @@ async function rodarAnalise(root, force) {
   try {
     const r = await window.api.invoke('analysis:run', root, force)
     renderizarAnalise(r.report, r.fromCache)
+    $('analysis-content').dataset.jaAnalisou = '1'
   } catch (err) {
     $('analysis-content').innerHTML =
       '<p class="muted">Nao consegui analisar agora: ' +
@@ -768,9 +1741,13 @@ function adicionarBolha(role, content, provider) {
     div.appendChild(tag)
   }
   area.appendChild(div)
+  animarEntradaMsg(div, role)
   area.scrollTop = area.scrollHeight
   return div
 }
+
+/** @type {Awaited<ReturnType<typeof iniciarHistoricoChat>> | null} */
+let histChat = null
 
 async function enviarMensagem() {
   if (!pastaAtual) return
@@ -779,19 +1756,62 @@ async function enviarMensagem() {
   if (!texto) return
   input.value = ''
   adicionarBolha('user', texto)
+  histChat?.registrarMensagem('user', texto)
   $('chat-send').disabled = true
-  const bolhaProc = adicionarBolha('assistant', 'Pensando...')
+  // Loading dedicado (não usa bolha "Pensando..." órfã)
+  mostrarLoadingChat()
+  let falhou = false
   try {
     const r = await window.api.invoke('chat:send', pastaAtual, texto)
-    bolhaProc.querySelector('.msg-text').textContent = r.message.content
-    if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
+    const ok = r && r.ok !== false && r.message && r.message.content
+    const conteudo = ok
+      ? r.message.content
+      : r?.message?.content || 'Não consegui responder.'
+    falhou = !ok || (r.message && r.message.provider === 'erro')
+    await removerLoadingChat({ erro: falhou })
+    const bolha = adicionarBolha('assistant', conteudo, r?.message?.provider)
+    if (!falhou) {
+      histChat?.registrarMensagem('assistant', conteudo, r.message.provider)
+      if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
+    }
+    void bolha
   } catch (err) {
-    bolhaProc.querySelector('.msg-text').textContent = 'Erro ao enviar: ' + String(err)
+    falhou = true
+    await removerLoadingChat({ erro: true })
+    adicionarBolha('assistant', 'Não consegui responder.')
+    console.info('[chat] erro invoke:', err)
   } finally {
     $('chat-send').disabled = false
     input.focus()
   }
 }
+
+async function ligarHistoricoChat(raiz) {
+  histChat = await iniciarHistoricoChat(raiz, {
+    onRender: (msgs) => {
+      const empty = $('empty-state')
+      if (empty) empty.classList.add('hidden')
+      renderizarChat(msgs || [])
+    },
+    onNova: () => {
+      const empty = $('empty-state')
+      if (empty) empty.classList.add('hidden')
+      renderizarChat([])
+    }
+  })
+}
+
+/** Nova conversa: limpa UI e reseta estado do histórico (chat.js). */
+function novaConversaUi() {
+  if (histChat && typeof histChat.nova === 'function') {
+    histChat.nova()
+    return
+  }
+  $('empty-state')?.classList.add('hidden')
+  renderizarChat([])
+}
+
+$('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
 
 // ---------- Config / Contas ----------
 async function abrirConfig() {
@@ -825,6 +1845,7 @@ async function abrirConfig() {
           escapar(o.models.map((m) => m.name).join(', ') || '—')
         : 'Instalado, mas parado. Rode: ollama serve'
       : 'Nao instalado. Baixe em ollama.com')
+  await carregarConfigOpenClawUi()
 }
 
 async function abrirContas() {
@@ -953,28 +1974,56 @@ async function carregarTema() {
   }
 }
 
-// ---------- Paleta ----------
-const COMANDOS = [
-  { id: 'abrir-pasta', label: 'Abrir pasta de trabalho', hint: 'Ctrl+O' },
-  { id: 'analisar', label: 'Analisar sistema aberto', hint: 'IA' },
-  { id: 'reanalisar', label: 'Analisar novamente', hint: 'IA' },
-  { id: 'limpar-chat', label: 'Limpar chat desta pasta', hint: 'chat' },
-  { id: 'contas', label: 'Abrir Contas e saude do sistema', hint: 'Fase 2' },
-  { id: 'config', label: 'Abrir Configuracoes', hint: 'sistema' },
-  { id: 'tema', label: 'Alternar tema claro/escuro', hint: 'visual' },
-  { id: 'guardian', label: 'Ver guardiao de recursos', hint: 'RAM/CPU' },
-  { id: 'salvar', label: 'Salvar arquivo ativo', hint: 'Ctrl+S' },
-  { id: 'fechar-aba', label: 'Fechar aba ativa', hint: 'Ctrl+W' },
-  { id: 'toggle-sidebar', label: 'Alternar Explorer', hint: 'Ctrl+B' },
-  { id: 'toggle-right', label: 'Alternar painel direito', hint: 'Ctrl+Alt+B' },
-  { id: 'navegador', label: 'Abrir navegador embutido', hint: 'Ctrl+Shift+N' }
-]
-
+// ---------- Paleta / Quick Open / Busca ----------
 let paletaItens = []
 let paletaSel = 0
+let buscaAbortId = null
+
+function bootstrapComandos() {
+  const defs = [
+    { id: 'abrir-pasta', titulo: 'Abrir pasta de trabalho', atalho: 'Ctrl+O', fn: () => abrirPasta() },
+    { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
+    { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
+    { id: 'paleta-comandos', titulo: 'Paleta de comandos', atalho: 'Ctrl+Shift+P', fn: () => abrirPaletaComandos() },
+    { id: 'analisar', titulo: 'Analisar sistema aberto', fn: () => pastaAtual && rodarAnalise(pastaAtual, false) },
+    { id: 'reanalisar', titulo: 'Analisar novamente', fn: () => pastaAtual && rodarAnalise(pastaAtual, true) },
+    {
+      id: 'limpar-chat',
+      titulo: 'Limpar chat',
+      fn: () => pastaAtual && window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([]))
+    },
+    { id: 'contas', titulo: 'Contas e saude', fn: () => abrirContas() },
+    { id: 'config', titulo: 'Configuracoes', fn: () => abrirConfig() },
+    { id: 'tema', titulo: 'Alternar tema', fn: () => alternarTema() },
+    { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
+    { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
+    { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
+    { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
+    { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
+    {
+      id: 'toggle-terminal',
+      titulo: 'Alternar terminal',
+      atalho: 'Ctrl+`',
+      fn: () => document.getElementById('btn-terminal-toggle')?.click()
+    },
+    {
+      id: 'navegador',
+      titulo: 'Navegador embutido',
+      atalho: 'Ctrl+Shift+N',
+      fn: () => {
+        toggleRight(true)
+        ativarAbaDireita('browser')
+        void abrirNavegadorUi()
+      }
+    }
+  ]
+  for (const d of defs) registrarComando(d)
+}
 
 function abrirPaletaComandos() {
   modoPaleta = 'comandos'
+  fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
   $('palette-input').placeholder = 'Digite um comando...'
@@ -984,9 +2033,10 @@ function abrirPaletaComandos() {
 
 function abrirPaletaArquivos() {
   modoPaleta = 'arquivos'
+  fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Buscar arquivo nas pastas...'
+  $('palette-input').placeholder = 'Quick Open — nome do arquivo...'
   renderizarPaleta('')
   $('palette-input').focus()
 }
@@ -995,13 +2045,23 @@ function fecharPaleta() {
   $('palette').classList.add('hidden')
 }
 
-async function coletarArquivos(dir, acc, profundidade) {
-  if (profundidade > 6 || acc.length > 800) return
-  const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
-  if (!r.ok) return
-  for (const e of r.entradas || []) {
-    if (e.tipo === 'dir') await coletarArquivos(e.caminho, acc, profundidade + 1)
-    else if (e.editavel) acc.push(e)
+function abrirBuscaGlobal() {
+  fecharPaleta()
+  $('busca-global')?.classList.remove('hidden')
+  const inp = $('busca-input')
+  if (inp) {
+    inp.value = ''
+    inp.focus()
+  }
+  const box = $('busca-resultados')
+  if (box) box.innerHTML = '<div class="palette-item muted">Digite para buscar no projeto</div>'
+}
+
+function fecharBuscaGlobal() {
+  $('busca-global')?.classList.add('hidden')
+  if (buscaAbortId) {
+    window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
+    buscaAbortId = null
   }
 }
 
@@ -1009,31 +2069,46 @@ async function renderizarPaleta(filtro) {
   const lista = $('palette-list')
   lista.innerHTML = ''
   paletaSel = 0
-  const f = filtro.toLowerCase().trim()
+  const f = (filtro || '').trim()
   paletaItens = []
 
   if (modoPaleta === 'comandos') {
-    const cmds = COMANDOS.filter((c) => !f || c.label.toLowerCase().includes(f))
+    let cmds = listarComandosLocais()
+    try {
+      const remoto = await window.api.invoke('comandos:listar')
+      if (remoto?.ok && Array.isArray(remoto.comandos)) {
+        for (const c of remoto.comandos) {
+          if (!cmds.find((x) => x.id === c.id)) {
+            cmds.push({ id: c.id, titulo: c.titulo, atalho: c.atalho })
+          }
+        }
+      }
+    } catch {
+      /* offline meta */
+    }
+    const fl = f.toLowerCase()
+    cmds = cmds.filter((c) => !fl || (c.titulo || '').toLowerCase().includes(fl) || c.id.includes(fl))
     for (const c of cmds) {
-      paletaItens.push({ tipo: 'cmd', id: c.id, label: c.label, hint: c.hint })
+      paletaItens.push({ tipo: 'cmd', id: c.id, label: c.titulo, hint: c.atalho || '' })
     }
   } else {
-    const acc = []
-    for (const p of pastasRecentes) await coletarArquivos(p, acc, 0)
-    const filtrados = acc.filter(
-      (e) =>
-        !f ||
-        e.nome.toLowerCase().includes(f) ||
-        e.caminho.toLowerCase().includes(f) ||
-        caminhoRelativo(e.caminho).toLowerCase().includes(f)
-    )
-    for (const e of filtrados.slice(0, 80)) {
-      paletaItens.push({
-        tipo: 'file',
-        caminho: e.caminho,
-        label: caminhoRelativo(e.caminho),
-        hint: e.nome
-      })
+    const raiz = pastaAtual || pastasRecentes[0]
+    if (raiz) {
+      try {
+        const r = await window.api.invoke('busca:arquivos', raiz, f, 80)
+        if (r?.ok && Array.isArray(r.itens)) {
+          for (const e of r.itens) {
+            paletaItens.push({
+              tipo: 'file',
+              caminho: e.caminho,
+              label: e.rel || e.nome,
+              hint: e.nome
+            })
+          }
+        }
+      } catch {
+        /* fallback vazio */
+      }
     }
   }
 
@@ -1064,6 +2139,7 @@ function executarItemPaleta(c) {
 }
 
 function executarComando(id) {
+  if (executarComandoLocal(id)) return
   if (id === 'abrir-pasta') abrirPasta()
   else if (id === 'analisar') {
     if (pastaAtual) rodarAnalise(pastaAtual, false)
@@ -1080,7 +2156,73 @@ function executarComando(id) {
     if (abaAtiva) fecharAba(abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
-  else if (id === 'navegador') window.api.invoke('navegador:abrir').catch(() => {})
+  else if (id === 'navegador') {
+    toggleRight(true)
+    ativarAbaDireita('browser')
+    void abrirNavegadorUi()
+  }
+}
+
+async function rodarBuscaGlobal() {
+  const raiz = pastaAtual || pastasRecentes[0]
+  const q = ($('busca-input')?.value || '').trim()
+  const box = $('busca-resultados')
+  if (!box) return
+  if (!raiz) {
+    box.innerHTML = '<div class="palette-item muted">Abra uma pasta primeiro</div>'
+    return
+  }
+  if (!q) {
+    box.innerHTML = '<div class="palette-item muted">Digite para buscar</div>'
+    return
+  }
+  if (buscaAbortId) await window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
+  buscaAbortId = 'ui-' + Date.now()
+  box.innerHTML = '<div class="palette-item muted">Buscando...</div>'
+  const regex = !!$('busca-regex')?.checked
+  try {
+    const r = await window.api.invoke('busca:conteudo', raiz, q, {
+      regex,
+      limite: 50,
+      id: buscaAbortId
+    })
+    box.innerHTML = ''
+    if (!r?.ok) {
+      box.innerHTML = '<div class="palette-item muted">' + escapar(r?.erro || 'falha') + '</div>'
+      return
+    }
+    if (r.cancelado) {
+      box.innerHTML = '<div class="palette-item muted">Cancelado</div>'
+      return
+    }
+    const grupos = r.grupos || []
+    if (!grupos.length) {
+      box.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
+      return
+    }
+    for (const g of grupos) {
+      const head = document.createElement('div')
+      head.className = 'palette-item'
+      head.innerHTML = '<span class="palette-label">' + escapar(g.rel) + '</span>'
+      head.addEventListener('click', () => {
+        fecharBuscaGlobal()
+        abrirArquivoNaAba(g.arquivo)
+      })
+      box.appendChild(head)
+      for (const h of g.hits || []) {
+        const hit = document.createElement('div')
+        hit.className = 'busca-hit'
+        hit.textContent = h.linha + ': ' + h.texto
+        hit.addEventListener('click', () => {
+          fecharBuscaGlobal()
+          abrirArquivoNaAba(g.arquivo)
+        })
+        box.appendChild(hit)
+      }
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="palette-item muted">' + escapar(String(e)) + '</div>'
+  }
 }
 
 function destacarPaleta(itens) {
@@ -1111,12 +2253,138 @@ function atualizarBadgeProvedor(nome) {
   if (alvo) alvo.textContent = 'IA: ' + nome
 }
 
+/** Toast DOM simples (canto inferior direito, auto-dismiss 5s). */
+function mostrarToast(mensagem, tipo = 'aviso') {
+  let host = document.getElementById('dg-toast-host')
+  if (!host) {
+    host = document.createElement('div')
+    host.id = 'dg-toast-host'
+    host.setAttribute('aria-live', 'polite')
+    host.style.cssText =
+      'position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none'
+    document.body.appendChild(host)
+  }
+  const el = document.createElement('div')
+  const cor =
+    tipo === 'erro' ? '#8b1e1e' : tipo === 'ok' ? '#1e5a32' : '#5a4a1e'
+  el.textContent = String(mensagem || '')
+  el.style.cssText =
+    'pointer-events:auto;padding:10px 14px;border-radius:6px;background:' +
+    cor +
+    ';color:#f5f5f0;font:13px/1.35 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);opacity:0;transition:opacity .2s'
+  host.appendChild(el)
+  requestAnimationFrame(() => {
+    el.style.opacity = '1'
+  })
+  setTimeout(() => {
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 250)
+  }, 5000)
+  return el
+}
+window.dgToast = mostrarToast
+
+async function atualizarBadgeProvedorReal(modeloForcado) {
+  try {
+    const ps = await window.api.invoke('brain:providers')
+    const ativo = Array.isArray(ps) ? ps.find((p) => p.available) : null
+    const nomeProv = ativo
+      ? ativo.name === 'ollama'
+        ? 'Ollama'
+        : String(ativo.name || 'IA')
+      : '—'
+    let modelo = modeloForcado || ''
+    let flagUpdate = false
+    if (!modelo) {
+      try {
+        const r = await window.api.invoke('modelos:listar')
+        modelo = (r && r.catalogo && r.catalogo.ativo) || ''
+        const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+        flagUpdate = !!(m && m.atualizadoDisponivel)
+      } catch {
+        /* ignora */
+      }
+    } else {
+      try {
+        const r = await window.api.invoke('modelos:listar')
+        const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+        flagUpdate = !!(m && m.atualizadoDisponivel)
+      } catch {
+        /* */
+      }
+    }
+    let texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
+    if (flagUpdate) texto += ' ⚠ atualização disponível'
+    const alvo = document.getElementById('chat-provider')
+    if (alvo) alvo.textContent = texto
+  } catch {
+    /* ignora */
+  }
+}
+
+// Checagem ocasional de versões remotas (não bloqueia UI)
+setTimeout(() => {
+  void window.api
+    .invoke('modelos:versoes-remotas')
+    .then(() => atualizarBadgeProvedorReal())
+    .catch(() => {})
+}, 20000)
+
+if (typeof window.api?.on === 'function') {
+  window.api.on('brain:fallback', (_e, payload) => {
+    const p = payload || {}
+    const de = p.de || '?'
+    const para = p.para || '?'
+    mostrarToast('IA trocou de modelo: ' + de + ' → ' + para, 'aviso')
+    marcarProviderFallback()
+    void atualizarBadgeProvedorReal(para)
+    void window.api.invoke('brain:avaliar', para).then((r) => {
+      const nota = r?.avaliacao?.nota
+      if (typeof nota === 'number' && nota < 6) {
+        mostrarToast(
+          'Modelo ' + para + ' respondeu abaixo do esperado (nota ' + nota + '/10) — verifique',
+          'aviso'
+        )
+      }
+    }).catch(() => {})
+  })
+}
+
+$('btn-brain-avaliar')?.addEventListener('click', async () => {
+  mostrarToast('Avaliando modelo ativo…', 'aviso')
+  try {
+    const r = await window.api.invoke('brain:avaliar')
+    if (!r?.ok) {
+      mostrarToast('Avaliação falhou: ' + (r?.erro || 'erro'), 'erro')
+      return
+    }
+    const a = r.avaliacao
+    mostrarToast(
+      'Nota ' + a.nota + '/10 (' + a.acertos + '/' + a.total + ') — ' + a.modelo,
+      a.nota < 6 ? 'aviso' : 'ok'
+    )
+  } catch (e) {
+    mostrarToast('Avaliação falhou: ' + String(e), 'erro')
+  }
+})
+
 // ---------- Eventos ----------
 $('btn-add-folder').addEventListener('click', abrirPasta)
 $('btn-empty-open')?.addEventListener('click', abrirPasta)
-$('btn-reanalyze').addEventListener('click', () => pastaAtual && rodarAnalise(pastaAtual, true))
+$('btn-reanalyze').addEventListener('click', () => {
+  if (!pastaAtual) return
+  const jaAnalisou = $('analysis-content').dataset.jaAnalisou === '1'
+  rodarAnalise(pastaAtual, jaAnalisou)
+})
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
+$('btn-oc-salvar')?.addEventListener('click', () => void salvarConfigOpenClawUi())
+$('btn-oc-limpar-token')?.addEventListener('click', async () => {
+  await window.api.invoke('openclaw:token-clear')
+  await carregarConfigOpenClawUi()
+})
+$('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
+$('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
@@ -1160,6 +2428,11 @@ document.addEventListener('keydown', (e) => {
     abrirPaletaComandos()
     return
   }
+  if (mod && e.shiftKey && key === 'f') {
+    e.preventDefault()
+    abrirBuscaGlobal()
+    return
+  }
   if (mod && key === 'p' && !e.shiftKey) {
     e.preventDefault()
     abrirPaletaArquivos()
@@ -1191,6 +2464,16 @@ document.addEventListener('keydown', (e) => {
     if (abaAtiva) fecharAba(abaAtiva)
     return
   }
+  if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'Left')) {
+    e.preventDefault()
+    void irHistAbas(-1)
+    return
+  }
+  if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowRight' || e.key === 'Right')) {
+    e.preventDefault()
+    void irHistAbas(1)
+    return
+  }
   if (mod && key === 'tab') {
     e.preventDefault()
     ciclarAbas()
@@ -1206,6 +2489,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     fecharPaleta()
+    fecharBuscaGlobal()
     $('modal-config').classList.add('hidden')
     $('modal-contas').classList.add('hidden')
   }
@@ -1214,6 +2498,22 @@ document.addEventListener('keydown', (e) => {
 $('palette').addEventListener('click', (e) => {
   if (e.target === $('palette')) fecharPaleta()
 })
+$('busca-global')?.addEventListener('click', (e) => {
+  if (e.target === $('busca-global')) fecharBuscaGlobal()
+})
+let buscaTimer = null
+$('busca-input')?.addEventListener('input', () => {
+  clearTimeout(buscaTimer)
+  buscaTimer = setTimeout(() => void rodarBuscaGlobal(), 280)
+})
+$('busca-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') fecharBuscaGlobal()
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    void rodarBuscaGlobal()
+  }
+})
+$('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
 $('modal-config').addEventListener('click', (e) => {
   if (e.target === $('modal-config')) $('modal-config').classList.add('hidden')
 })
@@ -1233,13 +2533,18 @@ async function rodarAutoAuditoria() {
     btn.textContent = 'Auditando...'
   }
   try {
-    const r = await window.api.invoke('auditoria:rodar', { autoAtualizar: true, reiniciarAoFim: false })
+    // Mesma regua do boot (autoAtualizar=false) — numeros OK/warn/erro identicos
+    const r = await window.api.invoke('auditoria:rodar', {
+      autoAtualizar: false,
+      reiniciarAoFim: false
+    })
     if (!r || r.erro) {
       console.warn('[auditoria] erro:', r && r.erro)
     } else {
-      const falhas = r.achados.filter(function (a) {
+      const falhas = (r.achados || []).filter(function (a) {
         return a.status === 'falhou'
       })
+      const pend = (r.resumo && r.resumo.pendencias) || []
       var msg =
         'Auditoria concluida\n' +
         'OK: ' +
@@ -1253,10 +2558,23 @@ async function rodarAutoAuditoria() {
         r.resumo.corrigidos +
         ' | Falhas: ' +
         r.resumo.falhas
+      if (pend.length) {
+        msg +=
+          '\n\nPendencias:\n' +
+          pend
+            .map(function (p) {
+              return '- [' + p.severidade + '] ' + p.id + ' — ' + p.titulo
+            })
+            .join('\n')
+      }
       if (falhas.length) {
-        msg += '\n\nFalhas:\n' + falhas.map(function (a) {
-          return '- ' + a.titulo
-        }).join('\n')
+        msg +=
+          '\n\nFalhas:\n' +
+          falhas
+            .map(function (a) {
+              return '- ' + a.titulo
+            })
+            .join('\n')
       }
       if (!r.reiniciarPendente) {
         alert(msg)
@@ -1384,8 +2702,10 @@ function abrirMenuCtxArvore(x, y, cwd) {
     e.stopPropagation()
     fecharMenuCtxArvore()
     const api = window.dgTerminal
-    if (api && typeof api.abrirEm === 'function') {
-      void api.abrirEm(cwd)
+    if (typeof garantirTerminal === 'function') garantirTerminal()
+    const api2 = window.dgTerminal
+    if (api2 && typeof api2.abrirEm === 'function') {
+      void api2.abrirEm(cwd)
     } else {
       console.warn('[arvore] dgTerminal.abrirEm indisponivel')
     }
@@ -1441,16 +2761,47 @@ carregarLayout()
 carregarPastas()
 initResizers()
 initActivityBar()
+bootstrapComandos()
 carregarTema()
-initTerminalPanel()
+// Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
+let terminalIniciado = false
+function garantirTerminal() {
+  if (terminalIniciado) return
+  terminalIniciado = true
+  initTerminalPanel()
+}
+document.getElementById('btn-terminal-toggle')?.addEventListener(
+  'click',
+  () => garantirTerminal(),
+  { once: true, capture: true }
+)
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '`') garantirTerminal()
+  },
+  true
+)
+// placeholder até primeiro uso
+const termPanel = document.getElementById('terminal-panel')
+if (termPanel && !termPanel.dataset.lazyReady) {
+  termPanel.dataset.lazyReady = '0'
+}
 initMenuCtxArvore()
+setSidebarMode('explorer')
+// Centro: Chat se já houver mensagens; senão Editor
+{
+  const temConversa = !!document.querySelector(
+    '#chat-messages .msg, #chat-messages .chat-msg, #chat-messages .bolha, #chat-messages .message'
+  )
+  ativarAbaCentro(temConversa ? 'chat' : 'editor')
+}
 renderizarPastas().then(() => restaurarAbas())
+void renderizarProjects().then(() => atualizarStatusBar(pastaAtual || pastasRecentes[0] || null))
+void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
-window.api.invoke('brain:providers').then((ps) => {
-  const ativo = ps.find((p) => p.available)
-  if (ativo) $('chat-provider').textContent = 'IA: ' + ativo.name
-})
+void atualizarBadgeProvedorReal()
 
 document.addEventListener('DOMContentLoaded', function () {
   var btn = document.getElementById('btn-auditar')
@@ -1458,6 +2809,15 @@ document.addEventListener('DOMContentLoaded', function () {
   var bMin = document.getElementById('tb-min')
   var bMax = document.getElementById('tb-max')
   var bClose = document.getElementById('tb-close')
+  var bVoltar = document.getElementById('tb-voltar')
+  var bAvancar = document.getElementById('tb-avancar')
+  if (bVoltar) bVoltar.addEventListener('click', function () {
+    void irHistAbas(-1)
+  })
+  if (bAvancar) bAvancar.addEventListener('click', function () {
+    void irHistAbas(1)
+  })
+  atualizarBotoesHist()
   if (bMin) bMin.addEventListener('click', function () {
     window.api.invoke('janela:minimizar')
   })

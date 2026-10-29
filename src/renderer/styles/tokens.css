@@ -52,9 +52,9 @@ body.tema-claro {
   --dg-space-6: 24px;
   --dg-space-7: 32px;
   --dg-space-8: 40px;
-  --dg-radius-sm: 6px;
-  --dg-radius-md: 8px;
-  --dg-radius-lg: 12px;
+  --dg-radius-sm: 4px;
+  --dg-radius-md: 6px;
+  --dg-radius-lg: 8px;
   --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08);
   --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.12);
   --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.16);
@@ -67,11 +67,23 @@ body.tema-claro {
   --dg-lh-normal: 1.5;
   --dg-lh-relaxed: 1.7;
   --dg-editor-line-height: 1.6;
-  --dg-tab-height: 36px;
   --dg-titlebar-height: 38px;
-  --dg-activitybar-width: 56px;
-  --dg-sidebar-width: 260px;
-  --dg-right-panel-width: 380px;
+
+  /* === ESTRUTURA (Prompt F / Etapa 1+3) === */
+  --dg-gap: 8px;
+  --dg-gap-sm: 6px;
+  --dg-iconbar-w: 48px;
+  --dg-sidebar-w: 260px;
+  --dg-panel-w: 320px;
+  --dg-statusbar-h: 24px;
+  --dg-tabbar-h: 34px;
+  /* Alias legado: 36 → 34 (tabbar Cursor). Manter nome para CSS antigo. */
+  --dg-tab-height: var(--dg-tabbar-h);
+
+  /* Aliases legados → estrutura (drag/layout e CSS antigo) */
+  --dg-activitybar-width: var(--dg-iconbar-w);
+  --dg-sidebar-width: var(--dg-sidebar-w);
+  --dg-right-panel-width: var(--dg-panel-w);
 }
 
 body.tema-escuro {

@@ -4,11 +4,13 @@ const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
   'system:get-profile', 'system:profile-strength',
   'folder:scan', 'folder:format-summary', 'folder:select',
-  'brain:ask', 'brain:providers', 'brain:ollama-status', 'brain:models',
+  'brain:ask', 'brain:providers', 'brain:ollama-status', 'brain:models', 'brain:avaliar',
   'analysis:run', 'analysis:cached',
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template',
   'chat:load', 'chat:send', 'chat:clear',
+  'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
+  'git:status', 'git:diff', 'git:repos',
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
@@ -16,15 +18,34 @@ const invokeChannels = [
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
-  'arquivo:ler', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
+  'navegador:fechar',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
-  'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao'
+  'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',
+  'qa:run',
+  'hibrido:analisar', 'hibrido:executar',
+  'agente:executar', 'agente:modelo', 'agente:historico',
+  'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
+  'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa', 'modelos:versoes-remotas',
+  'config:backup', 'sistema:safe-mode', 'app:is-safe-mode',
+  'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar',
+  'openclaw:config-get', 'openclaw:config-set',
+  'openclaw:token-set', 'openclaw:token-clear', 'openclaw:token-status',
+  'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',
+  'openclaw:auditoria-listar'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
+const eventOnChannels = [
+  'terminal:data',
+  'terminal:exit',
+  'brain:fallback',
+  'navegador:aberto',
+  'navegador:fechado'
+] as const
 
-const sendChannels = ['app:quit']
+const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']
 
 contextBridge.exposeInMainWorld('api', {
   invoke: (channel: string, ...args: unknown[]) => {
@@ -32,6 +53,9 @@ contextBridge.exposeInMainWorld('api', {
     return ipcRenderer.invoke(channel, ...args)
   },
   on: (channel: string, callback: (event: IpcRendererEvent, ...args: unknown[]) => void) => {
+    if (!(eventOnChannels as readonly string[]).includes(channel)) {
+      return () => {}
+    }
     const handler = (event: IpcRendererEvent, ...args: unknown[]) => callback(event, ...args)
     ipcRenderer.on(channel, handler)
     return () => ipcRenderer.removeListener(channel, handler)

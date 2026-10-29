@@ -1,10 +1,27 @@
 /**
- * Painel Navegador embutido — BaseWindow + WebContentsView (Electron 30+).
+ * Painel Navegador embutido — WebContentsView (chrome + conteúdo).
+ * App: View host filha da BrowserWindow principal (aba Browser).
+ * Smoke (DG_NAV_SMOKE=1): BaseWindow temporária (host com bounds controláveis).
  * Partition persist:dgnav = sessão (cookies/localStorage) em disco.
- * Sem BrowserView, sem <webview>, sem iframe.
+ *
+ * DÍVIDA DE ARQUITETURA — DOIS CAMINHOS
+ *
+ * DG_NAV_SMOKE=1 -> BaseWindow oculta (arquitetura antiga).
+ *   22 cenários do smoke testam essa bifurcação.
+ *   Views chrome/content são filhas do BaseWindow.
+ *
+ * Modo normal -> View host na BrowserWindow principal.
+ *   Renderer envia bounds via 'navegador:bounds'.
+ *
+ * CONSEQUÊNCIA: o smoke NÃO cobre o caminho de produção.
+ * Se a arquitetura de embed quebrar, o smoke continua verde.
+ * Fechar essa dívida exige reescrever os cenários com um
+ * host injetável. Não fazer sem decisão explícita.
  */
 import {
   BaseWindow,
+  BrowserWindow,
+  View,
   WebContentsView,
   app,
   ipcMain,
@@ -19,12 +36,19 @@ const PARTITION = 'persist:dgnav'
 const CHROME_H = 52
 
 export type OpcoesJanelaNavegador = {
-  /** true = show+focus; false/ausente = permanece oculta (MCP/smoke) */
+  /** true = show+focus (app: torna visível no painel); smoke: show BaseWindow */
   mostrar?: boolean
 }
 
 let chamadasCriacao = 0
 const timestampsCriacao: number[] = []
+
+function emSmokeNav(): boolean {
+  // ver DÍVIDA DE ARQUITETURA no topo do arquivo:
+  // smoke usa BaseWindow; produção usa host na janela
+  // principal. Caminhos coexistem por design.
+  return process.env.DG_NAV_SMOKE === '1'
+}
 
 function registrarChamadaCriacao(): void {
   chamadasCriacao += 1
@@ -42,7 +66,6 @@ function registrarChamadaCriacao(): void {
 }
 
 function caminhoUltimaUrl(): string {
-  // smoke NÃO contamina a URL real do usuário
   const nome =
     process.env.DG_NAV_SMOKE === '1' ? 'nav-ultima-url.smoke' : 'nav-ultima-url'
   return join(projectStateDir(resolverRaizProjeto()), nome)
@@ -77,12 +100,12 @@ const CHROME_HTML = `<!DOCTYPE html>
 <meta charset="utf-8"/>
 <title>DG Nav</title>
 <style>
-  html,body{margin:0;padding:0;height:100%;font:13px/1.3 system-ui,Segoe UI,sans-serif;background:#1a1a1a;color:#e8e8e8;user-select:none}
-  #bar{display:flex;align-items:center;gap:6px;height:100%;padding:0 8px;box-sizing:border-box;border-bottom:1px solid #333}
+  html,body{margin:0;padding:0;height:100%;width:100%;font:13px/1.3 system-ui,Segoe UI,sans-serif;background:#1a1a1a;color:#e8e8e8;user-select:none}
+  #bar{display:flex;align-items:center;gap:6px;height:100%;width:100%;padding:0 8px;box-sizing:border-box;border-bottom:1px solid #333}
   button{background:#2a2a2a;border:1px solid #444;color:#eee;border-radius:4px;padding:4px 10px;cursor:pointer}
   button:disabled{opacity:.35;cursor:default}
   button:hover:not(:disabled){background:#333}
-  #url{flex:1;background:#111;border:1px solid #444;color:#eee;border-radius:4px;padding:6px 8px;outline:none}
+  #url{flex:1;min-width:0;background:#111;border:1px solid #444;color:#eee;border-radius:4px;padding:6px 8px;outline:none}
   #url:focus{border-color:#6af}
   #titulo{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.7;font-size:12px}
 </style>
@@ -151,13 +174,25 @@ type Listeners = {
   onNavigate?: (url: string) => void
   onFinish?: (url: string) => void
   onTitle?: (titulo: string) => void
+  onClose?: () => void
 }
 
-let janela: BaseWindow | null = null
+type Bounds = { x: number; y: number; width: number; height: number }
+
+/** Smoke: BaseWindow host. App: null (usa hostView na principal). */
+let janelaSmoke: BaseWindow | null = null
+/** App: container View na BrowserWindow principal. */
+let hostView: View | null = null
 let chromeView: WebContentsView | null = null
 let contentView: WebContentsView | null = null
+let parentWin: BrowserWindow | null = null
 let carregando = false
 let ipcPronto = false
+let embutidoVisivel = false
+let ultimoBounds: Bounds = { x: 0, y: 0, width: 0, height: 0 }
+let hostAnexado = false
+/** true após criar; false após fechar (mesmo com views ainda em memória no app). */
+let sessaoAberta = false
 const listeners: Listeners = {}
 
 function garantirChromePreload(): string {
@@ -168,11 +203,69 @@ function garantirChromePreload(): string {
   return p
 }
 
-function layout(): void {
-  if (!janela || !chromeView || !contentView) return
-  const { width, height } = janela.getContentBounds()
+/** Layout relativo ao host (smoke BaseWindow ou View embutida). */
+function layoutInterno(width: number, height: number): void {
+  if (!chromeView || !contentView) return
   chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_H })
-  contentView.setBounds({ x: 0, y: CHROME_H, width, height: Math.max(0, height - CHROME_H) })
+  contentView.setBounds({
+    x: 0,
+    y: CHROME_H,
+    width,
+    height: Math.max(0, height - CHROME_H)
+  })
+}
+
+function layoutSmoke(): void {
+  if (!janelaSmoke || janelaSmoke.isDestroyed()) return
+  const { width, height } = janelaSmoke.getContentBounds()
+  layoutInterno(width, height)
+}
+
+/** Bounds do #browser-mount (coordenadas da content area da janela principal). */
+export function layoutNavegador(b: Bounds): void {
+  if (emSmokeNav()) {
+    layoutSmoke()
+    return
+  }
+  if (!hostView || !chromeView || !contentView) return
+  ultimoBounds = {
+    x: Math.round(b.x),
+    y: Math.round(b.y),
+    width: Math.max(0, Math.round(b.width)),
+    height: Math.max(0, Math.round(b.height))
+  }
+  if (!embutidoVisivel) {
+    hostView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+    return
+  }
+  hostView.setBounds(ultimoBounds)
+  layoutInterno(ultimoBounds.width, ultimoBounds.height)
+}
+
+export function mostrarNavegadorEmbutido(mostrar: boolean): void {
+  if (emSmokeNav()) return
+  embutidoVisivel = !!mostrar
+  if (!hostView) return
+  if (!mostrar) {
+    hostView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+    return
+  }
+  if (ultimoBounds.width > 0 && ultimoBounds.height > 0) {
+    hostView.setBounds(ultimoBounds)
+    layoutInterno(ultimoBounds.width, ultimoBounds.height)
+  }
+}
+
+export function definirJanelaPrincipalNavegador(win: BrowserWindow | null): void {
+  parentWin = win
+  if (win && !win.isDestroyed()) {
+    win.on('closed', () => {
+      if (parentWin === win) {
+        destruirNavegador()
+        parentWin = null
+      }
+    })
+  }
 }
 
 function canGoBack(wc: WebContents): boolean {
@@ -263,8 +356,18 @@ export function getContentView(): WebContentsView | null {
 
 /** Reaplica bounds chrome+conteúdo (necessário antes de capturePage). */
 export function forcarLayoutNavegador(): { width: number; height: number } | null {
-  if (!janela || janela.isDestroyed() || !contentView) return null
-  layout()
+  if (!contentView) return null
+  if (emSmokeNav()) {
+    if (!janelaSmoke || janelaSmoke.isDestroyed()) return null
+    layoutSmoke()
+  } else if (hostView && embutidoVisivel && ultimoBounds.width > 0) {
+    layoutNavegador(ultimoBounds)
+  } else if (hostView) {
+    // smoke/controle: força tamanho mínimo para screenshot
+    layoutInterno(1280, 800)
+  } else {
+    return null
+  }
   const b = contentView.getBounds()
   return { width: b.width, height: b.height }
 }
@@ -273,8 +376,14 @@ export function getPartition(): string {
   return PARTITION
 }
 
+function navegadorAberto(): boolean {
+  if (!contentView || !sessaoAberta) return false
+  if (emSmokeNav()) return !!(janelaSmoke && !janelaSmoke.isDestroyed())
+  return hostAnexado
+}
+
 export function estadoAtual(): EstadoNavegador {
-  if (!contentView || !janela || janela.isDestroyed()) {
+  if (!contentView || !navegadorAberto()) {
     return { aberto: false, url: '', titulo: '', carregando: false, logado: null }
   }
   const wc = contentView.webContents
@@ -294,13 +403,24 @@ export async function estadoComLogado(): Promise<EstadoNavegador> {
 }
 
 export function focarJanela(): void {
-  if (janela && !janela.isDestroyed()) {
-    if (janela.isMinimized()) janela.restore()
-    janela.focus()
+  if (emSmokeNav() && janelaSmoke && !janelaSmoke.isDestroyed()) {
+    if (janelaSmoke.isMinimized()) janelaSmoke.restore()
+    janelaSmoke.focus()
+    return
   }
+  if (parentWin && !parentWin.isDestroyed()) parentWin.focus()
 }
 
-export async function navegarPara(url: string, timeoutMs = 30_000): Promise<{ ok: boolean; url: string; erro?: string }> {
+/** Smoke: BaseWindow. App embutido: null. */
+export function getJanelaNavegador(): BaseWindow | null {
+  if (!janelaSmoke || janelaSmoke.isDestroyed()) return null
+  return janelaSmoke
+}
+
+export async function navegarPara(
+  url: string,
+  timeoutMs = 30_000
+): Promise<{ ok: boolean; url: string; erro?: string }> {
   if (!contentView) return { ok: false, url: '', erro: 'navegador fechado' }
   const wc = contentView.webContents
   let destino = url.trim()
@@ -340,85 +460,11 @@ export async function navegarPara(url: string, timeoutMs = 30_000): Promise<{ ok
   })
 }
 
-export function criarJanelaNavegador(
-  urlInicial?: string,
-  opts?: OpcoesJanelaNavegador
-): BaseWindow {
-  registrarChamadaCriacao()
-  const mostrar = opts?.mostrar === true
-  const destino =
-    urlInicial && urlInicial !== 'about:blank' ? urlInicial : urlInicial === 'about:blank' ? 'about:blank' : undefined
-
-  // Singleton: nunca criar segunda BaseWindow
-  if (janela && !janela.isDestroyed()) {
-    if (destino && destino !== 'about:blank') {
-      void contentView?.webContents.loadURL(destino)
-    } else if (destino === 'about:blank') {
-      void contentView?.webContents.loadURL('about:blank')
-    }
-    if (mostrar) {
-      if (!janela.isVisible()) janela.show()
-      janela.focus()
-    }
-    dglog(`[navegador] singleton reutilizado mostrar=${mostrar} url=${destino || '(mantém)'}`)
-    return janela
-  }
-
-  registrarIpc()
-
-  janela = new BaseWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 800,
-    minHeight: 500,
-    title: 'DG Navegador',
-    backgroundColor: '#1a1a1a',
-    show: false
-  })
-
-  const preload = garantirChromePreload()
-
-  chromeView = new WebContentsView({
-    webPreferences: {
-      preload,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  })
-
-  contentView = new WebContentsView({
-    webPreferences: {
-      partition: PARTITION,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      // UA real do Chromium — não sobrescrever com string falsa
-      spellcheck: true
-    }
-  })
-
-  // locale pt-BR na sessão da partition
-  try {
-    contentView.webContents.session.setSpellCheckerLanguages(['pt-BR', 'en-US'])
-  } catch {
-    /* ignore */
-  }
-
-  janela.contentView.addChildView(chromeView)
-  janela.contentView.addChildView(contentView)
-  layout()
-
-  chromeView.webContents.loadURL(
-    'data:text/html;charset=utf-8,' + encodeURIComponent(CHROME_HTML)
-  )
-
-  const wc = contentView.webContents
+function ligarEventosContent(wc: WebContents): void {
   wc.setWindowOpenHandler(({ url }) => {
     void wc.loadURL(url)
     return { action: 'deny' }
   })
-
   wc.on('did-start-loading', () => {
     carregando = true
   })
@@ -442,34 +488,205 @@ export function criarJanelaNavegador(
   })
   wc.on('page-title-updated', (_e, title) => {
     listeners.onTitle?.(title)
-    if (janela && !janela.isDestroyed()) janela.setTitle(title ? `DG Navegador — ${title}` : 'DG Navegador')
+    if (janelaSmoke && !janelaSmoke.isDestroyed()) {
+      janelaSmoke.setTitle(title ? `DG Navegador — ${title}` : 'DG Navegador')
+    }
     emitirEstadoChrome()
   })
+}
 
-  janela.on('resize', () => layout())
-  janela.on('closed', () => {
-    janela = null
-    chromeView = null
-    contentView = null
-    carregando = false
-    dglog('[navegador] painel fechado (refs null)')
+function criarViews(): void {
+  const preload = garantirChromePreload()
+  chromeView = new WebContentsView({
+    webPreferences: {
+      preload,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
   })
+  contentView = new WebContentsView({
+    webPreferences: {
+      partition: PARTITION,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: true
+    }
+  })
+  try {
+    contentView.webContents.session.setSpellCheckerLanguages(['pt-BR', 'en-US'])
+  } catch {
+    /* ignore */
+  }
+  chromeView.webContents.loadURL(
+    'data:text/html;charset=utf-8,' + encodeURIComponent(CHROME_HTML)
+  )
+  ligarEventosContent(contentView.webContents)
+}
+
+function destruirNavegador(): void {
+  try {
+    if (janelaSmoke && !janelaSmoke.isDestroyed()) janelaSmoke.close()
+  } catch {
+    /* ignore */
+  }
+  janelaSmoke = null
+  try {
+    if (hostView && parentWin && !parentWin.isDestroyed()) {
+      parentWin.contentView.removeChildView(hostView)
+    }
+  } catch {
+    /* ignore */
+  }
+  hostView = null
+  chromeView = null
+  contentView = null
+  hostAnexado = false
+  embutidoVisivel = false
+  sessaoAberta = false
+  carregando = false
+  dglog('[navegador] painel destruido (refs null)')
+  try {
+    listeners.onClose?.()
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Cria/reutiliza o navegador.
+ * Smoke: BaseWindow oculta. App: View host na janela principal.
+ * Retorno tipado como BaseWindow | null — smoke usa a BaseWindow; app retorna null.
+ */
+export function criarJanelaNavegador(
+  urlInicial?: string,
+  opts?: OpcoesJanelaNavegador
+): BaseWindow {
+  registrarChamadaCriacao()
+  const mostrar = opts?.mostrar === true
+  const destino =
+    urlInicial && urlInicial !== 'about:blank'
+      ? urlInicial
+      : urlInicial === 'about:blank'
+        ? 'about:blank'
+        : undefined
+
+  // --- SMOKE: BaseWindow (cenários 7/12 dependem) ---
+  if (emSmokeNav()) {
+    if (janelaSmoke && !janelaSmoke.isDestroyed()) {
+      if (destino && destino !== 'about:blank') {
+        void contentView?.webContents.loadURL(destino)
+      } else if (destino === 'about:blank') {
+        void contentView?.webContents.loadURL('about:blank')
+      }
+      if (mostrar) {
+        if (!janelaSmoke.isVisible()) janelaSmoke.show()
+        janelaSmoke.focus()
+      }
+      sessaoAberta = true
+      dglog(`[navegador] smoke singleton reutilizado mostrar=${mostrar}`)
+      return janelaSmoke
+    }
+    registrarIpc()
+    janelaSmoke = new BaseWindow({
+      width: 1280,
+      height: 800,
+      minWidth: 800,
+      minHeight: 500,
+      title: 'DG Navegador',
+      backgroundColor: '#1a1a1a',
+      show: false
+    })
+    criarViews()
+    janelaSmoke.contentView.addChildView(chromeView!)
+    janelaSmoke.contentView.addChildView(contentView!)
+    layoutSmoke()
+    janelaSmoke.on('resize', () => layoutSmoke())
+    janelaSmoke.on('closed', () => {
+      janelaSmoke = null
+      chromeView = null
+      contentView = null
+      carregando = false
+      sessaoAberta = false
+      dglog('[navegador] smoke BaseWindow closed')
+      try {
+        listeners.onClose?.()
+      } catch {
+        /* ignore */
+      }
+    })
+    sessaoAberta = true
+    const urlLoad = destino || 'about:blank'
+    void contentView!.webContents.loadURL(urlLoad)
+    if (mostrar) {
+      janelaSmoke.show()
+      janelaSmoke.focus()
+    }
+    dglog(`[navegador] smoke BaseWindow criada url=${urlLoad}`)
+    return janelaSmoke
+  }
+
+  // --- APP: embutido na janela principal ---
+  registrarIpc()
+  if (hostAnexado && hostView && chromeView && contentView) {
+    sessaoAberta = true
+    if (destino && destino !== 'about:blank') {
+      void contentView.webContents.loadURL(destino)
+    } else if (destino === 'about:blank') {
+      void contentView.webContents.loadURL('about:blank')
+    }
+    if (mostrar) {
+      embutidoVisivel = true
+      if (ultimoBounds.width > 0) layoutNavegador(ultimoBounds)
+    }
+    dglog(`[navegador] embutido singleton reutilizado mostrar=${mostrar}`)
+    // Cast: API pública tipada BaseWindow para smoke; app não usa o retorno
+    return janelaSmoke as unknown as BaseWindow
+  }
+
+  if (!parentWin || parentWin.isDestroyed()) {
+    dglog('[navegador] ERRO: janela principal nao definida — chamar definirJanelaPrincipalNavegador')
+    throw new Error('navegador: janela principal ausente')
+  }
+
+  criarViews()
+  hostView = new View()
+  hostView.addChildView(chromeView!)
+  hostView.addChildView(contentView!)
+  parentWin.contentView.addChildView(hostView)
+  hostAnexado = true
+  sessaoAberta = true
+  hostView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+  layoutInterno(0, 0)
 
   const urlLoad = destino || 'about:blank'
-  void wc.loadURL(urlLoad)
-  // NÃO chamar show() aqui — só se opts.mostrar === true
+  void contentView!.webContents.loadURL(urlLoad)
   if (mostrar) {
-    janela.show()
-    janela.focus()
+    embutidoVisivel = true
   }
-  dglog(
-    `[navegador] painel criado partition=${PARTITION} mostrar=${mostrar} url=${urlLoad}`
-  )
-  return janela
+  dglog(`[navegador] embutido criado partition=${PARTITION} url=${urlLoad}`)
+  return janelaSmoke as unknown as BaseWindow
 }
 
 export function fecharJanelaNavegador(): void {
-  if (janela && !janela.isDestroyed()) janela.close()
+  if (emSmokeNav()) {
+    if (janelaSmoke && !janelaSmoke.isDestroyed()) janelaSmoke.close()
+    return
+  }
+  // App: ocultar (não destruir) — reabrir a aba reutiliza as views
+  sessaoAberta = false
+  mostrarNavegadorEmbutido(false)
+  try {
+    listeners.onClose?.()
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Destrói de verdade (sair do app). */
+export function destruirJanelaNavegador(): void {
+  destruirNavegador()
 }
 
 export function onNavegadorEventos(l: Listeners): void {
