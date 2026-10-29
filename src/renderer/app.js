@@ -185,8 +185,7 @@ function initActivityBar() {
       } else if (a === 'busca') {
         abrirPaletaArquivos()
       } else if (a === 'chat') {
-        toggleRight(true)
-        ativarAbaDireita('chat')
+        ativarAbaCentro('chat')
         setTimeout(() => $('chat-input')?.focus(), 0)
       } else if (a === 'navegador') {
         window.api.invoke('navegador:abrir').catch((e) => console.warn('[navegador]', e))
@@ -200,6 +199,11 @@ function initActivityBar() {
 }
 
 function ativarAbaDireita(pane) {
+  // Chat saiu do painel direito (Etapa 5) — redirecionar
+  if (pane === 'chat') {
+    ativarAbaCentro('chat')
+    return
+  }
   document.querySelectorAll('.right-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.pane === pane)
   })
@@ -230,14 +234,31 @@ function ativarAbaDireita(pane) {
   }
 }
 
+function ativarAbaCentro(pane) {
+  const alvo = pane === 'editor' ? 'editor' : 'chat'
+  document.querySelectorAll('.center-tab').forEach((t) => {
+    const on = t.dataset.centerPane === alvo
+    t.classList.toggle('active', on)
+    t.setAttribute('aria-selected', on ? 'true' : 'false')
+  })
+  document.querySelectorAll('.center-pane').forEach((p) => {
+    p.classList.toggle('active', p.id === 'center-pane-' + alvo)
+  })
+}
+
 document.querySelectorAll('.right-tab').forEach((t) => {
   t.addEventListener('click', () => ativarAbaDireita(t.dataset.pane))
+})
+
+document.querySelectorAll('.center-tab').forEach((t) => {
+  t.addEventListener('click', () => ativarAbaCentro(t.dataset.centerPane))
 })
 
 // Bridge para terminal.js (toggle Ctrl+` / icon-bar) sem import circular
 window.dgUi = {
   toggleRight,
-  ativarAbaDireita
+  ativarAbaDireita,
+  ativarAbaCentro
 }
 
 // ---------- Pastas ----------
@@ -271,6 +292,7 @@ function carregarPastas() {
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
   pastaAtual = path
+  ativarAbaCentro('chat')
   $('chat-title').textContent = nomeArquivo(path)
   $('empty-state')?.remove()
   $('chat-send').disabled = false
@@ -957,6 +979,7 @@ function esconderImagem() {
 $('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
 
 async function abrirArquivoNaAba(caminho) {
+  ativarAbaCentro('editor')
   const existente = abas.find((a) => a.caminho === caminho)
   if (existente) {
     await ativarAba(caminho)
@@ -997,6 +1020,7 @@ function syncDirtyAtiva() {
 async function ativarAba(caminho, conteudoPrevio) {
   syncDirtyAtiva()
   abaAtiva = caminho
+  ativarAbaCentro('editor')
   if (ehImagemExt(caminho)) {
     if (!editor) initEditor()
     await mostrarImagem(caminho)
@@ -2229,6 +2253,13 @@ if (termPanel && !termPanel.dataset.lazyReady) {
 }
 initMenuCtxArvore()
 setSidebarMode('explorer')
+// Centro: Chat se já houver mensagens; senão Editor
+{
+  const temConversa = !!document.querySelector(
+    '#chat-messages .msg, #chat-messages .chat-msg, #chat-messages .bolha, #chat-messages .message'
+  )
+  ativarAbaCentro(temConversa ? 'chat' : 'editor')
+}
 renderizarPastas().then(() => restaurarAbas())
 void renderizarProjects()
 atualizarGuardiao()

@@ -7,7 +7,7 @@ export async function cenariosUiChat(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
-      await page.locator('.right-tab[data-pane="chat"]').click()
+      await page.locator('.center-tab[data-center-pane="chat"]').click()
       await page.waitForSelector('#chat-input', { timeout: 5000 })
       const input = page.locator('#chat-input')
       await input.fill('')

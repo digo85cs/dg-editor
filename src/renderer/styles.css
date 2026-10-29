@@ -416,13 +416,66 @@ body {
 .resizer:hover::after,
 .resizer.dragging::after { background: var(--dg-accent); opacity: 0.5; }
 
-/* ---------- Center: editor ---------- */
+/* ---------- Center: Chat | Editor ---------- */
 #center-panel {
   background: var(--dg-bg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+}
+.center-tabs {
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--dg-border);
+  background: var(--dg-sidebar);
+  min-width: 0;
+}
+.center-tab {
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  font-family: var(--fonte);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dg-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.center-tab:hover { color: var(--dg-text); background: var(--dg-surface-raised); }
+.center-tab.active {
+  color: var(--dg-text);
+  border-bottom-color: var(--dg-accent);
+}
+.center-pane {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+}
+.center-pane.active {
+  display: flex;
+  flex-direction: column;
+}
+#pane-chat.center-pane-inner {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+}
+#center-pane-editor #editor-host {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 #editor-tabs {
   height: 100%;
@@ -789,7 +842,7 @@ body {
 .terminal-tab-pane .xterm { height: 100%; }
 .terminal-tab-pane .xterm-viewport { background: var(--dg-bg) !important; }
 
-/* Chat panel ID preserved but relocated inside exec */
+/* Chat panel — agora no centro (max 720px via #pane-chat.center-pane-inner) */
 #chat-panel {
   display: flex;
   flex-direction: column;

@@ -91,79 +91,87 @@
 
     <div id="resize-sidebar" class="resizer" data-resize="sidebar" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Centro: editor + terminal (#editor-tabs vive em #tabbar acima de #app) -->
+    <!-- Centro: abas Chat | Editor (#editor-tabs vive em #tabbar acima de #app) -->
     <section id="center-panel">
-      <div id="editor-breadcrumb"></div>
-      <div id="editor-toolbar" class="editor-toolbar hidden">
-        <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+      <div class="center-tabs" role="tablist" aria-label="Área central">
+        <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
+        <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
       </div>
-      <div id="editor-host">
-        <div id="editor-mount"></div>
-        <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
-        <div id="image-preview" class="image-preview hidden" aria-hidden="true">
-          <img id="image-preview-img" alt="preview" />
+
+      <div id="center-pane-chat" class="center-pane active">
+        <div id="pane-chat" class="center-pane-inner">
+          <main id="chat-panel">
+            <header id="chat-header">
+              <div class="chat-header-meta">
+                <span id="chat-title">Nenhuma pasta aberta</span>
+                <span id="chat-provider" class="provider-badge"></span>
+              </div>
+              <div class="chat-header-actions">
+                <div id="chat-history-bar" class="chat-history-bar">
+                  <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
+                  <select id="chat-history-select" aria-label="Historico de chats"></select>
+                </div>
+                <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar</button>
+                <button type="button" id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
+                <button type="button" id="btn-auditar" class="btn-small" title="Auto auditoria do sistema">Auditar</button>
+              </div>
+            </header>
+            <div id="chat-messages" class="chat-messages">
+              <div class="empty-state" id="empty-state">
+                <h2>Bem-vindo ao DG Editor</h2>
+                <p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>
+                <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
+              </div>
+            </div>
+            <footer id="chat-input-bar">
+              <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
+              <button id="chat-send" class="btn-primary" disabled>Enviar</button>
+            </footer>
+          </main>
         </div>
-        <div id="editor-empty">
-          <h2>DG Editor</h2>
-          <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>
-          <div class="atalhos">
-            <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
-            <div><kbd>Ctrl+B</kbd> Alternar sidebar</div>
-            <div><kbd>Ctrl+Shift+P</kbd> Paleta de comandos</div>
-            <div><kbd>Ctrl+S</kbd> Salvar</div>
-            <div><kbd>Ctrl+`</kbd> Terminal</div>
+      </div>
+
+      <div id="center-pane-editor" class="center-pane">
+        <div id="editor-breadcrumb"></div>
+        <div id="editor-toolbar" class="editor-toolbar hidden">
+          <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+        </div>
+        <div id="editor-host">
+          <div id="editor-mount"></div>
+          <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
+          <div id="image-preview" class="image-preview hidden" aria-hidden="true">
+            <img id="image-preview-img" alt="preview" />
           </div>
+          <div id="editor-empty">
+            <h2>DG Editor</h2>
+            <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>
+            <div class="atalhos">
+              <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
+              <div><kbd>Ctrl+B</kbd> Alternar sidebar</div>
+              <div><kbd>Ctrl+Shift+P</kbd> Paleta de comandos</div>
+              <div><kbd>Ctrl+S</kbd> Salvar</div>
+              <div><kbd>Ctrl+`</kbd> Terminal</div>
+            </div>
+          </div>
+          <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
+            <header class="diff-panel-header">
+              <span id="diff-panel-title">Diff</span>
+              <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
+            </header>
+            <pre id="diff-panel-body" class="diff-panel-body"></pre>
+          </aside>
         </div>
-        <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
-          <header class="diff-panel-header">
-            <span id="diff-panel-title">Diff</span>
-            <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
-          </header>
-          <pre id="diff-panel-body" class="diff-panel-body"></pre>
-        </aside>
       </div>
     </section>
 
     <div id="resize-right" class="resizer" data-resize="right" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Direita: Chat/IA + análise + terminal + files -->
+    <!-- Direita: Análise + Terminal + Files (Chat moveu para o centro) -->
     <section id="exec-panel">
       <div class="right-tabs">
-        <button type="button" class="right-tab active" data-pane="chat">Chat / IA</button>
         <button type="button" class="right-tab" data-pane="analise">Análise</button>
-        <button type="button" class="right-tab" data-pane="terminal">Terminal</button>
+        <button type="button" class="right-tab active" data-pane="terminal">Terminal</button>
         <button type="button" class="right-tab" data-pane="files">Files</button>
-      </div>
-
-      <div id="pane-chat" class="right-pane active">
-        <main id="chat-panel">
-          <header id="chat-header">
-            <div class="chat-header-meta">
-              <span id="chat-title">Nenhuma pasta aberta</span>
-              <span id="chat-provider" class="provider-badge"></span>
-            </div>
-            <div class="chat-header-actions">
-              <div id="chat-history-bar" class="chat-history-bar">
-                <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
-                <select id="chat-history-select" aria-label="Historico de chats"></select>
-              </div>
-              <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar</button>
-              <button type="button" id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
-              <button type="button" id="btn-auditar" class="btn-small" title="Auto auditoria do sistema">Auditar</button>
-            </div>
-          </header>
-          <div id="chat-messages" class="chat-messages">
-            <div class="empty-state" id="empty-state">
-              <h2>Bem-vindo ao DG Editor</h2>
-              <p>Abra uma pasta no Explorer. Chat e análise ficam neste painel direito; o código edita no centro.</p>
-              <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
-            </div>
-          </div>
-          <footer id="chat-input-bar">
-            <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
-            <button id="chat-send" class="btn-primary" disabled>Enviar</button>
-          </footer>
-        </main>
       </div>
 
       <div id="pane-analise" class="right-pane">
@@ -179,7 +187,7 @@
         </div>
       </div>
 
-      <div id="pane-terminal" class="right-pane">
+      <div id="pane-terminal" class="right-pane active">
         <div id="terminal-panel" class="terminal-panel terminal-panel--docked" aria-hidden="true">
           <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
           <header class="terminal-header">
