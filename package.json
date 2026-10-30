@@ -16,7 +16,7 @@
         "test": "node test/validator.cjs",
         "typecheck": "tsc --noEmit",
         "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
-        "mcp": "npm run build:mcp && node .dg-editor\\bin\\main\\mcp\\server.js",
+        "mcp": "npm run build:mcp && node .dg-editor/bin/main/mcp/server.js",
         "indice": "node scripts/gerar-indice.cjs",
         "prebuild": "npm run build:mcp",
         "postinstall": "node scripts/patch-node-pty-spectre.cjs && electron-rebuild -f -w node-pty",
@@ -28,6 +28,9 @@
         "qa:report": "node scripts/run-qa.cjs --report-only",
         "qa:ia": "node scripts/qa-autocorrigir.cjs",
         "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run",
+        "limpeza": "node scripts/limpeza-workspace.cjs",
+        "limpeza:dry": "node scripts/limpeza-workspace.cjs --dry-run",
+        "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
         "dist:win": "npm run build && electron-builder --win --dir",
         "dist:win:installer": "npm run build && electron-builder --win nsis"
     },

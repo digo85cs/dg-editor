@@ -58,6 +58,18 @@ qa-artifacts/*
 !qa-artifacts/baseline.json
 !qa-artifacts/.gitkeep
 
+# Logs de smoke / dumps soltos na raiz
+smoke-*.log
+dg-*.log
+
+# Relatorios / A-B / auditorias gerados (runtime)
+.dg-editor/ab-*.json
+.dg-editor/ab2-*.json
+.dg-editor/ab-relatorio.md
+.dg-editor/auditoria-*.md
+.dg-editor/navegador-relatorio.md
+.dg-editor/dossie-estado-pronto.txt
+
 # Catalogo de modelos e estado de runtime (o default versionado fica em modelos.default.json)
 .dg-editor/modelos.json
 

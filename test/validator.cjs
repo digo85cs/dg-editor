@@ -910,8 +910,88 @@ async function main() {
     )
   }
 
-  // ---------- Vault Markdown ----------
-  
+  // ---------- Higiene workspace ----------
+  section('Limpeza workspace')
+  {
+    const script = path.join(ROOT, 'scripts/limpeza-workspace.cjs')
+    assert('script limpeza-workspace existe', fs.existsSync(script))
+    const srcLimpeza = fs.readFileSync(script, 'utf8')
+    assert('limpeza tem --leve', /--leve/.test(srcLimpeza))
+    assert('limpeza tem --dry-run', /--dry-run/.test(srcLimpeza))
+    const pkgLimpeza = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert('npm run limpeza', typeof pkgLimpeza.scripts.limpeza === 'string')
+    assert('npm run limpeza:leve', typeof pkgLimpeza.scripts['limpeza:leve'] === 'string')
+    assert(
+      'mcp script portatil',
+      !/\\\\/.test(pkgLimpeza.scripts.mcp) && /\.dg-editor\/bin/.test(pkgLimpeza.scripts.mcp)
+    )
+    const mcpTs = JSON.parse(
+      fs.readFileSync(path.join(SRC, 'main/mcp/tsconfig.mcp.json'), 'utf8')
+    )
+    assert(
+      'mcp outDir relativo',
+      typeof mcpTs.compilerOptions.outDir === 'string' &&
+        !/^[A-Za-z]:/.test(mcpTs.compilerOptions.outDir) &&
+        mcpTs.compilerOptions.outDir.includes('.dg-editor')
+    )
+    assert(
+      'mcp rootDir relativo',
+      typeof mcpTs.compilerOptions.rootDir === 'string' &&
+        !/^[A-Za-z]:/.test(mcpTs.compilerOptions.rootDir)
+    )
+    const audLimpeza = fs.readFileSync(path.join(SRC, 'main/auto-auditoria.ts'), 'utf8')
+    assert(
+      'auditoria chama limpeza leve',
+      /limparWorkspaceLeve/.test(audLimpeza) && /limpeza-workspace\.cjs/.test(audLimpeza)
+    )
+  }
+
+  // ---------- UI visual (menubar / Contas base / float) ----------
+  section('UI visual DG Editor')
+  {
+    const html = fs.readFileSync(path.join(ROOT, 'src/renderer/index.html'), 'utf8')
+    const css = fs.readFileSync(path.join(ROOT, 'src/renderer/styles.css'), 'utf8')
+    const appJs = fs.readFileSync(path.join(ROOT, 'src/renderer/app.js'), 'utf8')
+    const preload = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    const mainIdx = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    const menu = fs.readFileSync(path.join(SRC, 'main/menu.ts'), 'utf8')
+
+    assert('html tem #menubar', /id="menubar"/.test(html))
+    assert('html menus Arquivo..Ajuda', /data-menu="arquivo"/.test(html) && /data-menu="ajuda"/.test(html))
+    assert('html Contas no sidebar-footer', /sidebar-footer[\s\S]*id="btn-contas"/.test(html))
+    assert('html Config no sidebar-footer', /sidebar-footer[\s\S]*id="btn-config"/.test(html))
+    assert(
+      'html config fora da activity-bar',
+      !/<nav id="activity-bar"[\s\S]*?data-action="config"[\s\S]*?<\/nav>/.test(html)
+    )
+    assert('html modal-float config', /id="modal-config"[^>]*modal-float/.test(html))
+    assert('html modal-float contas', /id="modal-contas"[^>]*modal-float/.test(html))
+    assert('html data-float-handle', /data-float-handle/.test(html) && /data-float-box/.test(html))
+    assert('css #menubar', /#menubar\s*\{/.test(css))
+    assert('css titlebar no-drag', /#titlebar[\s\S]{0,400}-webkit-app-region:\s*no-drag/.test(css))
+    assert('css tb-drag-fill', /\.tb-drag-fill[\s\S]{0,120}-webkit-app-region:\s*drag/.test(css))
+    assert('css sidebar grid footer', /#sidebar\s*\{[\s\S]{0,200}grid-template-rows:/.test(css))
+    assert('css modal-float', /\.modal\.modal-float/.test(css))
+    assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
+    assert('app ligarJanelaFlutuante', /function ligarJanelaFlutuante\s*\(/.test(appJs))
+    assert('preload janela:recarregar', /janela:recarregar/.test(preload))
+    assert('preload janela:zoom', /janela:zoom/.test(preload))
+    assert('preload janela:tela-cheia', /janela:tela-cheia/.test(preload))
+    assert('preload menu:acao', /menu:acao/.test(preload))
+    assert('preload app:get-version', /app:get-version/.test(preload))
+    assert('main janela:recarregar', /janela:recarregar/.test(mainIdx))
+    assert('main janela:zoom', /janela:zoom/.test(mainIdx))
+    assert('main janela:tela-cheia', /janela:tela-cheia/.test(mainIdx))
+    assert('main envia menu:acao', /send\(\s*['"]menu:acao['"]/.test(mainIdx))
+    assert('main app:get-version handle', /ipcMain\.handle\(\s*['"]app:get-version['"]/.test(mainIdx))
+    assert('menu onAcao', /onAcao\??\s*:/.test(menu) || /onAcao\?:/.test(menu))
+    assert('atalho abrir-dg-editor.bat', fs.existsSync(path.join(ROOT, 'abrir-dg-editor.bat')))
+    assert(
+      'atalho corrigir-atalho-desktop.bat',
+      fs.existsSync(path.join(ROOT, 'corrigir-atalho-desktop.bat'))
+    )
+  }
+
   section('Branding DG Editor')
   {
     const brand = fs.readFileSync(path.join(SRC, 'main/branding.ts'), 'utf8')
@@ -924,7 +1004,7 @@ async function main() {
     assert('build appId', pkg.build && pkg.build.appId === 'com.dgeditor.app')
   }
 
-section('Vault Markdown')
+  section('Vault Markdown')
   {
     const fsAtom = loadModule('main/fs-atomico.ts')
     assert('detectarEol crlf', fsAtom.detectarEol('a\r\nb') === 'crlf')
