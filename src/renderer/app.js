@@ -2123,6 +2123,7 @@ async function atualizarPainelAdapta(elId) {
     const st = await window.api.invoke('adapta:status', pastaAtual || undefined)
     adaptaStatusCache = st
     el.innerHTML =
+      'Conta: <strong>digo85cs@gmail.com</strong><br>' +
       'Dossiê: ' +
       (st.dossieExiste ? 'ok' : 'ausente') +
       ' · Continuidade: ' +
