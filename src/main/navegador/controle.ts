@@ -7,7 +7,14 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import type { DownloadItem, Event as ElectronEvent, WebContents, WebFrameMain } from 'electron'
+import type {
+  DownloadItem,
+  Event as ElectronEvent,
+  NativeImage,
+  Rectangle,
+  WebContents,
+  WebFrameMain
+} from 'electron'
 import { projectStateDir, resolverRaizProjeto } from '../paths'
 import { dglog } from '../dglog'
 import {
@@ -695,6 +702,25 @@ async function handleBaixar(body: Json): Promise<Json> {
   })
 }
 
+async function capturePageComTimeout(
+  wc: WebContents,
+  rect: Rectangle | undefined,
+  ms: number
+): Promise<NativeImage> {
+  const captura = rect ? wc.capturePage(rect) : wc.capturePage()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      captura,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('capturePage timeout ' + ms + 'ms')), ms)
+      })
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 async function handleScreenshot(): Promise<Json> {
   const wc = getContentWebContents()
   if (!wc) return { erro: 'navegador fechado' }
@@ -706,20 +732,33 @@ async function handleScreenshot(): Promise<Json> {
     /* ignore */
   }
   await new Promise((r) => setTimeout(r, 200))
-  let img = await wc.capturePage()
-  let png = img.toPNG()
-  if (png.length < 100 && bounds && bounds.width > 0 && bounds.height > 0) {
-    img = await wc.capturePage({ x: 0, y: 0, width: bounds.width, height: bounds.height })
-    png = img.toPNG()
-  }
-  if (png.length < 100) {
-    return { ok: false, motivo: 'capturePage vazio (view sem paint?)', bounds: bounds || null }
-  }
-  return {
-    ok: true,
-    mime: 'image/png',
-    base64: png.toString('base64'),
-    bytes: png.length
+  const timeoutMs = process.env.DG_NAV_SMOKE === '1' ? 8000 : 20000
+  try {
+    let img = await capturePageComTimeout(wc, undefined, timeoutMs)
+    let png = img.toPNG()
+    if (png.length < 100 && bounds && bounds.width > 0 && bounds.height > 0) {
+      img = await capturePageComTimeout(
+        wc,
+        { x: 0, y: 0, width: bounds.width, height: bounds.height },
+        timeoutMs
+      )
+      png = img.toPNG()
+    }
+    if (png.length < 100) {
+      return { ok: false, motivo: 'capturePage vazio (view sem paint?)', bounds: bounds || null }
+    }
+    return {
+      ok: true,
+      mime: 'image/png',
+      base64: png.toString('base64'),
+      bytes: png.length
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      motivo: String((e as Error)?.message || e),
+      bounds: bounds || null
+    }
   }
 }
 

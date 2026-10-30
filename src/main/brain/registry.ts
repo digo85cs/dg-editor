@@ -179,25 +179,25 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
   const t = normalizarTarefa(String(tarefa))
 
   if (t === 'chat') {
-    // local primeiro — economia de credito (chat nao exige frontier)
+    // 7b primeiro; 1.5b fora; 3b so ultimo recurso
     return [
       cfg({
-        id: 'ollama:qwen2.5-coder:1.5b',
+        id: 'ollama:qwen2.5-coder:7b',
         tipo: 'local',
         formato: 'ollama',
-        modelo: 'qwen2.5-coder:1.5b',
+        modelo: 'qwen2.5-coder:7b',
         baseUrl: OLLAMA_BASE,
         numPredict: 512,
-        timeoutMs: 120_000
+        timeoutMs: 180_000
       }),
       cfg({
-        id: 'ollama:qwen2.5-coder:3b',
+        id: 'ollama:qwen2.5-coder:14b',
         tipo: 'local',
         formato: 'ollama',
-        modelo: 'qwen2.5-coder:3b',
+        modelo: 'qwen2.5-coder:14b',
         baseUrl: OLLAMA_BASE,
         numPredict: 512,
-        timeoutMs: 120_000
+        timeoutMs: 300_000
       }),
       cfg({
         id: 'openrouter:deepseek-v3.2',
@@ -209,7 +209,16 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
         numPredict: 512,
         timeoutMs: 120_000
       }),
-      cfgCursorCli()
+      cfgCursorCli(),
+      cfg({
+        id: 'ollama:qwen2.5-coder:3b',
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: 'qwen2.5-coder:3b',
+        baseUrl: OLLAMA_BASE,
+        numPredict: 512,
+        timeoutMs: 180_000
+      })
     ]
   }
 
@@ -459,7 +468,7 @@ export async function escolherModeloPorTarefa(
   }
 
   // fallback duro
-  const fb = t === 'chat' ? 'qwen2.5-coder:1.5b' : 'qwen2.5-coder:7b'
+  const fb = 'qwen2.5-coder:7b'
   registrarSelecao(process.env.DG_ROOT || process.cwd(), fb, t, 'fallback duro', origem)
   return fb
 }

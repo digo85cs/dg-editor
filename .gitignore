@@ -52,3 +52,35 @@ dossie-tecnico.md
 
 # telemetria de runtime (nao versionar)
 .dg-editor/modelos-stats.json
+
+# Agente QA (versionar so baseline e keep)
+qa-artifacts/*
+!qa-artifacts/baseline.json
+!qa-artifacts/.gitkeep
+
+# Logs de smoke / dumps soltos na raiz
+smoke-*.log
+dg-*.log
+
+# Relatorios / A-B / auditorias gerados (runtime)
+.dg-editor/ab-*.json
+.dg-editor/ab2-*.json
+.dg-editor/ab-relatorio.md
+.dg-editor/auditoria-*.md
+.dg-editor/navegador-relatorio.md
+.dg-editor/dossie-estado-pronto.txt
+
+# Catalogo de modelos e estado de runtime (o default versionado fica em modelos.default.json)
+.dg-editor/modelos.json
+
+# Provas isoladas de QA IA (scripts/qa-ia-teste.cjs)
+tmp/
+
+# Historico de chats (runtime)
+.dg-editor/chats/
+
+# Avaliacoes de modelo (runtime)
+.dg-editor/avaliacoes/
+
+.dg-editor/_backups/
+.dg-editor/modelos.json.bak-*

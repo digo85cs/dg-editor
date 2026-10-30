@@ -1,5 +1,7 @@
 export interface AuthUser {
   username: string
+  /** E-mail canônico do dono (único para contas do DG Editor). */
+  email: string
   createdAt: number
 }
 
@@ -124,7 +126,12 @@ export interface GuardianSnapshot {
 }
 
 export interface AccountsState {
-  identidade: { tokenPrefix: string; criadoEm: number }
+  identidade: {
+    username: string
+    email: string
+    tokenPrefix: string
+    criadoEm: number
+  }
   maquina: { hostname: string; plataforma: string; cpus: number; ramGB: string; forca: string }
   ia: { ollamaInstalado: boolean; ollamaRodando: boolean; modelos: string[]; provedores: { name: string; available: boolean; models: number }[] }
   guardian: GuardianSnapshot
