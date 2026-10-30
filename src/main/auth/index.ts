@@ -3,6 +3,7 @@ import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { AuthState, AuthSession, AuthUser } from '@shared/types'
+import { OWNER_EMAIL, OWNER_USERNAME } from '@shared/owner'
 
 const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
@@ -64,7 +65,8 @@ class AuthStoreImpl implements AuthStore {
     const token = this.identity?.token ?? randomToken()
     const createdAt = this.identity?.createdAt ?? Date.now()
     const user: AuthUser = {
-      username: 'owner',
+      username: OWNER_USERNAME,
+      email: OWNER_EMAIL,
       createdAt
     }
     return {

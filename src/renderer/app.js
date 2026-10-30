@@ -2191,7 +2191,12 @@ async function abrirContas() {
     const s = await window.api.invoke('accounts:get-state')
     $('contas-identidade').innerHTML =
       '<h4>Identidade</h4>' +
-      'Usuario: <strong>owner</strong> (device-token)<br>' +
+      'Usuario: <strong>' +
+      escapar(s.identidade.username || 'digo85cs') +
+      '</strong> (device-token)<br>' +
+      'E-mail: <strong>' +
+      escapar(s.identidade.email || 'digo85cs@gmail.com') +
+      '</strong><br>' +
       'Token: <code>' +
       escapar(s.identidade.tokenPrefix) +
       '...</code><br>' +

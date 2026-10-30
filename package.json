@@ -2,6 +2,10 @@
     "name": "dg-editor",
     "version": "0.2.0",
     "description": "DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)",
+    "author": {
+        "name": "Rodrigo Soares",
+        "email": "digo85cs@gmail.com"
+    },
     "main": "out/main/index.js",
     "scripts": {
         "dev": "electron-vite preview",

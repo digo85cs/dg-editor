@@ -41,10 +41,18 @@ function loadModule(relPath) {
       }
     }
     if (spec.startsWith('@shared/')) {
-      return loadModule('shared/' + spec.slice('@shared/'.length))
+      let alvo = 'shared/' + spec.slice('@shared/'.length)
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
+      return loadModule(alvo)
     }
     if (spec.startsWith('@main/')) {
-      return loadModule('main/' + spec.slice('@main/'.length))
+      let alvo = 'main/' + spec.slice('@main/'.length)
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
+      return loadModule(alvo)
     }
     if (spec.startsWith('./')) {
       const dir = path.dirname(relPath)
@@ -88,7 +96,8 @@ async function main() {
   const session = store.ensureDeviceIdentity()
   assert('ensureDeviceIdentity ok', session.authenticated === true)
   assert('session has token', typeof session.token === 'string' && session.token.length > 0)
-  assert('session user is owner', session.user.username === 'owner')
+  assert('session user is digo85cs', session.user.username === 'digo85cs')
+  assert('session email canonico', session.user.email === 'digo85cs@gmail.com')
 
   const state2 = store.getState()
   assert('state after identity authenticated', state2.authenticated === true)

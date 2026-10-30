@@ -37,6 +37,10 @@ Aba central **Agent**:
 
 Fila de propostas **unificada** (Agent + OpenClaw). Apply do Agent usa `agente:aplicar-proposta` (checkpoint). OpenClaw segue HTTP + aprovação humana, sem shell.
 
+## Contas / identidade
+
+E-mail canônico do dono (único para contas do DG Editor): **digo85cs@gmail.com** (`src/shared/owner.ts`). Aparece em **Contas → Identidade**.
+
 ## Adapta ONE / Maestro
 
 Continuidade para Contextos do ONE + MCP para o Maestro: painel em **Contas** / **Configurações**. Guia: [docs/adapta.md](docs/adapta.md).
