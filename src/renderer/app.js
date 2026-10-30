@@ -2466,9 +2466,84 @@ function bootstrapComandos() {
       id: 'adapta-maestro',
       titulo: 'Adapta: abrir Maestro',
       fn: () => void window.api.invoke('adapta:abrir', 'maestro')
+    },
+    {
+      id: 'recarregar',
+      titulo: 'Recarregar janela',
+      atalho: 'Ctrl+R',
+      fn: () => void window.api.invoke('janela:recarregar', false)
+    },
+    {
+      id: 'forcar-recarregar',
+      titulo: 'Forçar recarregamento',
+      atalho: 'Ctrl+Shift+R',
+      fn: () => void window.api.invoke('janela:recarregar', true)
+    },
+    {
+      id: 'zoom-in',
+      titulo: 'Zoom: aumentar',
+      atalho: 'Ctrl+=',
+      fn: () => void window.api.invoke('janela:zoom', 'in')
+    },
+    {
+      id: 'zoom-out',
+      titulo: 'Zoom: diminuir',
+      atalho: 'Ctrl+-',
+      fn: () => void window.api.invoke('janela:zoom', 'out')
+    },
+    {
+      id: 'zoom-reset',
+      titulo: 'Zoom: padrão',
+      atalho: 'Ctrl+0',
+      fn: () => void window.api.invoke('janela:zoom', 'reset')
+    },
+    {
+      id: 'tela-cheia',
+      titulo: 'Tela cheia',
+      atalho: 'F11',
+      fn: () => void window.api.invoke('janela:tela-cheia')
+    },
+    {
+      id: 'auditar',
+      titulo: 'Auto auditoria',
+      fn: () => void rodarAutoAuditoria()
+    },
+    {
+      id: 'sair',
+      titulo: 'Sair',
+      fn: () => {
+        try {
+          window.api.quit()
+        } catch {
+          void window.api.invoke('janela:fechar')
+        }
+      }
+    },
+    {
+      id: 'sobre',
+      titulo: 'Sobre o DG Editor',
+      fn: () => void mostrarSobreDgEditor()
     }
   ]
   for (const d of defs) registrarComando(d)
+}
+
+async function mostrarSobreDgEditor() {
+  let ver = ''
+  try {
+    ver = (await window.api.getVersion?.()) || (await window.api.invoke('app:get-version')) || ''
+  } catch {
+    ver = ''
+  }
+  alert('DG Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')
+}
+
+function acaoEditar(cmd) {
+  try {
+    document.execCommand(cmd)
+  } catch (e) {
+    console.warn('[menubar] editar:', cmd, e)
+  }
 }
 
 function abrirPaletaComandos() {
@@ -3630,12 +3705,176 @@ async function atualizarIconeMax() {
   } catch {}
 }
 
+// ---------- Menubar (titlebar frameless) ----------
+const MENUS_BARRA = {
+  arquivo: [
+    { id: 'abrir-pasta', label: 'Abrir pasta de trabalho…', accel: 'Ctrl+O' },
+    { id: 'abrir-vault', label: 'Abrir vault Markdown…' },
+    { sep: true },
+    { id: 'salvar', label: 'Salvar', accel: 'Ctrl+S' },
+    { id: 'fechar-aba', label: 'Fechar aba', accel: 'Ctrl+W' },
+    { sep: true },
+    { id: 'navegador', label: 'Navegador…', accel: 'Ctrl+Shift+N' },
+    { sep: true },
+    { id: 'sair', label: 'Sair', accel: 'Alt+F4' }
+  ],
+  editar: [
+    { id: 'edit-undo', label: 'Desfazer', accel: 'Ctrl+Z', edit: 'undo' },
+    { id: 'edit-redo', label: 'Refazer', accel: 'Ctrl+Y', edit: 'redo' },
+    { sep: true },
+    { id: 'edit-cut', label: 'Recortar', accel: 'Ctrl+X', edit: 'cut' },
+    { id: 'edit-copy', label: 'Copiar', accel: 'Ctrl+C', edit: 'copy' },
+    { id: 'edit-paste', label: 'Colar', accel: 'Ctrl+V', edit: 'paste' },
+    { id: 'edit-selectAll', label: 'Selecionar tudo', accel: 'Ctrl+A', edit: 'selectAll' }
+  ],
+  ver: [
+    { id: 'recarregar', label: 'Recarregar', accel: 'Ctrl+R' },
+    { id: 'forcar-recarregar', label: 'Forçar recarregamento', accel: 'Ctrl+Shift+R' },
+    { sep: true },
+    { id: 'zoom-in', label: 'Zoom: aumentar', accel: 'Ctrl+=' },
+    { id: 'zoom-out', label: 'Zoom: diminuir', accel: 'Ctrl+-' },
+    { id: 'zoom-reset', label: 'Zoom: padrão', accel: 'Ctrl+0' },
+    { sep: true },
+    { id: 'toggle-sidebar', label: 'Alternar Explorer', accel: 'Ctrl+B' },
+    { id: 'toggle-right', label: 'Alternar painel direito', accel: 'Ctrl+Alt+B' },
+    { id: 'toggle-terminal', label: 'Alternar terminal', accel: 'Ctrl+`' },
+    { id: 'tema', label: 'Alternar tema' },
+    { sep: true },
+    { id: 'tela-cheia', label: 'Tela cheia', accel: 'F11' }
+  ],
+  sistemas: [
+    { id: 'paleta-comandos', label: 'Paleta de comandos', accel: 'Ctrl+Shift+P' },
+    { id: 'quick-open', label: 'Quick Open', accel: 'Ctrl+P' },
+    { sep: true },
+    { id: 'contas', label: 'Contas e saúde' },
+    { id: 'config', label: 'Configurações' },
+    { id: 'analisar', label: 'Análise do sistema' },
+    { id: 'auditar', label: 'Auto auditoria' },
+    { sep: true },
+    { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
+  ],
+  ajuda: [{ id: 'sobre', label: 'Sobre o DG Editor' }]
+}
+
+function fecharMenubar() {
+  const bar = document.getElementById('menubar')
+  if (!bar) return
+  bar.dataset.open = ''
+  bar.querySelectorAll('.mb-btn').forEach((b) => b.setAttribute('aria-expanded', 'false'))
+  bar.querySelectorAll('.mb-dropdown').forEach((p) => {
+    p.hidden = true
+  })
+}
+
+function abrirMenuPainel(nome) {
+  const bar = document.getElementById('menubar')
+  if (!bar) return
+  bar.dataset.open = nome
+  bar.querySelectorAll('.mb-btn').forEach((b) => {
+    const on = b.getAttribute('data-menu') === nome
+    b.setAttribute('aria-expanded', on ? 'true' : 'false')
+  })
+  bar.querySelectorAll('.mb-dropdown').forEach((p) => {
+    p.hidden = p.getAttribute('data-menu-panel') !== nome
+  })
+}
+
+function executarAcaoMenu(id, editCmd) {
+  if (editCmd) {
+    acaoEditar(editCmd)
+    return
+  }
+  if (executarComandoLocal(id)) return
+  executarComando(id)
+}
+
+function popularPainelMenu(panel, itens) {
+  panel.textContent = ''
+  for (const it of itens) {
+    if (it.sep) {
+      const hr = document.createElement('div')
+      hr.className = 'mb-sep'
+      hr.setAttribute('role', 'separator')
+      panel.appendChild(hr)
+      continue
+    }
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-option'
+    btn.setAttribute('role', 'menuitem')
+    btn.dataset.acao = it.id
+    if (it.edit) btn.dataset.edit = it.edit
+    const lab = document.createElement('span')
+    lab.textContent = it.label
+    btn.appendChild(lab)
+    if (it.accel) {
+      const acc = document.createElement('span')
+      acc.className = 'mb-accel'
+      acc.textContent = it.accel
+      btn.appendChild(acc)
+    }
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      fecharMenubar()
+      executarAcaoMenu(it.id, it.edit)
+    })
+    panel.appendChild(btn)
+  }
+}
+
+function initMenubar() {
+  const bar = document.getElementById('menubar')
+  if (!bar || bar.dataset.ready === '1') return
+  bar.dataset.ready = '1'
+
+  for (const [nome, itens] of Object.entries(MENUS_BARRA)) {
+    const panel = bar.querySelector('[data-menu-panel="' + nome + '"]')
+    if (panel) popularPainelMenu(panel, itens)
+  }
+
+  bar.querySelectorAll('.mb-btn').forEach((btn) => {
+    const nome = btn.getAttribute('data-menu')
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (bar.dataset.open === nome) fecharMenubar()
+      else abrirMenuPainel(nome)
+    })
+    btn.addEventListener('mouseenter', () => {
+      if (bar.dataset.open && bar.dataset.open !== nome) abrirMenuPainel(nome)
+    })
+  })
+
+  document.addEventListener('mousedown', (e) => {
+    if (!bar.dataset.open) return
+    if (bar.contains(e.target)) return
+    fecharMenubar()
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && bar.dataset.open) {
+      fecharMenubar()
+      e.stopPropagation()
+    }
+  })
+
+  try {
+    window.api.on('menu:acao', (_ev, id) => {
+      if (!id) return
+      executarAcaoMenu(String(id))
+    })
+  } catch (e) {
+    console.warn('[menubar] menu:acao:', e)
+  }
+}
+
 // ---------- Boot ----------
 carregarLayout()
 carregarPastas()
 initResizers()
 initActivityBar()
 bootstrapComandos()
+initMenubar()
 carregarTema()
 // Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
 let terminalIniciado = false
@@ -3716,4 +3955,5 @@ document.addEventListener('DOMContentLoaded', function () {
       window.api.invoke('auditoria:rodar', { autoAtualizar: false, reiniciarAoFim: true })
     })
   atualizarIconeMax()
+  initMenubar()
 })

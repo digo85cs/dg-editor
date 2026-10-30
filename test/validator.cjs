@@ -1119,6 +1119,19 @@ async function main() {
       'CSS modal-float',
       /modal-float/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
     )
+    assert('menubar no HTML', /id="menubar"/.test(htmlA) && /data-menu="arquivo"/.test(htmlA))
+    assert(
+      'menubar no CSS',
+      /#menubar/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')) &&
+        /\.mb-dropdown/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+    )
+    assert(
+      'menubar init + IPC',
+      /function initMenubar/.test(appJsA) &&
+        /menu:acao/.test(appJsA) &&
+        /janela:zoom/.test(preA) &&
+        /janela:recarregar/.test(preA)
+    )
     assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
     assert('mcp script portatil', !/\\\\/.test(pkg.scripts.mcp) && /\.dg-editor\/bin/.test(pkg.scripts.mcp))

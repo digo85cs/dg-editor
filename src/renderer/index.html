@@ -10,7 +10,7 @@
 </head>
 <body>
   <header id="titlebar">
-    <div class="tb-drag">
+    <div class="tb-leading">
       <span class="tb-marca">DG<span class="tb-marca-acento">Editor</span></span>
       <div class="tb-nav" aria-label="Navegação de abas">
         <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true">
@@ -20,7 +20,30 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
         </button>
       </div>
+      <nav id="menubar" aria-label="Barra de menus" role="menubar">
+        <div class="mb-item" role="none">
+          <button type="button" class="mb-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" data-menu="arquivo">Arquivo</button>
+          <div class="mb-dropdown" role="menu" hidden data-menu-panel="arquivo"></div>
+        </div>
+        <div class="mb-item" role="none">
+          <button type="button" class="mb-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" data-menu="editar">Editar</button>
+          <div class="mb-dropdown" role="menu" hidden data-menu-panel="editar"></div>
+        </div>
+        <div class="mb-item" role="none">
+          <button type="button" class="mb-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" data-menu="ver">Ver</button>
+          <div class="mb-dropdown" role="menu" hidden data-menu-panel="ver"></div>
+        </div>
+        <div class="mb-item" role="none">
+          <button type="button" class="mb-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" data-menu="sistemas">Sistemas</button>
+          <div class="mb-dropdown" role="menu" hidden data-menu-panel="sistemas"></div>
+        </div>
+        <div class="mb-item" role="none">
+          <button type="button" class="mb-btn" role="menuitem" aria-haspopup="true" aria-expanded="false" data-menu="ajuda">Ajuda</button>
+          <div class="mb-dropdown" role="menu" hidden data-menu-panel="ajuda"></div>
+        </div>
+      </nav>
     </div>
+    <div class="tb-drag-fill" aria-hidden="true"></div>
     <div class="tb-controles">
       <button id="tb-min" class="tb-btn" title="Minimizar"><svg viewBox="0 0 10 10"><path d="M2 5h6"/></svg></button>
       <button id="tb-max" class="tb-btn" title="Maximizar"><svg viewBox="0 0 10 10"><rect x="2" y="2" width="6" height="6"/></svg></button>
