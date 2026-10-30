@@ -345,6 +345,13 @@ body {
 .sidebar-mode:hover { color: var(--dg-text); background: var(--dg-surface-raised); }
 .sidebar-mode.active { color: var(--dg-text); }
 .sidebar-actions { display: flex; gap: 2px; }
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
 .folder-list {
   flex: 1;
   overflow-y: auto;
@@ -455,11 +462,14 @@ body {
   background: var(--dg-selection);
 }
 .sidebar-footer {
+  flex: 0 0 auto;
+  margin-top: auto;
   border-top: 1px solid var(--dg-border-subtle);
   padding: var(--dg-space-2);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  background: var(--dg-sidebar);
 }
 .sidebar-section { margin-bottom: 2px; }
 .section-label {
