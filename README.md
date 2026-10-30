@@ -3,14 +3,16 @@ DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)
 
 ## Abrir no Windows
 
-Use o atalho **`abrir-dg-editor.bat`** ou **`dg-boot.bat`** na raiz do projeto (`D:\CURSOR\DG Editor\`).
+**Atalho da Área de Trabalho:** rode uma vez `corrigir-atalho-desktop.bat` na pasta do projeto. Ele cria/corrige o ícone **DG Editor** na Área de Trabalho (e remove atalho velho que apontava para `electron\dist`).
 
-Não use `node_modules\electron\dist` — isso abre o Electron cru / build velho e a UI (Contas na base, menus, etc.) não atualiza.
+Depois use só o atalho **DG Editor** da Área de Trabalho (ou `abrir-dg-editor.bat` / `dg-boot.bat`).
+
+Não use `node_modules\electron\dist` — abre Electron cru / build velho.
 
 ```bat
 cd /d "D:\CURSOR\DG Editor"
-git pull
-abrir-dg-editor.bat
+git pull origin feat/vault-markdown
+corrigir-atalho-desktop.bat
 ```
 
 ## Terminal

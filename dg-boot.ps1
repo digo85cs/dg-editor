@@ -130,7 +130,19 @@ if ($divergentes.Count -gt 0) {
   Log 'todas as dependencias batem com package.json' 'Green'
 }
 
-# ---------- 3. branch + build fresco (UI vem de out/renderer) ----------
+# ---------- 3. atalho da Area de Trabalho (sempre corrige) ----------
+$atalhoScript = Join-Path $raiz 'scripts\criar-atalho-desktop.ps1'
+if (Test-Path $atalhoScript) {
+  try {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $atalhoScript
+    if ($LASTEXITCODE -eq 0) { Log 'atalho da Area de Trabalho ok' 'Green' }
+    else { Log 'nao consegui atualizar o atalho da Area de Trabalho' 'Yellow' }
+  } catch {
+    Log ('atalho desktop: ' + $_.Exception.Message) 'Yellow'
+  }
+}
+
+# ---------- 4. branch + build fresco (UI vem de out/renderer) ----------
 try {
   $branch = (git -C $raiz rev-parse --abbrev-ref HEAD 2>$null)
   if ($branch) { Log ('branch: ' + $branch) 'Cyan' }
@@ -144,6 +156,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 Log 'build ok' 'Green'
 
-# ---------- 4. abrir o app (NUNCA use node_modules\electron\dist como atalho) ----------
-Log 'iniciando DG Editor via npm start (atalho correto = esta pasta\dg-boot.bat)...' 'Cyan'
+# ---------- 5. abrir o app (NUNCA use node_modules\electron\dist como atalho) ----------
+Log 'iniciando DG Editor via npm start...' 'Cyan'
 npm start
