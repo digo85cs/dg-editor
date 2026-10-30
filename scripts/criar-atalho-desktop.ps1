@@ -49,7 +49,7 @@ if (-not (Test-Path $desktop)) {
   exit 1
 }
 
-$nome = 'DG Editor.lnk'
+$nome = 'Dg Editor.lnk'
 $lnkPath = Join-Path $desktop $nome
 
 # Remove atalho antigo apontando para electron\dist (se existir com outro nome)
@@ -70,7 +70,7 @@ $lnk = $w.CreateShortcut($lnkPath)
 $lnk.TargetPath = $bat
 $lnk.WorkingDirectory = $raiz
 $lnk.WindowStyle = 1
-$lnk.Description = 'DG Editor'
+$lnk.Description = 'Dg Editor'
 # Ícone próprio do DG Editor (nunca o ícone genérico do runtime)
 $icoCandidate = Join-Path $raiz 'resources\dg-editor.ico'
 if (-not (Test-Path $icoCandidate)) {

@@ -17,7 +17,7 @@ corrigir-atalho-desktop.bat
 
 ### App instalável (Windows, sem pasta electron)
 
-Gera `DG Editor.exe` com ícone e nome próprios:
+Gera `Dg Editor.exe` com ícone e nome próprios:
 
 ```bat
 npm install
