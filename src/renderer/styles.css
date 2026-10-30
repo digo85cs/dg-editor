@@ -24,12 +24,28 @@ body {
   justify-content: space-between;
   background: var(--dg-sidebar);
   border-bottom: 1px solid var(--dg-border-subtle);
-  -webkit-app-region: drag;
+  /* drag só em .tb-drag-fill — senão o menubar não recebe clique */
+  -webkit-app-region: no-drag;
   user-select: none;
   position: relative;
   z-index: 100;
 }
-.tb-drag { flex: 1; display: flex; align-items: center; padding-left: 14px; height: 100%; gap: 4px; }
+.tb-leading {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 2px;
+  padding-left: 14px;
+  flex: 0 1 auto;
+  min-width: 0;
+  -webkit-app-region: no-drag;
+}
+.tb-drag-fill {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 24px;
+  -webkit-app-region: drag;
+}
 .tb-marca { font-size: 12.5px; font-weight: 700; letter-spacing: 0.4px; color: var(--dg-text); opacity: 0.9; }
 .tb-marca-acento { color: var(--dg-accent-brand); margin-left: 4px; font-weight: 500; }
 .tb-nav {
@@ -56,6 +72,85 @@ body {
 .tb-btn svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.3; }
 .tb-btn:hover { background: var(--dg-surface-raised); color: var(--dg-text); }
 .tb-close:hover { background: var(--dg-danger-close); color: #fff; }
+
+/* ---------- Menubar (titlebar) ---------- */
+#menubar {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  gap: 0;
+  padding: 0 2px 0 6px;
+  -webkit-app-region: no-drag;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.mb-item { position: relative; display: flex; align-items: stretch; }
+.mb-btn {
+  border: 0;
+  background: transparent;
+  color: var(--dg-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  opacity: 0.88;
+  -webkit-app-region: no-drag;
+  user-select: none;
+}
+.mb-btn:hover,
+.mb-btn[aria-expanded="true"] {
+  background: var(--dg-surface-raised);
+  opacity: 1;
+}
+.mb-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  max-width: min(320px, 90vw);
+  padding: 4px 0;
+  margin: 0;
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: var(--dg-radius-sm);
+  box-shadow: var(--dg-shadow-3), 0 8px 24px rgba(0, 0, 0, 0.22);
+  z-index: 30000;
+}
+.mb-dropdown[hidden] { display: none !important; }
+.mb-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--dg-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.mb-option:hover,
+.mb-option:focus-visible {
+  background: var(--dg-accent-brand);
+  color: #fff;
+  outline: none;
+}
+.mb-option .mb-accel {
+  font-size: 11px;
+  opacity: 0.65;
+  font-family: var(--fonte-mono, ui-monospace, monospace);
+}
+.mb-option:hover .mb-accel,
+.mb-option:focus-visible .mb-accel { opacity: 0.9; color: inherit; }
+.mb-sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--dg-border-subtle);
+  border: 0;
+}
 
 /* Tabbar dedicada (entre titlebar e #app) */
 #tabbar {
@@ -180,6 +275,14 @@ body {
   border-radius: 1px;
 }
 .ab-spacer { flex: 1; }
+.ab-base {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 6px;
+  flex: 0 0 auto;
+}
 .ab-btn[data-tip] { position: relative; }
 .ab-btn[data-tip]::after {
   content: attr(data-tip);
@@ -1555,7 +1658,64 @@ button:focus-visible { outline: 2px solid var(--dg-accent-brand); outline-offset
   overflow-y: auto;
   box-shadow: var(--dg-shadow-3);
 }
+
 .modal-box h3 { font-size: var(--dg-fs-lg); font-weight: 600; margin-bottom: 18px; }
+
+/* Janelas flutuantes (Config / Contas): arrastáveis e sempre à frente */
+.modal.modal-float {
+  background: transparent;
+  pointer-events: none;
+  align-items: stretch;
+  justify-content: flex-start;
+  z-index: 20000;
+}
+.modal.modal-float .modal-box {
+  pointer-events: auto;
+  position: absolute;
+  top: 10vh;
+  left: max(16px, calc(50vw - 260px));
+  margin: 0;
+  padding-top: 0;
+  border: 1px solid var(--dg-border-subtle);
+  box-shadow: var(--dg-shadow-3), 0 12px 40px rgba(0, 0, 0, 0.28);
+}
+.modal.modal-float .modal-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 calc(-1 * var(--dg-space-6)) var(--dg-space-4);
+  padding: 12px var(--dg-space-6);
+  border-bottom: 1px solid var(--dg-border-subtle);
+  cursor: move;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  background: var(--dg-surface-raised, var(--dg-surface));
+  border-radius: var(--dg-radius-lg) var(--dg-radius-lg) 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.modal.modal-float .modal-titlebar h3 {
+  margin: 0;
+  font-size: var(--dg-fs-lg);
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+.modal.modal-float .modal-titlebar-close {
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+}
+.modal.modal-float .modal-box.is-dragging {
+  opacity: 0.96;
+  user-select: none;
+}
+
 .config-section {
   margin-bottom: 18px;
   padding-bottom: 16px;

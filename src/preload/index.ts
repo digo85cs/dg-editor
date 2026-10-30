@@ -18,6 +18,8 @@ const invokeChannels = [
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
+  'janela:recarregar', 'janela:zoom', 'janela:tela-cheia',
+  'app:get-version',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
   'navegador:fechar',
@@ -40,7 +42,8 @@ const eventOnChannels = [
   'terminal:exit',
   'brain:fallback',
   'navegador:aberto',
-  'navegador:fechado'
+  'navegador:fechado',
+  'menu:acao'
 ] as const
 
 const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']

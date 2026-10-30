@@ -177,6 +177,13 @@ app.whenReady().then(() => {
       const url = lerUltimaUrlNavegador() || 'about:blank'
       dglog('[navegador] menu abrir url=' + url)
       abrirNavegadorAncorado(url)
+    },
+    onAcao: (id) => {
+      try {
+        mainWindow?.webContents?.send('menu:acao', id)
+      } catch {
+        /* ignore */
+      }
     }
   })
   onNavegadorEventos({
@@ -791,10 +798,7 @@ ipcMain.handle('diagnostico:rodar', async (_e, root: string | null) => {
 })
 
 // ---------- App ----------
-ipcMain.on('app:get-version', (e) => {
-  e.reply('app:version', app.getVersion())
-})
-
+ipcMain.handle('app:get-version', () => app.getVersion())
 
 // ---------- Controles da barra de titulo propria ----------
 ipcMain.handle('janela:minimizar', () => { mainWindow?.minimize() })
@@ -805,6 +809,30 @@ ipcMain.handle('janela:maximizar', () => {
 })
 ipcMain.handle('janela:fechar', () => { mainWindow?.close() })
 ipcMain.handle('janela:estado', () => ({ maximizado: !!mainWindow?.isMaximized() }))
+ipcMain.handle('janela:recarregar', (_e, forcar?: boolean) => {
+  const wc = mainWindow?.webContents
+  if (!wc) return { ok: false }
+  if (forcar) wc.reloadIgnoringCache()
+  else wc.reload()
+  return { ok: true }
+})
+ipcMain.handle('janela:zoom', (_e, op?: string) => {
+  const wc = mainWindow?.webContents
+  if (!wc) return { ok: false, fator: 1 }
+  const atual = wc.getZoomFactor()
+  let prox = atual
+  if (op === 'in') prox = Math.min(3, Math.round((atual + 0.1) * 100) / 100)
+  else if (op === 'out') prox = Math.max(0.5, Math.round((atual - 0.1) * 100) / 100)
+  else prox = 1
+  wc.setZoomFactor(prox)
+  return { ok: true, fator: prox }
+})
+ipcMain.handle('janela:tela-cheia', () => {
+  if (!mainWindow) return { ok: false, cheia: false }
+  const cheia = !mainWindow.isFullScreen()
+  mainWindow.setFullScreen(cheia)
+  return { ok: true, cheia }
+})
 
 ipcMain.on('app:quit', () => {
   app.quit()
