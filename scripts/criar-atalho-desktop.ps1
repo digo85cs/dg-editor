@@ -61,9 +61,16 @@ function Test-AlvoRuim {
   return $false
 }
 
-$raiz = Get-RaizProjeto
+# Sempre preferir a pasta de trabalho canônica deste PC
+$raizFixa = 'D:\CURSOR\DG Editor'
+$raiz = $null
+if (Test-Path (Join-Path $raizFixa 'package.json')) {
+  $raiz = $raizFixa
+} else {
+  $raiz = Get-RaizProjeto
+}
 if (-not $raiz) {
-  Write-Host '[ERRO] nao achei a raiz do DG Editor (package.json)' -ForegroundColor Red
+  Write-Host '[ERRO] nao achei a raiz do DG Editor — esperado: D:\CURSOR\DG Editor' -ForegroundColor Red
   exit 1
 }
 
@@ -73,9 +80,15 @@ if (-not (Test-Path $bat)) {
 }
 if (-not (Test-Path $bat)) {
   Write-Host '[ERRO] abrir-dg-editor.bat / dg-boot.bat nao encontrados em ' $raiz -ForegroundColor Red
-  Write-Host '[dica] rode: git checkout feat/vault-markdown; git pull' -ForegroundColor Yellow
+  Write-Host '[dica] rode: git checkout feat/vault-markdown; git pull origin feat/vault-markdown' -ForegroundColor Yellow
   exit 1
 }
+
+try {
+  Set-Content -LiteralPath (Join-Path $raiz '.dg-root') -Value $raiz -Encoding ASCII -Force
+} catch {}
+$env:DG_ROOT = $raiz
+
 
 $desktops = Get-PastasDesktop
 if (-not $desktops -or $desktops.Count -eq 0) {

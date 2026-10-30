@@ -70,6 +70,7 @@ export function cwdDiagnostico(): { cwd: string; userData: string; divergente: b
 
 export type FonteRaiz =
   | 'env:DG_ROOT'
+  | 'fix:windows-canonica'
   | 'arquivo:.dg-root'
   | 'subida:package+dg-editor'
   | 'cwd'
@@ -90,6 +91,9 @@ function ehRaizProjeto(dir: string): boolean {
  * 4) process.cwd() se for raiz valida
  * 5) erro explicito
  */
+/** Pasta de trabalho canônica deste PC (Windows). Só entra se existir. */
+const RAIZ_WINDOWS_CANONICA = 'D:\\CURSOR\\DG Editor'
+
 export function resolverRaizProjeto(forcar = false): string {
   if (_raizCache && !forcar) return _raizCache.raiz
 
@@ -98,6 +102,14 @@ export function resolverRaizProjeto(forcar = false): string {
   if (env && existsSync(env)) {
     const abs = resolve(env)
     _raizCache = { raiz: abs, fonte: 'env:DG_ROOT' }
+    logRaizUmaVez()
+    return abs
+  }
+
+  // 1b. pasta canônica do Windows deste projeto
+  if (existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
+    const abs = resolve(RAIZ_WINDOWS_CANONICA)
+    _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
     logRaizUmaVez()
     return abs
   }

@@ -24,19 +24,32 @@ function Get-RaizProjeto {
   return $null
 }
 
-$raiz = Get-RaizProjeto
+# Pasta de trabalho canônica no Windows deste projeto
+$raizFixa = 'D:\CURSOR\DG Editor'
+$raiz = $null
+if ($env:DG_ROOT -and (Test-Path (Join-Path $env:DG_ROOT 'package.json'))) {
+  $raiz = (Resolve-Path $env:DG_ROOT).Path
+} elseif (Test-Path (Join-Path $raizFixa 'package.json')) {
+  $raiz = $raizFixa
+} else {
+  $raiz = Get-RaizProjeto
+}
 if (-not $raiz) {
-  Write-Host '[ERRO] nao encontrei package.json em nenhum ancestral -- abortando' -ForegroundColor Red
+  Write-Host '[ERRO] nao encontrei package.json -- esperado em D:\CURSOR\DG Editor' -ForegroundColor Red
   exit 1
 }
 Set-Location $raiz
+$env:DG_ROOT = $raiz
+try {
+  Set-Content -LiteralPath (Join-Path $raiz '.dg-root') -Value $raiz -Encoding ASCII -Force
+} catch {}
 
 function Log($msg, $cor = 'Gray') {
   Write-Host ("[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), $msg) -ForegroundColor $cor
 }
 
 Log 'DG Editor -- verificacao de boot' 'Cyan'
-Log ('raiz: ' + $raiz)
+Log ('raiz fixa/windows: ' + $raiz)
 
 $pkgPath = Join-Path $raiz 'package.json'
 if (-not (Test-Path $pkgPath)) {
