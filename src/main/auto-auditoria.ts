@@ -113,6 +113,55 @@ async function checarOllama(): Promise<Achado[]> {
   return out
 }
 
+/** Rotina leve: scripts/limpeza-workspace.cjs --leve (qa dumps, logs, imgs tmp). */
+async function limparWorkspaceLeve(): Promise<Achado> {
+  try {
+    const raiz = resolverRaizProjeto()
+    const script = path.join(raiz, 'scripts', 'limpeza-workspace.cjs')
+    try {
+      await fsp.access(script)
+    } catch {
+      return {
+        id: 'limpeza:workspace',
+        area: 'limpeza',
+        titulo: 'Script limpeza-workspace ausente',
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      }
+    }
+    const { stdout, stderr } = await execFileP(process.execPath, [script, '--leve'], {
+      cwd: raiz,
+      timeout: 60000,
+      windowsHide: true,
+      maxBuffer: 2 * 1024 * 1024
+    })
+    const texto = String(stdout || '') + String(stderr || '')
+    const m = texto.match(/Removidos:\s*(\d+)\s*itens\s*·\s*([^\n]+)/)
+    return {
+      id: 'limpeza:workspace',
+      area: 'limpeza',
+      titulo: m ? 'Limpeza leve: ' + m[1] + ' itens (' + m[2].trim() + ')' : 'Limpeza leve executada',
+      detalhe: texto.trim().split(/\r?\n/).slice(-4).join(' | ').slice(0, 240),
+      severidade: 'ok',
+      corrigivel: true,
+      status: 'corrigido',
+      acao: 'npm run limpeza:leve'
+    }
+  } catch (e: any) {
+    return {
+      id: 'limpeza:workspace',
+      area: 'limpeza',
+      titulo: 'Limpeza leve falhou',
+      severidade: 'warn',
+      corrigivel: true,
+      status: 'falhou',
+      acao: 'npm run limpeza:leve',
+      erro: String(e?.message || e)
+    }
+  }
+}
+
 async function limparTemporarios(): Promise<{ achados: Achado[]; travados: number }> {
   const out: Achado[] = []
   let travadosTotal = 0
@@ -1248,6 +1297,7 @@ async function executarChecagens(opcoes: {
   achados.push(...checarIntegridadeDados())
   const limpeza = await limparTemporarios()
   achados.push(...limpeza.achados)
+  achados.push(await limparWorkspaceLeve())
   achados.push(...checarDependencias())
   achados.push(...(await checarOllama()))
   achados.push(...(await checarModelos()))

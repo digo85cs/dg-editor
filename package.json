@@ -26,7 +26,10 @@
         "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
         "qa:report": "node scripts/run-qa.cjs --report-only",
         "qa:ia": "node scripts/qa-autocorrigir.cjs",
-        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run"
+        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run",
+        "limpeza": "node scripts/limpeza-workspace.cjs",
+        "limpeza:dry": "node scripts/limpeza-workspace.cjs --dry-run",
+        "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve"
     },
     "dependencies": {
         "@codemirror/lang-css": "^6.3.1",

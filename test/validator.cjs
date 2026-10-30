@@ -1143,6 +1143,19 @@ async function main() {
     assert('mcp script portatil', !/\\\\/.test(pkg.scripts.mcp) && /\.dg-editor\/bin/.test(pkg.scripts.mcp))
   }
 
+  // ---------- Higiene workspace ----------
+  section('Limpeza workspace')
+  {
+    const script = path.join(ROOT, 'scripts/limpeza-workspace.cjs')
+    assert('script limpeza-workspace existe', fs.existsSync(script))
+    const src = fs.readFileSync(script, 'utf8')
+    assert('limpeza tem --leve', /--leve/.test(src))
+    assert('limpeza tem --dry-run', /--dry-run/.test(src))
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert('npm run limpeza', typeof pkg.scripts.limpeza === 'string')
+    assert('npm run limpeza:leve', typeof pkg.scripts['limpeza:leve'] === 'string')
+  }
+
   // ---------- Agent parity (plan/@projeto/checkpoint/fila) ----------
   section('Agent parity')
   {
