@@ -68,6 +68,7 @@ function Fail([string]$msg) {
 
 Log 'DG Editor -- verificacao de boot' 'Cyan'
 Log ('raiz fixa/windows: ' + $raiz)
+Log 'boot-silent=3 (sem npm start / sem vite no console)' 'Gray'
 
 function Invoke-ProcessHidden {
   param(
@@ -140,6 +141,17 @@ function Invoke-NodeHidden {
 $pkgPath = Join-Path $raiz 'package.json'
 if (-not (Test-Path $pkgPath)) { Fail 'package.json nao encontrado' }
 $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
+
+# Garante VBS + shim (npm start antigo → iniciar-app, nunca vite preview)
+$garantirJs = Join-Path $raiz 'scripts\garantir-launchers.cjs'
+if (Test-Path $garantirJs) {
+  try {
+    [void](Invoke-NodeHidden -ScriptPath $garantirJs)
+    Log 'launchers silenciosos ok' 'Green'
+  } catch {
+    Log ('garantir-launchers: ' + $_.Exception.Message) 'Yellow'
+  }
+}
 
 # ---------- 1. node_modules ----------
 $nm = Join-Path $raiz 'node_modules'

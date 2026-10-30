@@ -71,10 +71,9 @@ function Test-AlvoRuim {
   if ($nome -eq 'DG Editor.lnk') {
     $alvoBaixo = $alvo.ToLowerInvariant()
     $argsBaixo = [string]$argumentos
-    # Correto: wscript + abrir-dg-editor.vbs  OU  caminho direto do .vbs/.bat
+    # Correto APENAS: wscript + abrir-dg-editor.vbs (bat direto abre cmd — proibido)
     $okWscript = ($alvoBaixo -match 'wscript\.exe$') -and ($argsBaixo -match 'abrir-dg-editor\.vbs')
-    $okDireto = $alvo -match 'abrir-dg-editor\.(vbs|bat)$'
-    if (-not ($okWscript -or $okDireto)) { return $true }
+    if (-not $okWscript) { return $true }
   }
   return $false
 }
@@ -91,14 +90,47 @@ if (-not $raiz) {
   exit 1
 }
 
+# Sempre grava o VBS (nao depende de git pull) e forca atalho = wscript + vbs
 $launcher = Join-Path $raiz 'abrir-dg-editor.vbs'
-if (-not (Test-Path $launcher)) {
-  $launcher = Join-Path $raiz 'abrir-dg-editor.bat'
-}
-if (-not (Test-Path $launcher)) {
-  Write-Host '[ERRO] falta abrir-dg-editor.vbs/bat em ' $raiz -ForegroundColor Red
-  Write-Host '[dica] git pull origin feat/vault-markdown' -ForegroundColor Yellow
-  exit 1
+$vbsBody = @'
+' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
+Option Explicit
+Dim sh, raiz, splash, boot, cmd, fso
+raiz = "D:\CURSOR\DG Editor"
+splash = raiz & "\scripts\splash-boot.ps1"
+boot = raiz & "\dg-boot.ps1"
+Set fso = CreateObject("Scripting.FileSystemObject")
+On Error Resume Next
+fso.CreateTextFile(raiz & "\.dg-root", True).Write raiz
+On Error GoTo 0
+Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = raiz
+If fso.FileExists(splash) Then
+  cmd = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & splash & """"
+ElseIf fso.FileExists(boot) Then
+  cmd = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & boot & """ -Silent"
+Else
+  WScript.Quit 1
+End If
+sh.Run cmd, 0, False
+'@
+Set-Content -LiteralPath $launcher -Value $vbsBody -Encoding ASCII -Force
+
+$batAbrir = Join-Path $raiz 'abrir-dg-editor.bat'
+@(
+  '@echo off',
+  'set "DG_ROOT=D:\CURSOR\DG Editor"',
+  'if not exist "%DG_ROOT%\abrir-dg-editor.vbs" exit /b 1',
+  'start "" /min wscript.exe //nologo "%DG_ROOT%\abrir-dg-editor.vbs"',
+  'exit /b 0'
+) | Set-Content -LiteralPath $batAbrir -Encoding ASCII -Force
+
+# Garante scripts de start silencioso (mata electron-vite preview no npm start antigo)
+$garantir = Join-Path $raiz 'scripts\garantir-launchers.cjs'
+if (Test-Path $garantir) {
+  try {
+    & node.exe $garantir 2>$null
+  } catch {}
 }
 
 try {
@@ -147,17 +179,10 @@ foreach ($desktop in $desktops) {
   $lnkPath = Join-Path $desktop $nome
   $w = New-Object -ComObject WScript.Shell
   $lnk = $w.CreateShortcut($lnkPath)
-  # .vbs via wscript = nenhuma janela de terminal (NAO aponte para .bat/.ps1)
-  if ($launcher -like '*.vbs') {
-    $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
-    $lnk.Arguments = '//nologo "' + $launcher + '"'
-    # 7 = minimizado — wscript em si nao mostra UI; evita flash de console
-    $lnk.WindowStyle = 7
-  } else {
-    $lnk.TargetPath = $launcher
-    $lnk.Arguments = ''
-    $lnk.WindowStyle = 7
-  }
+  # SEMPRE wscript + vbs (nunca .bat — abre cmd)
+  $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+  $lnk.Arguments = '//nologo "' + $launcher + '"'
+  $lnk.WindowStyle = 7
   $lnk.WorkingDirectory = $raiz
   $lnk.Description = 'DG Editor (sem console)'
   if (Test-Path $icoCandidate) {
@@ -165,7 +190,7 @@ foreach ($desktop in $desktops) {
   }
   $lnk.Save()
   Write-Host ('[ok] Atalho: ' + $lnkPath) -ForegroundColor Green
-  Write-Host ('[ok] Alvo:  ' + $launcher) -ForegroundColor Green
+  Write-Host ('[ok] Alvo:  wscript -> ' + $launcher) -ForegroundColor Green
   if (-not $lnkPrincipal) { $lnkPrincipal = $lnkPath }
 }
 

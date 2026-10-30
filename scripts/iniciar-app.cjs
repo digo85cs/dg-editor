@@ -6,12 +6,20 @@
  */
 'use strict'
 
-const { spawn } = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')
 const RAIZ_WIN = 'D:\\CURSOR\\DG Editor'
+
+try {
+  spawnSync(process.execPath, [path.join(__dirname, 'garantir-launchers.cjs')], {
+    cwd: ROOT,
+    stdio: 'ignore',
+    windowsHide: true
+  })
+} catch { /* ignore */ }
 
 function resolverRaiz() {
   if (process.env.DG_ROOT && fs.existsSync(path.join(process.env.DG_ROOT, 'package.json'))) {

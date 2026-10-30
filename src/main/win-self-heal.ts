@@ -113,6 +113,12 @@ export function selfHealWindowsLaunchers(): { ok: boolean; escritos: string[] } 
     /* ignore */
   }
 
+  const garantir = join(raiz, 'scripts', 'garantir-launchers.cjs')
+  if (existsSync(garantir)) {
+    spawnHidden(process.execPath, [garantir], raiz)
+    dglog('[win-self-heal] garantir-launchers agendado')
+  }
+
   const atalhoPs1 = join(raiz, 'scripts', 'criar-atalho-desktop.ps1')
   if (existsSync(atalhoPs1)) {
     const ps =

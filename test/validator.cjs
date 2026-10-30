@@ -1039,6 +1039,14 @@ async function main() {
       typeof pkg.scripts.start === 'string' && !/electron-vite\s+preview/.test(pkg.scripts.start)
     )
     assert('iniciar-app.cjs existe', fs.existsSync(path.join(ROOT, 'scripts/iniciar-app.cjs')))
+    assert(
+      'garantir-launchers.cjs existe',
+      fs.existsSync(path.join(ROOT, 'scripts/garantir-launchers.cjs'))
+    )
+    assert(
+      'prestart garante launchers',
+      typeof pkg.scripts.prestart === 'string' && /garantir-launchers/.test(pkg.scripts.prestart)
+    )
   }
 
   section('Vault Markdown')

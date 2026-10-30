@@ -48,6 +48,7 @@ const essenciais = [
   'scripts/limpeza-workspace.cjs',
   'scripts/sincronizar-windows.ps1',
   'scripts/iniciar-app.cjs',
+  'scripts/garantir-launchers.cjs',
   'src/main/win-self-heal.ts',
   'src/main/index.ts',
   'resources/dg-editor.ico',
