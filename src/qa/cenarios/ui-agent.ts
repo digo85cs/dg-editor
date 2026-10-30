@@ -185,5 +185,35 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
     }
   }
 
+  {
+    const t0 = Date.now()
+    try {
+      await page.locator('#btn-contas').click({ timeout: 5000 })
+      await page.waitForSelector('#contas-adapta', { timeout: 5000 })
+      const copiar = page.locator('#btn-adapta-copiar')
+      const mcp = page.locator('#btn-adapta-mcp')
+      const maestro = page.locator('#btn-adapta-maestro')
+      const ok =
+        (await copiar.count()) === 1 && (await mcp.count()) === 1 && (await maestro.count()) === 1
+      out.push({
+        id: 'ui.adapta.painel',
+        area: 'ui',
+        titulo: 'Contas: painel Adapta ONE/Maestro',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0
+      })
+      await page.locator('#btn-contas-close').click({ timeout: 3000 }).catch(() => {})
+    } catch (e) {
+      out.push({
+        id: 'ui.adapta.painel',
+        area: 'ui',
+        titulo: 'painel Adapta',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
   return out
 }

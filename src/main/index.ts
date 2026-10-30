@@ -24,7 +24,14 @@ import { getAccountsState } from './accounts'
 import { guardianSnapshot, guardianResumo } from './guardian'
 import { bootSaudeIAs } from './boot-saude'
 import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
-import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
+import {
+  gerarContinuidade,
+  dossieDirDoApp,
+  statusAdapta,
+  lerContinuidade,
+  urlAdaptaPermitida,
+  ADAPTA_URLS
+} from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
 import { askOllama } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
@@ -789,6 +796,40 @@ ipcMain.handle('dossie:snapshot', async () => {
 })
 ipcMain.handle('dossie:caminho', () => {
   return caminhoDossie()
+})
+
+// ---------- Adapta ONE / Maestro ----------
+ipcMain.handle('adapta:status', async (_e, raiz?: unknown) => {
+  let r = typeof raiz === 'string' && raiz.trim() ? raiz.trim() : ''
+  if (!r) {
+    const { resolverRaizProjeto } = await import('./paths')
+    r = resolverRaizProjeto()
+  }
+  return statusAdapta(r)
+})
+
+ipcMain.handle('adapta:gerar', () => {
+  return gerarContinuidade(dossieDirDoApp())
+})
+
+ipcMain.handle('adapta:ler-continuidade', (_e, regenerar?: unknown) => {
+  if (regenerar === true) {
+    const g = gerarContinuidade(dossieDirDoApp())
+    if (!g.ok) return { ok: false, erro: g.erro }
+  }
+  return lerContinuidade()
+})
+
+ipcMain.handle('adapta:abrir', async (_e, alvo: unknown) => {
+  let url = ''
+  if (alvo === 'one') url = ADAPTA_URLS.one
+  else if (alvo === 'hub') url = ADAPTA_URLS.hub
+  else if (alvo === 'maestro') url = ADAPTA_URLS.maestro
+  else if (alvo === 'docs') url = ADAPTA_URLS.docs
+  else if (typeof alvo === 'string' && urlAdaptaPermitida(alvo)) url = alvo
+  else return { ok: false, erro: 'url nao permitida' }
+  await shell.openExternal(url)
+  return { ok: true, url }
 })
 
 // ---------- Diagnostico ao vivo ----------

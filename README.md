@@ -36,6 +36,10 @@ Aba central **Agent**:
 
 Fila de propostas **unificada** (Agent + OpenClaw). Apply do Agent usa `agente:aplicar-proposta` (checkpoint). OpenClaw segue HTTP + aprovação humana, sem shell.
 
+## Adapta ONE / Maestro
+
+Continuidade para Contextos do ONE + MCP para o Maestro: painel em **Contas** / **Configurações**. Guia: [docs/adapta.md](docs/adapta.md).
+
 ## Testes
 
 Ordem da suíte e regra do smoke **isolado**: [docs/TESTES.md](docs/TESTES.md).

@@ -1057,6 +1057,45 @@ async function main() {
     assert('openclaw sem shell', !shellLeak)
   }
 
+  // ---------- Adapta ONE / Maestro bridge ----------
+  section('Adapta bridge')
+  {
+    const ud = path.join(os.tmpdir(), 'dg-adapta-' + Date.now())
+    fs.mkdirSync(ud, { recursive: true })
+    process.env.DG_TEST_USERDATA = ud
+    const bridge = loadModule('main/bridge-adapta.ts')
+    assert('url maestro permitida', bridge.urlAdaptaPermitida('https://agent.adapta.one/'))
+    assert('url estranha bloqueada', !bridge.urlAdaptaPermitida('https://evil.example/'))
+    assert('url http bloqueada', !bridge.urlAdaptaPermitida('http://adapta.org/'))
+    const st0 = bridge.statusAdapta(ROOT)
+    assert('status ok', st0.ok === true && st0.dossieDir.indexOf(ud) >= 0)
+    assert('mcp comando json', /"command": "node"/.test(st0.mcpComando) && /server\.js/.test(st0.mcpComando))
+    const sem = bridge.gerarContinuidade(bridge.dossieDirDoApp())
+    assert('gerar sem dossie falha', sem.ok === false)
+    const dossieDir = bridge.dossieDirDoApp()
+    fs.mkdirSync(dossieDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dossieDir, 'dossie.txt'),
+      '=== DOSSIE DG EDITOR ===\nAtualizado em: 2026-01-01\nRaiz: /proj\nTotal de mensagens no chat: 1\nProvedor mais recente: ollama\n\n--- ULTIMAS MENSAGENS ---\n[2026-01-01T00:00:00.000Z] DONO: oi\n=== FIM DO DOSSIE ===\n',
+      'utf8'
+    )
+    const ger = bridge.gerarContinuidade(dossieDir)
+    assert('gerar continuidade ok', ger.ok === true && fs.existsSync(ger.destino))
+    const ler = bridge.lerContinuidade()
+    assert('ler continuidade', ler.ok && /Contexto de Continuidade/.test(ler.texto))
+    assert('bloco menciona Maestro', /Maestro/.test(ler.texto))
+    const preA = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload adapta:status', /adapta:status/.test(preA))
+    assert('preload adapta:ler-continuidade', /adapta:ler-continuidade/.test(preA))
+    assert('preload adapta:abrir', /adapta:abrir/.test(preA))
+    const htmlA = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
+    assert('UI Contas Adapta', /contas-adapta/.test(htmlA) && /btn-adapta-copiar/.test(htmlA))
+    assert('UI Config Adapta', /config-adapta/.test(htmlA))
+    assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert('mcp script portatil', !/\\\\/.test(pkg.scripts.mcp) && /\.dg-editor\/bin/.test(pkg.scripts.mcp))
+  }
+
   // ---------- Agent parity (plan/@projeto/checkpoint/fila) ----------
   section('Agent parity')
   {

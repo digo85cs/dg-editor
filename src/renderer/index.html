@@ -315,6 +315,18 @@
       <h3>Configurações</h3>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
+      <div id="config-adapta" class="config-section">
+        <h4>Adapta ONE / Maestro</h4>
+        <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE + comando MCP para o Maestro. Detalhes: docs/adapta.md</p>
+        <p id="adapta-status-cfg" class="muted" style="margin:0 0 8px;font-size:12px"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-adapta-copiar-cfg" class="btn-small">Copiar continuidade</button>
+          <button type="button" id="btn-adapta-gerar-cfg" class="btn-ghost">Gerar continuidade</button>
+          <button type="button" id="btn-adapta-mcp-cfg" class="btn-ghost">Copiar comando MCP</button>
+          <button type="button" id="btn-adapta-one-cfg" class="btn-ghost">Abrir ONE</button>
+          <button type="button" id="btn-adapta-maestro-cfg" class="btn-ghost">Abrir Maestro</button>
+        </div>
+      </div>
       <div id="config-openclaw" class="config-section">
         <h4>OpenClaw</h4>
         <label class="config-field">Endpoint<br>
@@ -343,6 +355,18 @@
       <div id="contas-maquina" class="config-section"></div>
       <div id="contas-ia" class="config-section"></div>
       <div id="contas-guardian" class="config-section"></div>
+      <div id="contas-adapta" class="config-section">
+        <h4>Adapta ONE / Maestro</h4>
+        <p id="adapta-status" class="muted" style="margin:0 0 8px;font-size:12px;word-break:break-all"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-adapta-copiar" class="btn-small" title="Copia continuidade.md para a área de transferência">Copiar continuidade</button>
+          <button type="button" id="btn-adapta-gerar" class="btn-ghost">Gerar</button>
+          <button type="button" id="btn-adapta-mcp" class="btn-ghost" title="JSON command/args/cwd para conector MCP do Maestro">Copiar MCP</button>
+          <button type="button" id="btn-adapta-one" class="btn-ghost">ONE</button>
+          <button type="button" id="btn-adapta-maestro" class="btn-ghost">Maestro</button>
+          <button type="button" id="btn-adapta-docs" class="btn-ghost">Docs</button>
+        </div>
+      </div>
       <div id="contas-diagnostico" class="config-section"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button id="btn-diag" class="btn-small">Rodar diagnostico</button>

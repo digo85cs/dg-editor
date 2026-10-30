@@ -2078,6 +2078,74 @@ async function abrirConfig() {
         : 'Instalado, mas parado. Rode: ollama serve'
       : 'Nao instalado. Baixe em ollama.com')
   await carregarConfigOpenClawUi()
+  await atualizarPainelAdapta('adapta-status-cfg')
+}
+
+/** @type {object | null} */
+let adaptaStatusCache = null
+
+async function atualizarPainelAdapta(elId) {
+  const el = $(elId)
+  if (!el) return
+  try {
+    const st = await window.api.invoke('adapta:status', pastaAtual || undefined)
+    adaptaStatusCache = st
+    el.innerHTML =
+      'Dossiê: ' +
+      (st.dossieExiste ? 'ok' : 'ausente') +
+      ' · Continuidade: ' +
+      (st.continuidadeExiste ? 'ok' : 'ausente') +
+      ' · MCP: ' +
+      (st.mcpExiste ? 'compilado' : 'rode npm run build:mcp') +
+      '<br><code style="font-size:11px">' +
+      escapar(st.caminhoContinuidade || '') +
+      '</code>'
+  } catch (e) {
+    el.textContent = 'Falha ao ler status Adapta: ' + String(e)
+  }
+}
+
+async function copiarContinuidadeAdapta(regenerar) {
+  const r = await window.api.invoke('adapta:ler-continuidade', !!regenerar)
+  if (!r?.ok || !r.texto) {
+    if (!regenerar) {
+      const g = await window.api.invoke('adapta:gerar')
+      if (!g?.ok) {
+        alert('Continuidade indisponível: ' + (g?.erro || r?.erro || 'sem dossiê — use o chat primeiro'))
+        return
+      }
+      return copiarContinuidadeAdapta(false)
+    }
+    alert('Continuidade indisponível: ' + (r?.erro || 'erro'))
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(r.texto)
+    alert('Continuidade copiada. No Adapta ONE: + → Contextos → cole.')
+  } catch (e) {
+    alert('Não foi possível copiar: ' + String(e))
+  }
+  await atualizarPainelAdapta('adapta-status')
+  await atualizarPainelAdapta('adapta-status-cfg')
+}
+
+async function copiarMcpAdapta() {
+  const st =
+    adaptaStatusCache || (await window.api.invoke('adapta:status', pastaAtual || undefined))
+  adaptaStatusCache = st
+  if (!st?.mcpComando) {
+    alert('Comando MCP indisponível')
+    return
+  }
+  if (!st.mcpExiste) {
+    alert('MCP ainda não compilado. Rode: npm run build:mcp\n\nO JSON será copiado mesmo assim.')
+  }
+  try {
+    await navigator.clipboard.writeText(st.mcpComando)
+    alert('JSON MCP copiado. Cole no conector MCP do Maestro (ver docs/adapta.md).')
+  } catch (e) {
+    alert('Não foi possível copiar: ' + String(e))
+  }
 }
 
 async function abrirContas() {
@@ -2086,6 +2154,7 @@ async function abrirContas() {
   $('contas-maquina').innerHTML = '<h4>Maquina</h4>Carregando...'
   $('contas-ia').innerHTML = '<h4>IA</h4>Carregando...'
   $('contas-guardian').innerHTML = '<h4>Guardiao de recursos</h4>Carregando...'
+  void atualizarPainelAdapta('adapta-status')
   try {
     const s = await window.api.invoke('accounts:get-state')
     $('contas-identidade').innerHTML =
@@ -2265,6 +2334,21 @@ function bootstrapComandos() {
         ativarAbaDireita('browser')
         void abrirNavegadorUi()
       }
+    },
+    {
+      id: 'adapta-copiar',
+      titulo: 'Adapta: copiar continuidade (ONE)',
+      fn: () => void copiarContinuidadeAdapta(false)
+    },
+    {
+      id: 'adapta-mcp',
+      titulo: 'Adapta: copiar comando MCP (Maestro)',
+      fn: () => void copiarMcpAdapta()
+    },
+    {
+      id: 'adapta-maestro',
+      titulo: 'Adapta: abrir Maestro',
+      fn: () => void window.api.invoke('adapta:abrir', 'maestro')
     }
   ]
   for (const d of defs) registrarComando(d)
@@ -3023,6 +3107,27 @@ void refrescarPlanoUi()
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
+$('btn-adapta-copiar')?.addEventListener('click', () => void copiarContinuidadeAdapta(false))
+$('btn-adapta-gerar')?.addEventListener('click', async () => {
+  const g = await window.api.invoke('adapta:gerar')
+  alert(g?.ok ? 'Continuidade gerada em:\n' + g.destino : 'Falha: ' + (g?.erro || ''))
+  await atualizarPainelAdapta('adapta-status')
+})
+$('btn-adapta-mcp')?.addEventListener('click', () => void copiarMcpAdapta())
+$('btn-adapta-one')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'one'))
+$('btn-adapta-maestro')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'maestro'))
+$('btn-adapta-docs')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'docs'))
+$('btn-adapta-copiar-cfg')?.addEventListener('click', () => void copiarContinuidadeAdapta(false))
+$('btn-adapta-gerar-cfg')?.addEventListener('click', async () => {
+  const g = await window.api.invoke('adapta:gerar')
+  alert(g?.ok ? 'Continuidade gerada.' : 'Falha: ' + (g?.erro || ''))
+  await atualizarPainelAdapta('adapta-status-cfg')
+})
+$('btn-adapta-mcp-cfg')?.addEventListener('click', () => void copiarMcpAdapta())
+$('btn-adapta-one-cfg')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'one'))
+$('btn-adapta-maestro-cfg')?.addEventListener('click', () =>
+  void window.api.invoke('adapta:abrir', 'maestro')
+)
 $('chat-send').addEventListener('click', enviarMensagem)
 $('chat-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {

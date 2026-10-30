@@ -14,6 +14,7 @@ const invokeChannels = [
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
+  'adapta:status', 'adapta:gerar', 'adapta:ler-continuidade', 'adapta:abrir',
   'roteador:planejar',
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
