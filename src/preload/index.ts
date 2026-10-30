@@ -35,7 +35,11 @@ const invokeChannels = [
   'openclaw:config-get', 'openclaw:config-set',
   'openclaw:token-set', 'openclaw:token-clear', 'openclaw:token-status',
   'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',
-  'openclaw:auditoria-listar'
+  'openclaw:auditoria-listar',
+  'agente:pedir', 'agente:orquestrar', 'agente:listar', 'agente:fila-status',
+  'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
+  'agente:checkpoint-desfazer', 'contexto:projeto',
+  'navegador:embed-status'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const

@@ -119,6 +119,16 @@ export function registerOpenClawIpc(): void {
     const p = exigirArrayStrings(pastas, 'pastas')
     if (isErroPayload(p)) return p
     const pend = obterPendente(i)
+    let checkpointId: string | undefined
+    if (pend?.absPath) {
+      try {
+        const { criarCheckpoint } = await import('../agent/checkpoint')
+        const ck = await criarCheckpoint([pend.absPath], 'openclaw:aplicar')
+        checkpointId = ck.id
+      } catch {
+        /* checkpoint best-effort */
+      }
+    }
     const r = await aplicarPendenteAprovado(i, p)
     if (r.ok) {
       registrarAuditoria({
@@ -127,10 +137,11 @@ export function registerOpenClawIpc(): void {
         id: i,
         path: r.absPath || pend?.absPath,
         hashAntes: r.hashAntes,
-        hashDepois: r.hashDepois
+        hashDepois: r.hashDepois,
+        detalhe: checkpointId ? 'checkpoint=' + checkpointId : undefined
       })
     }
-    return r
+    return { ...r, checkpointId }
   })
 
   ipcMain.handle('openclaw:rejeitar', (_e, id: unknown) => {

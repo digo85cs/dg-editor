@@ -396,6 +396,23 @@ export function estadoAtual(): EstadoNavegador {
   }
 }
 
+/** Status do caminho de produção (embed) vs smoke — para UI/diagnóstico. */
+export function statusEmbedNavegador(): {
+  modo: 'smoke' | 'embed'
+  hostAnexado: boolean
+  embutidoVisivel: boolean
+  aberto: boolean
+  bounds: Bounds | null
+} {
+  return {
+    modo: emSmokeNav() ? 'smoke' : 'embed',
+    hostAnexado,
+    embutidoVisivel,
+    aberto: navegadorAberto(),
+    bounds: ultimoBounds.width > 0 ? { ...ultimoBounds } : null
+  }
+}
+
 export async function estadoComLogado(): Promise<EstadoNavegador> {
   const base = estadoAtual()
   if (!base.aberto) return base

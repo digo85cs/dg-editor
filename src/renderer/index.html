@@ -109,6 +109,7 @@
     <section id="center-panel">
       <div class="center-tabs" role="tablist" aria-label="Área central">
         <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
+        <button type="button" class="center-tab" data-center-pane="agent" role="tab" aria-selected="false">Agent</button>
         <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
       </div>
 
@@ -142,6 +143,27 @@
               <button id="chat-send" class="btn-primary" disabled>Enviar</button>
             </footer>
           </main>
+        </div>
+      </div>
+
+      <div id="center-pane-agent" class="center-pane">
+        <div id="pane-agent" class="center-pane-inner agent-pane">
+          <header class="agent-header">
+            <label class="agent-mode">
+              <input type="checkbox" id="agent-plan-mode" />
+              Plan mode
+            </label>
+            <select id="agent-select" aria-label="Agente"></select>
+            <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor">Orquestrar</button>
+            <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint">Desfazer apply</button>
+            <span id="agent-fila-status" class="muted agent-fila"></span>
+          </header>
+          <div id="agent-trace" class="agent-trace" aria-live="polite"></div>
+          <div id="agent-output" class="agent-output"></div>
+          <footer class="agent-input-bar">
+            <textarea id="agent-input" rows="2" placeholder="Pedido ao agente… use @projeto para contexto do workspace"></textarea>
+            <button type="button" id="agent-send" class="btn-primary">Executar</button>
+          </footer>
         </div>
       </div>
 

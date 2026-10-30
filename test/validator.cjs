@@ -1057,6 +1057,46 @@ async function main() {
     assert('openclaw sem shell', !shellLeak)
   }
 
+  // ---------- Agent parity (plan/@projeto/checkpoint/fila) ----------
+  section('Agent parity')
+  {
+    const ctx = loadModule('main/agent/contexto-projeto.ts')
+    const d = ctx.detectarMençãoProjeto('explique @projeto o boot')
+    assert('detecta @projeto', d.tem === true)
+    assert('consulta sem @projeto', !/@projeto/i.test(d.consulta))
+
+    const fila = loadModule('main/agent/fila.ts')
+    const st0 = fila.statusFilaAgente()
+    assert('fila inicia vazia', st0.tamanho === 0 && st0.ocupado === false)
+    let ordem = ''
+    const p1 = fila.enfileirarAgente(async () => {
+      ordem += 'a'
+      await new Promise((r) => setTimeout(r, 20))
+      ordem += 'b'
+      return 1
+    })
+    const p2 = fila.enfileirarAgente(async () => {
+      ordem += 'c'
+      return 2
+    })
+    const rs = await Promise.all([p1, p2])
+    assert('fila serial', ordem === 'abc' && rs[0] === 1 && rs[1] === 2)
+
+    const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload agente:pedir', /agente:pedir/.test(pre))
+    assert('preload checkpoint-desfazer', /agente:checkpoint-desfazer/.test(pre))
+    assert('preload contexto:projeto', /contexto:projeto/.test(pre))
+    assert('preload navegador:embed-status', /navegador:embed-status/.test(pre))
+    const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
+    assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
+    const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
+    assert('modo plan no agent', /modo === 'plan'/.test(agentTs) || /modo\?: 'plan'/.test(agentTs))
+    const html = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
+    assert('aba Agent no HTML', /data-center-pane="agent"/.test(html))
+    assert('plan mode checkbox', /agent-plan-mode/.test(html))
+  }
+
   // ---------- Summary ----------
   console.log('\n==============================')
   console.log('Results: ' + passed + ' passed, ' + failed + ' failed')

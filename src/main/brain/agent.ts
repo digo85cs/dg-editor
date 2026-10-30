@@ -60,6 +60,10 @@ export interface OpcoesExecutarAgente {
   modeloForcado?: string
   agente?: string
   tarefa?: Tarefa
+  /** plan = só plano em markdown, sem tools; agent = loop com MCP */
+  modo?: 'plan' | 'agent'
+  /** Contexto extra (@projeto etc.) injetado no system */
+  contextoExtra?: string
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
@@ -482,16 +486,32 @@ export async function executarAgente(
     const blocoSkills = skills.length
       ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
       : ''
-    const systemExtra = blocoAgente + (memoria ? '\n\n' + memoria : '') + blocoSkills
+    const modo = opcoes.modo === 'plan' ? 'plan' : 'agent'
+    const blocoPlan =
+      modo === 'plan'
+        ? '\n\n### MODO PLAN\nVoce esta em modo PLAN. NAO chame tools. NAO edite arquivos. ' +
+          'Responda APENAS com um plano em markdown: objetivo, passos numerados, ' +
+          'arquivos envolvidos, riscos. Aguarde aprovacao humana antes de executar.'
+        : ''
+    const systemExtra =
+      blocoAgente +
+      (memoria ? '\n\n' + memoria : '') +
+      blocoSkills +
+      blocoPlan +
+      (opcoes.contextoExtra ? '\n\n' + opcoes.contextoExtra : '')
 
     let tools: McpTool[] = []
-    try {
-      tools = await listarTools()
-      // Anti-recursao: nunca expor agente_executar ao loop interno
-      tools = tools.filter((t) => t.name !== 'agente_executar')
-      dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
-    } catch (e) {
-      dglog('[agente] MCP indisponivel: ' + String(e))
+    if (modo === 'agent') {
+      try {
+        tools = await listarTools()
+        // Anti-recursao: nunca expor agente_executar ao loop interno
+        tools = tools.filter((t) => t.name !== 'agente_executar')
+        dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
+      } catch (e) {
+        dglog('[agente] MCP indisponivel: ' + String(e))
+      }
+    } else {
+      dglog('[agente] modo plan — tools desligadas')
     }
 
     await garantirCatalogoOpenRouter()

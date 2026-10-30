@@ -355,7 +355,7 @@ window.addEventListener('resize', () => {
 })()
 
 function ativarAbaCentro(pane) {
-  const alvo = pane === 'editor' ? 'editor' : 'chat'
+  const alvo = pane === 'editor' || pane === 'agent' ? pane : 'chat'
   document.querySelectorAll('.center-tab').forEach((t) => {
     const on = t.dataset.centerPane === alvo
     t.classList.toggle('active', on)
@@ -364,6 +364,7 @@ function ativarAbaCentro(pane) {
   document.querySelectorAll('.center-pane').forEach((p) => {
     p.classList.toggle('active', p.id === 'center-pane-' + alvo)
   })
+  if (alvo === 'agent') void carregarAgentesUi()
 }
 
 document.querySelectorAll('.right-tab').forEach((t) => {
@@ -2125,6 +2126,21 @@ function bootstrapComandos() {
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
     { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
+    {
+      id: 'agent-panel',
+      titulo: 'Painel Agent',
+      fn: () => {
+        ativarAbaCentro('agent')
+      }
+    },
+    {
+      id: 'agent-undo',
+      titulo: 'Desfazer último apply (checkpoint)',
+      fn: async () => {
+        const r = await window.api.invoke('agente:checkpoint-desfazer')
+        alert(r?.ok ? 'Restaurado.' : r?.erro || 'falha')
+      }
+    },
     { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
     { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
     { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
@@ -2521,6 +2537,123 @@ $('btn-oc-limpar-token')?.addEventListener('click', async () => {
 })
 $('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
+
+async function carregarAgentesUi() {
+  const sel = $('agent-select')
+  if (!sel || !pastaAtual) return
+  const r = await window.api.invoke('agente:listar', pastaAtual)
+  const cur = sel.value
+  sel.innerHTML = ''
+  for (const a of r?.agentes || []) {
+    const o = document.createElement('option')
+    o.value = a.id
+    o.textContent = a.nome || a.id
+    sel.appendChild(o)
+  }
+  if (cur) sel.value = cur
+  const st = await window.api.invoke('agente:fila-status')
+  const fs = $('agent-fila-status')
+  if (fs && st) {
+    fs.textContent = st.ocupado
+      ? 'fila: ocupado (' + st.tamanho + ')'
+      : st.tamanho
+        ? 'fila: ' + st.tamanho
+        : ''
+  }
+}
+
+function renderAgentTrace(passos) {
+  const box = $('agent-trace')
+  if (!box) return
+  box.innerHTML = ''
+  if (!passos || !passos.length) {
+    box.innerHTML = '<span class="muted">Sem tool calls neste turno.</span>'
+    return
+  }
+  for (const p of passos) {
+    const div = document.createElement('div')
+    div.className = 'step'
+    if (p.tipo === 'tool') {
+      div.textContent =
+        '⚙ ' +
+        (p.nome || 'tool') +
+        (p.resultado ? ' → ' + String(p.resultado).slice(0, 160) : '')
+    } else {
+      div.textContent = '💬 ' + String(p.texto || '').slice(0, 200)
+    }
+    box.appendChild(div)
+  }
+}
+
+async function executarAgentUi(orquestrar) {
+  if (!pastaAtual) {
+    alert('Abra uma pasta primeiro.')
+    return
+  }
+  const input = $('agent-input')
+  const texto = input?.value?.trim()
+  if (!texto) return
+  const plan = $('agent-plan-mode')?.checked
+  const agente = $('agent-select')?.value || undefined
+  const out = $('agent-output')
+  const send = $('agent-send')
+  if (send) send.disabled = true
+  if (out) out.textContent = plan ? 'Gerando plano…' : 'Executando…'
+  renderAgentTrace([])
+  try {
+    let r
+    if (orquestrar) {
+      r = await window.api.invoke('agente:orquestrar', pastaAtual, texto)
+      if (out) {
+        out.textContent = (r?.passos || [])
+          .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
+          .join('\n\n')
+      }
+      const todos = []
+      for (const p of r?.passos || []) {
+        if (p.passos) todos.push(...p.passos)
+      }
+      renderAgentTrace(todos)
+    } else {
+      r = await window.api.invoke('agente:pedir', {
+        raiz: pastaAtual,
+        pergunta: texto,
+        modo: plan ? 'plan' : 'agent',
+        agente
+      })
+      if (!r?.ok) {
+        if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
+        return
+      }
+      if (out) {
+        out.textContent =
+          (plan ? '[PLAN]\n\n' : '') +
+          (r.texto || '') +
+          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
+      }
+      renderAgentTrace(r.passos || [])
+    }
+    await carregarAgentesUi()
+  } catch (e) {
+    if (out) out.textContent = 'Erro: ' + String(e)
+  } finally {
+    if (send) send.disabled = false
+  }
+}
+
+$('agent-send')?.addEventListener('click', () => void executarAgentUi(false))
+$('btn-agent-orquestrar')?.addEventListener('click', () => void executarAgentUi(true))
+$('btn-agent-undo')?.addEventListener('click', async () => {
+  const r = await window.api.invoke('agente:checkpoint-desfazer')
+  alert(r?.ok ? 'Checkpoint restaurado (' + r.restaurados + ' arquivo(s)).' : 'Falha: ' + (r?.erro || ''))
+})
+$('agent-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    void executarAgentUi(false)
+  }
+})
+
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))

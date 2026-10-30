@@ -36,7 +36,8 @@ import {
   definirJanelaPrincipalNavegador,
   layoutNavegador,
   mostrarNavegadorEmbutido,
-  onNavegadorEventos
+  onNavegadorEventos,
+  statusEmbedNavegador
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
@@ -73,6 +74,7 @@ import {
 import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
 import { registerVaultIpc } from './vault/ipc'
 import { registerOpenClawIpc } from './openclaw/ipc'
+import { registerAgentExtrasIpc } from './agent/ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -244,6 +246,10 @@ ipcMain.handle('navegador:abrir', (_e, url?: string) => {
   return abrirNavegadorAncorado(url)
 })
 
+ipcMain.handle('navegador:embed-status', () => {
+  return { ok: true, ...statusEmbedNavegador() }
+})
+
 ipcMain.on('navegador:bounds', (_e, b: unknown) => {
   if (!b || typeof b !== 'object') return
   const o = b as Record<string, unknown>
@@ -377,6 +383,8 @@ ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) =
 registerVaultIpc()
 // ---------- OpenClaw (diffs + aprovacao humana; sem shell) ----------
 registerOpenClawIpc()
+// ---------- Agent: checkpoint, @projeto, orquestracao, fila ----------
+registerAgentExtrasIpc()
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {
@@ -834,17 +842,44 @@ ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
 
 
 // ---------- Agente com MCP + memoria generativa ----------
-ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, modelo?: string) => {
-  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
-  try {
-    const r = await executarAgente(root, pergunta, modelo)
-    return { ok: true, texto: r.texto, modelo: r.modelo, passos: r.passos }
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    dglog('[agente:executar] falhou: ' + msg)
-    return { ok: false, erro: msg }
+ipcMain.handle(
+  'agente:executar',
+  async (
+    _e,
+    root: string,
+    pergunta: string,
+    modeloOuOpcoes?: string | { modelo?: string; modo?: string; agente?: string; contextoExtra?: string }
+  ) => {
+    if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    try {
+      const opcoes =
+        typeof modeloOuOpcoes === 'string'
+          ? { modeloForcado: modeloOuOpcoes }
+          : modeloOuOpcoes && typeof modeloOuOpcoes === 'object'
+            ? {
+                modeloForcado: typeof modeloOuOpcoes.modelo === 'string' ? modeloOuOpcoes.modelo : undefined,
+                modo: modeloOuOpcoes.modo === 'plan' ? ('plan' as const) : ('agent' as const),
+                agente: typeof modeloOuOpcoes.agente === 'string' ? modeloOuOpcoes.agente : undefined,
+                contextoExtra:
+                  typeof modeloOuOpcoes.contextoExtra === 'string' ? modeloOuOpcoes.contextoExtra : undefined
+              }
+            : {}
+      const r = await executarAgente(root, pergunta, opcoes)
+      return {
+        ok: true,
+        texto: r.texto,
+        modelo: r.modelo,
+        passos: r.passos,
+        duracaoMs: r.duracaoMs,
+        modo: opcoes.modo || 'agent'
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      dglog('[agente:executar] falhou: ' + msg)
+      return { ok: false, erro: msg }
+    }
   }
-})
+)
 
 ipcMain.handle('agente:modelo', async () => {
   if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
