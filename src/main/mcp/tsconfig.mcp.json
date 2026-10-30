@@ -1,7 +1,7 @@
 ﻿{
   "compilerOptions": {
-    "outDir": "D:\\\\CURSOR\\\\DG Editor\\\.dg-editor\\bin",
-    "rootDir": "D:\\\\CURSOR\\\\DG Editor\\src",
+    "outDir": "../../../.dg-editor/bin",
+    "rootDir": "../..",
     "module": "commonjs",
     "target": "es2022",
     "moduleResolution": "node",
