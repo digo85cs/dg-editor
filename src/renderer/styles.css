@@ -324,6 +324,24 @@ body {
 #sidebar > .sidebar-header { grid-row: 1; }
 #sidebar > .sidebar-scroll { grid-row: 2; }
 #sidebar > .sidebar-footer { grid-row: 3; }
+.sidebar-footer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--dg-border-subtle);
+  padding: var(--dg-space-2);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  background: var(--dg-sidebar);
+}
+.sidebar-footer .btn-ghost {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  flex: 0 0 auto;
+}
 .sidebar-header {
   display: flex;
   align-items: center;

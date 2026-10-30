@@ -984,6 +984,10 @@ async function main() {
     assert('css titlebar no-drag', /#titlebar[\s\S]{0,400}-webkit-app-region:\s*no-drag/.test(css))
     assert('css tb-drag-fill', /\.tb-drag-fill[\s\S]{0,120}-webkit-app-region:\s*drag/.test(css))
     assert('css sidebar grid footer', /#sidebar\s*\{[\s\S]{0,200}grid-template-rows:/.test(css))
+    assert(
+      'css Contas/Config empilhados (column)',
+      /\.sidebar-footer\s*\{[\s\S]{0,180}flex-direction:\s*column/.test(css)
+    )
     assert('css modal-float', /\.modal\.modal-float/.test(css))
     assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
     assert('app ligarJanelaFlutuante', /function ligarJanelaFlutuante\s*\(/.test(appJs))
