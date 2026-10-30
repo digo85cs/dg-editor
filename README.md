@@ -3,16 +3,26 @@ Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
-**Atalho da Área de Trabalho:** rode uma vez `corrigir-atalho-desktop.bat` na pasta do projeto. Ele cria/corrige o ícone **DG Editor** na Área de Trabalho (e remove atalho velho que apontava para `electron\dist`).
+### Pasta vazia / arquivos faltando
 
-Depois use só o atalho **DG Editor** da Área de Trabalho (ou `abrir-dg-editor.bat` / `dg-boot.bat`).
+Se `D:\CURSOR\DG Editor` **não tem** `abrir-dg-editor.vbs`, `atualizar-atalho-desktop.bat`, etc., cole isto no **PowerShell** (não precisa de nada na pasta):
+
+```powershell
+irm https://raw.githubusercontent.com/digo85cs/dg-editor/feat/vault-markdown/scripts/sincronizar-windows.ps1 | iex
+```
+
+Isso clona/atualiza a branch `feat/vault-markdown` em `D:\CURSOR\DG Editor` e recria o atalho.
+
+### Uso diário
+
+**Atalho da Área de Trabalho:** rode uma vez `atualizar-atalho-desktop.bat` (ou o comando acima). Depois use só o ícone **DG Editor**.
 
 Não use `node_modules\electron\dist` — abre Electron cru / build velho.
 
 ```bat
 cd /d "D:\CURSOR\DG Editor"
 git pull origin feat/vault-markdown
-corrigir-atalho-desktop.bat
+atualizar-atalho-desktop.bat
 ```
 
 ### Faxina (só o necessário para rodar)
