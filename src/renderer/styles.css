@@ -1177,6 +1177,21 @@ body {
 #editor-host { position: relative; display: flex; min-height: 0; flex: 1; }
 #editor-host.split-preview #editor-mount { width: 50%; }
 #editor-host.split-preview .md-preview { display: block; width: 50%; }
+#editor-host.split-diff #editor-mount { width: 50%; min-width: 0; }
+#editor-host.split-diff #editor-diff-side {
+  display: block;
+  width: 50%;
+  min-width: 0;
+  border-left: 1px solid var(--dg-border-subtle);
+  overflow: hidden;
+}
+.editor-diff-side {
+  display: none;
+  height: 100%;
+  min-height: 0;
+}
+.editor-diff-side .cm-editor { height: 100%; }
+.editor-diff-side[hidden] { display: none !important; }
 .md-preview {
   overflow: auto;
   padding: 12px 16px;

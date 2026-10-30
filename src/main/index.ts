@@ -233,7 +233,18 @@ app.whenReady().then(() => {
   })
 
   // Smoke headless do navegador embutido (DG_NAV_SMOKE=1)
+  // Com DG_NAV_SMOKE_EMBED=1: injeta BrowserWindow pai e usa host View (produção).
   if (process.env.DG_NAV_SMOKE === '1') {
+    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+      // Pai oculto (não offscreen) — WebContentsView precisa de paint real p/ screenshot.
+      const smokeParent = new BrowserWindow({
+        width: 1280,
+        height: 800,
+        show: false,
+        backgroundColor: '#1a1a1a'
+      })
+      definirJanelaPrincipalNavegador(smokeParent)
+    }
     void import('./navegador/smoke').then((m) => m.rodarSmokeESair())
   }
 })

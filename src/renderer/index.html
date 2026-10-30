@@ -185,6 +185,7 @@
         </div>
         <div id="editor-host">
           <div id="editor-mount"></div>
+          <div id="editor-diff-side" class="editor-diff-side" hidden aria-hidden="true" aria-label="Preview depois da proposta"></div>
           <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
           <div id="image-preview" class="image-preview hidden" aria-hidden="true">
             <img id="image-preview-img" alt="preview" />
@@ -204,6 +205,7 @@
             <header class="diff-panel-header">
               <span id="diff-panel-title">Diff</span>
               <div class="diff-panel-actions" id="diff-panel-actions" hidden>
+                <button type="button" id="btn-oc-preview-editor" class="btn-small" title="Marcar diff no editor (side-by-side)">No editor</button>
                 <button type="button" id="btn-oc-aplicar" class="btn-small" title="Aplicar arquivo inteiro">Aplicar arquivo</button>
                 <button type="button" id="btn-oc-aplicar-hunks" class="btn-small" title="Aplicar só hunks aceitos">Aplicar hunks</button>
                 <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar arquivo</button>

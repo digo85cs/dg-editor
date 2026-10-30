@@ -940,6 +940,38 @@ function fecharPainelDiff() {
     bar.hidden = true
     bar.innerHTML = ''
   }
+  if (editor && editor.limparDiff) editor.limparDiff()
+}
+
+/** Preview side-by-side no CodeMirror via propostas:preview (sem gravar disco). */
+async function previewDiffNoEditor(pendente) {
+  if (!pendente?.id || !editor || !editor.mostrarDiffProposta) return
+  const r = await window.api.invoke('propostas:preview', pendente.id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Preview: ' + (r?.erro || 'falha'))
+    return
+  }
+  // abre o arquivo no editor (antes) se ainda nao estiver
+  const abs = r.absPath || pendente.absPath || pendente.path
+  if (abs && abaAtiva !== abs) {
+    try {
+      await abrirArquivoNaAba(abs)
+    } catch {
+      /* */
+    }
+  }
+  if (abs && editor.getCaminho && editor.getCaminho() !== abs && r.antes != null) {
+    editor.abrir(abs, r.antes)
+  } else if (r.antes != null && editor.getConteudo && editor.getConteudo() !== r.antes) {
+    // alinha doc com o original do disco usado no preview
+    editor.abrir(abs || editor.getCaminho(), r.antes)
+  }
+  editor.mostrarDiffProposta({
+    linhasDel: r.linhasDel || [],
+    linhasAdd: r.linhasAdd || [],
+    depois: r.depois,
+    caminho: abs
+  })
 }
 
 async function carregarHunksDiff(pendenteId) {
@@ -2725,6 +2757,10 @@ $('btn-oc-limpar-token')?.addEventListener('click', async () => {
   await window.api.invoke('openclaw:token-clear')
   await carregarConfigOpenClawUi()
 })
+$('btn-oc-preview-editor')?.addEventListener('click', () => {
+  const p = ocPendentes.find((x) => x.id === ocPendenteAtivoId)
+  if (p) void previewDiffNoEditor(p)
+})
 $('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
 $('btn-oc-aplicar-hunks')?.addEventListener('click', () => void aplicarHunksSelecionadosOc())
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
@@ -2915,6 +2951,22 @@ function coletarAbasCtx() {
   return out
 }
 
+/** Erros/diagnostics recentes do agent (typecheck/test/manual) para o contexto. */
+async function coletarErrosEditor() {
+  try {
+    const r = await window.api.invoke('agente:diagnosticos')
+    const lista = (r?.recentes || r?.diagnosticos || []).filter((d) => d && d.ok === false && d.saida)
+    if (!lista.length) return ''
+    return lista
+      .slice(0, 5)
+      .map((d) => '[' + d.origem + '] ' + (d.resumo || '') + '\n' + String(d.saida || '').slice(0, 3000))
+      .join('\n\n')
+      .slice(0, 8000)
+  } catch {
+    return ''
+  }
+}
+
 function renderPlanoChecklist(plano) {
   const box = $('agent-plano-checklist')
   if (!box) return
@@ -2997,6 +3049,7 @@ async function executarAgentUi(orquestrar) {
       }
       renderAgentTrace(todos)
     } else {
+      const errosEditor = await coletarErrosEditor()
       r = await window.api.invoke('agente:pedir', {
         raiz: pastaAtual,
         pergunta: texto,
@@ -3008,7 +3061,8 @@ async function executarAgentUi(orquestrar) {
         proposeWrites: true,
         verificarApos: !!verify && !plan,
         abas: coletarAbasCtx(),
-        incluirGit: true
+        incluirGit: true,
+        errosEditor: errosEditor || undefined
       })
       if (!r?.ok) {
         if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')

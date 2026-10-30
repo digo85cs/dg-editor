@@ -1,8 +1,12 @@
 /**
  * Smoke do navegador embutido.
  *
- * Ativacao: DG_NAV_SMOKE=1 npx electron out/main/index.js
- * (ou: DG_NAV_SMOKE=1 node_modules/electron/dist/electron.exe out/main/index.js)
+ * Ativacao (host BaseWindow legado):
+ *   DG_NAV_SMOKE=1 npx electron out/main/index.js
+ *
+ * Ativacao (host View de produção — embed):
+ *   DG_NAV_SMOKE=1 DG_NAV_SMOKE_EMBED=1 npx electron out/main/index.js
+ *   (index.ts injeta BrowserWindow pai oculta)
  *
  * Contagem oficial: 22 cenarios com ids 0..21 (derivados do array resultados).
  * Nao imprime o token completo.
@@ -10,7 +14,13 @@
 import { app } from 'electron'
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs'
 import { basename, isAbsolute, join, relative, resolve } from 'path'
-import { criarJanelaNavegador, fecharJanelaNavegador, estadoAtual } from './janela'
+import {
+  criarJanelaNavegador,
+  fecharJanelaNavegador,
+  estadoAtual,
+  statusEmbedNavegador,
+  caminhoHostNavegador
+} from './janela'
 import { NAV_HOST, NAV_PORT, prefixoTokenControle, resetarRateLimit } from './controle'
 import {
   caminhoNavToken,
@@ -142,15 +152,46 @@ export async function rodarSmokeESair(): Promise<void> {
     // 9: screenshot da view (página estável)
     await req('POST', '/abrir', { url: 'https://example.com' }, token)
     await new Promise((r) => setTimeout(r, 2000))
+    // Embed: pai oculto não pinta — showInactive breve p/ capturePage.
+    let embedParentShown = false
+    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+      try {
+        const { BrowserWindow } = await import('electron')
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed() && !w.isVisible()) {
+            w.showInactive()
+            embedParentShown = true
+          }
+        }
+        if (embedParentShown) await new Promise((r) => setTimeout(r, 400))
+      } catch {
+        /* */
+      }
+    }
     let shot = await req('POST', '/screenshot', {}, token)
     if (!(shot.status === 200 && Number(shot.json.bytes || 0) > 100)) {
       await new Promise((r) => setTimeout(r, 1500))
       shot = await req('POST', '/screenshot', {}, token)
     }
+    if (embedParentShown) {
+      try {
+        const { BrowserWindow } = await import('electron')
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed() && w.isVisible()) w.hide()
+        }
+      } catch {
+        /* */
+      }
+    }
     resultados.push({
       id: 9,
       ok: shot.status === 200 && shot.json.ok === true && Number(shot.json.bytes || 0) > 100,
-      detalhe: 'bytes=' + String(shot.json.bytes || 0) + ' erro=' + String(shot.json.erro || '')
+      detalhe:
+        'bytes=' +
+        String(shot.json.bytes || 0) +
+        ' erro=' +
+        String(shot.json.erro || shot.json.motivo || '') +
+        (embedParentShown ? ' embedParentShown' : '')
     })
 
     // 10: /ler com seletor inexistente → candidatos[]
@@ -206,17 +247,37 @@ export async function rodarSmokeESair(): Promise<void> {
     })
 
     // 12: singleton — duas chamadas = mesma instância, sem show
+    // Embed: retorno tipado BaseWindow é null; valida host View + sessão aberta.
     const a = criarJanelaNavegador('about:blank', { mostrar: false })
     const b = criarJanelaNavegador('https://example.com', { mostrar: false })
-    const ok12 = a === b && a.isVisible() === false && !a.isDestroyed()
+    const host = caminhoHostNavegador()
+    let ok12: boolean
+    let det12: Record<string, unknown>
+    if (host === 'embed') {
+      const st = statusEmbedNavegador()
+      ok12 =
+        st.host === 'embed' &&
+        st.conteudoCompartilhado === true &&
+        estadoAtual().aberto === true
+      det12 = {
+        modo: 'embed',
+        host: st.host,
+        conteudoCompartilhado: st.conteudoCompartilhado,
+        aberto: estadoAtual().aberto,
+        retornoNull: a == null && b == null
+      }
+    } else {
+      ok12 = !!a && a === b && a.isVisible() === false && !a.isDestroyed()
+      det12 = {
+        mesmaInstancia: a === b,
+        visible: a?.isVisible?.() ?? null,
+        destroyed: a?.isDestroyed?.() ?? null
+      }
+    }
     resultados.push({
       id: 12,
       ok: ok12,
-      detalhe: JSON.stringify({
-        mesmaInstancia: a === b,
-        visible: a.isVisible(),
-        destroyed: a.isDestroyed()
-      })
+      detalhe: JSON.stringify(det12)
     })
 
     // 13: download real → _smoke/, nome legível, colisão _1

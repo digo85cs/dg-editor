@@ -79,11 +79,23 @@ No painel Adapta:
 
 Ou use a aba **Browser** do DG e navegue manualmente.
 
+## Provider `maestro` no Brain (stub)
+
+Não há endpoint HTTP público da Adapta compatível com o registry de providers do DG (`ollama` / `api`). O tipo `maestro` em `shared/types` é **reservado**; não selecione nem implemente chat via HTTP até existir API oficial documentada.
+
+Integração suportada hoje:
+
+| Canal | Como |
+|-------|------|
+| ONE Contextos | `continuidade.md` (copiar/colar; regenerado após turnos do Agent) |
+| Maestro | MCP do DG (`npm run build:mcp` + colar JSON no conector) |
+
 ## O que não fazer
 
 - Guardar senha da Adapta no DG
 - Scraping / login automatizado no ONE ou Maestro
 - Esperar provider `maestro` no Brain sem API oficial da Adapta
+- Trocar Ollama/API por “maestro HTTP” inventado
 
 ## Referências
 

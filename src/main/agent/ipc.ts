@@ -26,7 +26,8 @@ import {
 } from './propostas'
 import {
   listarHunksPendente,
-  definirHunksPendente
+  definirHunksPendente,
+  previewPendente
 } from '../openclaw/diffs'
 import {
   rodarTypecheck,
@@ -34,6 +35,7 @@ import {
   listarDiagnosticosRecentes,
   registrarDiagnosticoManual
 } from './diagnosticos'
+import { gerarContinuidade, dossieDirDoApp } from '../bridge-adapta'
 
 function parseAbas(raw: unknown): AbaCtx[] {
   if (!Array.isArray(raw)) return []
@@ -147,6 +149,14 @@ export function registerAgentExtrasIpc(): void {
     return definirHunksPendente(i, indices as number[])
   })
 
+  ipcMain.handle('propostas:preview', async (_e, id: unknown, pastas: unknown) => {
+    const i = exigirString(id, 'id')
+    if (isErroPayload(i)) return i
+    const p = exigirArrayStrings(pastas, 'pastas')
+    if (isErroPayload(p)) return p
+    return previewPendente(i, p)
+  })
+
   ipcMain.handle('agente:plano-salvar', (_e, payload: unknown) => {
     if (!payload || typeof payload !== 'object') return { ok: false, erro: 'payload' }
     const o = payload as Record<string, unknown>
@@ -234,12 +244,15 @@ export function registerAgentExtrasIpc(): void {
     const proposeWrites = o.proposeWrites !== false
     const verificarApos = o.verificarApos === true
     const abas = parseAbas(o.abas)
+    const errosEditor = typeof o.errosEditor === 'string' ? o.errosEditor : undefined
     const exp = await expandirMencoes({ raiz, pergunta, selecao, arquivoAtivo })
     const implicito = await montarContextoImplicito({
       raiz,
       abas,
       incluirGit: o.incluirGit !== false,
-      incluirDiagnosticos: true
+      incluirDiagnosticos: true,
+      incluirRegras: true,
+      errosEditor
     })
     const contextoExtra = [exp.contextoExtra, implicito].filter(Boolean).join('\n\n')
     const sender = e.sender
@@ -301,6 +314,12 @@ export function registerAgentExtrasIpc(): void {
       })
       if (modo === 'plan' && r.texto) {
         salvarPlano({ texto: r.texto, raiz, salvoEm: new Date().toISOString(), agente })
+      }
+      // Sync Adapta continuidade (best-effort) após turno
+      try {
+        gerarContinuidade(dossieDirDoApp())
+      } catch {
+        /* */
       }
       return {
         ok: true,

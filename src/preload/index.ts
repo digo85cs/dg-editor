@@ -42,7 +42,7 @@ const invokeChannels = [
   'agente:plano-salvar', 'agente:plano-ler', 'agente:plano-limpar', 'agente:executar-plano',
   'agente:plano-marcar-passo', 'agente:plano-atualizar-passos',
   'agente:verificar', 'agente:diagnosticos', 'agente:diagnostico-manual',
-  'propostas:listar', 'propostas:hunks', 'propostas:definir-hunks',
+  'propostas:listar', 'propostas:hunks', 'propostas:definir-hunks', 'propostas:preview',
   'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
   'agente:checkpoint-desfazer', 'contexto:projeto',
   'navegador:embed-status'

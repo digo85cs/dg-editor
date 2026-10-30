@@ -242,6 +242,63 @@ export function hashConteudo(s: string): string {
   return createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 16)
 }
 
+/** Preview em memória (antes/depois + linhas tocadas) sem gravar disco. */
+export async function previewPendente(
+  id: string,
+  pastas: string[]
+): Promise<{
+  ok: boolean
+  erro?: string
+  absPath?: string
+  antes?: string
+  depois?: string
+  linhasDel?: number[]
+  linhasAdd?: number[]
+}> {
+  const p = pendentes.get(id)
+  if (!p) return { ok: false, erro: 'pendente inexistente' }
+  if (p.status !== 'pendente') return { ok: false, erro: 'ja processado: ' + p.status }
+  const seg = caminhoSeguro(p.absPath, pastas)
+  if (!seg.ok) {
+    return { ok: false, erro: 'erro' in seg ? String(seg.erro) : 'path fora das pastas' }
+  }
+  let original = ''
+  try {
+    original = await fsp.readFile(seg.abs, 'utf8')
+  } catch {
+    original = ''
+  }
+  const applied = aplicarUnifiedDiff(original, p.unifiedDiff)
+  if (!applied.ok || applied.resultado == null) return { ok: false, erro: applied.erro || 'falha ao aplicar' }
+  const hunks = listarHunks(p.unifiedDiff)
+  const linhasDel: number[] = []
+  const linhasAdd: number[] = []
+  for (const h of hunks) {
+    let oldLine = h.oldStart
+    let newLine = h.newStart
+    for (const ln of h.lines) {
+      if (ln.startsWith('+') && !ln.startsWith('+++')) {
+        linhasAdd.push(newLine)
+        newLine++
+      } else if (ln.startsWith('-') && !ln.startsWith('---')) {
+        linhasDel.push(oldLine)
+        oldLine++
+      } else if (ln.startsWith(' ') || ln === '') {
+        oldLine++
+        newLine++
+      }
+    }
+  }
+  return {
+    ok: true,
+    absPath: seg.abs,
+    antes: original,
+    depois: applied.resultado,
+    linhasDel,
+    linhasAdd
+  }
+}
+
 export async function aplicarPendenteAprovado(
   id: string,
   pastas: string[]

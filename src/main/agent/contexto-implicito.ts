@@ -1,10 +1,11 @@
 /**
- * Contexto automático (sem @): abas abertas, git status/diff, diagnósticos.
+ * Contexto automático (sem @): .dgrules, abas, git, diagnósticos, erros do editor.
  */
 import { existsSync, readFileSync } from 'fs'
 import { relative } from 'path'
 import { gitStatus, gitDiff } from '../git'
 import { blocoDiagnosticosParaPrompt } from './diagnosticos'
+import { readRules, createRulesTemplate, rulesExist } from '../dgrules'
 
 export type AbaCtx = {
   path: string
@@ -17,12 +18,27 @@ export type ContextoImplicitoOpts = {
   abas?: AbaCtx[]
   incluirGit?: boolean
   incluirDiagnosticos?: boolean
+  /** Erros/diagnostics vindos do renderer (typecheck colado, lint, etc.) */
+  errosEditor?: string
+  incluirRegras?: boolean
   maxBytes?: number
 }
 
 export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Promise<string> {
   const partes: string[] = []
   const max = opts.maxBytes ?? 40_000
+
+  if (opts.incluirRegras !== false) {
+    try {
+      if (!rulesExist(opts.raiz)) createRulesTemplate(opts.raiz)
+      const rules = readRules(opts.raiz)
+      if (rules && rules.trim()) {
+        partes.push('### Regras do projeto (.dgrules)\n' + rules.trim().slice(0, 12000))
+      }
+    } catch {
+      /* */
+    }
+  }
 
   if (opts.abas?.length) {
     const linhas: string[] = ['### Abas abertas']
@@ -68,6 +84,14 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
   if (opts.incluirDiagnosticos !== false) {
     const diag = blocoDiagnosticosParaPrompt(3)
     if (diag) partes.push(diag)
+  }
+
+  if (opts.errosEditor && String(opts.errosEditor).trim()) {
+    partes.push(
+      '### Erros / diagnostics do editor\n```\n' +
+        String(opts.errosEditor).trim().slice(0, 8000) +
+        '\n```'
+    )
   }
 
   let out = partes.join('\n\n')
