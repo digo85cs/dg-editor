@@ -1,5 +1,6 @@
 # Cria/corrige o atalho "DG Editor" na Area de Trabalho do Windows.
-# Alvo: <raiz>\abrir-dg-editor.bat  (NUNCA node_modules\electron\dist)
+# Alvo: D:\CURSOR\DG Editor\abrir-dg-editor.bat  (NUNCA node_modules\electron\dist)
+# Desktop canônico deste PC: C:\Users\digo8\OneDrive\Desktop
 $ErrorActionPreference = 'Stop'
 
 function Get-RaizProjeto {
@@ -34,13 +35,14 @@ function Get-PastasDesktop {
     }
   }
 
+  # 1) Desktop OneDrive deste usuario (pedido explicito)
+  & $add 'C:\Users\digo8\OneDrive\Desktop'
+  & $add (Join-Path $env:USERPROFILE 'OneDrive\Desktop')
+
+  # 2) Desktop resolvido pelo Windows
   & $add ([Environment]::GetFolderPath('Desktop'))
   & $add (Join-Path $env:USERPROFILE 'Desktop')
-  & $add (Join-Path $env:USERPROFILE 'OneDrive\Desktop')
-  & $add (Join-Path $env:USERPROFILE 'OneDrive\Área de Trabalho')
-  & $add (Join-Path $env:USERPROFILE 'OneDrive\Area de Trabalho')
 
-  # Desktop conhecido do OneDrive (quando redirecionado)
   $one = $env:OneDrive
   if ($one) {
     & $add (Join-Path $one 'Desktop')
@@ -58,10 +60,11 @@ function Test-AlvoRuim {
   if ($alvo -match 'node_modules[\\/]+electron([\\/]+dist)?') { return $true }
   if ($alvo -match '(^|[\\/])electron\.exe$') { return $true }
   if ($alvo -match '[\\/]electron[\\/]dist([\\/]|$)') { return $true }
+  # atalho DG Editor apontando para qualquer coisa que nao seja abrir-dg-editor.bat
+  if ($nome -eq 'DG Editor.lnk' -and $alvo -notmatch 'abrir-dg-editor\.bat$') { return $true }
   return $false
 }
 
-# Sempre preferir a pasta de trabalho canônica deste PC
 $raizFixa = 'D:\CURSOR\DG Editor'
 $raiz = $null
 if (Test-Path (Join-Path $raizFixa 'package.json')) {
@@ -76,11 +79,8 @@ if (-not $raiz) {
 
 $bat = Join-Path $raiz 'abrir-dg-editor.bat'
 if (-not (Test-Path $bat)) {
-  $bat = Join-Path $raiz 'dg-boot.bat'
-}
-if (-not (Test-Path $bat)) {
-  Write-Host '[ERRO] abrir-dg-editor.bat / dg-boot.bat nao encontrados em ' $raiz -ForegroundColor Red
-  Write-Host '[dica] rode: git checkout feat/vault-markdown; git pull origin feat/vault-markdown' -ForegroundColor Yellow
+  Write-Host '[ERRO] falta abrir-dg-editor.bat em ' $raiz -ForegroundColor Red
+  Write-Host '[dica] git pull origin feat/vault-markdown' -ForegroundColor Yellow
   exit 1
 }
 
@@ -89,10 +89,18 @@ try {
 } catch {}
 $env:DG_ROOT = $raiz
 
-
 $desktops = Get-PastasDesktop
 if (-not $desktops -or $desktops.Count -eq 0) {
-  Write-Host '[ERRO] Area de Trabalho nao encontrada (Desktop / OneDrive\Desktop)' -ForegroundColor Red
+  # Força criar a pasta OneDrive Desktop se o path canônico existir como pai
+  $deskCanon = 'C:\Users\digo8\OneDrive\Desktop'
+  $pai = Split-Path -Parent $deskCanon
+  if (Test-Path -LiteralPath $pai) {
+    New-Item -ItemType Directory -Path $deskCanon -Force | Out-Null
+    $desktops = @($deskCanon)
+  }
+}
+if (-not $desktops -or $desktops.Count -eq 0) {
+  Write-Host '[ERRO] Area de Trabalho nao encontrada' -ForegroundColor Red
   exit 1
 }
 
@@ -106,7 +114,6 @@ if (-not (Test-Path $icoCandidate)) {
 
 $lnkPrincipal = $null
 foreach ($desktop in $desktops) {
-  # Remove atalhos ruins (electron\dist, electron.exe, nome legado)
   Get-ChildItem -Path $desktop -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
     try {
       $sh = New-Object -ComObject WScript.Shell
@@ -136,6 +143,5 @@ foreach ($desktop in $desktops) {
 }
 
 Write-Host ''
-Write-Host 'O atalho NÃO deve apontar para node_modules\electron\dist' -ForegroundColor Cyan
-Write-Host ('Use: ' + $lnkPrincipal) -ForegroundColor Cyan
+Write-Host ('Pronto. Use: ' + $lnkPrincipal) -ForegroundColor Cyan
 exit 0
