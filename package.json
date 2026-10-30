@@ -31,6 +31,7 @@
         "limpeza": "node scripts/limpeza-workspace.cjs",
         "limpeza:dry": "node scripts/limpeza-workspace.cjs --dry-run",
         "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
+        "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
         "dist:win": "npm run build && electron-builder --win --dir",
         "dist:win:installer": "npm run build && electron-builder --win nsis"
     },

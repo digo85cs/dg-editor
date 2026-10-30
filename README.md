@@ -15,6 +15,17 @@ git pull origin feat/vault-markdown
 corrigir-atalho-desktop.bat
 ```
 
+### Faxina (só o necessário para rodar)
+
+Remove logs, caches, `dist-app`, dumps de QA e lixo de packaging. **Não** apaga `src`, `out`, `node_modules`, `resources` nem skills/agentes.
+
+```bat
+cd /d "D:\CURSOR\DG Editor"
+faxina.bat
+```
+
+Ou: `npm run limpeza:organica`
+
 ### App instalável (Windows, sem pasta electron)
 
 Gera `DG Editor.exe` com ícone e nome próprios:

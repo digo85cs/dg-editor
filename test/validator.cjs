@@ -931,9 +931,12 @@ async function main() {
     const srcLimpeza = fs.readFileSync(script, 'utf8')
     assert('limpeza tem --leve', /--leve/.test(srcLimpeza))
     assert('limpeza tem --dry-run', /--dry-run/.test(srcLimpeza))
+    assert('limpeza tem --organica', /--organica/.test(srcLimpeza))
     const pkgLimpeza = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
     assert('npm run limpeza', typeof pkgLimpeza.scripts.limpeza === 'string')
     assert('npm run limpeza:leve', typeof pkgLimpeza.scripts['limpeza:leve'] === 'string')
+    assert('npm run limpeza:organica', typeof pkgLimpeza.scripts['limpeza:organica'] === 'string')
+    assert('faxina.bat existe', fs.existsSync(path.join(ROOT, 'faxina.bat')))
     assert(
       'mcp script portatil',
       !/\\\\/.test(pkgLimpeza.scripts.mcp) && /\.dg-editor\/bin/.test(pkgLimpeza.scripts.mcp)
