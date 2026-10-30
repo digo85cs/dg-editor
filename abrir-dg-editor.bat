@@ -1,14 +1,13 @@
 @echo off
-REM Redireciona para o launcher sem console (VBS).
-REM Pasta fixa: D:\CURSOR\DG Editor
+REM Entrega imediata ao VBS (zero console). Nao rode npm/build daqui.
+REM Preferivel: atalho → wscript + abrir-dg-editor.vbs
 set "DG_ROOT=D:\CURSOR\DG Editor"
-if not exist "%DG_ROOT%\package.json" (
-  echo [ERRO] Pasta fixa nao encontrada: %DG_ROOT%
+if not exist "%DG_ROOT%\abrir-dg-editor.vbs" (
+  echo [ERRO] Falta abrir-dg-editor.vbs em %DG_ROOT%
+  echo Rode: git pull origin feat/vault-markdown
   pause
   exit /b 1
 )
-cd /d "%DG_ROOT%"
-echo %DG_ROOT%> "%DG_ROOT%\.dg-root"
-REM wscript = zero janela de terminal
-wscript //nologo "%DG_ROOT%\abrir-dg-editor.vbs"
+REM start deixa o cmd fechar na hora; wscript nao mostra janela
+start "" /min wscript.exe //nologo "%DG_ROOT%\abrir-dg-editor.vbs"
 exit /b 0

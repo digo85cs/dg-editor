@@ -69,27 +69,72 @@ function Fail([string]$msg) {
 Log 'DG Editor -- verificacao de boot' 'Cyan'
 Log ('raiz fixa/windows: ' + $raiz)
 
+function Invoke-ProcessHidden {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [string]$OutFile = '',
+    [string]$WorkDir = $raiz
+  )
+  # CreateNoWindow=true (nao so WindowStyle Hidden): evita cmd/node abrir console filho.
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $FilePath
+  $psi.WorkingDirectory = $WorkDir
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $psi.RedirectStandardInput = $true
+  if ($ArgumentList -and $ArgumentList.Count -gt 0) {
+    # PS 5.1: Arguments e string unica
+    $parts = foreach ($a in $ArgumentList) {
+      if ($null -eq $a) { continue }
+      $s = [string]$a
+      if ($s -match '[\s"]') { '"' + ($s -replace '"', '\"') + '"' } else { $s }
+    }
+    $psi.Arguments = [string]::Join(' ', $parts)
+  }
+  $p = New-Object System.Diagnostics.Process
+  $p.StartInfo = $psi
+  [void]$p.Start()
+  # Leitura async evita deadlock quando stdout+stderr enchem o buffer (vite).
+  $tOut = $p.StandardOutput.ReadToEndAsync()
+  $tErr = $p.StandardError.ReadToEndAsync()
+  $p.WaitForExit()
+  $stdout = $tOut.Result
+  $stderr = $tErr.Result
+  if ($OutFile) {
+    $text = $stdout
+    if ($stderr) { $text = $text + [Environment]::NewLine + $stderr }
+    try { Set-Content -LiteralPath $OutFile -Value $text -Encoding UTF8 } catch {}
+  }
+  return [int]$p.ExitCode
+}
+
 function Invoke-NpmHidden {
   param(
     [Parameter(Mandatory = $true)][string[]]$NpmArgs,
     [string]$OutFile = ''
   )
-  # npm.cmd abre console se chamado direto — usa cmd oculto
-  $cmdline = 'npm ' + (($NpmArgs | ForEach-Object {
-        if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
-      }) -join ' ')
-  if ($OutFile) {
-    $cmdline = $cmdline + ' > "' + $OutFile + '" 2>&1'
-  } else {
-    $cmdline = $cmdline + ' > NUL 2>&1'
-  }
-  $p = Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList @('/d', '/s', '/c', $cmdline) `
-    -WorkingDirectory $raiz `
-    -WindowStyle Hidden `
-    -Wait `
-    -PassThru
-  return [int]$p.ExitCode
+  # npm.cmd via ComSpec + CreateNoWindow — WindowStyle Hidden NAO basta (vite abre cmd).
+  $comspec = if ($env:ComSpec) { $env:ComSpec } else { 'cmd.exe' }
+  $argStr = ($NpmArgs | ForEach-Object {
+      if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+    }) -join ' '
+  $inner = 'npm ' + $argStr
+  return Invoke-ProcessHidden -FilePath $comspec -ArgumentList @('/d', '/s', '/c', $inner) -OutFile $OutFile
+}
+
+function Invoke-NodeHidden {
+  param(
+    [Parameter(Mandatory = $true)][string]$ScriptPath,
+    [string[]]$ScriptArgs = @(),
+    [string]$OutFile = ''
+  )
+  $node = (Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+  if (-not $node) { $node = 'node.exe' }
+  $argsList = @($ScriptPath) + $ScriptArgs
+  return Invoke-ProcessHidden -FilePath $node -ArgumentList $argsList -OutFile $OutFile
 }
 
 $pkgPath = Join-Path $raiz 'package.json'
@@ -167,16 +212,18 @@ if ($divergentes.Count -gt 0) {
 $atalhoScript = Join-Path $raiz 'scripts\criar-atalho-desktop.ps1'
 if (Test-Path $atalhoScript) {
   try {
-    Start-Process -FilePath 'powershell.exe' `
-      -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $atalhoScript) `
-      -WindowStyle Hidden -Wait | Out-Null
+    $psExe = (Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+    if (-not $psExe) { $psExe = 'powershell.exe' }
+    [void](Invoke-ProcessHidden -FilePath $psExe -ArgumentList @(
+        '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $atalhoScript
+      ))
     Log 'atalho atualizado' 'Green'
   } catch {
     Log ('atalho: ' + $_.Exception.Message) 'Yellow'
   }
 }
 
-# ---------- 4. build so se necessario ----------
+# ---------- 4. build so se necessario (node direto — sem npm/cmd/vite console) ----------
 function Test-BuildNecessario {
   $outMain = Join-Path $raiz 'out\main\index.js'
   $outRend = Join-Path $raiz 'out\renderer\index.html'
@@ -197,10 +244,68 @@ function Test-BuildNecessario {
   return $false
 }
 
+function Invoke-BuildHidden {
+  param([string]$OutFile)
+  $logParts = New-Object System.Collections.Generic.List[string]
+  $append = {
+    param($title, $code, $chunkFile)
+    $body = ''
+    if ($chunkFile -and (Test-Path -LiteralPath $chunkFile)) {
+      try { $body = Get-Content -LiteralPath $chunkFile -Raw -ErrorAction SilentlyContinue } catch {}
+    }
+    $logParts.Add(('=== ' + $title + ' exit=' + $code + ' ==='))
+    if ($body) { $logParts.Add($body.TrimEnd()) }
+  }
+
+  $tmpMcp = Join-Path $env:TEMP ('dg-build-mcp-' + $PID + '.log')
+  $tmpEv = Join-Path $env:TEMP ('dg-build-ev-' + $PID + '.log')
+  $tmpEmit = Join-Path $env:TEMP ('dg-build-emit-' + $PID + '.log')
+  Remove-Item -LiteralPath $tmpMcp, $tmpEv, $tmpEmit -Force -ErrorAction SilentlyContinue
+
+  # Equivale a: npm run build:mcp && electron-vite build && emit-shell-detect
+  $tscJs = Join-Path $raiz 'node_modules\typescript\bin\tsc'
+  $tscCli = Join-Path $raiz 'node_modules\typescript\lib\tsc.js'
+  $mcpTs = 'src\main\mcp\tsconfig.mcp.json'
+  if (Test-Path $tscCli) {
+    $code = Invoke-NodeHidden -ScriptPath $tscCli -ScriptArgs @('-p', $mcpTs) -OutFile $tmpMcp
+  } elseif (Test-Path $tscJs) {
+    $code = Invoke-NodeHidden -ScriptPath $tscJs -ScriptArgs @('-p', $mcpTs) -OutFile $tmpMcp
+  } else {
+    $code = Invoke-NpmHidden -NpmArgs @('run', 'build:mcp') -OutFile $tmpMcp
+  }
+  & $append 'build:mcp' $code $tmpMcp
+  if ($code -ne 0) {
+    if ($OutFile) { Set-Content -LiteralPath $OutFile -Value ($logParts -join "`n") -Encoding UTF8 }
+    return $code
+  }
+
+  $evJs = Join-Path $raiz 'node_modules\electron-vite\bin\electron-vite.js'
+  if (-not (Test-Path $evJs)) {
+    $code = Invoke-NpmHidden -NpmArgs @('run', 'build') -OutFile $tmpEv
+    & $append 'npm run build (fallback)' $code $tmpEv
+    if ($OutFile) { Set-Content -LiteralPath $OutFile -Value ($logParts -join "`n") -Encoding UTF8 }
+    return $code
+  }
+  $code = Invoke-NodeHidden -ScriptPath $evJs -ScriptArgs @('build') -OutFile $tmpEv
+  & $append 'electron-vite build' $code $tmpEv
+  if ($code -ne 0) {
+    if ($OutFile) { Set-Content -LiteralPath $OutFile -Value ($logParts -join "`n") -Encoding UTF8 }
+    return $code
+  }
+
+  $emit = Join-Path $raiz 'scripts\emit-shell-detect.cjs'
+  if (Test-Path $emit) {
+    $code = Invoke-NodeHidden -ScriptPath $emit -OutFile $tmpEmit
+    & $append 'emit-shell-detect' $code $tmpEmit
+  }
+  if ($OutFile) { Set-Content -LiteralPath $OutFile -Value ($logParts -join "`n") -Encoding UTF8 }
+  return [int]$code
+}
+
 if (Test-BuildNecessario) {
-  Log 'gerando build (npm run build)...' 'Cyan'
+  Log 'gerando build (sem janela de terminal)...' 'Cyan'
   $buildLog = Join-Path $logDir 'build-last.log'
-  $code = Invoke-NpmHidden -NpmArgs @('run', 'build') -OutFile $buildLog
+  $code = Invoke-BuildHidden -OutFile $buildLog
   if ($code -ne 0) { Fail 'build falhou — veja .dg-editor/logs/build-last.log' }
   Log 'build ok' 'Green'
 } else {
@@ -214,6 +319,7 @@ if (-not (Test-Path $electron)) {
 }
 
 Log 'iniciando DG Editor...' 'Cyan'
+# GUI Electron: UseShellExecute true + Normal (nao CreateNoWindow)
 $p = Start-Process -FilePath $electron -ArgumentList @('.', '--no-sandbox') -WorkingDirectory $raiz -PassThru -WindowStyle Normal
 if (-not $p) { Fail 'falha ao iniciar electron' }
 

@@ -133,17 +133,19 @@ foreach ($desktop in $desktops) {
   $lnkPath = Join-Path $desktop $nome
   $w = New-Object -ComObject WScript.Shell
   $lnk = $w.CreateShortcut($lnkPath)
-  # .vbs via wscript = nenhuma janela de terminal
+  # .vbs via wscript = nenhuma janela de terminal (NAO aponte para .bat/.ps1)
   if ($launcher -like '*.vbs') {
     $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
     $lnk.Arguments = '//nologo "' + $launcher + '"'
+    # 7 = minimizado — wscript em si nao mostra UI; evita flash de console
+    $lnk.WindowStyle = 7
   } else {
     $lnk.TargetPath = $launcher
     $lnk.Arguments = ''
+    $lnk.WindowStyle = 7
   }
   $lnk.WorkingDirectory = $raiz
-  $lnk.WindowStyle = 7
-  $lnk.Description = 'DG Editor'
+  $lnk.Description = 'DG Editor (sem console)'
   if (Test-Path $icoCandidate) {
     $lnk.IconLocation = $icoCandidate + ',0'
   }

@@ -73,16 +73,21 @@ Remove-Item -LiteralPath $doneFlag, $errorFlag -Force -ErrorAction SilentlyConti
 Write-BootLog 'splash iniciado'
 $form.Add_Shown({
   $timerDots.Start()
-  $argsList = @(
-    '-NoProfile',
-    '-ExecutionPolicy', 'Bypass',
-    '-WindowStyle', 'Hidden',
-    '-File', $jobScript,
-    '-Silent',
-    '-DoneFlag', $doneFlag,
-    '-ErrorFlag', $errorFlag
-  )
-  Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -WindowStyle Hidden | Out-Null
+  # CreateNoWindow: WindowStyle Hidden ainda deixa filhos (npm/vite) abrirem cmd.
+  $psExe = (Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+  if (-not $psExe) { $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $psExe
+  $psi.Arguments = '-NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $jobScript + '" -Silent -DoneFlag "' + $doneFlag + '" -ErrorFlag "' + $errorFlag + '"'
+  $psi.WorkingDirectory = $raiz
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+  try {
+    [void][System.Diagnostics.Process]::Start($psi)
+  } catch {
+    Write-BootLog ('falha ao iniciar boot: ' + $_.Exception.Message)
+  }
 })
 
 $timerPoll = New-Object System.Windows.Forms.Timer
