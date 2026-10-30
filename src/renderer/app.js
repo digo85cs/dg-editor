@@ -207,6 +207,8 @@ function initActivityBar() {
         toggleRight(true)
         ativarAbaDireita('browser')
         void abrirNavegadorUi()
+      } else if (a === 'contas') {
+        abrirContas()
       } else if (a === 'config') {
         abrirConfig()
       } else if (a === 'tema') {

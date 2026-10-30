@@ -1132,13 +1132,11 @@ async function main() {
         /janela:zoom/.test(preA) &&
         /janela:recarregar/.test(preA)
     )
-    assert('sidebar-scroll wrapper', /class="sidebar-scroll"/.test(htmlA) && /sidebar-footer/.test(htmlA))
+    assert('Contas/Config na base da activity bar', /class="ab-base"/.test(htmlA) && /data-action="contas"/.test(htmlA))
+    assert('sidebar sem footer Contas', !/sidebar-footer/.test(htmlA))
     assert(
-      'CSS sidebar Contas/Config na base',
-      /\.sidebar-scroll/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')) &&
-        /\.sidebar-footer[\s\S]{0,120}margin-top:\s*auto/.test(
-          fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')
-        )
+      'CSS ab-base',
+      /\.ab-base/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
     )
     assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
