@@ -32,23 +32,35 @@ function loadModule(relPath) {
         BrowserWindow: Object.assign(class { constructor() {} on() {} webContents = { setWindowOpenHandler() {}, send() {} } }, { getAllWindows: () => [] }),
         ipcMain: { on() {}, handle() {} },
         dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
-        shell: { openExternal() {} }
+        shell: { openExternal() {} },
+        safeStorage: {
+          isEncryptionAvailable: () => false,
+          encryptString: (s) => Buffer.from(s, 'utf8'),
+          decryptString: (b) => Buffer.from(b).toString('utf8')
+        }
       }
     }
     if (spec.startsWith('@shared/')) {
-      return loadModule('shared/' + spec.slice('@shared/'.length))
-    }
-    if (spec.startsWith('@main/')) {
-      return loadModule('main/' + spec.slice('@main/'.length))
-    }
-    if (spec.startsWith('./')) {
-      const dir = path.dirname(relPath)
-      let alvo = path.join(dir, spec.slice(2))
-      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) alvo += '.ts'
+      let alvo = 'shared/' + spec.slice('@shared/'.length)
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
       return loadModule(alvo)
     }
-    if (spec.startsWith('../')) {
-      return loadModule('main/' + spec.slice(3) + '.ts')
+    if (spec.startsWith('@main/')) {
+      let alvo = 'main/' + spec.slice('@main/'.length)
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
+      return loadModule(alvo)
+    }
+    if (spec.startsWith('./') || spec.startsWith('../')) {
+      const dir = path.dirname(relPath)
+      let alvo = path.normalize(path.join(dir, spec)).replace(/\\/g, '/')
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
+      return loadModule(alvo)
     }
     return require(spec)
   }
@@ -83,7 +95,8 @@ async function main() {
   const session = store.ensureDeviceIdentity()
   assert('ensureDeviceIdentity ok', session.authenticated === true)
   assert('session has token', typeof session.token === 'string' && session.token.length > 0)
-  assert('session user is owner', session.user.username === 'owner')
+  assert('session user is digo85cs', session.user.username === 'digo85cs')
+  assert('session email canonico', session.user.email === 'digo85cs@gmail.com')
 
   const state2 = store.getState()
   assert('state after identity authenticated', state2.authenticated === true)
@@ -1071,6 +1084,403 @@ async function main() {
     assert('preload vault:salvar', /vault:salvar/.test(pre))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('index registra vault ipc', /registerVaultIpc/.test(idxMain))
+  }
+
+  // ---------- OpenClaw ----------
+  section('OpenClaw')
+  {
+    const cliente = loadModule('main/openclaw/cliente.ts')
+    const parsed = cliente.parseRespostaChat({
+      choices: [
+        {
+          finish_reason: 'tool_calls',
+          message: {
+            content: '',
+            tool_calls: [
+              {
+                function: {
+                  name: 'dg_propose_file_diffs',
+                  arguments: JSON.stringify({
+                    edits: [
+                      {
+                        path: 'a.txt',
+                        unifiedDiff: '@@ -1,1 +1,1 @@\n-old\n+new\n'
+                      }
+                    ]
+                  })
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
+    assert('parse tool edits', parsed.ok && parsed.edits && parsed.edits.length === 1)
+    assert('parse path', parsed.edits[0].path === 'a.txt')
+
+    const diffs = loadModule('main/openclaw/diffs.ts')
+    const ap = diffs.aplicarUnifiedDiff('old\n', '@@ -1,1 +1,1 @@\n-old\n+new\n')
+    assert('aplicar unified diff', ap.ok && ap.resultado === 'new\n', ap.erro || ap.resultado)
+
+    const tmpOc = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-oc-'))
+    const fora = path.join(os.tmpdir(), 'dg-oc-fora-' + Date.now() + '.txt')
+    fs.writeFileSync(fora, 'x', 'utf8')
+    const reg = diffs.registrarPendentes(
+      [{ path: fora, unifiedDiff: '@@ -1,1 +1,1 @@\n-x\n+y\n' }],
+      [tmpOc]
+    )
+    assert('recusa path fora ACL', reg.rejeitados.length === 1 && reg.pendentes.length === 0)
+
+    const dentro = path.join(tmpOc, 'a.txt')
+    fs.writeFileSync(dentro, 'old\n', 'utf8')
+    const reg2 = diffs.registrarPendentes(
+      [{ path: dentro, unifiedDiff: '@@ -1,1 +1,1 @@\n-old\n+new\n' }],
+      [tmpOc]
+    )
+    assert('aceita path na ACL', reg2.pendentes.length === 1)
+    const prev = await diffs.previewPendente(reg2.pendentes[0].id, [tmpOc])
+    assert('preview pendente ok', prev.ok === true, prev.erro)
+    assert('preview nao grava disco', fs.readFileSync(dentro, 'utf8') === 'old\n')
+    assert('preview depois', prev.depois === 'new\n')
+    assert('preview linhasAdd', Array.isArray(prev.linhasAdd) && prev.linhasAdd.length >= 1)
+    const apl = await diffs.aplicarPendenteAprovado(reg2.pendentes[0].id, [tmpOc])
+    assert('aplicar pendente', apl.ok, apl.erro)
+    assert('arquivo atualizado', fs.readFileSync(dentro, 'utf8') === 'new\n')
+
+    const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload openclaw:pedir', /openclaw:pedir/.test(pre))
+    assert('preload openclaw:aplicar', /openclaw:aplicar/.test(pre))
+    const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    assert('index registra openclaw', /registerOpenClawIpc/.test(idxMain))
+
+    const ocDir = path.join(SRC, 'main/openclaw')
+    let shellLeak = false
+    for (const f of fs.readdirSync(ocDir)) {
+      if (!f.endsWith('.ts')) continue
+      const src = fs.readFileSync(path.join(ocDir, f), 'utf8')
+      if (/child_process|node-pty|execFile|spawn\(/.test(src)) shellLeak = true
+    }
+    assert('openclaw sem shell', !shellLeak)
+  }
+
+  // ---------- Adapta ONE / Maestro bridge ----------
+  section('Adapta bridge')
+  {
+    const ud = path.join(os.tmpdir(), 'dg-adapta-' + Date.now())
+    fs.mkdirSync(ud, { recursive: true })
+    process.env.DG_TEST_USERDATA = ud
+    const bridge = loadModule('main/bridge-adapta.ts')
+    assert('url maestro permitida', bridge.urlAdaptaPermitida('https://agent.adapta.one/'))
+    assert('url estranha bloqueada', !bridge.urlAdaptaPermitida('https://evil.example/'))
+    assert('url http bloqueada', !bridge.urlAdaptaPermitida('http://adapta.org/'))
+    const st0 = bridge.statusAdapta(ROOT)
+    assert('status ok', st0.ok === true && st0.dossieDir.indexOf(ud) >= 0)
+    assert('mcp comando json', /"command": "node"/.test(st0.mcpComando) && /server\.js/.test(st0.mcpComando))
+    const sem = bridge.gerarContinuidade(bridge.dossieDirDoApp())
+    assert('gerar sem dossie falha', sem.ok === false)
+    const dossieDir = bridge.dossieDirDoApp()
+    fs.mkdirSync(dossieDir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dossieDir, 'dossie.txt'),
+      '=== DOSSIE DG EDITOR ===\nAtualizado em: 2026-01-01\nRaiz: /proj\nTotal de mensagens no chat: 1\nProvedor mais recente: ollama\n\n--- ULTIMAS MENSAGENS ---\n[2026-01-01T00:00:00.000Z] DONO: oi\n=== FIM DO DOSSIE ===\n',
+      'utf8'
+    )
+    assert(
+      'continuidade inclui email canonico',
+      /digo85cs@gmail\.com/.test(bridge.montarBlocoDossie(fs.readFileSync(path.join(dossieDir, 'dossie.txt'), 'utf8')))
+    )
+    const ger = bridge.gerarContinuidade(dossieDir)
+    assert('gerar continuidade ok', ger.ok === true && fs.existsSync(ger.destino))
+    const ler = bridge.lerContinuidade()
+    assert('ler continuidade', ler.ok && /Contexto de Continuidade/.test(ler.texto))
+    assert('bloco menciona Maestro', /Maestro/.test(ler.texto))
+    const preA = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload adapta:status', /adapta:status/.test(preA))
+    assert('preload adapta:ler-continuidade', /adapta:ler-continuidade/.test(preA))
+    assert('preload adapta:abrir', /adapta:abrir/.test(preA))
+    const htmlA = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
+    const appJsA = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
+    assert('UI Contas Adapta', /contas-adapta/.test(htmlA) && /btn-adapta-copiar/.test(htmlA))
+    assert('UI Config Adapta', /config-adapta/.test(htmlA))
+    assert('modal config flutuante', /id="modal-config"[^>]*modal-float/.test(htmlA) && /data-float-handle/.test(htmlA))
+    assert('modal contas flutuante', /id="modal-contas"[^>]*modal-float/.test(htmlA))
+    assert(
+      'UI arrastar janela float',
+      /ligarJanelaFlutuante/.test(appJsA) && /trazerJanelaFrente/.test(appJsA)
+    )
+    assert(
+      'CSS modal-float',
+      /modal-float/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+    )
+    assert('menubar no HTML', /id="menubar"/.test(htmlA) && /data-menu="arquivo"/.test(htmlA))
+    assert(
+      'menubar no CSS',
+      /#menubar/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')) &&
+        /\.mb-dropdown/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+    )
+    assert(
+      'menubar init + IPC',
+      /function initMenubar/.test(appJsA) &&
+        /menu:acao/.test(appJsA) &&
+        /janela:zoom/.test(preA) &&
+        /janela:recarregar/.test(preA)
+    )
+    assert('Contas/Config no footer da sidebar', /class="sidebar-footer"/.test(htmlA) && /id="btn-contas"/.test(htmlA) && /id="btn-config"/.test(htmlA))
+    assert(
+      'CSS sidebar Contas na base (grid)',
+      /grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/.test(
+        fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')
+      ) && /\.sidebar-footer/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+    )
+    assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert('mcp script portatil', !/\\\\/.test(pkg.scripts.mcp) && /\.dg-editor\/bin/.test(pkg.scripts.mcp))
+  }
+
+  // ---------- Agent parity (plan/@projeto/checkpoint/fila) ----------
+  section('Agent parity')
+  {
+    const ctx = loadModule('main/agent/contexto-projeto.ts')
+    const d = ctx.detectarMençãoProjeto('explique @projeto o boot')
+    assert('detecta @projeto', d.tem === true)
+    assert('consulta sem @projeto', !/@projeto/i.test(d.consulta))
+
+    const fila = loadModule('main/agent/fila.ts')
+    const st0 = fila.statusFilaAgente()
+    assert('fila inicia vazia', st0.tamanho === 0 && st0.ocupado === false)
+    let ordem = ''
+    const p1 = fila.enfileirarAgente(async () => {
+      ordem += 'a'
+      await new Promise((r) => setTimeout(r, 20))
+      ordem += 'b'
+      return 1
+    })
+    const p2 = fila.enfileirarAgente(async () => {
+      ordem += 'c'
+      return 2
+    })
+    const rs = await Promise.all([p1, p2])
+    assert('fila serial', ordem === 'abc' && rs[0] === 1 && rs[1] === 2)
+
+    // cancelamento + AbortSignal
+    {
+      const fila2 = loadModule('main/agent/fila.ts')
+      let viuAbort = false
+      const slow = fila2.enfileirarAgente(async (signal) => {
+        await new Promise((resolve, reject) => {
+          const t = setTimeout(resolve, 5000)
+          signal.addEventListener('abort', () => {
+            viuAbort = true
+            clearTimeout(t)
+            reject(new Error('cancelado'))
+          })
+        })
+        return 'done'
+      })
+      const queued = fila2.enfileirarAgente(async () => 'never')
+      await new Promise((r) => setTimeout(r, 15))
+      const can = fila2.cancelarFilaAgente('teste')
+      assert('cancelar retorna ok', can.ok === true && can.cancelados >= 1)
+      let rejSlow = false
+      let rejQueued = false
+      await slow.catch(() => { rejSlow = true })
+      await queued.catch(() => { rejQueued = true })
+      assert('cancel aborta job atual', viuAbort && rejSlow)
+      assert('cancel limpa fila pendente', rejQueued)
+      const stF = fila2.statusFilaAgente()
+      assert('fila limpa apos cancel', stF.tamanho === 0)
+    }
+
+    // propostas + diff unificado com hunks
+    {
+      const prop = loadModule('main/agent/propostas.ts')
+      const hunksMod = loadModule('main/openclaw/hunks.ts')
+      assert('ehToolEscrita codigo_editar', prop.ehToolEscrita('codigo_editar') === true)
+      assert('ehToolEscrita read false', prop.ehToolEscrita('codigo_ler') === false)
+      const diff = prop.diffUnificado('a.ts', 'ola\n', 'ola\nmundo\n')
+      assert('diff unificado header', /--- a\/a\.ts/.test(diff) && /\+\+\+ b\/a\.ts/.test(diff))
+      assert('diff unificado add mundo', /^\+mundo/m.test(diff))
+      const multi = hunksMod.gerarDiffUnificado(
+        'm.ts',
+        'a\nb\nc\nd\ne\n',
+        'a\nB\nc\nD\ne\n'
+      )
+      const hs = hunksMod.listarHunks(multi)
+      assert('hunks multiplos ou pelo menos 1', hs.length >= 1)
+      const filtrado = hunksMod.filtrarHunks(multi, [0])
+      assert('filtrar hunks mantem header', /--- a\/m\.ts/.test(filtrado) && /@@/.test(filtrado))
+
+      const tmpP = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-prop-'))
+      const arq = path.join(tmpP, 'x.ts')
+      fs.writeFileSync(arq, 'const a = 1\nconst b = 2\n', 'utf8')
+      const proposta = prop.proporCodigoEditar(
+        tmpP,
+        { arquivo: arq, ancora: 'const a = 1', novo: 'const a = 2' },
+        [tmpP]
+      )
+      assert('proporCodigoEditar ok', proposta.ok === true && !!proposta.pendente)
+      assert('listarPendentes apos propor', prop.listarPendentes().length >= 1)
+      assert('origem agent na proposta', proposta.pendente.origem === 'agent')
+      const hkLista = hunksMod.listarHunks(proposta.pendente.unifiedDiff)
+      assert('hunks na proposta', hkLista.length >= 1)
+      const id = proposta.pendente.id
+      const apl = await prop.aplicarPropostaComCheckpoint(id, [tmpP])
+      assert('aplicarPropostaComCheckpoint ok', apl.ok === true)
+      assert('checkpointId apos apply', typeof apl.checkpointId === 'string' && apl.checkpointId.length > 0)
+      const depois = fs.readFileSync(arq, 'utf8')
+      assert('arquivo alterado apos apply', /const a = 2/.test(depois))
+
+      // fila unificada: adicionar sem limpar
+      const arq2 = path.join(tmpP, 'y.ts')
+      fs.writeFileSync(arq2, 'export const y = 1\n', 'utf8')
+      const p2 = prop.proporCodigoEditar(
+        tmpP,
+        { arquivo: arq2, ancora: 'y = 1', novo: 'y = 2' },
+        [tmpP]
+      )
+      assert('segunda proposta nao limpa fila', p2.ok && prop.listarPendentes().length >= 1)
+    }
+
+    // plano + checklist
+    {
+      const ud = path.join(os.tmpdir(), 'dg-plano-' + Date.now())
+      fs.mkdirSync(ud, { recursive: true })
+      process.env.DG_TEST_USERDATA = ud
+      const plano = loadModule('main/agent/plano.ts')
+      assert('plano inicia vazio', plano.lerPlano() === null)
+      const passos = plano.extrairPassosDoTexto('# plano\n1. criar x\n2. testar y\n- opcional z')
+      assert('extrairPassosDoTexto', passos.length >= 2)
+      plano.salvarPlano({
+        texto: '# plano\n1. criar x\n2. testar y',
+        raiz: '/tmp',
+        salvoEm: new Date().toISOString(),
+        agente: 'revisor'
+      })
+      const lido = plano.lerPlano()
+      assert('plano salva e le', !!lido && lido.texto.indexOf('plano') >= 0 && lido.agente === 'revisor')
+      assert('plano tem passos', (lido.passos || []).length >= 2)
+      const pid = lido.passos[0].id
+      plano.marcarPasso(pid, true, 'ck-test')
+      const l2 = plano.lerPlano()
+      assert('marcarPasso', l2.passos[0].feito === true && l2.passos[0].checkpointId === 'ck-test')
+      assert('proximoPassoPendente', plano.proximoPassoPendente()?.id === l2.passos[1].id)
+      plano.limparPlano()
+      assert('plano limpar', plano.lerPlano() === null)
+    }
+
+    // menções
+    {
+      const tmpM = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-menc-'))
+      const fM = path.join(tmpM, 'nota.ts')
+      fs.writeFileSync(fM, 'export const n = 1\n', 'utf8')
+      const menc = loadModule('main/agent/mencoes.ts')
+      const exp = await menc.expandirMencoes({
+        raiz: tmpM,
+        pergunta: 'veja @arquivo:nota.ts e @selecao',
+        selecao: 'const n',
+        arquivoAtivo: fM
+      })
+      assert('mencao @arquivo', exp.mencoes.some((m) => m.indexOf('@arquivo:') === 0))
+      assert('mencao @selecao', exp.mencoes.includes('@selecao'))
+      assert('contexto contem arquivo', /@arquivo:nota\.ts/.test(exp.contextoExtra))
+      assert('contexto contem selecao', /@selecao/.test(exp.contextoExtra) && /const n/.test(exp.contextoExtra))
+    }
+
+    // checkpoint create/restore
+    {
+      const udCk = path.join(os.tmpdir(), 'dg-ck-' + Date.now())
+      fs.mkdirSync(udCk, { recursive: true })
+      process.env.DG_TEST_USERDATA = udCk
+      const ck = loadModule('main/agent/checkpoint.ts')
+      const tmpC = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-ckf-'))
+      const fC = path.join(tmpC, 'y.txt')
+      fs.writeFileSync(fC, 'antes', 'utf8')
+      const meta = await ck.criarCheckpoint([fC], 'teste')
+      assert('checkpoint criado', !!meta.id)
+      fs.writeFileSync(fC, 'depois', 'utf8')
+      const rest = await ck.restaurarCheckpoint(meta.id)
+      assert('checkpoint restaurar', rest.ok === true && rest.restaurados === 1)
+      assert('conteudo restaurado', fs.readFileSync(fC, 'utf8') === 'antes')
+      assert('ultimoCheckpoint', ck.ultimoCheckpoint()?.id === meta.id)
+    }
+
+    const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload agente:pedir', /agente:pedir/.test(pre))
+    assert('preload checkpoint-desfazer', /agente:checkpoint-desfazer/.test(pre))
+    assert('preload contexto:projeto', /contexto:projeto/.test(pre))
+    assert('preload navegador:embed-status', /navegador:embed-status/.test(pre))
+    assert('preload agente:cancelar', /agente:cancelar/.test(pre))
+    assert('preload agente:aplicar-proposta', /agente:aplicar-proposta/.test(pre))
+    assert('preload agente:executar-plano', /agente:executar-plano/.test(pre))
+    assert('preload agente:progresso', /agente:progresso/.test(pre))
+    assert('preload propostas:hunks', /propostas:hunks/.test(pre))
+    assert('preload propostas:definir-hunks', /propostas:definir-hunks/.test(pre))
+    assert('preload propostas:preview', /propostas:preview/.test(pre))
+    assert('preload agente:verificar', /agente:verificar/.test(pre))
+    assert('preload agente:plano-marcar-passo', /agente:plano-marcar-passo/.test(pre))
+    const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
+    assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
+    assert('smoke embed injeta BrowserWindow pai', /DG_NAV_SMOKE_EMBED/.test(idxMain))
+    const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
+    assert('modo plan no agent', /modo === 'plan'/.test(agentTs) || /modo\?: 'plan'/.test(agentTs))
+    assert('proposeWrites no agent', /proposeWrites/.test(agentTs))
+    assert('checkpoint em write direto', /criarCheckpoint/.test(agentTs))
+    assert('AbortSignal no agent', /signal\?\.aborted|opts\?\.signal/.test(agentTs))
+    const html = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
+    assert('aba Agent no HTML', /data-center-pane="agent"/.test(html))
+    assert('plan mode checkbox', /agent-plan-mode/.test(html))
+    assert('btn Parar agente', /btn-agent-stop/.test(html))
+    assert('btn Executar plano', /btn-agent-exec-plano/.test(html))
+    assert('btn Proximo passo', /btn-agent-exec-passo/.test(html))
+    assert('btn Verificar', /btn-agent-verificar/.test(html))
+    assert('auto-verify checkbox', /agent-verify-loop/.test(html))
+    assert('diff hunks bar', /diff-hunks-bar/.test(html))
+    assert('btn Aplicar hunks', /btn-oc-aplicar-hunks/.test(html))
+    assert('btn No editor preview', /btn-oc-preview-editor/.test(html))
+    assert('editor-diff-side', /id="editor-diff-side"/.test(html))
+    assert('btn Desfazer apply', /btn-agent-undo/.test(html))
+    assert('statusbar sb-agent', /id="sb-agent"/.test(html))
+    assert('a11y region agent', /aria-label="Painel do agente"/.test(html))
+    const appJs = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
+    assert('UI apply via agente', /agente:aplicar-proposta/.test(appJs) && /__dgApplyViaAgente/.test(appJs))
+    assert('UI progresso agent', /agente:progresso/.test(appJs))
+    assert('UI hunks', /propostas:definir-hunks/.test(appJs) && /carregarHunksDiff/.test(appJs))
+    assert('UI preview no editor', /propostas:preview/.test(appJs) && /previewDiffNoEditor/.test(appJs))
+    assert('UI errosEditor', /errosEditor/.test(appJs) && /coletarErrosEditor/.test(appJs))
+    assert('UI contexto abas', /coletarAbasCtx/.test(appJs) && /verificarApos/.test(appJs))
+    assert('UI plano checklist', /renderPlanoChecklist/.test(appJs))
+    assert('contexto embeddings opcional', /buscarSemelhantes/.test(fs.readFileSync(path.join(SRC, 'main/agent/contexto-projeto.ts'), 'utf8')))
+    assert('contexto implicito existe', fs.existsSync(path.join(SRC, 'main/agent/contexto-implicito.ts')))
+    assert('diagnosticos existe', fs.existsSync(path.join(SRC, 'main/agent/diagnosticos.ts')))
+    const ctxImp = fs.readFileSync(path.join(SRC, 'main/agent/contexto-implicito.ts'), 'utf8')
+    assert('contexto implicito .dgrules', /readRules|createRulesTemplate/.test(ctxImp))
+    assert('contexto implicito errosEditor', /errosEditor/.test(ctxImp))
+    {
+      const tmpRules = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-rules-'))
+      const ctxMod = loadModule('main/agent/contexto-implicito.ts')
+      const txt = await ctxMod.montarContextoImplicito({
+        raiz: tmpRules,
+        incluirGit: false,
+        incluirDiagnosticos: false,
+        errosEditor: 'TS2322: Type string not assignable'
+      })
+      assert('contexto cria .dgrules', fs.existsSync(path.join(tmpRules, '.dgrules')))
+      assert('contexto inclui regras', /Regras do projeto/.test(txt))
+      assert('contexto inclui errosEditor', /Erros \/ diagnostics/.test(txt) && /TS2322/.test(txt))
+    }
+    const editorCm = fs.readFileSync(path.join(SRC, 'renderer/editor-cm.js'), 'utf8')
+    assert('editor mostrarDiffProposta', /mostrarDiffProposta/.test(editorCm) && /getSelecao/.test(editorCm))
+    const janela = fs.readFileSync(path.join(SRC, 'main/navegador/janela.ts'), 'utf8')
+    assert('statusEmbedNavegador modo smoke|embed', /modo:\s*'smoke'\s*\|\s*'embed'/.test(janela))
+    assert('carregarUrlNasViews compartilhado', /function carregarUrlNasViews/.test(janela))
+    assert('conteudoCompartilhado no status', /conteudoCompartilhado:\s*true/.test(janela))
+    assert('usaHostBaseWindow / smoke embed', /usaHostBaseWindow|DG_NAV_SMOKE_EMBED/.test(janela))
+    const e2eRunner = fs.readFileSync(path.join(SRC, 'qa/runner-e2e.ts'), 'utf8')
+    assert('e2e suite agent', /cenariosUiAgent/.test(e2eRunner))
+    assert('e2e suite browser-embed', /cenariosUiBrowserEmbed/.test(e2eRunner))
+    const termE2e = fs.readFileSync(path.join(SRC, 'qa/cenarios/ui-terminal.ts'), 'utf8')
+    assert('e2e terminal echo warn sem shell', /execvp|semShell/.test(termE2e))
   }
 
   // ---------- Summary ----------

@@ -85,8 +85,7 @@ export function installPtBrMenu(hooks: MenuHooks = {}): void {
           click: () => {
             hooks.onAcao?.('sobre')
             const win = BrowserWindow.getFocusedWindow()
-            void mostrarSobreDg(win)
-          }
+            void mostrarSobreDg(win)          }
         }
       ]
     }

@@ -14,6 +14,7 @@ const invokeChannels = [
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
+  'adapta:status', 'adapta:gerar', 'adapta:ler-continuidade', 'adapta:abrir',
   'roteador:planejar',
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
@@ -33,7 +34,20 @@ const invokeChannels = [
   'config:backup', 'sistema:safe-mode', 'app:is-safe-mode',
   'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar',
   'vault:abrir', 'vault:fechar', 'vault:estado', 'vault:listar',
-  'vault:resolver-link', 'vault:backlinks', 'vault:tags', 'vault:nota', 'vault:salvar'
+  'vault:resolver-link', 'vault:backlinks', 'vault:tags', 'vault:nota', 'vault:salvar',
+  'openclaw:config-get', 'openclaw:config-set',
+  'openclaw:token-set', 'openclaw:token-clear', 'openclaw:token-status',
+  'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',
+  'openclaw:auditoria-listar',
+  'agente:pedir', 'agente:orquestrar', 'agente:listar', 'agente:fila-status',
+  'agente:cancelar', 'agente:propostas', 'agente:aplicar-proposta', 'agente:rejeitar-proposta',
+  'agente:plano-salvar', 'agente:plano-ler', 'agente:plano-limpar', 'agente:executar-plano',
+  'agente:plano-marcar-passo', 'agente:plano-atualizar-passos',
+  'agente:verificar', 'agente:diagnosticos', 'agente:diagnostico-manual',
+  'propostas:listar', 'propostas:hunks', 'propostas:definir-hunks', 'propostas:preview',
+  'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
+  'agente:checkpoint-desfazer', 'contexto:projeto',
+  'navegador:embed-status'
 ]
 
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
@@ -43,7 +57,7 @@ const eventOnChannels = [
   'brain:fallback',
   'navegador:aberto',
   'navegador:fechado',
-  'menu:acao'
+  'agente:progresso',  'menu:acao'
 ] as const
 
 const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']

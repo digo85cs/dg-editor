@@ -207,6 +207,8 @@ function initActivityBar() {
         toggleRight(true)
         ativarAbaDireita('browser')
         void abrirNavegadorUi()
+      } else if (a === 'contas') {
+        abrirContas()
       } else if (a === 'config') {
         abrirConfig()
       } else if (a === 'tema') {
@@ -355,7 +357,7 @@ window.addEventListener('resize', () => {
 })()
 
 function ativarAbaCentro(pane) {
-  const alvo = pane === 'editor' ? 'editor' : 'chat'
+  const alvo = pane === 'editor' || pane === 'agent' ? pane : 'chat'
   document.querySelectorAll('.center-tab').forEach((t) => {
     const on = t.dataset.centerPane === alvo
     t.classList.toggle('active', on)
@@ -364,6 +366,7 @@ function ativarAbaCentro(pane) {
   document.querySelectorAll('.center-pane').forEach((p) => {
     p.classList.toggle('active', p.id === 'center-pane-' + alvo)
   })
+  if (alvo === 'agent') void carregarAgentesUi()
 }
 
 document.querySelectorAll('.right-tab').forEach((t) => {
@@ -909,11 +912,312 @@ async function abrirPainelDiff(absPath) {
   }
 }
 
+/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string, origem?: string }[]} */
+let ocPendentes = []
+/** @type {string | null} */
+let ocPendenteAtivoId = null
+/** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string, origem?: string }[]} */
+let agentPropostas = []
+let agentProgressUnsub = null
+/** @type {Set<number>} */
+let ocHunksAceitos = new Set()
+
 function fecharPainelDiff() {
   const panel = $('diff-panel')
   if (!panel) return
   panel.classList.add('hidden')
   panel.setAttribute('aria-hidden', 'true')
+  ocPendenteAtivoId = null
+  window.__dgApplyViaAgente = false
+  ocHunksAceitos = new Set()
+  const acoes = $('diff-panel-actions')
+  if (acoes) acoes.hidden = true
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    lista.hidden = true
+    lista.innerHTML = ''
+  }
+  const bar = $('diff-hunks-bar')
+  if (bar) {
+    bar.hidden = true
+    bar.innerHTML = ''
+  }
+  if (editor && editor.limparDiff) editor.limparDiff()
+}
+
+/** Preview side-by-side no CodeMirror via propostas:preview (sem gravar disco). */
+async function previewDiffNoEditor(pendente) {
+  if (!pendente?.id || !editor || !editor.mostrarDiffProposta) return
+  const r = await window.api.invoke('propostas:preview', pendente.id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Preview: ' + (r?.erro || 'falha'))
+    return
+  }
+  // abre o arquivo no editor (antes) se ainda nao estiver
+  const abs = r.absPath || pendente.absPath || pendente.path
+  if (abs && abaAtiva !== abs) {
+    try {
+      await abrirArquivoNaAba(abs)
+    } catch {
+      /* */
+    }
+  }
+  if (abs && editor.getCaminho && editor.getCaminho() !== abs && r.antes != null) {
+    editor.abrir(abs, r.antes)
+  } else if (r.antes != null && editor.getConteudo && editor.getConteudo() !== r.antes) {
+    // alinha doc com o original do disco usado no preview
+    editor.abrir(abs || editor.getCaminho(), r.antes)
+  }
+  editor.mostrarDiffProposta({
+    linhasDel: r.linhasDel || [],
+    linhasAdd: r.linhasAdd || [],
+    depois: r.depois,
+    caminho: abs
+  })
+}
+
+async function carregarHunksDiff(pendenteId) {
+  const bar = $('diff-hunks-bar')
+  if (!bar) return
+  bar.innerHTML = ''
+  ocHunksAceitos = new Set()
+  const r = await window.api.invoke('propostas:hunks', pendenteId)
+  if (!r?.ok || !r.hunks?.length) {
+    bar.hidden = true
+    return
+  }
+  bar.hidden = false
+  for (const h of r.hunks) {
+    ocHunksAceitos.add(h.index)
+    const row = document.createElement('div')
+    row.className = 'diff-hunk-row'
+    row.dataset.index = String(h.index)
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.checked = true
+    cb.setAttribute('aria-label', 'Aceitar hunk ' + (h.index + 1))
+    cb.addEventListener('change', () => {
+      if (cb.checked) {
+        ocHunksAceitos.add(h.index)
+        row.classList.remove('rejeitado')
+      } else {
+        ocHunksAceitos.delete(h.index)
+        row.classList.add('rejeitado')
+      }
+    })
+    const code = document.createElement('code')
+    code.textContent = 'hunk ' + (h.index + 1) + ' ' + (h.resumo || '') + ' ' + (h.header || '')
+    row.appendChild(cb)
+    row.appendChild(code)
+    bar.appendChild(row)
+  }
+}
+
+function mostrarDiffOpenClaw(pendente) {
+  const panel = $('diff-panel')
+  const body = $('diff-panel-body')
+  const title = $('diff-panel-title')
+  const acoes = $('diff-panel-actions')
+  if (!panel || !body || !pendente) return
+  ocPendenteAtivoId = pendente.id
+  const origem = pendente.origem || (window.__dgApplyViaAgente ? 'agent' : 'openclaw')
+  if (title) title.textContent = origem + ': ' + (pendente.path || pendente.absPath)
+  body.innerHTML = renderDiffHtml(pendente.unifiedDiff)
+  if (acoes) acoes.hidden = false
+  panel.classList.remove('hidden')
+  panel.setAttribute('aria-hidden', 'false')
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    for (const btn of lista.querySelectorAll('button')) {
+      btn.classList.toggle('active', btn.dataset.id === pendente.id)
+    }
+  }
+  void carregarHunksDiff(pendente.id)
+}
+
+function renderListaPendentesOc() {
+  const lista = $('oc-pendentes-lista')
+  if (!lista) return
+  lista.innerHTML = ''
+  if (!ocPendentes.length) {
+    lista.hidden = true
+    return
+  }
+  lista.hidden = false
+  for (const p of ocPendentes) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.dataset.id = p.id
+    b.textContent = nomeArquivo(p.path || p.absPath)
+    b.title = p.absPath || p.path
+    if (p.id === ocPendenteAtivoId) b.classList.add('active')
+    b.addEventListener('click', () => mostrarDiffOpenClaw(p))
+    lista.appendChild(b)
+  }
+}
+
+async function pedirOpenClawUi() {
+  const prompt = window.prompt('Pedido para o OpenClaw (edicoes voltam como diff para aprovacao):')
+  if (prompt == null || !String(prompt).trim()) return
+  const arquivosAbertos = []
+  for (const a of abas) {
+    const item = { path: a.caminho }
+    if (a.caminho === abaAtiva && editor) {
+      item.conteudo = editor.getConteudo()
+      if (editor.getSelecao) {
+        const sel = editor.getSelecao()
+        if (sel) item.selecao = sel
+      }
+    }
+    arquivosAbertos.push(item)
+  }
+  const r = await window.api.invoke('openclaw:pedir', {
+    prompt: String(prompt).trim(),
+    pastas: pastasPermitidas(),
+    arquivosAbertos
+  })
+  if (!r?.ok) {
+    alert('OpenClaw: ' + (r?.erro || 'erro'))
+    return
+  }
+  ocPendentes = r.pendentes || []
+  if (r.rejeitados?.length) {
+    console.warn('[openclaw] paths rejeitados:', r.rejeitados)
+  }
+  if (!ocPendentes.length) {
+    alert(r.mensagem || 'Nenhum diff proposto.')
+    return
+  }
+  renderListaPendentesOc()
+  mostrarDiffOpenClaw(ocPendentes[0])
+}
+
+async function finalizarApplyPendente(r, id) {
+  const viaAgente = !!window.__dgApplyViaAgente
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  agentPropostas = agentPropostas.filter((p) => p.id !== id)
+  mostrarPropostasAgent(agentPropostas)
+  if (r.absPath && abaAtiva === r.absPath && editor) {
+    const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
+    if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
+  }
+  // fila unificada
+  const rest = await window.api.invoke('propostas:listar')
+  ocPendentes = (rest?.pendentes || []).map((p) => ({
+    id: p.id,
+    path: p.path,
+    absPath: p.absPath,
+    unifiedDiff: p.unifiedDiff,
+    origem: p.origem
+  }))
+  agentPropostas = ocPendentes.slice()
+  mostrarPropostasAgent(agentPropostas)
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+    alert(viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.')
+  }
+}
+
+async function aplicarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  if (!window.confirm('Aplicar este arquivo no disco?')) return
+  const viaAgente = !!window.__dgApplyViaAgente
+  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
+  const id = ocPendenteAtivoId
+  const r = await window.api.invoke(canal, id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
+    return
+  }
+  await finalizarApplyPendente(r, id)
+}
+
+async function aplicarHunksSelecionadosOc() {
+  if (!ocPendenteAtivoId) return
+  const indices = [...ocHunksAceitos].sort((a, b) => a - b)
+  if (!indices.length) {
+    alert('Nenhum hunk selecionado.')
+    return
+  }
+  if (!window.confirm('Aplicar ' + indices.length + ' hunk(s) selecionado(s)?')) return
+  const def = await window.api.invoke('propostas:definir-hunks', ocPendenteAtivoId, indices)
+  if (!def?.ok) {
+    alert('Falha ao filtrar hunks: ' + (def?.erro || ''))
+    return
+  }
+  if (def.rejeitado) {
+    alert('Todos os hunks rejeitados.')
+    fecharPainelDiff()
+    return
+  }
+  const viaAgente = !!window.__dgApplyViaAgente || def.pendente?.origem === 'agent'
+  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
+  const id = ocPendenteAtivoId
+  const r = await window.api.invoke(canal, id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar hunks: ' + (r?.erro || 'erro'))
+    return
+  }
+  await finalizarApplyPendente(r, id)
+}
+
+async function rejeitarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  const viaAgente = !!window.__dgApplyViaAgente
+  const canal = viaAgente ? 'agente:rejeitar-proposta' : 'openclaw:rejeitar'
+  await window.api.invoke(canal, ocPendenteAtivoId)
+  const id = ocPendenteAtivoId
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (viaAgente) {
+    agentPropostas = agentPropostas.filter((p) => p.id !== id)
+    mostrarPropostasAgent(agentPropostas)
+  }
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+  }
+}
+
+async function carregarConfigOpenClawUi() {
+  const cfg = await window.api.invoke('openclaw:config-get')
+  const st = await window.api.invoke('openclaw:token-status')
+  if (cfg?.config) {
+    const ep = $('oc-endpoint')
+    const md = $('oc-model')
+    if (ep) ep.value = cfg.config.endpoint || ''
+    if (md) md.value = cfg.config.model || ''
+  }
+  const tok = $('oc-token')
+  if (tok) tok.value = ''
+  const status = $('oc-token-status')
+  if (status) {
+    status.textContent = st?.configurado
+      ? 'Token gravado no cofre do SO (safeStorage).'
+      : 'Nenhum token configurado.'
+  }
+}
+
+async function salvarConfigOpenClawUi() {
+  const endpoint = $('oc-endpoint')?.value?.trim()
+  const model = $('oc-model')?.value?.trim()
+  await window.api.invoke('openclaw:config-set', { endpoint, model })
+  const token = $('oc-token')?.value
+  if (token && token.trim()) {
+    const r = await window.api.invoke('openclaw:token-set', token.trim())
+    if (!r?.ok) {
+      alert('Token nao salvo: ' + (r?.erro || 'erro'))
+      return
+    }
+    const tok = $('oc-token')
+    if (tok) tok.value = ''
+  }
+  await carregarConfigOpenClawUi()
+  alert('OpenClaw salvo.')
 }
 
 async function atualizarGitStatusArvore() {
@@ -1776,8 +2080,7 @@ function novaConversaUi() {
 
 $('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
 
-// ---------- Janelas flutuantes (Config / Contas) ----------
-let dgFloatZ = 20000
+// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------let dgFloatZ = 20000
 
 function trazerJanelaFrente(modalEl) {
   if (!modalEl) return
@@ -1785,6 +2088,12 @@ function trazerJanelaFrente(modalEl) {
   modalEl.style.zIndex = String(dgFloatZ)
 }
 
+function limparPosicaoFloat(modalEl) {
+  const box = modalEl?.querySelector('[data-float-box]')
+  if (!box) return
+  box.style.left = ''
+  box.style.top = ''
+}
 function abrirJanelaFlutuante(modalEl) {
   if (!modalEl) return
   modalEl.classList.remove('hidden')
@@ -1831,7 +2140,7 @@ function ligarJanelaFlutuante(modalEl) {
     if (e.target.closest('button, a, input, select, textarea')) return
     trazerJanelaFrente(modalEl)
     const rect = box.getBoundingClientRect()
-    box.style.left = rect.left + 'px'
+    // fixa posição absoluta a partir do layout atual    box.style.left = rect.left + 'px'
     box.style.top = rect.top + 'px'
     ox = e.clientX - rect.left
     oy = e.clientY - rect.top
@@ -1879,6 +2188,76 @@ async function abrirConfig() {
           escapar(o.models.map((m) => m.name).join(', ') || '—')
         : 'Instalado, mas parado. Rode: ollama serve'
       : 'Nao instalado. Baixe em ollama.com')
+  await carregarConfigOpenClawUi()
+  await atualizarPainelAdapta('adapta-status-cfg')
+}
+
+/** @type {object | null} */
+let adaptaStatusCache = null
+
+async function atualizarPainelAdapta(elId) {
+  const el = $(elId)
+  if (!el) return
+  try {
+    const st = await window.api.invoke('adapta:status', pastaAtual || undefined)
+    adaptaStatusCache = st
+    el.innerHTML =
+      'Conta: <strong>digo85cs@gmail.com</strong><br>' +
+      'Dossiê: ' +
+      (st.dossieExiste ? 'ok' : 'ausente') +
+      ' · Continuidade: ' +
+      (st.continuidadeExiste ? 'ok' : 'ausente') +
+      ' · MCP: ' +
+      (st.mcpExiste ? 'compilado' : 'rode npm run build:mcp') +
+      '<br><code style="font-size:11px">' +
+      escapar(st.caminhoContinuidade || '') +
+      '</code>'
+  } catch (e) {
+    el.textContent = 'Falha ao ler status Adapta: ' + String(e)
+  }
+}
+
+async function copiarContinuidadeAdapta(regenerar) {
+  const r = await window.api.invoke('adapta:ler-continuidade', !!regenerar)
+  if (!r?.ok || !r.texto) {
+    if (!regenerar) {
+      const g = await window.api.invoke('adapta:gerar')
+      if (!g?.ok) {
+        alert('Continuidade indisponível: ' + (g?.erro || r?.erro || 'sem dossiê — use o chat primeiro'))
+        return
+      }
+      return copiarContinuidadeAdapta(false)
+    }
+    alert('Continuidade indisponível: ' + (r?.erro || 'erro'))
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(r.texto)
+    alert('Continuidade copiada. No Adapta ONE: + → Contextos → cole.')
+  } catch (e) {
+    alert('Não foi possível copiar: ' + String(e))
+  }
+  await atualizarPainelAdapta('adapta-status')
+  await atualizarPainelAdapta('adapta-status-cfg')
+}
+
+async function copiarMcpAdapta() {
+  const st =
+    adaptaStatusCache || (await window.api.invoke('adapta:status', pastaAtual || undefined))
+  adaptaStatusCache = st
+  if (!st?.mcpComando) {
+    alert('Comando MCP indisponível')
+    return
+  }
+  if (!st.mcpExiste) {
+    alert('MCP ainda não compilado. Rode: npm run build:mcp\n\nO JSON será copiado mesmo assim.')
+  }
+  try {
+    await navigator.clipboard.writeText(st.mcpComando)
+    alert('JSON MCP copiado. Cole no conector MCP do Maestro (ver docs/adapta.md).')
+  } catch (e) {
+    alert('Não foi possível copiar: ' + String(e))
+  }
 }
 
 async function abrirContas() {
@@ -1887,11 +2266,17 @@ async function abrirContas() {
   $('contas-maquina').innerHTML = '<h4>Maquina</h4>Carregando...'
   $('contas-ia').innerHTML = '<h4>IA</h4>Carregando...'
   $('contas-guardian').innerHTML = '<h4>Guardiao de recursos</h4>Carregando...'
+  void atualizarPainelAdapta('adapta-status')
   try {
     const s = await window.api.invoke('accounts:get-state')
     $('contas-identidade').innerHTML =
       '<h4>Identidade</h4>' +
-      'Usuario: <strong>owner</strong> (device-token)<br>' +
+      'Usuario: <strong>' +
+      escapar(s.identidade.username || 'digo85cs') +
+      '</strong> (device-token)<br>' +
+      'E-mail: <strong>' +
+      escapar(s.identidade.email || 'digo85cs@gmail.com') +
+      '</strong><br>' +
       'Token: <code>' +
       escapar(s.identidade.tokenPrefix) +
       '...</code><br>' +
@@ -2032,6 +2417,22 @@ function bootstrapComandos() {
     { id: 'tema', titulo: 'Alternar tema', fn: () => alternarTema() },
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
+    {
+      id: 'agent-panel',
+      titulo: 'Painel Agent',
+      fn: () => {
+        ativarAbaCentro('agent')
+      }
+    },
+    {
+      id: 'agent-undo',
+      titulo: 'Desfazer último apply (checkpoint)',
+      fn: async () => {
+        const r = await window.api.invoke('agente:checkpoint-desfazer')
+        alert(r?.ok ? 'Restaurado.' : r?.erro || 'falha')
+      }
+    },
     { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
     { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
     { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
@@ -2052,7 +2453,21 @@ function bootstrapComandos() {
       }
     },
     {
-      id: 'recarregar',
+      id: 'adapta-copiar',
+      titulo: 'Adapta: copiar continuidade (ONE)',
+      fn: () => void copiarContinuidadeAdapta(false)
+    },
+    {
+      id: 'adapta-mcp',
+      titulo: 'Adapta: copiar comando MCP (Maestro)',
+      fn: () => void copiarMcpAdapta()
+    },
+    {
+      id: 'adapta-maestro',
+      titulo: 'Adapta: abrir Maestro',
+      fn: () => void window.api.invoke('adapta:abrir', 'maestro')
+    },
+    {      id: 'recarregar',
       titulo: 'Recarregar janela',
       atalho: 'Ctrl+R',
       fn: () => void window.api.invoke('janela:recarregar', false)
@@ -2105,8 +2520,7 @@ function bootstrapComandos() {
     },
     {
       id: 'sobre',
-      titulo: 'Sobre o Dg Editor',
-      fn: () => void mostrarSobreDgEditor()
+      titulo: 'Sobre o Dg Editor',      fn: () => void mostrarSobreDgEditor()
     }
   ]
   for (const d of defs) registrarComando(d)
@@ -2119,8 +2533,7 @@ async function mostrarSobreDgEditor() {
   } catch {
     ver = ''
   }
-  alert('Dg Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')
-}
+  alert('Dg Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')}
 
 function acaoEditar(cmd) {
   try {
@@ -2496,9 +2909,436 @@ $('btn-reanalyze').addEventListener('click', () => {
 })
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
+$('btn-oc-salvar')?.addEventListener('click', () => void salvarConfigOpenClawUi())
+$('btn-oc-limpar-token')?.addEventListener('click', async () => {
+  await window.api.invoke('openclaw:token-clear')
+  await carregarConfigOpenClawUi()
+})
+$('btn-oc-preview-editor')?.addEventListener('click', () => {
+  const p = ocPendentes.find((x) => x.id === ocPendenteAtivoId)
+  if (p) void previewDiffNoEditor(p)
+})
+$('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
+$('btn-oc-aplicar-hunks')?.addEventListener('click', () => void aplicarHunksSelecionadosOc())
+$('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
+
+function atualizarStatusAgent(modelo, ms, fila) {
+  const el = $('sb-agent')
+  if (!el) return
+  const partes = []
+  if (modelo) partes.push(modelo)
+  if (ms != null) partes.push(ms + 'ms')
+  if (fila) {
+    if (fila.ocupado) partes.push('fila●')
+    else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
+  }
+  el.textContent = partes.length ? 'Agent: ' + partes.join(' · ') : 'Agent: —'
+}
+
+async function carregarAgentesUi() {
+  const sel = $('agent-select')
+  if (!sel || !pastaAtual) return
+  const r = await window.api.invoke('agente:listar', pastaAtual)
+  const cur = sel.value
+  sel.innerHTML = ''
+  for (const a of r?.agentes || []) {
+    const o = document.createElement('option')
+    o.value = a.id
+    o.textContent = a.nome || a.id
+    sel.appendChild(o)
+  }
+  if (cur) sel.value = cur
+  const st = await window.api.invoke('agente:fila-status')
+  const fs = $('agent-fila-status')
+  if (fs && st) {
+    fs.textContent = st.ocupado
+      ? 'fila: ocupado (' + st.tamanho + ')'
+      : st.tamanho
+        ? 'fila: ' + st.tamanho
+        : 'pronto'
+  }
+  atualizarStatusAgent(null, null, st)
+}
+
+function renderAgentTrace(passos) {
+  const box = $('agent-trace')
+  if (!box) return
+  box.innerHTML = ''
+  if (!passos || !passos.length) {
+    box.innerHTML = '<span class="muted">Sem tool calls neste turno.</span>'
+    return
+  }
+  for (const p of passos) {
+    const div = document.createElement('div')
+    div.className = 'step'
+    if (p.tipo === 'tool') {
+      div.textContent =
+        '⚙ ' +
+        (p.nome || 'tool') +
+        (p.resultado ? ' → ' + String(p.resultado).slice(0, 160) : '')
+    } else {
+      div.textContent = '💬 ' + String(p.texto || '').slice(0, 200)
+    }
+    box.appendChild(div)
+  }
+  box.scrollTop = box.scrollHeight
+}
+
+function appendAgentTraceLive(line) {
+  const box = $('agent-trace')
+  if (!box) return
+  if (box.querySelector('.muted')) box.innerHTML = ''
+  const div = document.createElement('div')
+  div.className = 'step'
+  div.textContent = line
+  box.appendChild(div)
+  box.scrollTop = box.scrollHeight
+}
+
+function mostrarPropostasAgent(propostas) {
+  agentPropostas = propostas || []
+  const box = $('agent-propostas-resumo')
+  if (!box) return
+  if (!agentPropostas.length) {
+    box.hidden = true
+    box.innerHTML = ''
+    box.removeAttribute('aria-label')
+    return
+  }
+  box.hidden = false
+  const n = agentPropostas.length
+  const linhas = agentPropostas
+    .map((p) => {
+      const add = (String(p.unifiedDiff || '').match(/^\+/gm) || []).length
+      const del = (String(p.unifiedDiff || '').match(/^-/gm) || []).length
+      return (
+        '<li><code>' +
+        String(p.path || '').replace(/</g, '&lt;') +
+        '</code> <span class="muted">+' +
+        Math.max(0, add - 1) +
+        '/−' +
+        Math.max(0, del - 1) +
+        '</span></li>'
+      )
+    })
+    .join('')
+  box.setAttribute('aria-label', n + ' proposta(s) de edição pendentes')
+  box.innerHTML =
+    '<div class="agent-propostas-titulo"><strong>' +
+    n +
+    ' proposta(s)</strong></div><ul class="agent-propostas-lista">' +
+    linhas +
+    '</ul>'
+  const acoes = document.createElement('div')
+  acoes.className = 'agent-propostas-acoes'
+  const btnVer = document.createElement('button')
+  btnVer.type = 'button'
+  btnVer.className = 'btn-small'
+  btnVer.textContent = 'Revisar diffs'
+  btnVer.addEventListener('click', () => abrirFilaPropostasAgent())
+  const btnAll = document.createElement('button')
+  btnAll.type = 'button'
+  btnAll.className = 'btn-small'
+  btnAll.textContent = 'Aplicar todas'
+  btnAll.addEventListener('click', () => void aplicarTodasPropostasAgent())
+  acoes.appendChild(btnVer)
+  acoes.appendChild(btnAll)
+  box.appendChild(acoes)
+}
+
+function abrirFilaPropostasAgent() {
+  if (!agentPropostas.length) return
+  ocPendentes = agentPropostas.map((p) => ({
+    id: p.id,
+    path: p.path,
+    absPath: p.absPath || p.path,
+    unifiedDiff: p.unifiedDiff
+  }))
+  // reutilizar painel OpenClaw mas apply via agente:aplicar-proposta
+  renderListaPendentesOc()
+  mostrarDiffOpenClaw(ocPendentes[0])
+  window.__dgApplyViaAgente = true
+}
+
+async function aplicarTodasPropostasAgent() {
+  if (!agentPropostas.length) return
+  if (!window.confirm('Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.'))
+    return
+  for (const p of [...agentPropostas]) {
+    const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
+    if (!r?.ok) {
+      alert('Falha em ' + p.path + ': ' + (r?.erro || ''))
+      break
+    }
+  }
+  const rest = await window.api.invoke('agente:propostas')
+  mostrarPropostasAgent(rest?.pendentes || [])
+  alert('Apply concluído.')
+}
+
+function ligarProgressoAgent() {
+  if (agentProgressUnsub) agentProgressUnsub()
+  agentProgressUnsub = window.api.on('agente:progresso', (_e, ev) => {
+    if (!ev || typeof ev !== 'object') return
+    if (ev.tipo === 'status') appendAgentTraceLive('… ' + ev.texto)
+    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('⚙ ' + ev.nome + '…')
+    else if (ev.tipo === 'tool' && ev.fase === 'fim')
+      appendAgentTraceLive('✓ ' + ev.nome + (ev.detalhe ? ' → ' + String(ev.detalhe).slice(0, 80) : ''))
+    else if (ev.tipo === 'proposta') appendAgentTraceLive('📝 proposta ' + ev.path)
+    else if (ev.tipo === 'texto') {
+      const out = $('agent-output')
+      if (out) out.textContent = String(ev.texto || '')
+    }
+  })
+}
+
+function coletarAbasCtx() {
+  const out = []
+  for (const a of abas) {
+    const item = { path: a.caminho, ativa: a.caminho === abaAtiva }
+    if (a.caminho === abaAtiva && editor && editor.getConteudo) {
+      try {
+        item.conteudo = editor.getConteudo()
+      } catch {
+        /* */
+      }
+    }
+    out.push(item)
+  }
+  return out
+}
+
+/** Erros/diagnostics recentes do agent (typecheck/test/manual) para o contexto. */
+async function coletarErrosEditor() {
+  try {
+    const r = await window.api.invoke('agente:diagnosticos')
+    const lista = (r?.recentes || r?.diagnosticos || []).filter((d) => d && d.ok === false && d.saida)
+    if (!lista.length) return ''
+    return lista
+      .slice(0, 5)
+      .map((d) => '[' + d.origem + '] ' + (d.resumo || '') + '\n' + String(d.saida || '').slice(0, 3000))
+      .join('\n\n')
+      .slice(0, 8000)
+  } catch {
+    return ''
+  }
+}
+
+function renderPlanoChecklist(plano) {
+  const box = $('agent-plano-checklist')
+  if (!box) return
+  const passos = plano?.passos || []
+  if (!passos.length) {
+    box.hidden = true
+    box.innerHTML = ''
+    return
+  }
+  box.hidden = false
+  box.innerHTML = ''
+  const titulo = document.createElement('div')
+  titulo.innerHTML =
+    '<strong>Plano</strong> <span class="muted">' +
+    passos.filter((p) => p.feito).length +
+    '/' +
+    passos.length +
+    '</span>'
+  box.appendChild(titulo)
+  for (const p of passos) {
+    const lab = document.createElement('label')
+    if (p.feito) lab.classList.add('feito')
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.checked = !!p.feito
+    cb.addEventListener('change', async () => {
+      await window.api.invoke('agente:plano-marcar-passo', p.id, cb.checked)
+      const r = await window.api.invoke('agente:plano-ler')
+      renderPlanoChecklist(r?.plano)
+    })
+    const span = document.createElement('span')
+    span.textContent = p.texto
+    lab.appendChild(cb)
+    lab.appendChild(span)
+    box.appendChild(lab)
+  }
+}
+
+async function refrescarPlanoUi() {
+  const r = await window.api.invoke('agente:plano-ler')
+  renderPlanoChecklist(r?.plano)
+}
+
+async function executarAgentUi(orquestrar) {
+  if (!pastaAtual) {
+    alert('Abra uma pasta primeiro.')
+    return
+  }
+  const input = $('agent-input')
+  const texto = input?.value?.trim()
+  if (!texto) return
+  const plan = $('agent-plan-mode')?.checked
+  const verify = $('agent-verify-loop')?.checked
+  const agente = $('agent-select')?.value || undefined
+  const out = $('agent-output')
+  const send = $('agent-send')
+  if (send) send.disabled = true
+  if (out) out.textContent = plan ? 'Gerando plano…' : 'Executando…'
+  renderAgentTrace([])
+  mostrarPropostasAgent([])
+  ligarProgressoAgent()
+  let selecao = ''
+  try {
+    if (editor && editor.getSelecao) selecao = editor.getSelecao() || ''
+  } catch {
+    /* */
+  }
+  try {
+    let r
+    if (orquestrar) {
+      r = await window.api.invoke('agente:orquestrar', pastaAtual, texto)
+      if (out) {
+        out.textContent = (r?.passos || [])
+          .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
+          .join('\n\n')
+      }
+      const todos = []
+      for (const p of r?.passos || []) {
+        if (p.passos) todos.push(...p.passos)
+      }
+      renderAgentTrace(todos)
+    } else {
+      const errosEditor = await coletarErrosEditor()
+      r = await window.api.invoke('agente:pedir', {
+        raiz: pastaAtual,
+        pergunta: texto,
+        modo: plan ? 'plan' : 'agent',
+        agente,
+        pastas: pastasPermitidas(),
+        selecao,
+        arquivoAtivo: abaAtiva || undefined,
+        proposeWrites: true,
+        verificarApos: !!verify && !plan,
+        abas: coletarAbasCtx(),
+        incluirGit: true,
+        errosEditor: errosEditor || undefined
+      })
+      if (!r?.ok) {
+        if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
+        return
+      }
+      if (out) {
+        out.textContent =
+          (plan ? '[PLAN]\n\n' : '') +
+          (r.texto || '') +
+          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
+      }
+      renderAgentTrace(r.passos || [])
+      mostrarPropostasAgent(r.propostas || [])
+      atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
+      if (plan || r.plano) renderPlanoChecklist(r.plano)
+      else await refrescarPlanoUi()
+    }
+    await carregarAgentesUi()
+  } catch (e) {
+    if (out) out.textContent = 'Erro: ' + String(e)
+  } finally {
+    if (send) send.disabled = false
+  }
+}
+
+$('agent-send')?.addEventListener('click', () => void executarAgentUi(false))
+$('btn-agent-orquestrar')?.addEventListener('click', () => void executarAgentUi(true))
+$('btn-agent-stop')?.addEventListener('click', async () => {
+  const r = await window.api.invoke('agente:cancelar')
+  appendAgentTraceLive('■ cancelado (' + (r?.cancelados || 0) + ')')
+  await carregarAgentesUi()
+})
+$('btn-agent-exec-plano')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  ligarProgressoAgent()
+  const out = $('agent-output')
+  if (out) out.textContent = 'Executando plano salvo…'
+  const r = await window.api.invoke('agente:executar-plano', {
+    raiz: pastaAtual,
+    pastas: pastasPermitidas(),
+    soProximo: false
+  })
+  if (!r?.ok) {
+    alert(r?.erro || 'falha')
+    return
+  }
+  if (out) out.textContent = r.texto || ''
+  renderAgentTrace(r.passos || [])
+  mostrarPropostasAgent(r.propostas || [])
+  atualizarStatusAgent(r.modelo, r.duracaoMs, null)
+  renderPlanoChecklist(r.plano)
+})
+$('btn-agent-exec-passo')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  ligarProgressoAgent()
+  const out = $('agent-output')
+  if (out) out.textContent = 'Executando próximo passo…'
+  const r = await window.api.invoke('agente:executar-plano', {
+    raiz: pastaAtual,
+    pastas: pastasPermitidas(),
+    soProximo: true
+  })
+  if (!r?.ok) {
+    alert(r?.erro || 'falha')
+    return
+  }
+  if (out) {
+    out.textContent =
+      (r.passoExecutado ? '[Passo] ' + r.passoExecutado.texto + '\n\n' : '') + (r.texto || '')
+  }
+  renderAgentTrace(r.passos || [])
+  mostrarPropostasAgent(r.propostas || [])
+  renderPlanoChecklist(r.plano)
+})
+$('btn-agent-verificar')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  appendAgentTraceLive('… typecheck')
+  const r = await window.api.invoke('agente:verificar', { raiz: pastaAtual, modo: 'typecheck' })
+  const d = r?.diagnostico
+  appendAgentTraceLive(d?.ok ? '✓ typecheck ok' : '✗ ' + (d?.resumo || 'falha'))
+  const out = $('agent-output')
+  if (out && d && !d.ok) out.textContent = (out.textContent || '') + '\n\n[typecheck]\n' + (d.saida || '')
+})
+$('btn-agent-undo')?.addEventListener('click', async () => {
+  const r = await window.api.invoke('agente:checkpoint-desfazer')
+  alert(r?.ok ? 'Checkpoint restaurado (' + r.restaurados + ' arquivo(s)).' : 'Falha: ' + (r?.erro || ''))
+})
+$('agent-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    void executarAgentUi(false)
+  }
+})
+void refrescarPlanoUi()
+
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
+$('btn-adapta-copiar')?.addEventListener('click', () => void copiarContinuidadeAdapta(false))
+$('btn-adapta-gerar')?.addEventListener('click', async () => {
+  const g = await window.api.invoke('adapta:gerar')
+  alert(g?.ok ? 'Continuidade gerada em:\n' + g.destino : 'Falha: ' + (g?.erro || ''))
+  await atualizarPainelAdapta('adapta-status')
+})
+$('btn-adapta-mcp')?.addEventListener('click', () => void copiarMcpAdapta())
+$('btn-adapta-one')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'one'))
+$('btn-adapta-maestro')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'maestro'))
+$('btn-adapta-docs')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'docs'))
+$('btn-adapta-copiar-cfg')?.addEventListener('click', () => void copiarContinuidadeAdapta(false))
+$('btn-adapta-gerar-cfg')?.addEventListener('click', async () => {
+  const g = await window.api.invoke('adapta:gerar')
+  alert(g?.ok ? 'Continuidade gerada.' : 'Falha: ' + (g?.erro || ''))
+  await atualizarPainelAdapta('adapta-status-cfg')
+})
+$('btn-adapta-mcp-cfg')?.addEventListener('click', () => void copiarMcpAdapta())
+$('btn-adapta-one-cfg')?.addEventListener('click', () => void window.api.invoke('adapta:abrir', 'one'))
+$('btn-adapta-maestro-cfg')?.addEventListener('click', () =>
+  void window.api.invoke('adapta:abrir', 'maestro')
+)
 $('chat-send').addEventListener('click', enviarMensagem)
 $('chat-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -2625,9 +3465,7 @@ $('busca-input')?.addEventListener('keydown', (e) => {
   }
 })
 $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
-// Config/Contas flutuantes: fecham só no ×
-
-
+// Config/Contas flutuantes: não fecham ao clicar no fundo (só no ×)
 function alternarPainel() {
   toggleRight()
 }
@@ -2863,7 +3701,6 @@ async function atualizarIconeMax() {
   } catch {}
 }
 
-
 // ---------- Menubar (titlebar frameless) ----------
 const MENUS_BARRA = {
   arquivo: [
@@ -2912,8 +3749,7 @@ const MENUS_BARRA = {
     { sep: true },
     { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
   ],
-  ajuda: [{ id: 'sobre', label: 'Sobre o Dg Editor' }]
-}
+  ajuda: [{ id: 'sobre', label: 'Sobre o Dg Editor' }]}
 
 function fecharMenubar() {
   const bar = document.getElementById('menubar')

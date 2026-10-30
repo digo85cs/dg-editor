@@ -2,21 +2,18 @@
  * Painel Navegador embutido — WebContentsView (chrome + conteúdo).
  * App: View host filha da BrowserWindow principal (aba Browser).
  * Smoke (DG_NAV_SMOKE=1): BaseWindow temporária (host com bounds controláveis).
+ * Smoke embed (DG_NAV_SMOKE=1 + DG_NAV_SMOKE_EMBED=1): mesmo host View de produção
+ *   (BrowserWindow pai injetada em index.ts) — cobre o caminho embed no smoke.
  * Partition persist:dgnav = sessão (cookies/localStorage) em disco.
  *
- * DÍVIDA DE ARQUITETURA — DOIS CAMINHOS
+ * DÍVIDA DE ARQUITETURA — DOIS HOSTS (conteúdo unificado)
  *
- * DG_NAV_SMOKE=1 -> BaseWindow oculta (arquitetura antiga).
- *   22 cenários do smoke testam essa bifurcação.
- *   Views chrome/content são filhas do BaseWindow.
+ * DG_NAV_SMOKE=1 (sem EMBED) -> BaseWindow oculta (host legado; smoke 22/22).
+ * DG_NAV_SMOKE_EMBED=1 -> View host (produção) com pai injetável.
+ * Modo normal -> View host na BrowserWindow (bounds via navegador:bounds).
  *
- * Modo normal -> View host na BrowserWindow principal.
- *   Renderer envia bounds via 'navegador:bounds'.
- *
- * CONSEQUÊNCIA: o smoke NÃO cobre o caminho de produção.
- * Se a arquitetura de embed quebrar, o smoke continua verde.
- * Fechar essa dívida exige reescrever os cenários com um
- * host injetável. Não fazer sem decisão explícita.
+ * Mitigação: criarViews + carregarUrlNasViews + layoutInterno são compartilhados.
+ * Produção coberta por navegador:embed-status + e2e ui.browser.*.
  */
 import {
   BaseWindow,
@@ -43,11 +40,14 @@ export type OpcoesJanelaNavegador = {
 let chamadasCriacao = 0
 const timestampsCriacao: number[] = []
 
+/** Isolamento de token/downloads do smoke (qualquer host). */
 function emSmokeNav(): boolean {
-  // ver DÍVIDA DE ARQUITETURA no topo do arquivo:
-  // smoke usa BaseWindow; produção usa host na janela
-  // principal. Caminhos coexistem por design.
   return process.env.DG_NAV_SMOKE === '1'
+}
+
+/** Host legado BaseWindow — só smoke clássico, sem EMBED. */
+function usaHostBaseWindow(): boolean {
+  return process.env.DG_NAV_SMOKE === '1' && process.env.DG_NAV_SMOKE_EMBED !== '1'
 }
 
 function registrarChamadaCriacao(): void {
@@ -223,7 +223,7 @@ function layoutSmoke(): void {
 
 /** Bounds do #browser-mount (coordenadas da content area da janela principal). */
 export function layoutNavegador(b: Bounds): void {
-  if (emSmokeNav()) {
+  if (usaHostBaseWindow()) {
     layoutSmoke()
     return
   }
@@ -243,7 +243,7 @@ export function layoutNavegador(b: Bounds): void {
 }
 
 export function mostrarNavegadorEmbutido(mostrar: boolean): void {
-  if (emSmokeNav()) return
+  if (usaHostBaseWindow()) return
   embutidoVisivel = !!mostrar
   if (!hostView) return
   if (!mostrar) {
@@ -357,13 +357,14 @@ export function getContentView(): WebContentsView | null {
 /** Reaplica bounds chrome+conteúdo (necessário antes de capturePage). */
 export function forcarLayoutNavegador(): { width: number; height: number } | null {
   if (!contentView) return null
-  if (emSmokeNav()) {
+  if (usaHostBaseWindow()) {
     if (!janelaSmoke || janelaSmoke.isDestroyed()) return null
     layoutSmoke()
   } else if (hostView && embutidoVisivel && ultimoBounds.width > 0) {
     layoutNavegador(ultimoBounds)
   } else if (hostView) {
-    // smoke/controle: força tamanho mínimo para screenshot
+    // smoke embed / controle: força tamanho mínimo para screenshot
+    hostView.setBounds({ x: 0, y: 0, width: 1280, height: 800 })
     layoutInterno(1280, 800)
   } else {
     return null
@@ -378,7 +379,7 @@ export function getPartition(): string {
 
 function navegadorAberto(): boolean {
   if (!contentView || !sessaoAberta) return false
-  if (emSmokeNav()) return !!(janelaSmoke && !janelaSmoke.isDestroyed())
+  if (usaHostBaseWindow()) return !!(janelaSmoke && !janelaSmoke.isDestroyed())
   return hostAnexado
 }
 
@@ -396,6 +397,29 @@ export function estadoAtual(): EstadoNavegador {
   }
 }
 
+/** Status do caminho de produção (embed) vs smoke — para UI/diagnóstico. */
+export function statusEmbedNavegador(): {
+  modo: 'smoke' | 'embed'
+  host: 'smoke' | 'embed'
+  hostAnexado: boolean
+  embutidoVisivel: boolean
+  aberto: boolean
+  bounds: Bounds | null
+  conteudoCompartilhado: true
+} {
+  const host = caminhoHostNavegador()
+  return {
+    modo: host,
+    host,
+    hostAnexado,
+    embutidoVisivel,
+    aberto: navegadorAberto(),
+    bounds: ultimoBounds.width > 0 ? { ...ultimoBounds } : null,
+    /** chrome/content/loadURL via criarViews+carregarUrlNasViews nos dois hosts */
+    conteudoCompartilhado: true
+  }
+}
+
 export async function estadoComLogado(): Promise<EstadoNavegador> {
   const base = estadoAtual()
   if (!base.aberto) return base
@@ -403,7 +427,7 @@ export async function estadoComLogado(): Promise<EstadoNavegador> {
 }
 
 export function focarJanela(): void {
-  if (emSmokeNav() && janelaSmoke && !janelaSmoke.isDestroyed()) {
+  if (usaHostBaseWindow() && janelaSmoke && !janelaSmoke.isDestroyed()) {
     if (janelaSmoke.isMinimized()) janelaSmoke.restore()
     janelaSmoke.focus()
     return
@@ -525,6 +549,17 @@ function criarViews(): void {
   ligarEventosContent(contentView.webContents)
 }
 
+/** Caminho de conteúdo compartilhado smoke↔embed (loadURL na contentView). */
+function carregarUrlNasViews(url: string): void {
+  if (!contentView) return
+  void contentView.webContents.loadURL(url || 'about:blank')
+}
+
+/** Host atual: smoke (BaseWindow) ou embed (View na principal / smoke-embed). */
+export function caminhoHostNavegador(): 'smoke' | 'embed' {
+  return usaHostBaseWindow() ? 'smoke' : 'embed'
+}
+
 function destruirNavegador(): void {
   try {
     if (janelaSmoke && !janelaSmoke.isDestroyed()) janelaSmoke.close()
@@ -572,14 +607,12 @@ export function criarJanelaNavegador(
         ? 'about:blank'
         : undefined
 
-  // --- SMOKE: BaseWindow (cenários 7/12 dependem) ---
-  if (emSmokeNav()) {
+  // --- SMOKE clássico: BaseWindow (cenários 7/12 dependem do host) ---
+  // Conteúdo (criarViews + carregarUrlNasViews + layoutInterno) = mesmo do embed.
+  // Com DG_NAV_SMOKE_EMBED=1 cai no caminho APP abaixo (View host).
+  if (usaHostBaseWindow()) {
     if (janelaSmoke && !janelaSmoke.isDestroyed()) {
-      if (destino && destino !== 'about:blank') {
-        void contentView?.webContents.loadURL(destino)
-      } else if (destino === 'about:blank') {
-        void contentView?.webContents.loadURL('about:blank')
-      }
+      if (destino != null) carregarUrlNasViews(destino)
       if (mostrar) {
         if (!janelaSmoke.isVisible()) janelaSmoke.show()
         janelaSmoke.focus()
@@ -618,7 +651,7 @@ export function criarJanelaNavegador(
     })
     sessaoAberta = true
     const urlLoad = destino || 'about:blank'
-    void contentView!.webContents.loadURL(urlLoad)
+    carregarUrlNasViews(urlLoad)
     if (mostrar) {
       janelaSmoke.show()
       janelaSmoke.focus()
@@ -631,17 +664,12 @@ export function criarJanelaNavegador(
   registrarIpc()
   if (hostAnexado && hostView && chromeView && contentView) {
     sessaoAberta = true
-    if (destino && destino !== 'about:blank') {
-      void contentView.webContents.loadURL(destino)
-    } else if (destino === 'about:blank') {
-      void contentView.webContents.loadURL('about:blank')
-    }
+    if (destino != null) carregarUrlNasViews(destino)
     if (mostrar) {
       embutidoVisivel = true
       if (ultimoBounds.width > 0) layoutNavegador(ultimoBounds)
     }
     dglog(`[navegador] embutido singleton reutilizado mostrar=${mostrar}`)
-    // Cast: API pública tipada BaseWindow para smoke; app não usa o retorno
     return janelaSmoke as unknown as BaseWindow
   }
 
@@ -661,20 +689,26 @@ export function criarJanelaNavegador(
   layoutInterno(0, 0)
 
   const urlLoad = destino || 'about:blank'
-  void contentView!.webContents.loadURL(urlLoad)
-  if (mostrar) {
+  carregarUrlNasViews(urlLoad)
+  if (mostrar || process.env.DG_NAV_SMOKE_EMBED === '1') {
     embutidoVisivel = true
+    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+      // smoke-embed: pai oculta — força bounds úteis p/ captura/HTTP
+      hostView.setBounds({ x: 0, y: 0, width: 1280, height: 800 })
+      layoutInterno(1280, 800)
+      ultimoBounds = { x: 0, y: 0, width: 1280, height: 800 }
+    }
   }
   dglog(`[navegador] embutido criado partition=${PARTITION} url=${urlLoad}`)
   return janelaSmoke as unknown as BaseWindow
 }
 
 export function fecharJanelaNavegador(): void {
-  if (emSmokeNav()) {
+  if (usaHostBaseWindow()) {
     if (janelaSmoke && !janelaSmoke.isDestroyed()) janelaSmoke.close()
     return
   }
-  // App: ocultar (não destruir) — reabrir a aba reutiliza as views
+  // App / smoke-embed: ocultar (não destruir) — reabrir a aba reutiliza as views
   sessaoAberta = false
   mostrarNavegadorEmbutido(false)
   try {

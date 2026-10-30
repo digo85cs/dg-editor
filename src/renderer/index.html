@@ -11,8 +11,7 @@
 <body>
   <header id="titlebar">
     <div class="tb-leading">
-      <span class="tb-marca">Dg<span class="tb-marca-acento">Editor</span></span>
-      <div class="tb-nav" aria-label="Navegação de abas">
+      <span class="tb-marca">Dg<span class="tb-marca-acento">Editor</span></span>      <div class="tb-nav" aria-label="Navegação de abas">
         <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
         </button>
@@ -133,6 +132,7 @@
     <section id="center-panel">
       <div class="center-tabs" role="tablist" aria-label="Área central">
         <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
+        <button type="button" class="center-tab" data-center-pane="agent" role="tab" aria-selected="false">Agent</button>
         <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
       </div>
 
@@ -169,6 +169,38 @@
         </div>
       </div>
 
+      <div id="center-pane-agent" class="center-pane">
+        <div id="pane-agent" class="center-pane-inner agent-pane" role="region" aria-label="Painel do agente">
+          <header class="agent-header">
+            <label class="agent-mode">
+              <input type="checkbox" id="agent-plan-mode" aria-describedby="agent-plan-hint" />
+              Plan mode
+            </label>
+            <span id="agent-plan-hint" class="sr-only">Quando ativo, o agente só gera plano sem editar arquivos</span>
+            <select id="agent-select" aria-label="Escolher agente"></select>
+            <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
+            <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
+            <button type="button" id="btn-agent-exec-passo" class="btn-small" title="Executar próximo passo do plano" aria-label="Executar próximo passo">Próximo passo</button>
+            <button type="button" id="btn-agent-verificar" class="btn-small" title="Rodar typecheck e alimentar diagnósticos" aria-label="Verificar typecheck">Verificar</button>
+            <label class="agent-mode" title="Após o turno, roda typecheck e pede correção se falhar">
+              <input type="checkbox" id="agent-verify-loop" />
+              Auto-verify
+            </label>
+            <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
+            <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
+            <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
+          </header>
+          <div id="agent-plano-checklist" class="agent-plano-checklist" hidden role="region" aria-label="Checklist do plano"></div>
+          <div id="agent-trace" class="agent-trace" aria-live="polite" aria-relevant="additions" aria-label="Tool trace" tabindex="0"></div>
+          <div id="agent-output" class="agent-output" tabindex="0" role="log" aria-label="Resposta do agente" aria-live="polite"></div>
+          <div id="agent-propostas-resumo" class="agent-propostas-resumo muted" hidden role="region"></div>
+          <footer class="agent-input-bar">
+            <textarea id="agent-input" rows="2" aria-label="Pedido ao agente" placeholder="Pedido… @projeto @arquivo:path @nota:Nome @selecao"></textarea>
+            <button type="button" id="agent-send" class="btn-primary" aria-label="Executar pedido do agente">Executar</button>
+          </footer>
+        </div>
+      </div>
+
       <div id="center-pane-editor" class="center-pane">
         <div id="editor-breadcrumb"></div>
         <div id="editor-toolbar" class="editor-toolbar hidden">
@@ -176,6 +208,7 @@
         </div>
         <div id="editor-host">
           <div id="editor-mount"></div>
+          <div id="editor-diff-side" class="editor-diff-side" hidden aria-hidden="true" aria-label="Preview depois da proposta"></div>
           <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
           <div id="image-preview" class="image-preview hidden" aria-hidden="true">
             <img id="image-preview-img" alt="preview" />
@@ -194,8 +227,16 @@
           <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
             <header class="diff-panel-header">
               <span id="diff-panel-title">Diff</span>
+              <div class="diff-panel-actions" id="diff-panel-actions" hidden>
+                <button type="button" id="btn-oc-preview-editor" class="btn-small" title="Marcar diff no editor (side-by-side)">No editor</button>
+                <button type="button" id="btn-oc-aplicar" class="btn-small" title="Aplicar arquivo inteiro">Aplicar arquivo</button>
+                <button type="button" id="btn-oc-aplicar-hunks" class="btn-small" title="Aplicar só hunks aceitos">Aplicar hunks</button>
+                <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar arquivo</button>
+              </div>
               <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
             </header>
+            <div id="oc-pendentes-lista" class="oc-pendentes-lista" hidden></div>
+            <div id="diff-hunks-bar" class="diff-hunks-bar" hidden></div>
             <pre id="diff-panel-body" class="diff-panel-body"></pre>
           </aside>
         </div>
@@ -268,6 +309,7 @@
       </div>
       <div class="sb-center">
         <span id="sb-ambiente">This PC</span>
+        <span id="sb-agent" title="Agente: modelo / latência / fila">Agent: —</span>
       </div>
       <div class="sb-right">
         <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
@@ -301,7 +343,35 @@
       </header>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
-    </div>
+      <div id="config-adapta" class="config-section">
+        <h4>Adapta ONE / Maestro</h4>
+        <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE + comando MCP para o Maestro. Detalhes: docs/adapta.md</p>
+        <p id="adapta-status-cfg" class="muted" style="margin:0 0 8px;font-size:12px"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-adapta-copiar-cfg" class="btn-small">Copiar continuidade</button>
+          <button type="button" id="btn-adapta-gerar-cfg" class="btn-ghost">Gerar continuidade</button>
+          <button type="button" id="btn-adapta-mcp-cfg" class="btn-ghost">Copiar comando MCP</button>
+          <button type="button" id="btn-adapta-one-cfg" class="btn-ghost">Abrir ONE</button>
+          <button type="button" id="btn-adapta-maestro-cfg" class="btn-ghost">Abrir Maestro</button>
+        </div>
+      </div>
+      <div id="config-openclaw" class="config-section">
+        <h4>OpenClaw</h4>
+        <label class="config-field">Endpoint<br>
+          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" />
+        </label>
+        <label class="config-field">Model<br>
+          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" />
+        </label>
+        <label class="config-field">Token (Gateway Bearer)<br>
+          <input type="password" id="oc-token" placeholder="colar token — nao fica em texto plano" style="width:100%" autocomplete="off" />
+        </label>
+        <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
+          <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
+        </div>
+      </div>    </div>
   </div>
 
   <div id="modal-contas" class="modal modal-float hidden" role="dialog" aria-labelledby="modal-contas-title">
@@ -314,10 +384,21 @@
       <div id="contas-maquina" class="config-section"></div>
       <div id="contas-ia" class="config-section"></div>
       <div id="contas-guardian" class="config-section"></div>
+      <div id="contas-adapta" class="config-section">
+        <h4>Adapta ONE / Maestro</h4>
+        <p id="adapta-status" class="muted" style="margin:0 0 8px;font-size:12px;word-break:break-all"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-adapta-copiar" class="btn-small" title="Copia continuidade.md para a área de transferência">Copiar continuidade</button>
+          <button type="button" id="btn-adapta-gerar" class="btn-ghost">Gerar</button>
+          <button type="button" id="btn-adapta-mcp" class="btn-ghost" title="JSON command/args/cwd para conector MCP do Maestro">Copiar MCP</button>
+          <button type="button" id="btn-adapta-one" class="btn-ghost">ONE</button>
+          <button type="button" id="btn-adapta-maestro" class="btn-ghost">Maestro</button>
+          <button type="button" id="btn-adapta-docs" class="btn-ghost">Docs</button>
+        </div>
+      </div>
       <div id="contas-diagnostico" class="config-section"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button type="button" id="btn-diag" class="btn-small">Rodar diagnostico</button>
-      </div>
+        <button type="button" id="btn-diag" class="btn-small">Rodar diagnostico</button>      </div>
     </div>
   </div>
 

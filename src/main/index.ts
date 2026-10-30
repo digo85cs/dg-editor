@@ -28,7 +28,14 @@ import { getAccountsState } from './accounts'
 import { guardianSnapshot, guardianResumo } from './guardian'
 import { bootSaudeIAs } from './boot-saude'
 import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
-import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
+import {
+  gerarContinuidade,
+  dossieDirDoApp,
+  statusAdapta,
+  lerContinuidade,
+  urlAdaptaPermitida,
+  ADAPTA_URLS
+} from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
 import { askOllama } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
@@ -40,7 +47,8 @@ import {
   definirJanelaPrincipalNavegador,
   layoutNavegador,
   mostrarNavegadorEmbutido,
-  onNavegadorEventos
+  onNavegadorEventos,
+  statusEmbedNavegador
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
@@ -76,6 +84,8 @@ import {
 } from './terminal'
 import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
 import { registerVaultIpc } from './vault/ipc'
+import { registerOpenClawIpc } from './openclaw/ipc'
+import { registerAgentExtrasIpc } from './agent/ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -235,7 +245,18 @@ app.whenReady().then(() => {
   })
 
   // Smoke headless do navegador embutido (DG_NAV_SMOKE=1)
+  // Com DG_NAV_SMOKE_EMBED=1: injeta BrowserWindow pai e usa host View (produção).
   if (process.env.DG_NAV_SMOKE === '1') {
+    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+      // Pai oculto (não offscreen) — WebContentsView precisa de paint real p/ screenshot.
+      const smokeParent = new BrowserWindow({
+        width: 1280,
+        height: 800,
+        show: false,
+        backgroundColor: '#1a1a1a'
+      })
+      definirJanelaPrincipalNavegador(smokeParent)
+    }
     void import('./navegador/smoke').then((m) => m.rodarSmokeESair())
   }
 })
@@ -253,6 +274,10 @@ app.on('window-all-closed', () => {
 
 ipcMain.handle('navegador:abrir', (_e, url?: string) => {
   return abrirNavegadorAncorado(url)
+})
+
+ipcMain.handle('navegador:embed-status', () => {
+  return { ok: true, ...statusEmbedNavegador() }
 })
 
 ipcMain.on('navegador:bounds', (_e, b: unknown) => {
@@ -386,6 +411,10 @@ ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) =
 
 // ---------- Vault Markdown (Obsidian-compat) ----------
 registerVaultIpc()
+// ---------- OpenClaw (diffs + aprovacao humana; sem shell) ----------
+registerOpenClawIpc()
+// ---------- Agent: checkpoint, @projeto, orquestracao, fila ----------
+registerAgentExtrasIpc()
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {
@@ -792,6 +821,40 @@ ipcMain.handle('dossie:caminho', () => {
   return caminhoDossie()
 })
 
+// ---------- Adapta ONE / Maestro ----------
+ipcMain.handle('adapta:status', async (_e, raiz?: unknown) => {
+  let r = typeof raiz === 'string' && raiz.trim() ? raiz.trim() : ''
+  if (!r) {
+    const { resolverRaizProjeto } = await import('./paths')
+    r = resolverRaizProjeto()
+  }
+  return statusAdapta(r)
+})
+
+ipcMain.handle('adapta:gerar', () => {
+  return gerarContinuidade(dossieDirDoApp())
+})
+
+ipcMain.handle('adapta:ler-continuidade', (_e, regenerar?: unknown) => {
+  if (regenerar === true) {
+    const g = gerarContinuidade(dossieDirDoApp())
+    if (!g.ok) return { ok: false, erro: g.erro }
+  }
+  return lerContinuidade()
+})
+
+ipcMain.handle('adapta:abrir', async (_e, alvo: unknown) => {
+  let url = ''
+  if (alvo === 'one') url = ADAPTA_URLS.one
+  else if (alvo === 'hub') url = ADAPTA_URLS.hub
+  else if (alvo === 'maestro') url = ADAPTA_URLS.maestro
+  else if (alvo === 'docs') url = ADAPTA_URLS.docs
+  else if (typeof alvo === 'string' && urlAdaptaPermitida(alvo)) url = alvo
+  else return { ok: false, erro: 'url nao permitida' }
+  await shell.openExternal(url)
+  return { ok: true, url }
+})
+
 // ---------- Diagnostico ao vivo ----------
 ipcMain.handle('diagnostico:rodar', async (_e, root: string | null) => {
   return diagnosticoCompleto(root)
@@ -864,17 +927,44 @@ ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
 
 
 // ---------- Agente com MCP + memoria generativa ----------
-ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, modelo?: string) => {
-  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
-  try {
-    const r = await executarAgente(root, pergunta, modelo)
-    return { ok: true, texto: r.texto, modelo: r.modelo, passos: r.passos }
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    dglog('[agente:executar] falhou: ' + msg)
-    return { ok: false, erro: msg }
+ipcMain.handle(
+  'agente:executar',
+  async (
+    _e,
+    root: string,
+    pergunta: string,
+    modeloOuOpcoes?: string | { modelo?: string; modo?: string; agente?: string; contextoExtra?: string }
+  ) => {
+    if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    try {
+      const opcoes =
+        typeof modeloOuOpcoes === 'string'
+          ? { modeloForcado: modeloOuOpcoes }
+          : modeloOuOpcoes && typeof modeloOuOpcoes === 'object'
+            ? {
+                modeloForcado: typeof modeloOuOpcoes.modelo === 'string' ? modeloOuOpcoes.modelo : undefined,
+                modo: modeloOuOpcoes.modo === 'plan' ? ('plan' as const) : ('agent' as const),
+                agente: typeof modeloOuOpcoes.agente === 'string' ? modeloOuOpcoes.agente : undefined,
+                contextoExtra:
+                  typeof modeloOuOpcoes.contextoExtra === 'string' ? modeloOuOpcoes.contextoExtra : undefined
+              }
+            : {}
+      const r = await executarAgente(root, pergunta, opcoes)
+      return {
+        ok: true,
+        texto: r.texto,
+        modelo: r.modelo,
+        passos: r.passos,
+        duracaoMs: r.duracaoMs,
+        modo: opcoes.modo || 'agent'
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      dglog('[agente:executar] falhou: ' + msg)
+      return { ok: false, erro: msg }
+    }
   }
-})
+)
 
 ipcMain.handle('agente:modelo', async () => {
   if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
