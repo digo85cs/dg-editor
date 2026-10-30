@@ -938,6 +938,15 @@ async function main() {
     assert('npm run limpeza:organica', typeof pkgLimpeza.scripts['limpeza:organica'] === 'string')
     assert('faxina.bat existe', fs.existsSync(path.join(ROOT, 'faxina.bat')))
     assert(
+      'win-self-heal existe',
+      fs.existsSync(path.join(SRC, 'main/win-self-heal.ts'))
+    )
+    assert(
+      'index chama win-self-heal',
+      /win-self-heal/.test(fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8'))
+    )
+    assert('npm run certificar', typeof pkgLimpeza.scripts.certificar === 'string')
+    assert(
       'mcp script portatil',
       !/\\\\/.test(pkgLimpeza.scripts.mcp) && /\.dg-editor\/bin/.test(pkgLimpeza.scripts.mcp)
     )

@@ -3,38 +3,13 @@ Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
-### Pasta vazia / arquivos faltando
+Trabalho e validação ficam no **Cursor** (branch `feat/vault-markdown`). No boot, o app **self-heal** grava `abrir-dg-editor.vbs`/atalho sozinho (sem console).
 
-Se `D:\CURSOR\DG Editor` **não tem** `abrir-dg-editor.vbs`, `atualizar-atalho-desktop.bat`, etc., cole isto no **PowerShell** (não precisa de nada na pasta):
+Use o atalho **DG Editor** na Área de Trabalho (alvo: `wscript` + `abrir-dg-editor.vbs`). Não abra `node_modules\electron\dist`.
 
-```powershell
-irm https://raw.githubusercontent.com/digo85cs/dg-editor/feat/vault-markdown/scripts/sincronizar-windows.ps1 | iex
-```
+Certificação no repo: `npm run certificar` (typecheck + test + build).
 
-Isso clona/atualiza a branch `feat/vault-markdown` em `D:\CURSOR\DG Editor` e recria o atalho.
-
-### Uso diário
-
-**Atalho da Área de Trabalho:** rode uma vez `atualizar-atalho-desktop.bat` (ou o comando acima). Depois use só o ícone **DG Editor**.
-
-Não use `node_modules\electron\dist` — abre Electron cru / build velho.
-
-```bat
-cd /d "D:\CURSOR\DG Editor"
-git pull origin feat/vault-markdown
-atualizar-atalho-desktop.bat
-```
-
-### Faxina (só o necessário para rodar)
-
-Remove logs, caches, `dist-app`, dumps de QA e lixo de packaging. **Não** apaga `src`, `out`, `node_modules`, `resources` nem skills/agentes.
-
-```bat
-cd /d "D:\CURSOR\DG Editor"
-faxina.bat
-```
-
-Ou: `npm run limpeza:organica`
+Faxina orgânica: `npm run limpeza:organica` (ou `faxina.bat`).
 
 ### App instalável (Windows, sem pasta electron)
 

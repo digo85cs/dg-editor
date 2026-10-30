@@ -180,6 +180,16 @@ app.whenReady().then(() => {
   void import('./logs-estruturados').then(({ logEstruturado }) => {
     logEstruturado('info', 'boot', emSafeMode() || SAFE_MODE ? 'inicio safe-mode' : 'inicio normal')
   })
+  // Windows: garante VBS/atalho sem pedir nada ao usuario
+  if (process.platform === 'win32' && !SAFE_MODE) {
+    void import('./win-self-heal')
+      .then(({ selfHealWindowsLaunchers }) => {
+        selfHealWindowsLaunchers()
+      })
+      .catch((e) => {
+        dglog('[boot] win-self-heal: ' + String(e))
+      })
+  }
   // Token de sessão ANTES do servidor de controle (sempre novo)
   garantirTokenSessao()
   installPtBrMenu({
