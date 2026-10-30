@@ -1047,6 +1047,21 @@ async function main() {
       'prestart garante launchers',
       typeof pkg.scripts.prestart === 'string' && /garantir-launchers/.test(pkg.scripts.prestart)
     )
+    assert(
+      'raiz canonica Windows',
+      /D:\\\\CURSOR\\\\DG Editor/.test(
+        fs.readFileSync(path.join(SRC, 'shared/raiz-canonica.ts'), 'utf8')
+      )
+    )
+    assert(
+      'sincronizar-remoto.cjs existe',
+      fs.existsSync(path.join(ROOT, 'scripts/sincronizar-remoto.cjs'))
+    )
+    assert(
+      'paths prioriza windows-canonica',
+      /fix:windows-canonica/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8')) &&
+        /RAIZ_WINDOWS_CANONICA/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8'))
+    )
   }
 
   section('Vault Markdown')

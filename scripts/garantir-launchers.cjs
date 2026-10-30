@@ -159,24 +159,30 @@ function instalarShimElectronVite() {
 
 function main() {
   const feitos = []
-  if (escrever(path.join(ROOT, 'abrir-dg-editor.vbs'), VBS)) feitos.push('abrir-dg-editor.vbs')
-  if (escrever(path.join(ROOT, 'abrir-dg-editor.bat'), BAT_ABRIR)) feitos.push('abrir-dg-editor.bat')
-  if (escrever(path.join(ROOT, 'atualizar-atalho-desktop.bat'), BAT_ATALHO)) feitos.push('atualizar-atalho-desktop.bat')
-  if (escrever(path.join(ROOT, 'corrigir-atalho-desktop.bat'), BAT_ATALHO)) feitos.push('corrigir-atalho-desktop.bat')
+  // No Windows a raiz oficial e sempre D:\CURSOR\DG Editor
+  const alvo =
+    process.platform === 'win32' && fs.existsSync(path.join(RAIZ_WIN, 'package.json'))
+      ? RAIZ_WIN
+      : ROOT
+  if (escrever(path.join(alvo, 'abrir-dg-editor.vbs'), VBS)) feitos.push('abrir-dg-editor.vbs')
+  if (escrever(path.join(alvo, 'abrir-dg-editor.bat'), BAT_ABRIR)) feitos.push('abrir-dg-editor.bat')
+  if (escrever(path.join(alvo, 'atualizar-atalho-desktop.bat'), BAT_ATALHO)) feitos.push('atualizar-atalho-desktop.bat')
+  if (escrever(path.join(alvo, 'corrigir-atalho-desktop.bat'), BAT_ATALHO)) feitos.push('corrigir-atalho-desktop.bat')
   try {
-    fs.writeFileSync(path.join(ROOT, '.dg-root'), (process.platform === 'win32' && fs.existsSync(RAIZ_WIN) ? RAIZ_WIN : ROOT) + '\n', 'utf8')
+    fs.writeFileSync(path.join(alvo, '.dg-root'), (alvo === RAIZ_WIN ? RAIZ_WIN : alvo) + '\n', 'utf8')
   } catch { /* ignore */ }
+  // package.json / shim: usa ROOT (cwd do script) — no PC ROOT == RAIZ_WIN apos sync
   if (patchPackageJson()) feitos.push('package.json#start')
   if (instalarShimElectronVite()) feitos.push('shim:electron-vite')
-  const markerDir = path.join(ROOT, '.dg-editor')
+  const markerDir = path.join(alvo, '.dg-editor')
   if (!fs.existsSync(markerDir)) fs.mkdirSync(markerDir, { recursive: true })
   fs.writeFileSync(
     path.join(markerDir, 'boot-silent.flag'),
-    'version=3\nstart=iniciar-app\natalho=wscript+vbs\n',
+    'version=4\nraiz=' + alvo + '\nstart=iniciar-app\natalho=wscript+vbs\nbranch=feat/vault-markdown\n',
     'utf8'
   )
   if (process.argv.includes('--verbose') || feitos.length) {
-    console.log('[garantir-launchers] ok' + (feitos.length ? ': ' + feitos.join(', ') : ' (ja atualizado)'))
+    console.log('[garantir-launchers] ok raiz=' + alvo + (feitos.length ? ': ' + feitos.join(', ') : ' (ja atualizado)'))
   }
 }
 

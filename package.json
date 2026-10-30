@@ -34,6 +34,7 @@
         "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
         "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
         "certificar": "node scripts/certificar.cjs",
+        "sync:win": "node scripts/sincronizar-remoto.cjs",
         "dist:win": "npm run build && electron-builder --win --dir",
         "dist:win:installer": "npm run build && electron-builder --win nsis"
     },

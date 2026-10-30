@@ -16,5 +16,9 @@
 - Programar em pt-BR: comentarios, logs, textos de UI, mensagens de erro, docs e nomes de regras/skills quando forem texto humano.
 - Codigo (APIs, identificadores ja existentes em ingles) pode manter ingles tecnico; texto voltado a pessoa fica em pt-BR.
 - Nao misturar idiomas na mesma resposta ao usuario.
+# === PASTA DE TRABALHO (permanente) ===
+- Pasta oficial do DG Editor no Windows: D:\CURSOR\DG Editor (sempre).
+- Cloud Agent trabalha em /workspace e publica na branch feat/vault-markdown; o PC sincroniza essa pasta com o remoto no boot.
+- Nunca usar node_modules\electron\dist como atalho ou raiz.
 # === QUALIDADE DO CHAT ===
 - Respostas diretas e acionaveis, em bloco unico pronto para uso.

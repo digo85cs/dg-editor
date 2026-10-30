@@ -3,13 +3,12 @@ Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
-Trabalho e validação ficam no **Cursor** (branch `feat/vault-markdown`). No boot, o app **self-heal** grava `abrir-dg-editor.vbs`/atalho sozinho (sem console).
+**Pasta oficial permanente:** `D:\CURSOR\DG Editor`  
+Cloud Agent edita em `/workspace` e publica na branch `feat/vault-markdown`. No boot Windows o app **sincroniza** essa pasta com o remoto e self-heal do atalho (`wscript` + `abrir-dg-editor.vbs`, sem console).
 
-Use o atalho **DG Editor** na Área de Trabalho (alvo: `wscript` + `abrir-dg-editor.vbs`). Não abra `node_modules\electron\dist`.
+Não abra `node_modules\electron\dist`.
 
-Certificação no repo: `npm run certificar` (typecheck + test + build).
-
-Faxina orgânica: `npm run limpeza:organica` (ou `faxina.bat`).
+Certificação: `npm run certificar`. Faxina: `npm run limpeza:organica`.
 
 ### App instalável (Windows, sem pasta electron)
 

@@ -6,9 +6,9 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { spawn } from 'child_process'
 import { dglog } from './dglog'
-import { resolverRaizProjeto } from './paths'
+import { resolverRaizProjeto, RAIZ_WINDOWS_CANONICA } from './paths'
 
-const RAIZ_CANONICA = 'D:\\CURSOR\\DG Editor'
+const RAIZ_CANONICA = RAIZ_WINDOWS_CANONICA
 
 const VBS = `' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
 Option Explicit
@@ -111,6 +111,12 @@ export function selfHealWindowsLaunchers(): { ok: boolean; escritos: string[] } 
     writeFileSync(join(raiz, '.dg-root'), raiz + '\n', 'utf8')
   } catch {
     /* ignore */
+  }
+
+  const sync = join(raiz, 'scripts', 'sincronizar-remoto.cjs')
+  if (existsSync(sync)) {
+    spawnHidden(process.execPath, [sync], raiz)
+    dglog('[win-self-heal] sync remoto agendado → ' + RAIZ_CANONICA)
   }
 
   const garantir = join(raiz, 'scripts', 'garantir-launchers.cjs')
