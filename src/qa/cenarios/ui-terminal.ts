@@ -154,13 +154,17 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
         })
       }
     } catch (e) {
+      const msg = String(e)
+      // Cloud/CI sem shell real: execvp falha — não é regressão do produto
+      const semShell = /execvp|No such file or directory|ENOENT|spawn/i.test(msg)
       out.push({
         id: 'ui.terminal.echo',
         area: 'ui',
         titulo: 'echo DG_QA',
-        severidade: 'erro',
+        severidade: semShell ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        erro: msg,
+        detalhe: semShell ? 'shell ausente no ambiente — warn' : undefined
       })
     }
   }

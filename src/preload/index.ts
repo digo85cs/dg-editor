@@ -39,6 +39,9 @@ const invokeChannels = [
   'agente:pedir', 'agente:orquestrar', 'agente:listar', 'agente:fila-status',
   'agente:cancelar', 'agente:propostas', 'agente:aplicar-proposta', 'agente:rejeitar-proposta',
   'agente:plano-salvar', 'agente:plano-ler', 'agente:plano-limpar', 'agente:executar-plano',
+  'agente:plano-marcar-passo', 'agente:plano-atualizar-passos',
+  'agente:verificar', 'agente:diagnosticos', 'agente:diagnostico-manual',
+  'propostas:listar', 'propostas:hunks', 'propostas:definir-hunks',
   'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
   'agente:checkpoint-desfazer', 'contexto:projeto',
   'navegador:embed-status'

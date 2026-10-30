@@ -4,19 +4,14 @@
  * Smoke (DG_NAV_SMOKE=1): BaseWindow temporária (host com bounds controláveis).
  * Partition persist:dgnav = sessão (cookies/localStorage) em disco.
  *
- * DÍVIDA DE ARQUITETURA — DOIS CAMINHOS
+ * DÍVIDA DE ARQUITETURA — DOIS HOSTS (conteúdo unificado)
  *
- * DG_NAV_SMOKE=1 -> BaseWindow oculta (arquitetura antiga).
- *   22 cenários do smoke testam essa bifurcação.
- *   Views chrome/content são filhas do BaseWindow.
+ * DG_NAV_SMOKE=1 -> BaseWindow oculta (host legado; smoke 22/22).
+ * Modo normal -> View host na BrowserWindow (bounds via navegador:bounds).
  *
- * Modo normal -> View host na BrowserWindow principal.
- *   Renderer envia bounds via 'navegador:bounds'.
- *
- * CONSEQUÊNCIA: o smoke NÃO cobre o caminho de produção.
- * Se a arquitetura de embed quebrar, o smoke continua verde.
- * Fechar essa dívida exige reescrever os cenários com um
- * host injetável. Não fazer sem decisão explícita.
+ * Mitigação: criarViews + carregarUrlNasViews + layoutInterno são compartilhados.
+ * Produção coberta por navegador:embed-status + e2e ui.browser.*.
+ * Remover BaseWindow ainda exige host injetável no smoke — decisão explícita.
  */
 import {
   BaseWindow,
@@ -399,17 +394,23 @@ export function estadoAtual(): EstadoNavegador {
 /** Status do caminho de produção (embed) vs smoke — para UI/diagnóstico. */
 export function statusEmbedNavegador(): {
   modo: 'smoke' | 'embed'
+  host: 'smoke' | 'embed'
   hostAnexado: boolean
   embutidoVisivel: boolean
   aberto: boolean
   bounds: Bounds | null
+  conteudoCompartilhado: true
 } {
+  const host = caminhoHostNavegador()
   return {
-    modo: emSmokeNav() ? 'smoke' : 'embed',
+    modo: host,
+    host,
     hostAnexado,
     embutidoVisivel,
     aberto: navegadorAberto(),
-    bounds: ultimoBounds.width > 0 ? { ...ultimoBounds } : null
+    bounds: ultimoBounds.width > 0 ? { ...ultimoBounds } : null,
+    /** chrome/content/loadURL via criarViews+carregarUrlNasViews nos dois hosts */
+    conteudoCompartilhado: true
   }
 }
 
@@ -542,6 +543,17 @@ function criarViews(): void {
   ligarEventosContent(contentView.webContents)
 }
 
+/** Caminho de conteúdo compartilhado smoke↔embed (loadURL na contentView). */
+function carregarUrlNasViews(url: string): void {
+  if (!contentView) return
+  void contentView.webContents.loadURL(url || 'about:blank')
+}
+
+/** Host atual: smoke (BaseWindow) ou embed (View na principal). */
+export function caminhoHostNavegador(): 'smoke' | 'embed' {
+  return emSmokeNav() ? 'smoke' : 'embed'
+}
+
 function destruirNavegador(): void {
   try {
     if (janelaSmoke && !janelaSmoke.isDestroyed()) janelaSmoke.close()
@@ -589,14 +601,11 @@ export function criarJanelaNavegador(
         ? 'about:blank'
         : undefined
 
-  // --- SMOKE: BaseWindow (cenários 7/12 dependem) ---
+  // --- SMOKE: BaseWindow (cenários 7/12 dependem do host) ---
+  // Conteúdo (criarViews + carregarUrlNasViews + layoutInterno) = mesmo do embed.
   if (emSmokeNav()) {
     if (janelaSmoke && !janelaSmoke.isDestroyed()) {
-      if (destino && destino !== 'about:blank') {
-        void contentView?.webContents.loadURL(destino)
-      } else if (destino === 'about:blank') {
-        void contentView?.webContents.loadURL('about:blank')
-      }
+      if (destino != null) carregarUrlNasViews(destino)
       if (mostrar) {
         if (!janelaSmoke.isVisible()) janelaSmoke.show()
         janelaSmoke.focus()
@@ -635,7 +644,7 @@ export function criarJanelaNavegador(
     })
     sessaoAberta = true
     const urlLoad = destino || 'about:blank'
-    void contentView!.webContents.loadURL(urlLoad)
+    carregarUrlNasViews(urlLoad)
     if (mostrar) {
       janelaSmoke.show()
       janelaSmoke.focus()
@@ -648,17 +657,12 @@ export function criarJanelaNavegador(
   registrarIpc()
   if (hostAnexado && hostView && chromeView && contentView) {
     sessaoAberta = true
-    if (destino && destino !== 'about:blank') {
-      void contentView.webContents.loadURL(destino)
-    } else if (destino === 'about:blank') {
-      void contentView.webContents.loadURL('about:blank')
-    }
+    if (destino != null) carregarUrlNasViews(destino)
     if (mostrar) {
       embutidoVisivel = true
       if (ultimoBounds.width > 0) layoutNavegador(ultimoBounds)
     }
     dglog(`[navegador] embutido singleton reutilizado mostrar=${mostrar}`)
-    // Cast: API pública tipada BaseWindow para smoke; app não usa o retorno
     return janelaSmoke as unknown as BaseWindow
   }
 
@@ -678,7 +682,7 @@ export function criarJanelaNavegador(
   layoutInterno(0, 0)
 
   const urlLoad = destino || 'about:blank'
-  void contentView!.webContents.loadURL(urlLoad)
+  carregarUrlNasViews(urlLoad)
   if (mostrar) {
     embutidoVisivel = true
   }

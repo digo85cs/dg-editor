@@ -3,11 +3,14 @@ import { dirname, resolve } from 'path'
 import { randomBytes, createHash } from 'crypto'
 import { caminhoSeguro } from '../ipc-seguro'
 import type { EditProposta } from './cliente'
+import { filtrarHunks, listarHunks, type HunkInfo } from './hunks'
 
 export type EditPendente = EditProposta & {
   id: string
   absPath: string
   status: 'pendente' | 'aplicado' | 'rejeitado'
+  /** origem da proposta — fila unificada Agent/OpenClaw */
+  origem?: 'agent' | 'openclaw' | 'manual'
 }
 
 const pendentes = new Map<string, EditPendente>()
@@ -20,53 +23,75 @@ export function listarPendentes(): EditPendente[] {
   return [...pendentes.values()].filter((p) => p.status === 'pendente')
 }
 
-export function registrarPendentes(
-  edits: EditProposta[],
-  pastas: string[]
-): { ok: boolean; pendentes: EditPendente[]; rejeitados: Array<{ path: string; erro: string }> } {
-  limparPendentes()
-  const okList: EditPendente[] = []
-  const rejeitados: Array<{ path: string; erro: string }> = []
-  for (const e of edits) {
-    const seg = caminhoSeguro(e.path, pastas)
-    if (!seg.ok) {
-      // tenta path relativo à primeira pasta
-      let resolvido: ReturnType<typeof caminhoSeguro> | null = null
-      for (const raiz of pastas) {
-        const cand = resolve(raiz, e.path)
-        const s = caminhoSeguro(cand, pastas)
-        if (s.ok) {
-          resolvido = s
-          break
-        }
+function registrarUm(
+  e: EditProposta,
+  pastas: string[],
+  origem: EditPendente['origem'],
+  okList: EditPendente[],
+  rejeitados: Array<{ path: string; erro: string }>
+): void {
+  const seg = caminhoSeguro(e.path, pastas)
+  if (!seg.ok) {
+    let resolvido: ReturnType<typeof caminhoSeguro> | null = null
+    for (const raiz of pastas) {
+      const cand = resolve(raiz, e.path)
+      const s = caminhoSeguro(cand, pastas)
+      if (s.ok) {
+        resolvido = s
+        break
       }
-      if (!resolvido || !resolvido.ok) {
-        const erroSeg = 'erro' in seg ? String(seg.erro) : 'path fora das pastas'
-        rejeitados.push({ path: e.path, erro: erroSeg })
-        continue
-      }
-      const id = randomBytes(8).toString('hex')
-      const p: EditPendente = {
-        id,
-        path: e.path,
-        unifiedDiff: e.unifiedDiff,
-        absPath: resolvido.abs,
-        status: 'pendente'
-      }
-      pendentes.set(id, p)
-      okList.push(p)
-      continue
+    }
+    if (!resolvido || !resolvido.ok) {
+      const erroSeg = 'erro' in seg ? String(seg.erro) : 'path fora das pastas'
+      rejeitados.push({ path: e.path, erro: erroSeg })
+      return
     }
     const id = randomBytes(8).toString('hex')
     const p: EditPendente = {
       id,
       path: e.path,
       unifiedDiff: e.unifiedDiff,
-      absPath: seg.abs,
-      status: 'pendente'
+      absPath: resolvido.abs,
+      status: 'pendente',
+      origem
     }
     pendentes.set(id, p)
     okList.push(p)
+    return
+  }
+  const id = randomBytes(8).toString('hex')
+  const p: EditPendente = {
+    id,
+    path: e.path,
+    unifiedDiff: e.unifiedDiff,
+    absPath: seg.abs,
+    status: 'pendente',
+    origem
+  }
+  pendentes.set(id, p)
+  okList.push(p)
+}
+
+/** Substitui a fila (OpenClaw pedir). */
+export function registrarPendentes(
+  edits: EditProposta[],
+  pastas: string[],
+  origem: EditPendente['origem'] = 'openclaw'
+): { ok: boolean; pendentes: EditPendente[]; rejeitados: Array<{ path: string; erro: string }> } {
+  limparPendentes()
+  return adicionarPendentes(edits, pastas, origem)
+}
+
+/** Acumula na fila sem limpar (Agent / multi-turno). */
+export function adicionarPendentes(
+  edits: EditProposta[],
+  pastas: string[],
+  origem: EditPendente['origem'] = 'agent'
+): { ok: boolean; pendentes: EditPendente[]; rejeitados: Array<{ path: string; erro: string }> } {
+  const okList: EditPendente[] = []
+  const rejeitados: Array<{ path: string; erro: string }> = []
+  for (const e of edits) {
+    registrarUm(e, pastas, origem, okList, rejeitados)
   }
   return { ok: true, pendentes: okList, rejeitados }
 }
@@ -80,6 +105,39 @@ export function marcarRejeitado(id: string): boolean {
   if (!p || p.status !== 'pendente') return false
   p.status = 'rejeitado'
   return true
+}
+
+export function listarHunksPendente(id: string): { ok: boolean; erro?: string; hunks?: HunkInfo[] } {
+  const p = pendentes.get(id)
+  if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
+  return { ok: true, hunks: listarHunks(p.unifiedDiff) }
+}
+
+/** Mantém só os hunks aceitos; se vazio, rejeita o pendente. */
+export function definirHunksPendente(
+  id: string,
+  indicesAceitos: number[]
+): { ok: boolean; erro?: string; pendente?: EditPendente; rejeitado?: boolean } {
+  const p = pendentes.get(id)
+  if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
+  if (!indicesAceitos.length) {
+    p.status = 'rejeitado'
+    return { ok: true, rejeitado: true, pendente: p }
+  }
+  const novo = filtrarHunks(p.unifiedDiff, indicesAceitos)
+  if (!novo.trim()) return { ok: false, erro: 'diff vazio apos filtro' }
+  p.unifiedDiff = novo
+  return { ok: true, pendente: p }
+}
+
+export function atualizarDiffPendente(
+  id: string,
+  unifiedDiff: string
+): { ok: boolean; erro?: string; pendente?: EditPendente } {
+  const p = pendentes.get(id)
+  if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
+  p.unifiedDiff = String(unifiedDiff || '')
+  return { ok: true, pendente: p }
 }
 
 /**

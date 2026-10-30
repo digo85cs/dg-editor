@@ -15,16 +15,22 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
       const stop = page.locator('#btn-agent-stop')
       const undo = page.locator('#btn-agent-undo')
       const execPlano = page.locator('#btn-agent-exec-plano')
+      const execPasso = page.locator('#btn-agent-exec-passo')
+      const verificar = page.locator('#btn-agent-verificar')
+      const autoVerify = page.locator('#agent-verify-loop')
       const visivel =
         (await plan.count()) === 1 &&
         (await send.count()) === 1 &&
         (await stop.count()) === 1 &&
         (await undo.count()) === 1 &&
-        (await execPlano.count()) === 1
+        (await execPlano.count()) === 1 &&
+        (await execPasso.count()) === 1 &&
+        (await verificar.count()) === 1 &&
+        (await autoVerify.count()) === 1
       out.push({
         id: 'ui.agent.painel',
         area: 'ui',
-        titulo: 'aba Agent com Plan/Parar/Undo/Executar plano',
+        titulo: 'aba Agent Plan/Parar/Undo/Plano/Passo/Verificar',
         severidade: visivel ? 'ok' : 'erro',
         duracaoMs: Date.now() - t0
       })

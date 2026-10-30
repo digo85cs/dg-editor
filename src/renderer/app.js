@@ -910,6 +910,16 @@ async function abrirPainelDiff(absPath) {
   }
 }
 
+/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string, origem?: string }[]} */
+let ocPendentes = []
+/** @type {string | null} */
+let ocPendenteAtivoId = null
+/** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string, origem?: string }[]} */
+let agentPropostas = []
+let agentProgressUnsub = null
+/** @type {Set<number>} */
+let ocHunksAceitos = new Set()
+
 function fecharPainelDiff() {
   const panel = $('diff-panel')
   if (!panel) return
@@ -917,6 +927,7 @@ function fecharPainelDiff() {
   panel.setAttribute('aria-hidden', 'true')
   ocPendenteAtivoId = null
   window.__dgApplyViaAgente = false
+  ocHunksAceitos = new Set()
   const acoes = $('diff-panel-actions')
   if (acoes) acoes.hidden = true
   const lista = $('oc-pendentes-lista')
@@ -924,15 +935,49 @@ function fecharPainelDiff() {
     lista.hidden = true
     lista.innerHTML = ''
   }
+  const bar = $('diff-hunks-bar')
+  if (bar) {
+    bar.hidden = true
+    bar.innerHTML = ''
+  }
 }
 
-/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string }[]} */
-let ocPendentes = []
-/** @type {string | null} */
-let ocPendenteAtivoId = null
-/** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string }[]} */
-let agentPropostas = []
-let agentProgressUnsub = null
+async function carregarHunksDiff(pendenteId) {
+  const bar = $('diff-hunks-bar')
+  if (!bar) return
+  bar.innerHTML = ''
+  ocHunksAceitos = new Set()
+  const r = await window.api.invoke('propostas:hunks', pendenteId)
+  if (!r?.ok || !r.hunks?.length) {
+    bar.hidden = true
+    return
+  }
+  bar.hidden = false
+  for (const h of r.hunks) {
+    ocHunksAceitos.add(h.index)
+    const row = document.createElement('div')
+    row.className = 'diff-hunk-row'
+    row.dataset.index = String(h.index)
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.checked = true
+    cb.setAttribute('aria-label', 'Aceitar hunk ' + (h.index + 1))
+    cb.addEventListener('change', () => {
+      if (cb.checked) {
+        ocHunksAceitos.add(h.index)
+        row.classList.remove('rejeitado')
+      } else {
+        ocHunksAceitos.delete(h.index)
+        row.classList.add('rejeitado')
+      }
+    })
+    const code = document.createElement('code')
+    code.textContent = 'hunk ' + (h.index + 1) + ' ' + (h.resumo || '') + ' ' + (h.header || '')
+    row.appendChild(cb)
+    row.appendChild(code)
+    bar.appendChild(row)
+  }
+}
 
 function mostrarDiffOpenClaw(pendente) {
   const panel = $('diff-panel')
@@ -941,7 +986,8 @@ function mostrarDiffOpenClaw(pendente) {
   const acoes = $('diff-panel-actions')
   if (!panel || !body || !pendente) return
   ocPendenteAtivoId = pendente.id
-  if (title) title.textContent = 'OpenClaw: ' + (pendente.path || pendente.absPath)
+  const origem = pendente.origem || (window.__dgApplyViaAgente ? 'agent' : 'openclaw')
+  if (title) title.textContent = origem + ': ' + (pendente.path || pendente.absPath)
   body.innerHTML = renderDiffHtml(pendente.unifiedDiff)
   if (acoes) acoes.hidden = false
   panel.classList.remove('hidden')
@@ -952,6 +998,7 @@ function mostrarDiffOpenClaw(pendente) {
       btn.classList.toggle('active', btn.dataset.id === pendente.id)
     }
   }
+  void carregarHunksDiff(pendente.id)
 }
 
 function renderListaPendentesOc() {
@@ -1011,26 +1058,26 @@ async function pedirOpenClawUi() {
   mostrarDiffOpenClaw(ocPendentes[0])
 }
 
-async function aplicarPendenteOc() {
-  if (!ocPendenteAtivoId) return
-  if (!window.confirm('Aplicar este diff no disco? Acao irreversivel sem git.')) return
+async function finalizarApplyPendente(r, id) {
   const viaAgente = !!window.__dgApplyViaAgente
-  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
-  const r = await window.api.invoke(canal, ocPendenteAtivoId, pastasPermitidas())
-  if (!r?.ok) {
-    alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
-    return
-  }
-  const id = ocPendenteAtivoId
   ocPendentes = ocPendentes.filter((p) => p.id !== id)
-  if (viaAgente) {
-    agentPropostas = agentPropostas.filter((p) => p.id !== id)
-    mostrarPropostasAgent(agentPropostas)
-  }
+  agentPropostas = agentPropostas.filter((p) => p.id !== id)
+  mostrarPropostasAgent(agentPropostas)
   if (r.absPath && abaAtiva === r.absPath && editor) {
     const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
     if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
   }
+  // fila unificada
+  const rest = await window.api.invoke('propostas:listar')
+  ocPendentes = (rest?.pendentes || []).map((p) => ({
+    id: p.id,
+    path: p.path,
+    absPath: p.absPath,
+    unifiedDiff: p.unifiedDiff,
+    origem: p.origem
+  }))
+  agentPropostas = ocPendentes.slice()
+  mostrarPropostasAgent(agentPropostas)
   if (ocPendentes.length) {
     renderListaPendentesOc()
     mostrarDiffOpenClaw(ocPendentes[0])
@@ -1038,6 +1085,49 @@ async function aplicarPendenteOc() {
     fecharPainelDiff()
     alert(viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.')
   }
+}
+
+async function aplicarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  if (!window.confirm('Aplicar este arquivo no disco?')) return
+  const viaAgente = !!window.__dgApplyViaAgente
+  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
+  const id = ocPendenteAtivoId
+  const r = await window.api.invoke(canal, id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
+    return
+  }
+  await finalizarApplyPendente(r, id)
+}
+
+async function aplicarHunksSelecionadosOc() {
+  if (!ocPendenteAtivoId) return
+  const indices = [...ocHunksAceitos].sort((a, b) => a - b)
+  if (!indices.length) {
+    alert('Nenhum hunk selecionado.')
+    return
+  }
+  if (!window.confirm('Aplicar ' + indices.length + ' hunk(s) selecionado(s)?')) return
+  const def = await window.api.invoke('propostas:definir-hunks', ocPendenteAtivoId, indices)
+  if (!def?.ok) {
+    alert('Falha ao filtrar hunks: ' + (def?.erro || ''))
+    return
+  }
+  if (def.rejeitado) {
+    alert('Todos os hunks rejeitados.')
+    fecharPainelDiff()
+    return
+  }
+  const viaAgente = !!window.__dgApplyViaAgente || def.pendente?.origem === 'agent'
+  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
+  const id = ocPendenteAtivoId
+  const r = await window.api.invoke(canal, id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar hunks: ' + (r?.erro || 'erro'))
+    return
+  }
+  await finalizarApplyPendente(r, id)
 }
 
 async function rejeitarPendenteOc() {
@@ -2552,6 +2642,7 @@ $('btn-oc-limpar-token')?.addEventListener('click', async () => {
   await carregarConfigOpenClawUi()
 })
 $('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
+$('btn-oc-aplicar-hunks')?.addEventListener('click', () => void aplicarHunksSelecionadosOc())
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 
 function atualizarStatusAgent(modelo, ms, fila) {
@@ -2724,6 +2815,65 @@ function ligarProgressoAgent() {
   })
 }
 
+function coletarAbasCtx() {
+  const out = []
+  for (const a of abas) {
+    const item = { path: a.caminho, ativa: a.caminho === abaAtiva }
+    if (a.caminho === abaAtiva && editor && editor.getConteudo) {
+      try {
+        item.conteudo = editor.getConteudo()
+      } catch {
+        /* */
+      }
+    }
+    out.push(item)
+  }
+  return out
+}
+
+function renderPlanoChecklist(plano) {
+  const box = $('agent-plano-checklist')
+  if (!box) return
+  const passos = plano?.passos || []
+  if (!passos.length) {
+    box.hidden = true
+    box.innerHTML = ''
+    return
+  }
+  box.hidden = false
+  box.innerHTML = ''
+  const titulo = document.createElement('div')
+  titulo.innerHTML =
+    '<strong>Plano</strong> <span class="muted">' +
+    passos.filter((p) => p.feito).length +
+    '/' +
+    passos.length +
+    '</span>'
+  box.appendChild(titulo)
+  for (const p of passos) {
+    const lab = document.createElement('label')
+    if (p.feito) lab.classList.add('feito')
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.checked = !!p.feito
+    cb.addEventListener('change', async () => {
+      await window.api.invoke('agente:plano-marcar-passo', p.id, cb.checked)
+      const r = await window.api.invoke('agente:plano-ler')
+      renderPlanoChecklist(r?.plano)
+    })
+    const span = document.createElement('span')
+    span.textContent = p.texto
+    lab.appendChild(cb)
+    lab.appendChild(span)
+    box.appendChild(lab)
+  }
+}
+
+async function refrescarPlanoUi() {
+  const r = await window.api.invoke('agente:plano-ler')
+  renderPlanoChecklist(r?.plano)
+}
+
 async function executarAgentUi(orquestrar) {
   if (!pastaAtual) {
     alert('Abra uma pasta primeiro.')
@@ -2733,6 +2883,7 @@ async function executarAgentUi(orquestrar) {
   const texto = input?.value?.trim()
   if (!texto) return
   const plan = $('agent-plan-mode')?.checked
+  const verify = $('agent-verify-loop')?.checked
   const agente = $('agent-select')?.value || undefined
   const out = $('agent-output')
   const send = $('agent-send')
@@ -2770,7 +2921,10 @@ async function executarAgentUi(orquestrar) {
         pastas: pastasPermitidas(),
         selecao,
         arquivoAtivo: abaAtiva || undefined,
-        proposeWrites: true
+        proposeWrites: true,
+        verificarApos: !!verify && !plan,
+        abas: coletarAbasCtx(),
+        incluirGit: true
       })
       if (!r?.ok) {
         if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
@@ -2785,6 +2939,8 @@ async function executarAgentUi(orquestrar) {
       renderAgentTrace(r.passos || [])
       mostrarPropostasAgent(r.propostas || [])
       atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
+      if (plan || r.plano) renderPlanoChecklist(r.plano)
+      else await refrescarPlanoUi()
     }
     await carregarAgentesUi()
   } catch (e) {
@@ -2808,7 +2964,8 @@ $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   if (out) out.textContent = 'Executando plano salvo…'
   const r = await window.api.invoke('agente:executar-plano', {
     raiz: pastaAtual,
-    pastas: pastasPermitidas()
+    pastas: pastasPermitidas(),
+    soProximo: false
   })
   if (!r?.ok) {
     alert(r?.erro || 'falha')
@@ -2818,6 +2975,38 @@ $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   renderAgentTrace(r.passos || [])
   mostrarPropostasAgent(r.propostas || [])
   atualizarStatusAgent(r.modelo, r.duracaoMs, null)
+  renderPlanoChecklist(r.plano)
+})
+$('btn-agent-exec-passo')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  ligarProgressoAgent()
+  const out = $('agent-output')
+  if (out) out.textContent = 'Executando próximo passo…'
+  const r = await window.api.invoke('agente:executar-plano', {
+    raiz: pastaAtual,
+    pastas: pastasPermitidas(),
+    soProximo: true
+  })
+  if (!r?.ok) {
+    alert(r?.erro || 'falha')
+    return
+  }
+  if (out) {
+    out.textContent =
+      (r.passoExecutado ? '[Passo] ' + r.passoExecutado.texto + '\n\n' : '') + (r.texto || '')
+  }
+  renderAgentTrace(r.passos || [])
+  mostrarPropostasAgent(r.propostas || [])
+  renderPlanoChecklist(r.plano)
+})
+$('btn-agent-verificar')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  appendAgentTraceLive('… typecheck')
+  const r = await window.api.invoke('agente:verificar', { raiz: pastaAtual, modo: 'typecheck' })
+  const d = r?.diagnostico
+  appendAgentTraceLive(d?.ok ? '✓ typecheck ok' : '✗ ' + (d?.resumo || 'falha'))
+  const out = $('agent-output')
+  if (out && d && !d.ok) out.textContent = (out.textContent || '') + '\n\n[typecheck]\n' + (d.saida || '')
 })
 $('btn-agent-undo')?.addEventListener('click', async () => {
   const r = await window.api.invoke('agente:checkpoint-desfazer')
@@ -2829,6 +3018,7 @@ $('agent-input')?.addEventListener('keydown', (e) => {
     void executarAgentUi(false)
   }
 })
+void refrescarPlanoUi()
 
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)

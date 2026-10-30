@@ -157,10 +157,17 @@
             <select id="agent-select" aria-label="Escolher agente"></select>
             <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
             <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
+            <button type="button" id="btn-agent-exec-passo" class="btn-small" title="Executar próximo passo do plano" aria-label="Executar próximo passo">Próximo passo</button>
+            <button type="button" id="btn-agent-verificar" class="btn-small" title="Rodar typecheck e alimentar diagnósticos" aria-label="Verificar typecheck">Verificar</button>
+            <label class="agent-mode" title="Após o turno, roda typecheck e pede correção se falhar">
+              <input type="checkbox" id="agent-verify-loop" />
+              Auto-verify
+            </label>
             <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
             <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
             <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
           </header>
+          <div id="agent-plano-checklist" class="agent-plano-checklist" hidden role="region" aria-label="Checklist do plano"></div>
           <div id="agent-trace" class="agent-trace" aria-live="polite" aria-relevant="additions" aria-label="Tool trace" tabindex="0"></div>
           <div id="agent-output" class="agent-output" tabindex="0" role="log" aria-label="Resposta do agente" aria-live="polite"></div>
           <div id="agent-propostas-resumo" class="agent-propostas-resumo muted" hidden role="region"></div>
@@ -197,12 +204,14 @@
             <header class="diff-panel-header">
               <span id="diff-panel-title">Diff</span>
               <div class="diff-panel-actions" id="diff-panel-actions" hidden>
-                <button type="button" id="btn-oc-aplicar" class="btn-small">Aplicar</button>
-                <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar</button>
+                <button type="button" id="btn-oc-aplicar" class="btn-small" title="Aplicar arquivo inteiro">Aplicar arquivo</button>
+                <button type="button" id="btn-oc-aplicar-hunks" class="btn-small" title="Aplicar só hunks aceitos">Aplicar hunks</button>
+                <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar arquivo</button>
               </div>
               <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
             </header>
             <div id="oc-pendentes-lista" class="oc-pendentes-lista" hidden></div>
+            <div id="diff-hunks-bar" class="diff-hunks-bar" hidden></div>
             <pre id="diff-panel-body" class="diff-panel-body"></pre>
           </aside>
         </div>

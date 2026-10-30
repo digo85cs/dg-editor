@@ -25,12 +25,16 @@ Aba central **Agent**:
 | **@arquivo:path** | Injeta conteúdo do arquivo |
 | **@nota:Nome** | Resolve wikilink do vault Markdown |
 | **@selecao** | Seleção atual do editor |
-| **Propostas** | Writes MCP viram unified diffs; **Revisar** / **Aplicar** / **Aplicar todas** (com checkpoint) |
+| **Propostas** | Writes MCP viram unified diffs; **Revisar** / **Aplicar arquivo** / **Aplicar hunks** / **Aplicar todas** (checkpoint) |
+| **Hunks** | Aceitar/rejeitar por hunk no painel de diff (`propostas:definir-hunks`) |
+| **Auto-verify** | Após o turno, typecheck + rodada de correção se falhar |
+| **Contexto implícito** | Abas abertas + git status/diff + diagnósticos (sem `@`) |
+| **Checklist do plano** | Passos editáveis; **Próximo passo** executa só o pendente |
 | **Parar** | Aborta o job atual e limpa a fila (`AbortController`) |
 | **Desfazer apply** | Restaura o último checkpoint |
 | **Statusbar** | `#sb-agent` — modelo · latência · fila |
 
-OpenClaw continua separado (HTTP + aprovação humana, sem shell). O painel de diffs é reutilizado; apply do Agent usa `agente:aplicar-proposta` (checkpoint automático).
+Fila de propostas **unificada** (Agent + OpenClaw). Apply do Agent usa `agente:aplicar-proposta` (checkpoint). OpenClaw segue HTTP + aprovação humana, sem shell.
 
 ## Testes
 

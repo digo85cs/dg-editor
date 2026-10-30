@@ -1111,18 +1111,28 @@ async function main() {
       assert('fila limpa apos cancel', stF.tamanho === 0)
     }
 
-    // propostas + diff unificado
+    // propostas + diff unificado com hunks
     {
       const prop = loadModule('main/agent/propostas.ts')
+      const hunksMod = loadModule('main/openclaw/hunks.ts')
       assert('ehToolEscrita codigo_editar', prop.ehToolEscrita('codigo_editar') === true)
       assert('ehToolEscrita read false', prop.ehToolEscrita('codigo_ler') === false)
       const diff = prop.diffUnificado('a.ts', 'ola\n', 'ola\nmundo\n')
       assert('diff unificado header', /--- a\/a\.ts/.test(diff) && /\+\+\+ b\/a\.ts/.test(diff))
-      assert('diff unificado linhas', /^-ola/m.test(diff) && /^\+mundo/m.test(diff))
+      assert('diff unificado add mundo', /^\+mundo/m.test(diff))
+      const multi = hunksMod.gerarDiffUnificado(
+        'm.ts',
+        'a\nb\nc\nd\ne\n',
+        'a\nB\nc\nD\ne\n'
+      )
+      const hs = hunksMod.listarHunks(multi)
+      assert('hunks multiplos ou pelo menos 1', hs.length >= 1)
+      const filtrado = hunksMod.filtrarHunks(multi, [0])
+      assert('filtrar hunks mantem header', /--- a\/m\.ts/.test(filtrado) && /@@/.test(filtrado))
 
       const tmpP = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-prop-'))
       const arq = path.join(tmpP, 'x.ts')
-      fs.writeFileSync(arq, 'const a = 1\n', 'utf8')
+      fs.writeFileSync(arq, 'const a = 1\nconst b = 2\n', 'utf8')
       const proposta = prop.proporCodigoEditar(
         tmpP,
         { arquivo: arq, ancora: 'const a = 1', novo: 'const a = 2' },
@@ -1130,24 +1140,50 @@ async function main() {
       )
       assert('proporCodigoEditar ok', proposta.ok === true && !!proposta.pendente)
       assert('listarPendentes apos propor', prop.listarPendentes().length >= 1)
+      assert('origem agent na proposta', proposta.pendente.origem === 'agent')
+      const hkLista = hunksMod.listarHunks(proposta.pendente.unifiedDiff)
+      assert('hunks na proposta', hkLista.length >= 1)
       const id = proposta.pendente.id
       const apl = await prop.aplicarPropostaComCheckpoint(id, [tmpP])
       assert('aplicarPropostaComCheckpoint ok', apl.ok === true)
       assert('checkpointId apos apply', typeof apl.checkpointId === 'string' && apl.checkpointId.length > 0)
       const depois = fs.readFileSync(arq, 'utf8')
       assert('arquivo alterado apos apply', /const a = 2/.test(depois))
+
+      // fila unificada: adicionar sem limpar
+      const arq2 = path.join(tmpP, 'y.ts')
+      fs.writeFileSync(arq2, 'export const y = 1\n', 'utf8')
+      const p2 = prop.proporCodigoEditar(
+        tmpP,
+        { arquivo: arq2, ancora: 'y = 1', novo: 'y = 2' },
+        [tmpP]
+      )
+      assert('segunda proposta nao limpa fila', p2.ok && prop.listarPendentes().length >= 1)
     }
 
-    // plano persistido
+    // plano + checklist
     {
       const ud = path.join(os.tmpdir(), 'dg-plano-' + Date.now())
       fs.mkdirSync(ud, { recursive: true })
       process.env.DG_TEST_USERDATA = ud
       const plano = loadModule('main/agent/plano.ts')
       assert('plano inicia vazio', plano.lerPlano() === null)
-      plano.salvarPlano({ texto: '# plano\n1. x', raiz: '/tmp', salvoEm: new Date().toISOString(), agente: 'revisor' })
+      const passos = plano.extrairPassosDoTexto('# plano\n1. criar x\n2. testar y\n- opcional z')
+      assert('extrairPassosDoTexto', passos.length >= 2)
+      plano.salvarPlano({
+        texto: '# plano\n1. criar x\n2. testar y',
+        raiz: '/tmp',
+        salvoEm: new Date().toISOString(),
+        agente: 'revisor'
+      })
       const lido = plano.lerPlano()
       assert('plano salva e le', !!lido && lido.texto.indexOf('plano') >= 0 && lido.agente === 'revisor')
+      assert('plano tem passos', (lido.passos || []).length >= 2)
+      const pid = lido.passos[0].id
+      plano.marcarPasso(pid, true, 'ck-test')
+      const l2 = plano.lerPlano()
+      assert('marcarPasso', l2.passos[0].feito === true && l2.passos[0].checkpointId === 'ck-test')
+      assert('proximoPassoPendente', plano.proximoPassoPendente()?.id === l2.passos[1].id)
       plano.limparPlano()
       assert('plano limpar', plano.lerPlano() === null)
     }
@@ -1197,6 +1233,10 @@ async function main() {
     assert('preload agente:aplicar-proposta', /agente:aplicar-proposta/.test(pre))
     assert('preload agente:executar-plano', /agente:executar-plano/.test(pre))
     assert('preload agente:progresso', /agente:progresso/.test(pre))
+    assert('preload propostas:hunks', /propostas:hunks/.test(pre))
+    assert('preload propostas:definir-hunks', /propostas:definir-hunks/.test(pre))
+    assert('preload agente:verificar', /agente:verificar/.test(pre))
+    assert('preload agente:plano-marcar-passo', /agente:plano-marcar-passo/.test(pre))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
     assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
@@ -1210,18 +1250,32 @@ async function main() {
     assert('plan mode checkbox', /agent-plan-mode/.test(html))
     assert('btn Parar agente', /btn-agent-stop/.test(html))
     assert('btn Executar plano', /btn-agent-exec-plano/.test(html))
+    assert('btn Proximo passo', /btn-agent-exec-passo/.test(html))
+    assert('btn Verificar', /btn-agent-verificar/.test(html))
+    assert('auto-verify checkbox', /agent-verify-loop/.test(html))
+    assert('diff hunks bar', /diff-hunks-bar/.test(html))
+    assert('btn Aplicar hunks', /btn-oc-aplicar-hunks/.test(html))
     assert('btn Desfazer apply', /btn-agent-undo/.test(html))
     assert('statusbar sb-agent', /id="sb-agent"/.test(html))
     assert('a11y region agent', /aria-label="Painel do agente"/.test(html))
     const appJs = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
     assert('UI apply via agente', /agente:aplicar-proposta/.test(appJs) && /__dgApplyViaAgente/.test(appJs))
     assert('UI progresso agent', /agente:progresso/.test(appJs))
+    assert('UI hunks', /propostas:definir-hunks/.test(appJs) && /carregarHunksDiff/.test(appJs))
+    assert('UI contexto abas', /coletarAbasCtx/.test(appJs) && /verificarApos/.test(appJs))
+    assert('UI plano checklist', /renderPlanoChecklist/.test(appJs))
     assert('contexto embeddings opcional', /buscarSemelhantes/.test(fs.readFileSync(path.join(SRC, 'main/agent/contexto-projeto.ts'), 'utf8')))
+    assert('contexto implicito existe', fs.existsSync(path.join(SRC, 'main/agent/contexto-implicito.ts')))
+    assert('diagnosticos existe', fs.existsSync(path.join(SRC, 'main/agent/diagnosticos.ts')))
     const janela = fs.readFileSync(path.join(SRC, 'main/navegador/janela.ts'), 'utf8')
     assert('statusEmbedNavegador modo smoke|embed', /modo:\s*'smoke'\s*\|\s*'embed'/.test(janela))
+    assert('carregarUrlNasViews compartilhado', /function carregarUrlNasViews/.test(janela))
+    assert('conteudoCompartilhado no status', /conteudoCompartilhado:\s*true/.test(janela))
     const e2eRunner = fs.readFileSync(path.join(SRC, 'qa/runner-e2e.ts'), 'utf8')
     assert('e2e suite agent', /cenariosUiAgent/.test(e2eRunner))
     assert('e2e suite browser-embed', /cenariosUiBrowserEmbed/.test(e2eRunner))
+    const termE2e = fs.readFileSync(path.join(SRC, 'qa/cenarios/ui-terminal.ts'), 'utf8')
+    assert('e2e terminal echo warn sem shell', /execvp|semShell/.test(termE2e))
   }
 
   // ---------- Summary ----------

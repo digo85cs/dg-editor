@@ -622,6 +622,39 @@ body {
   font: inherit;
 }
 .agent-fila { font-size: 11px; margin-left: auto; }
+.agent-plano-checklist {
+  font-size: 12px;
+  max-height: 140px;
+  overflow: auto;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--dg-sidebar);
+}
+.agent-plano-checklist label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 2px 0;
+}
+.agent-plano-checklist .feito { opacity: 0.55; text-decoration: line-through; }
+.diff-hunks-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dg-border-subtle);
+  max-height: 160px;
+  overflow: auto;
+  font-size: 12px;
+}
+.diff-hunk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diff-hunk-row.rejeitado { opacity: 0.45; }
+.diff-hunk-row code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-propostas-resumo {
   font-size: 12px;
   padding: 6px 8px;

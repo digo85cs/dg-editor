@@ -5,13 +5,14 @@
 import { readFileSync, existsSync } from 'fs'
 import { resolve, join, relative } from 'path'
 import {
-  registrarPendentes,
+  adicionarPendentes,
   listarPendentes,
   aplicarPendenteAprovado,
   marcarRejeitado,
   obterPendente,
   type EditPendente
 } from '../openclaw/diffs'
+import { gerarDiffUnificado } from '../openclaw/hunks'
 import { criarCheckpoint } from './checkpoint'
 
 const WRITE_TOOLS = new Set(['codigo_editar', 'vault_write', 'dossie_write'])
@@ -20,19 +21,9 @@ export function ehToolEscrita(nome: string): boolean {
   return WRITE_TOOLS.has(nome)
 }
 
-/** Gera unified diff linha a linha (replace completo). */
+/** Gera unified diff com hunks (LCS). */
 export function diffUnificado(pathLabel: string, antes: string, depois: string): string {
-  const a = antes.replace(/\r\n/g, '\n').split('\n')
-  const b = depois.replace(/\r\n/g, '\n').split('\n')
-  // remove trailing empty from split if both empty file
-  const lines: string[] = [
-    '--- a/' + pathLabel,
-    '+++ b/' + pathLabel,
-    '@@ -1,' + Math.max(1, a.length) + ' +1,' + Math.max(1, b.length) + ' @@'
-  ]
-  for (const ln of a) lines.push('-' + ln)
-  for (const ln of b) lines.push('+' + ln)
-  return lines.join('\n') + '\n'
+  return gerarDiffUnificado(pathLabel, antes, depois)
 }
 
 export function proporCodigoEditar(
@@ -52,7 +43,7 @@ export function proporCodigoEditar(
   const depois = antes.replace(ancora, novo)
   const rel = relative(raiz, abs).replace(/\\/g, '/') || abs
   const unifiedDiff = diffUnificado(rel, antes, depois)
-  const reg = registrarPendentes([{ path: abs, unifiedDiff }], pastas.length ? pastas : [raiz])
+  const reg = adicionarPendentes([{ path: abs, unifiedDiff }], pastas.length ? pastas : [raiz], 'agent')
   if (!reg.pendentes.length) {
     return { ok: false, texto: 'proposta rejeitada ACL: ' + (reg.rejeitados[0]?.erro || '') }
   }
@@ -73,7 +64,7 @@ export function proporEscritaCompleta(
   const antes = existsSync(abs) ? readFileSync(abs, 'utf8') : ''
   const rel = relative(raiz, abs).replace(/\\/g, '/') || abs
   const unifiedDiff = diffUnificado(rel, antes, String(conteudo ?? ''))
-  const reg = registrarPendentes([{ path: abs, unifiedDiff }], pastas.length ? pastas : [raiz])
+  const reg = adicionarPendentes([{ path: abs, unifiedDiff }], pastas.length ? pastas : [raiz], 'agent')
   if (!reg.pendentes.length) {
     return { ok: false, texto: 'proposta rejeitada ACL: ' + (reg.rejeitados[0]?.erro || '') }
   }
