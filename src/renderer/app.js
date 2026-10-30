@@ -914,6 +914,169 @@ function fecharPainelDiff() {
   if (!panel) return
   panel.classList.add('hidden')
   panel.setAttribute('aria-hidden', 'true')
+  ocPendenteAtivoId = null
+  const acoes = $('diff-panel-actions')
+  if (acoes) acoes.hidden = true
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    lista.hidden = true
+    lista.innerHTML = ''
+  }
+}
+
+/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string }[]} */
+let ocPendentes = []
+/** @type {string | null} */
+let ocPendenteAtivoId = null
+
+function mostrarDiffOpenClaw(pendente) {
+  const panel = $('diff-panel')
+  const body = $('diff-panel-body')
+  const title = $('diff-panel-title')
+  const acoes = $('diff-panel-actions')
+  if (!panel || !body || !pendente) return
+  ocPendenteAtivoId = pendente.id
+  if (title) title.textContent = 'OpenClaw: ' + (pendente.path || pendente.absPath)
+  body.innerHTML = renderDiffHtml(pendente.unifiedDiff)
+  if (acoes) acoes.hidden = false
+  panel.classList.remove('hidden')
+  panel.setAttribute('aria-hidden', 'false')
+  const lista = $('oc-pendentes-lista')
+  if (lista) {
+    for (const btn of lista.querySelectorAll('button')) {
+      btn.classList.toggle('active', btn.dataset.id === pendente.id)
+    }
+  }
+}
+
+function renderListaPendentesOc() {
+  const lista = $('oc-pendentes-lista')
+  if (!lista) return
+  lista.innerHTML = ''
+  if (!ocPendentes.length) {
+    lista.hidden = true
+    return
+  }
+  lista.hidden = false
+  for (const p of ocPendentes) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.dataset.id = p.id
+    b.textContent = nomeArquivo(p.path || p.absPath)
+    b.title = p.absPath || p.path
+    if (p.id === ocPendenteAtivoId) b.classList.add('active')
+    b.addEventListener('click', () => mostrarDiffOpenClaw(p))
+    lista.appendChild(b)
+  }
+}
+
+async function pedirOpenClawUi() {
+  const prompt = window.prompt('Pedido para o OpenClaw (edicoes voltam como diff para aprovacao):')
+  if (prompt == null || !String(prompt).trim()) return
+  const arquivosAbertos = []
+  for (const a of abas) {
+    const item = { path: a.caminho }
+    if (a.caminho === abaAtiva && editor) {
+      item.conteudo = editor.getConteudo()
+      if (editor.getSelecao) {
+        const sel = editor.getSelecao()
+        if (sel) item.selecao = sel
+      }
+    }
+    arquivosAbertos.push(item)
+  }
+  const r = await window.api.invoke('openclaw:pedir', {
+    prompt: String(prompt).trim(),
+    pastas: pastasPermitidas(),
+    arquivosAbertos
+  })
+  if (!r?.ok) {
+    alert('OpenClaw: ' + (r?.erro || 'erro'))
+    return
+  }
+  ocPendentes = r.pendentes || []
+  if (r.rejeitados?.length) {
+    console.warn('[openclaw] paths rejeitados:', r.rejeitados)
+  }
+  if (!ocPendentes.length) {
+    alert(r.mensagem || 'Nenhum diff proposto.')
+    return
+  }
+  renderListaPendentesOc()
+  mostrarDiffOpenClaw(ocPendentes[0])
+}
+
+async function aplicarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  if (!window.confirm('Aplicar este diff no disco? Acao irreversivel sem git.')) return
+  const r = await window.api.invoke('openclaw:aplicar', ocPendenteAtivoId, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
+    return
+  }
+  const id = ocPendenteAtivoId
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (r.absPath && abaAtiva === r.absPath && editor) {
+    const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
+    if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
+  }
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+    alert('Diff aplicado.')
+  }
+}
+
+async function rejeitarPendenteOc() {
+  if (!ocPendenteAtivoId) return
+  await window.api.invoke('openclaw:rejeitar', ocPendenteAtivoId)
+  const id = ocPendenteAtivoId
+  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (ocPendentes.length) {
+    renderListaPendentesOc()
+    mostrarDiffOpenClaw(ocPendentes[0])
+  } else {
+    fecharPainelDiff()
+  }
+}
+
+async function carregarConfigOpenClawUi() {
+  const cfg = await window.api.invoke('openclaw:config-get')
+  const st = await window.api.invoke('openclaw:token-status')
+  if (cfg?.config) {
+    const ep = $('oc-endpoint')
+    const md = $('oc-model')
+    if (ep) ep.value = cfg.config.endpoint || ''
+    if (md) md.value = cfg.config.model || ''
+  }
+  const tok = $('oc-token')
+  if (tok) tok.value = ''
+  const status = $('oc-token-status')
+  if (status) {
+    status.textContent = st?.configurado
+      ? 'Token gravado no cofre do SO (safeStorage).'
+      : 'Nenhum token configurado.'
+  }
+}
+
+async function salvarConfigOpenClawUi() {
+  const endpoint = $('oc-endpoint')?.value?.trim()
+  const model = $('oc-model')?.value?.trim()
+  await window.api.invoke('openclaw:config-set', { endpoint, model })
+  const token = $('oc-token')?.value
+  if (token && token.trim()) {
+    const r = await window.api.invoke('openclaw:token-set', token.trim())
+    if (!r?.ok) {
+      alert('Token nao salvo: ' + (r?.erro || 'erro'))
+      return
+    }
+    const tok = $('oc-token')
+    if (tok) tok.value = ''
+  }
+  await carregarConfigOpenClawUi()
+  alert('OpenClaw salvo.')
 }
 
 async function atualizarGitStatusArvore() {
@@ -1807,6 +1970,7 @@ async function abrirConfig() {
           escapar(o.models.map((m) => m.name).join(', ') || '—')
         : 'Instalado, mas parado. Rode: ollama serve'
       : 'Nao instalado. Baixe em ollama.com')
+  await carregarConfigOpenClawUi()
 }
 
 async function abrirContas() {
@@ -1960,6 +2124,7 @@ function bootstrapComandos() {
     { id: 'tema', titulo: 'Alternar tema', fn: () => alternarTema() },
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
     { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
     { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
     { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
@@ -2349,6 +2514,13 @@ $('btn-reanalyze').addEventListener('click', () => {
 })
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
+$('btn-oc-salvar')?.addEventListener('click', () => void salvarConfigOpenClawUi())
+$('btn-oc-limpar-token')?.addEventListener('click', async () => {
+  await window.api.invoke('openclaw:token-clear')
+  await carregarConfigOpenClawUi()
+})
+$('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
+$('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-diag').addEventListener('click', rodarDiagnostico)
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))

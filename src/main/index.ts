@@ -72,6 +72,7 @@ import {
 } from './terminal'
 import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
 import { registerVaultIpc } from './vault/ipc'
+import { registerOpenClawIpc } from './openclaw/ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -374,6 +375,8 @@ ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) =
 
 // ---------- Vault Markdown (Obsidian-compat) ----------
 registerVaultIpc()
+// ---------- OpenClaw (diffs + aprovacao humana; sem shell) ----------
+registerOpenClawIpc()
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {

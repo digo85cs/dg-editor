@@ -170,8 +170,13 @@
           <aside id="diff-panel" class="diff-panel hidden" aria-hidden="true">
             <header class="diff-panel-header">
               <span id="diff-panel-title">Diff</span>
+              <div class="diff-panel-actions" id="diff-panel-actions" hidden>
+                <button type="button" id="btn-oc-aplicar" class="btn-small">Aplicar</button>
+                <button type="button" id="btn-oc-rejeitar" class="btn-ghost">Rejeitar</button>
+              </div>
               <button type="button" id="diff-panel-close" class="btn-icon" title="Fechar diff">×</button>
             </header>
+            <div id="oc-pendentes-lista" class="oc-pendentes-lista" hidden></div>
             <pre id="diff-panel-body" class="diff-panel-body"></pre>
           </aside>
         </div>
@@ -274,6 +279,23 @@
       <h3>Configurações</h3>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
+      <div id="config-openclaw" class="config-section">
+        <h4>OpenClaw</h4>
+        <label class="config-field">Endpoint<br>
+          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" />
+        </label>
+        <label class="config-field">Model<br>
+          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" />
+        </label>
+        <label class="config-field">Token (Gateway Bearer)<br>
+          <input type="password" id="oc-token" placeholder="colar token — nao fica em texto plano" style="width:100%" autocomplete="off" />
+        </label>
+        <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
+          <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
+        </div>
+      </div>
       <button id="btn-config-close" class="btn-primary">Fechar</button>
     </div>
   </div>

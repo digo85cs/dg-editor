@@ -32,7 +32,12 @@ function loadModule(relPath) {
         BrowserWindow: Object.assign(class { constructor() {} on() {} webContents = { setWindowOpenHandler() {}, send() {} } }, { getAllWindows: () => [] }),
         ipcMain: { on() {}, handle() {} },
         dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }) },
-        shell: { openExternal() {} }
+        shell: { openExternal() {} },
+        safeStorage: {
+          isEncryptionAvailable: () => false,
+          encryptString: (s) => Buffer.from(s, 'utf8'),
+          decryptString: (b) => Buffer.from(b).toString('utf8')
+        }
       }
     }
     if (spec.startsWith('@shared/')) {
@@ -978,6 +983,78 @@ async function main() {
     assert('preload vault:salvar', /vault:salvar/.test(pre))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('index registra vault ipc', /registerVaultIpc/.test(idxMain))
+  }
+
+  // ---------- OpenClaw ----------
+  section('OpenClaw')
+  {
+    const cliente = loadModule('main/openclaw/cliente.ts')
+    const parsed = cliente.parseRespostaChat({
+      choices: [
+        {
+          finish_reason: 'tool_calls',
+          message: {
+            content: '',
+            tool_calls: [
+              {
+                function: {
+                  name: 'dg_propose_file_diffs',
+                  arguments: JSON.stringify({
+                    edits: [
+                      {
+                        path: 'a.txt',
+                        unifiedDiff: '@@ -1,1 +1,1 @@\n-old\n+new\n'
+                      }
+                    ]
+                  })
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
+    assert('parse tool edits', parsed.ok && parsed.edits && parsed.edits.length === 1)
+    assert('parse path', parsed.edits[0].path === 'a.txt')
+
+    const diffs = loadModule('main/openclaw/diffs.ts')
+    const ap = diffs.aplicarUnifiedDiff('old\n', '@@ -1,1 +1,1 @@\n-old\n+new\n')
+    assert('aplicar unified diff', ap.ok && ap.resultado === 'new\n', ap.erro || ap.resultado)
+
+    const tmpOc = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-oc-'))
+    const fora = path.join(os.tmpdir(), 'dg-oc-fora-' + Date.now() + '.txt')
+    fs.writeFileSync(fora, 'x', 'utf8')
+    const reg = diffs.registrarPendentes(
+      [{ path: fora, unifiedDiff: '@@ -1,1 +1,1 @@\n-x\n+y\n' }],
+      [tmpOc]
+    )
+    assert('recusa path fora ACL', reg.rejeitados.length === 1 && reg.pendentes.length === 0)
+
+    const dentro = path.join(tmpOc, 'a.txt')
+    fs.writeFileSync(dentro, 'old\n', 'utf8')
+    const reg2 = diffs.registrarPendentes(
+      [{ path: dentro, unifiedDiff: '@@ -1,1 +1,1 @@\n-old\n+new\n' }],
+      [tmpOc]
+    )
+    assert('aceita path na ACL', reg2.pendentes.length === 1)
+    const apl = await diffs.aplicarPendenteAprovado(reg2.pendentes[0].id, [tmpOc])
+    assert('aplicar pendente', apl.ok, apl.erro)
+    assert('arquivo atualizado', fs.readFileSync(dentro, 'utf8') === 'new\n')
+
+    const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    assert('preload openclaw:pedir', /openclaw:pedir/.test(pre))
+    assert('preload openclaw:aplicar', /openclaw:aplicar/.test(pre))
+    const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
+    assert('index registra openclaw', /registerOpenClawIpc/.test(idxMain))
+
+    const ocDir = path.join(SRC, 'main/openclaw')
+    let shellLeak = false
+    for (const f of fs.readdirSync(ocDir)) {
+      if (!f.endsWith('.ts')) continue
+      const src = fs.readFileSync(path.join(ocDir, f), 'utf8')
+      if (/child_process|node-pty|execFile|spawn\(/.test(src)) shellLeak = true
+    }
+    assert('openclaw sem shell', !shellLeak)
   }
 
   // ---------- Summary ----------
