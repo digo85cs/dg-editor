@@ -1,5 +1,7 @@
 # DG Editor — Design System (Opção B / IDE)
 
+**Idioma padrão: pt-BR.** UI, docs, commits e respostas ao usuário em português do Brasil.
+
 ## Paleta (hexes preservados)
 
 | Token | Light | Dark |
