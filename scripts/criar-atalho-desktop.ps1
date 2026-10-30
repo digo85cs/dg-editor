@@ -55,14 +55,27 @@ function Get-PastasDesktop {
 }
 
 function Test-AlvoRuim {
-  param([string]$alvo, [string]$nome)
+  param(
+    [string]$alvo,
+    [string]$nome,
+    [string]$argumentos = ''
+  )
   if (-not $alvo) { return $false }
   if ($nome -eq 'Dg Editor.lnk') { return $true }
   if ($alvo -match 'node_modules[\\/]+electron([\\/]+dist)?') { return $true }
   if ($alvo -match '(^|[\\/])electron\.exe$') { return $true }
   if ($alvo -match '[\\/]electron[\\/]dist([\\/]|$)') { return $true }
-  # atalho DG Editor deve apontar para o launcher sem console (.vbs)
-  if ($nome -eq 'DG Editor.lnk' -and $alvo -notmatch 'abrir-dg-editor\.(vbs|bat)$') { return $true }
+  # npm / electron-vite / cmd de build = console preto (ruim)
+  if ($alvo -match '(^|[\\/])(npm|npm\.cmd|npx|npx\.cmd)$') { return $true }
+  if ($alvo -match '(^|[\\/])cmd\.exe$' -and $argumentos -match 'npm|electron-vite|vite') { return $true }
+  if ($nome -eq 'DG Editor.lnk') {
+    $alvoBaixo = $alvo.ToLowerInvariant()
+    $argsBaixo = [string]$argumentos
+    # Correto: wscript + abrir-dg-editor.vbs  OU  caminho direto do .vbs/.bat
+    $okWscript = ($alvoBaixo -match 'wscript\.exe$') -and ($argsBaixo -match 'abrir-dg-editor\.vbs')
+    $okDireto = $alvo -match 'abrir-dg-editor\.(vbs|bat)$'
+    if (-not ($okWscript -or $okDireto)) { return $true }
+  }
   return $false
 }
 
@@ -123,8 +136,9 @@ foreach ($desktop in $desktops) {
       $sh = New-Object -ComObject WScript.Shell
       $existente = $sh.CreateShortcut($_.FullName)
       $alvo = [string]$existente.TargetPath
-      if (Test-AlvoRuim -alvo $alvo -nome $_.Name) {
-        Write-Host ('[atalho] removendo: ' + $_.FullName + ' -> ' + $alvo) -ForegroundColor Yellow
+      $argsLnk = [string]$existente.Arguments
+      if (Test-AlvoRuim -alvo $alvo -nome $_.Name -argumentos $argsLnk) {
+        Write-Host ('[atalho] removendo: ' + $_.FullName + ' -> ' + $alvo + ' ' + $argsLnk) -ForegroundColor Yellow
         Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
       }
     } catch {}

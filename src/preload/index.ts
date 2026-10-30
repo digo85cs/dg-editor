@@ -21,6 +21,7 @@ const invokeChannels = [
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
   'janela:recarregar', 'janela:zoom', 'janela:tela-cheia',
   'app:get-version',
+  'app:raiz-projeto',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'navegador:abrir',
   'navegador:fechar',

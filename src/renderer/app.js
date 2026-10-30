@@ -599,8 +599,45 @@ function carregarPastas() {
   const salvas = localStorage.getItem('dg-pastas')
   if (salvas) {
     try {
-      pastasRecentes.push(...JSON.parse(salvas))
+      const lista = JSON.parse(salvas)
+      if (Array.isArray(lista)) {
+        for (const p of lista) {
+          if (typeof p === 'string' && p && !pastasRecentes.includes(p)) {
+            pastasRecentes.push(p)
+          }
+        }
+      }
     } catch { /* ignora */ }
+  }
+}
+
+/** Garante a raiz do projeto no Explorer (evita "Nenhuma pasta" no primeiro boot). */
+async function garantirPastaRaizProjeto() {
+  try {
+    const r = await window.api.invoke('app:raiz-projeto')
+    if (!r?.ok || !r.raiz) return
+    const raiz = String(r.raiz)
+    // Remove caminhos truncados por bug de espaco (ex.: "D:\\CURSOR\\DG Edi")
+    for (let i = pastasRecentes.length - 1; i >= 0; i--) {
+      const p = String(pastasRecentes[i] || '')
+      if (!p) {
+        pastasRecentes.splice(i, 1)
+        continue
+      }
+      if (p !== raiz && raiz.toLowerCase().startsWith(p.toLowerCase())) {
+        pastasRecentes.splice(i, 1)
+      }
+    }
+    if (!pastasRecentes.includes(raiz)) {
+      pastasRecentes.unshift(raiz)
+    }
+    salvarPastas()
+    await renderizarPastas()
+    if (!pastaAtual) {
+      await selecionarPasta(raiz)
+    }
+  } catch (e) {
+    console.warn('[pastas] raiz projeto:', e)
   }
 }
 
@@ -3911,7 +3948,9 @@ setSidebarMode('explorer')
   )
   ativarAbaCentro(temConversa ? 'chat' : 'editor')
 }
-renderizarPastas().then(() => restaurarAbas())
+renderizarPastas()
+  .then(() => garantirPastaRaizProjeto())
+  .then(() => restaurarAbas())
 void renderizarProjects().then(() => atualizarStatusBar(pastaAtual || pastasRecentes[0] || null))
 void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
 atualizarGuardiao()

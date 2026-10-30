@@ -475,6 +475,17 @@ ipcMain.handle('folder:select', async () => {
   return { canceled: false, path: result.filePaths[0] }
 })
 
+/** Raiz canônica do DG Editor (ex.: D:\CURSOR\DG Editor) — para autoabrir no Explorer. */
+ipcMain.handle('app:raiz-projeto', async () => {
+  try {
+    const { resolverRaizProjeto, fonteRaizResolvida } = await import('./paths')
+    const raiz = resolverRaizProjeto()
+    return { ok: true, raiz, fonte: fonteRaizResolvida() }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error)?.message || e) }
+  }
+})
+
 // ---------- Brain IPC ----------
 ipcMain.handle('brain:ask', async (_e, prompt: string, context: string) => {
   return getBrain().ask(prompt, context)

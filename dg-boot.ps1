@@ -319,12 +319,24 @@ if (-not (Test-Path $electron)) {
 }
 
 Log 'iniciando DG Editor...' 'Cyan'
-# GUI Electron: UseShellExecute true + Normal (nao CreateNoWindow)
-$p = Start-Process -FilePath $electron -ArgumentList @('.', '--no-sandbox') -WorkingDirectory $raiz -PassThru -WindowStyle Normal
+# Caminho com espaco (D:\CURSOR\DG Editor): ProcessStartInfo + aspas; NUNCA npm start / vite.
+$env:DG_ROOT = $raiz
+$psiEl = New-Object System.Diagnostics.ProcessStartInfo
+$psiEl.FileName = $electron
+# 1o argumento = pasta do app (aspas obrigatorias com espaco)
+$psiEl.Arguments = '"' + $raiz + '" --no-sandbox'
+$psiEl.WorkingDirectory = $raiz
+$psiEl.UseShellExecute = $true
+$psiEl.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
+try {
+  $p = [System.Diagnostics.Process]::Start($psiEl)
+} catch {
+  Fail ('falha ao iniciar electron: ' + $_.Exception.Message)
+}
 if (-not $p) { Fail 'falha ao iniciar electron' }
 
 if ($DoneFlag) {
   Set-Content -LiteralPath $DoneFlag -Value ('pid=' + $p.Id) -Encoding ASCII
 }
-Log ('electron pid=' + $p.Id) 'Green'
+Log ('electron pid=' + $p.Id + ' raiz="' + $raiz + '"') 'Green'
 exit 0

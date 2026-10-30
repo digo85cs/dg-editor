@@ -1008,11 +1008,14 @@ async function main() {
     assert('preload janela:tela-cheia', /janela:tela-cheia/.test(preload))
     assert('preload menu:acao', /menu:acao/.test(preload))
     assert('preload app:get-version', /app:get-version/.test(preload))
+    assert('preload app:raiz-projeto', /app:raiz-projeto/.test(preload))
     assert('main janela:recarregar', /janela:recarregar/.test(mainIdx))
     assert('main janela:zoom', /janela:zoom/.test(mainIdx))
     assert('main janela:tela-cheia', /janela:tela-cheia/.test(mainIdx))
     assert('main envia menu:acao', /send\(\s*['"]menu:acao['"]/.test(mainIdx))
     assert('main app:get-version handle', /ipcMain\.handle\(\s*['"]app:get-version['"]/.test(mainIdx))
+    assert('main app:raiz-projeto handle', /app:raiz-projeto/.test(mainIdx))
+    assert('renderer garante pasta raiz', /garantirPastaRaizProjeto/.test(appJs))
     assert('menu onAcao', /onAcao\??\s*:/.test(menu) || /onAcao\?:/.test(menu))
     assert('atalho abrir-dg-editor.bat', fs.existsSync(path.join(ROOT, 'abrir-dg-editor.bat')))
     assert(
@@ -1031,6 +1034,11 @@ async function main() {
     assert('productName DG Editor', pkg.productName === 'DG Editor')
     assert('executableName DG Editor', pkg.build && pkg.build.win && pkg.build.win.executableName === 'DG Editor')
     assert('build appId', pkg.build && pkg.build.appId === 'com.dgeditor.app')
+    assert(
+      'npm start nao usa electron-vite preview',
+      typeof pkg.scripts.start === 'string' && !/electron-vite\s+preview/.test(pkg.scripts.start)
+    )
+    assert('iniciar-app.cjs existe', fs.existsSync(path.join(ROOT, 'scripts/iniciar-app.cjs')))
   }
 
   section('Vault Markdown')
