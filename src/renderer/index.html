@@ -312,9 +312,12 @@
     </div>
   </div>
 
-  <div id="modal-config" class="modal hidden">
-    <div class="modal-box">
-      <h3>Configurações</h3>
+  <div id="modal-config" class="modal modal-float hidden" role="dialog" aria-labelledby="modal-config-title">
+    <div class="modal-box" data-float-box>
+      <header class="modal-titlebar" data-float-handle>
+        <h3 id="modal-config-title">Configurações</h3>
+        <button type="button" id="btn-config-close" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar configurações">×</button>
+      </header>
       <div id="config-profile" class="config-section"></div>
       <div id="config-ollama" class="config-section"></div>
       <div id="config-adapta" class="config-section">
@@ -346,13 +349,15 @@
           <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
         </div>
       </div>
-      <button id="btn-config-close" class="btn-primary">Fechar</button>
     </div>
   </div>
 
-  <div id="modal-contas" class="modal hidden">
-    <div class="modal-box">
-      <h3>Contas e saúde do sistema</h3>
+  <div id="modal-contas" class="modal modal-float hidden" role="dialog" aria-labelledby="modal-contas-title">
+    <div class="modal-box" data-float-box>
+      <header class="modal-titlebar" data-float-handle>
+        <h3 id="modal-contas-title">Contas e saúde do sistema</h3>
+        <button type="button" id="btn-contas-close" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar contas">×</button>
+      </header>
       <div id="contas-identidade" class="config-section"></div>
       <div id="contas-maquina" class="config-section"></div>
       <div id="contas-ia" class="config-section"></div>
@@ -372,7 +377,6 @@
       <div id="contas-diagnostico" class="config-section"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button id="btn-diag" class="btn-small">Rodar diagnostico</button>
-        <button id="btn-contas-close" class="btn-primary">Fechar</button>
       </div>
     </div>
   </div>

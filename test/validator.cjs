@@ -1106,8 +1106,19 @@ async function main() {
     assert('preload adapta:ler-continuidade', /adapta:ler-continuidade/.test(preA))
     assert('preload adapta:abrir', /adapta:abrir/.test(preA))
     const htmlA = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
+    const appJsA = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
     assert('UI Contas Adapta', /contas-adapta/.test(htmlA) && /btn-adapta-copiar/.test(htmlA))
     assert('UI Config Adapta', /config-adapta/.test(htmlA))
+    assert('modal config flutuante', /id="modal-config"[^>]*modal-float/.test(htmlA) && /data-float-handle/.test(htmlA))
+    assert('modal contas flutuante', /id="modal-contas"[^>]*modal-float/.test(htmlA))
+    assert(
+      'UI arrastar janela float',
+      /ligarJanelaFlutuante/.test(appJsA) && /trazerJanelaFrente/.test(appJsA)
+    )
+    assert(
+      'CSS modal-float',
+      /modal-float/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+    )
     assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
     assert('mcp script portatil', !/\\\\/.test(pkg.scripts.mcp) && /\.dg-editor\/bin/.test(pkg.scripts.mcp))

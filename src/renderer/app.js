@@ -2077,9 +2077,88 @@ function novaConversaUi() {
 
 $('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
 
+// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------
+let dgFloatZ = 20000
+
+function trazerJanelaFrente(modalEl) {
+  if (!modalEl) return
+  dgFloatZ += 1
+  modalEl.style.zIndex = String(dgFloatZ)
+}
+
+function limparPosicaoFloat(modalEl) {
+  const box = modalEl?.querySelector('[data-float-box]')
+  if (!box) return
+  box.style.left = ''
+  box.style.top = ''
+}
+
+function abrirJanelaFlutuante(modalEl) {
+  if (!modalEl) return
+  modalEl.classList.remove('hidden')
+  trazerJanelaFrente(modalEl)
+}
+
+function ligarJanelaFlutuante(modalEl) {
+  if (!modalEl || modalEl.dataset.floatBound) return
+  modalEl.dataset.floatBound = '1'
+  const box = modalEl.querySelector('[data-float-box]')
+  const handle = modalEl.querySelector('[data-float-handle]')
+  if (!box || !handle) return
+
+  modalEl.addEventListener('mousedown', () => trazerJanelaFrente(modalEl), true)
+
+  let dragging = false
+  let ox = 0
+  let oy = 0
+
+  function onMove(e) {
+    if (!dragging) return
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const rect = box.getBoundingClientRect()
+    let left = e.clientX - ox
+    let top = e.clientY - oy
+    const minVisible = 48
+    left = Math.min(Math.max(left, -rect.width + minVisible), vw - minVisible)
+    top = Math.min(Math.max(top, 0), vh - minVisible)
+    box.style.left = left + 'px'
+    box.style.top = top + 'px'
+  }
+
+  function onUp() {
+    if (!dragging) return
+    dragging = false
+    box.classList.remove('is-dragging')
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+  }
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    if (e.target.closest('button, a, input, select, textarea')) return
+    trazerJanelaFrente(modalEl)
+    const rect = box.getBoundingClientRect()
+    // fixa posição absoluta a partir do layout atual
+    box.style.left = rect.left + 'px'
+    box.style.top = rect.top + 'px'
+    ox = e.clientX - rect.left
+    oy = e.clientY - rect.top
+    dragging = true
+    box.classList.add('is-dragging')
+    handle.setPointerCapture?.(e.pointerId)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    e.preventDefault()
+  })
+}
+
+ligarJanelaFlutuante($('modal-config'))
+ligarJanelaFlutuante($('modal-contas'))
+
 // ---------- Config / Contas ----------
 async function abrirConfig() {
-  $('modal-config').classList.remove('hidden')
+  abrirJanelaFlutuante($('modal-config'))
   const p = await window.api.invoke('system:get-profile')
   const forca = await window.api.invoke('system:profile-strength')
   const gb = (b) => (b / 1024 / 1024 / 1024).toFixed(1) + ' GB'
@@ -2182,7 +2261,7 @@ async function copiarMcpAdapta() {
 }
 
 async function abrirContas() {
-  $('modal-contas').classList.remove('hidden')
+  abrirJanelaFlutuante($('modal-contas'))
   $('contas-identidade').innerHTML = '<h4>Identidade</h4>Carregando...'
   $('contas-maquina').innerHTML = '<h4>Maquina</h4>Carregando...'
   $('contas-ia').innerHTML = '<h4>IA</h4>Carregando...'
@@ -3314,12 +3393,7 @@ $('busca-input')?.addEventListener('keydown', (e) => {
   }
 })
 $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
-$('modal-config').addEventListener('click', (e) => {
-  if (e.target === $('modal-config')) $('modal-config').classList.add('hidden')
-})
-$('modal-contas').addEventListener('click', (e) => {
-  if (e.target === $('modal-contas')) $('modal-contas').classList.add('hidden')
-})
+// Config/Contas flutuantes: não fecham ao clicar no fundo (só no ×)
 
 function alternarPainel() {
   toggleRight()
