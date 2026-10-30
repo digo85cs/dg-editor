@@ -2520,7 +2520,8 @@ function bootstrapComandos() {
     },
     {
       id: 'sobre',
-      titulo: 'Sobre o Dg Editor',      fn: () => void mostrarSobreDgEditor()
+      titulo: 'Sobre o DG Editor',
+      fn: () => void mostrarSobreDgEditor()
     }
   ]
   for (const d of defs) registrarComando(d)
@@ -2533,7 +2534,8 @@ async function mostrarSobreDgEditor() {
   } catch {
     ver = ''
   }
-  alert('Dg Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')}
+  alert('DG Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')
+}
 
 function acaoEditar(cmd) {
   try {
@@ -3749,7 +3751,8 @@ const MENUS_BARRA = {
     { sep: true },
     { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
   ],
-  ajuda: [{ id: 'sobre', label: 'Sobre o Dg Editor' }]}
+  ajuda: [{ id: 'sobre', label: 'Sobre o DG Editor' }]
+}
 
 function fecharMenubar() {
   const bar = document.getElementById('menubar')

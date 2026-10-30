@@ -10,5 +10,5 @@ if errorlevel 1 (
   exit /b 1
 )
 echo.
-echo Pronto. Use o atalho "DG Editor" na Area de Trabalho.
+echo Pronto. Use o atalho "DG Editor" na Area de Trabalho ^(DG Editor.lnk^).
 pause

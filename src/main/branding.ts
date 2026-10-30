@@ -3,7 +3,7 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 
 /** Identidade pública do produto — nunca expor "Electron" na UI. */
-export const DG_APP_NAME = 'Dg Editor'
+export const DG_APP_NAME = 'DG Editor'
 export const DG_APP_ID = 'com.dgeditor.app'
 export const DG_COPYRIGHT = '© Rodrigo Soares'
 export const DG_TAGLINE = 'Editor de sistemas com IA local'

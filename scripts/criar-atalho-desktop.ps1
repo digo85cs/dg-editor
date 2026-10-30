@@ -49,16 +49,22 @@ if (-not (Test-Path $desktop)) {
   exit 1
 }
 
-$nome = 'Dg Editor.lnk'
+$nome = 'DG Editor.lnk'
 $lnkPath = Join-Path $desktop $nome
 
 # Remove atalho antigo apontando para electron\dist (se existir com outro nome)
+# e o atalho legado "Dg Editor.lnk"
 Get-ChildItem -Path $desktop -Filter '*.lnk' -ErrorAction SilentlyContinue | ForEach-Object {
   try {
     $sh = New-Object -ComObject WScript.Shell
     $existente = $sh.CreateShortcut($_.FullName)
     $alvo = [string]$existente.TargetPath
-    if ($alvo -match 'node_modules[\\/]+electron[\\/]+dist' -or $alvo -match 'electron\.exe$') {
+    $ehLegadoNome = $_.Name -eq 'Dg Editor.lnk'
+    if (
+      $ehLegadoNome -or
+      $alvo -match 'node_modules[\\/]+electron[\\/]+dist' -or
+      $alvo -match 'electron\.exe$'
+    ) {
       Write-Host ('[atalho] removendo atalho antigo: ' + $_.Name + ' -> ' + $alvo) -ForegroundColor Yellow
       Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
     }
@@ -70,7 +76,7 @@ $lnk = $w.CreateShortcut($lnkPath)
 $lnk.TargetPath = $bat
 $lnk.WorkingDirectory = $raiz
 $lnk.WindowStyle = 1
-$lnk.Description = 'Dg Editor'
+$lnk.Description = 'DG Editor'
 # Ícone próprio do DG Editor (nunca o ícone genérico do runtime)
 $icoCandidate = Join-Path $raiz 'resources\dg-editor.ico'
 if (-not (Test-Path $icoCandidate)) {

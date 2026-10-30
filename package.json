@@ -1,8 +1,8 @@
 {
     "name": "dg-editor",
-    "productName": "Dg Editor",
+    "productName": "DG Editor",
     "version": "0.2.0",
-    "description": "Dg Editor — editor de sistemas com IA local",
+    "description": "DG Editor — editor de sistemas com IA local",
     "author": {
         "name": "Rodrigo Soares",
         "email": "digo85cs@gmail.com"
@@ -36,7 +36,7 @@
     },
     "build": {
         "appId": "com.dgeditor.app",
-        "productName": "Dg Editor",
+        "productName": "DG Editor",
         "copyright": "Copyright © Rodrigo Soares",
         "directories": {
             "output": "dist-app",
@@ -52,9 +52,9 @@
             "main": "out/main/index.js"
         },
         "win": {
-            "executableName": "Dg Editor",
+            "executableName": "DG Editor",
             "icon": "resources/dg-editor.ico",
-            "artifactName": "Dg-Editor-${version}-${arch}.${ext}",
+            "artifactName": "DG-Editor-${version}-${arch}.${ext}",
             "target": [
                 {
                     "target": "nsis",
@@ -73,15 +73,15 @@
         "nsis": {
             "oneClick": false,
             "allowToChangeInstallationDirectory": true,
-            "shortcutName": "Dg Editor",
-            "uninstallDisplayName": "Dg Editor",
+            "shortcutName": "DG Editor",
+            "uninstallDisplayName": "DG Editor",
             "createDesktopShortcut": true,
             "createStartMenuShortcut": true,
             "installerIcon": "resources/dg-editor.ico",
             "uninstallerIcon": "resources/dg-editor.ico"
         },
         "portable": {
-            "artifactName": "Dg-Editor-Portable-${version}.exe"
+            "artifactName": "DG-Editor-Portable-${version}.exe"
         }
     },
     "dependencies": {

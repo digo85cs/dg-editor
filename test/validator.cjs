@@ -1008,12 +1008,12 @@ async function main() {
   section('Branding DG Editor')
   {
     const brand = fs.readFileSync(path.join(SRC, 'main/branding.ts'), 'utf8')
-    assert('branding setName Dg Editor', /DG_APP_NAME\s*=\s*'Dg Editor'/.test(brand))
+    assert('branding setName DG Editor', /DG_APP_NAME\s*=\s*'DG Editor'/.test(brand))
     assert('branding appId', /com\.dgeditor\.app/.test(brand))
     assert('icone dg-editor.ico', fs.existsSync(path.join(ROOT, 'resources/dg-editor.ico')))
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
-    assert('productName Dg Editor', pkg.productName === 'Dg Editor')
-    assert('executableName Dg Editor', pkg.build && pkg.build.win && pkg.build.win.executableName === 'Dg Editor')
+    assert('productName DG Editor', pkg.productName === 'DG Editor')
+    assert('executableName DG Editor', pkg.build && pkg.build.win && pkg.build.win.executableName === 'DG Editor')
     assert('build appId', pkg.build && pkg.build.appId === 'com.dgeditor.app')
   }
 
