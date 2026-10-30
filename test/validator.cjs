@@ -1082,19 +1082,146 @@ async function main() {
     const rs = await Promise.all([p1, p2])
     assert('fila serial', ordem === 'abc' && rs[0] === 1 && rs[1] === 2)
 
+    // cancelamento + AbortSignal
+    {
+      const fila2 = loadModule('main/agent/fila.ts')
+      let viuAbort = false
+      const slow = fila2.enfileirarAgente(async (signal) => {
+        await new Promise((resolve, reject) => {
+          const t = setTimeout(resolve, 5000)
+          signal.addEventListener('abort', () => {
+            viuAbort = true
+            clearTimeout(t)
+            reject(new Error('cancelado'))
+          })
+        })
+        return 'done'
+      })
+      const queued = fila2.enfileirarAgente(async () => 'never')
+      await new Promise((r) => setTimeout(r, 15))
+      const can = fila2.cancelarFilaAgente('teste')
+      assert('cancelar retorna ok', can.ok === true && can.cancelados >= 1)
+      let rejSlow = false
+      let rejQueued = false
+      await slow.catch(() => { rejSlow = true })
+      await queued.catch(() => { rejQueued = true })
+      assert('cancel aborta job atual', viuAbort && rejSlow)
+      assert('cancel limpa fila pendente', rejQueued)
+      const stF = fila2.statusFilaAgente()
+      assert('fila limpa apos cancel', stF.tamanho === 0)
+    }
+
+    // propostas + diff unificado
+    {
+      const prop = loadModule('main/agent/propostas.ts')
+      assert('ehToolEscrita codigo_editar', prop.ehToolEscrita('codigo_editar') === true)
+      assert('ehToolEscrita read false', prop.ehToolEscrita('codigo_ler') === false)
+      const diff = prop.diffUnificado('a.ts', 'ola\n', 'ola\nmundo\n')
+      assert('diff unificado header', /--- a\/a\.ts/.test(diff) && /\+\+\+ b\/a\.ts/.test(diff))
+      assert('diff unificado linhas', /^-ola/m.test(diff) && /^\+mundo/m.test(diff))
+
+      const tmpP = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-prop-'))
+      const arq = path.join(tmpP, 'x.ts')
+      fs.writeFileSync(arq, 'const a = 1\n', 'utf8')
+      const proposta = prop.proporCodigoEditar(
+        tmpP,
+        { arquivo: arq, ancora: 'const a = 1', novo: 'const a = 2' },
+        [tmpP]
+      )
+      assert('proporCodigoEditar ok', proposta.ok === true && !!proposta.pendente)
+      assert('listarPendentes apos propor', prop.listarPendentes().length >= 1)
+      const id = proposta.pendente.id
+      const apl = await prop.aplicarPropostaComCheckpoint(id, [tmpP])
+      assert('aplicarPropostaComCheckpoint ok', apl.ok === true)
+      assert('checkpointId apos apply', typeof apl.checkpointId === 'string' && apl.checkpointId.length > 0)
+      const depois = fs.readFileSync(arq, 'utf8')
+      assert('arquivo alterado apos apply', /const a = 2/.test(depois))
+    }
+
+    // plano persistido
+    {
+      const ud = path.join(os.tmpdir(), 'dg-plano-' + Date.now())
+      fs.mkdirSync(ud, { recursive: true })
+      process.env.DG_TEST_USERDATA = ud
+      const plano = loadModule('main/agent/plano.ts')
+      assert('plano inicia vazio', plano.lerPlano() === null)
+      plano.salvarPlano({ texto: '# plano\n1. x', raiz: '/tmp', salvoEm: new Date().toISOString(), agente: 'revisor' })
+      const lido = plano.lerPlano()
+      assert('plano salva e le', !!lido && lido.texto.indexOf('plano') >= 0 && lido.agente === 'revisor')
+      plano.limparPlano()
+      assert('plano limpar', plano.lerPlano() === null)
+    }
+
+    // menções
+    {
+      const tmpM = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-menc-'))
+      const fM = path.join(tmpM, 'nota.ts')
+      fs.writeFileSync(fM, 'export const n = 1\n', 'utf8')
+      const menc = loadModule('main/agent/mencoes.ts')
+      const exp = await menc.expandirMencoes({
+        raiz: tmpM,
+        pergunta: 'veja @arquivo:nota.ts e @selecao',
+        selecao: 'const n',
+        arquivoAtivo: fM
+      })
+      assert('mencao @arquivo', exp.mencoes.some((m) => m.indexOf('@arquivo:') === 0))
+      assert('mencao @selecao', exp.mencoes.includes('@selecao'))
+      assert('contexto contem arquivo', /@arquivo:nota\.ts/.test(exp.contextoExtra))
+      assert('contexto contem selecao', /@selecao/.test(exp.contextoExtra) && /const n/.test(exp.contextoExtra))
+    }
+
+    // checkpoint create/restore
+    {
+      const udCk = path.join(os.tmpdir(), 'dg-ck-' + Date.now())
+      fs.mkdirSync(udCk, { recursive: true })
+      process.env.DG_TEST_USERDATA = udCk
+      const ck = loadModule('main/agent/checkpoint.ts')
+      const tmpC = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-ckf-'))
+      const fC = path.join(tmpC, 'y.txt')
+      fs.writeFileSync(fC, 'antes', 'utf8')
+      const meta = await ck.criarCheckpoint([fC], 'teste')
+      assert('checkpoint criado', !!meta.id)
+      fs.writeFileSync(fC, 'depois', 'utf8')
+      const rest = await ck.restaurarCheckpoint(meta.id)
+      assert('checkpoint restaurar', rest.ok === true && rest.restaurados === 1)
+      assert('conteudo restaurado', fs.readFileSync(fC, 'utf8') === 'antes')
+      assert('ultimoCheckpoint', ck.ultimoCheckpoint()?.id === meta.id)
+    }
+
     const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
     assert('preload agente:pedir', /agente:pedir/.test(pre))
     assert('preload checkpoint-desfazer', /agente:checkpoint-desfazer/.test(pre))
     assert('preload contexto:projeto', /contexto:projeto/.test(pre))
     assert('preload navegador:embed-status', /navegador:embed-status/.test(pre))
+    assert('preload agente:cancelar', /agente:cancelar/.test(pre))
+    assert('preload agente:aplicar-proposta', /agente:aplicar-proposta/.test(pre))
+    assert('preload agente:executar-plano', /agente:executar-plano/.test(pre))
+    assert('preload agente:progresso', /agente:progresso/.test(pre))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
     assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
     const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
     assert('modo plan no agent', /modo === 'plan'/.test(agentTs) || /modo\?: 'plan'/.test(agentTs))
+    assert('proposeWrites no agent', /proposeWrites/.test(agentTs))
+    assert('checkpoint em write direto', /criarCheckpoint/.test(agentTs))
+    assert('AbortSignal no agent', /signal\?\.aborted|opts\?\.signal/.test(agentTs))
     const html = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
     assert('aba Agent no HTML', /data-center-pane="agent"/.test(html))
     assert('plan mode checkbox', /agent-plan-mode/.test(html))
+    assert('btn Parar agente', /btn-agent-stop/.test(html))
+    assert('btn Executar plano', /btn-agent-exec-plano/.test(html))
+    assert('btn Desfazer apply', /btn-agent-undo/.test(html))
+    assert('statusbar sb-agent', /id="sb-agent"/.test(html))
+    assert('a11y region agent', /aria-label="Painel do agente"/.test(html))
+    const appJs = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
+    assert('UI apply via agente', /agente:aplicar-proposta/.test(appJs) && /__dgApplyViaAgente/.test(appJs))
+    assert('UI progresso agent', /agente:progresso/.test(appJs))
+    assert('contexto embeddings opcional', /buscarSemelhantes/.test(fs.readFileSync(path.join(SRC, 'main/agent/contexto-projeto.ts'), 'utf8')))
+    const janela = fs.readFileSync(path.join(SRC, 'main/navegador/janela.ts'), 'utf8')
+    assert('statusEmbedNavegador modo smoke|embed', /modo:\s*'smoke'\s*\|\s*'embed'/.test(janela))
+    const e2eRunner = fs.readFileSync(path.join(SRC, 'qa/runner-e2e.ts'), 'utf8')
+    assert('e2e suite agent', /cenariosUiAgent/.test(e2eRunner))
+    assert('e2e suite browser-embed', /cenariosUiBrowserEmbed/.test(e2eRunner))
   }
 
   // ---------- Summary ----------

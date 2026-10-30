@@ -7,6 +7,8 @@ import type { ResultadoCenario } from './tipos'
 import { cenariosUiNavegacao } from './cenarios/ui-navegacao'
 import { cenariosUiTerminal } from './cenarios/ui-terminal'
 import { cenariosUiChat } from './cenarios/ui-chat'
+import { cenariosUiAgent } from './cenarios/ui-agent'
+import { cenariosUiBrowserEmbed } from './cenarios/ui-browser-embed'
 
 export async function executarSuiteE2e(
   raiz: string,
@@ -79,7 +81,9 @@ export async function executarSuiteE2e(
     const suites = [
       { nome: 'navegacao', fn: () => cenariosUiNavegacao(window) },
       { nome: 'terminal', fn: () => cenariosUiTerminal(window) },
-      { nome: 'chat', fn: () => cenariosUiChat(window) }
+      { nome: 'chat', fn: () => cenariosUiChat(window) },
+      { nome: 'agent', fn: () => cenariosUiAgent(window) },
+      { nome: 'browser-embed', fn: () => cenariosUiBrowserEmbed(window) }
     ]
 
     for (const s of suites) {

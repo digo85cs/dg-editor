@@ -916,6 +916,7 @@ function fecharPainelDiff() {
   panel.classList.add('hidden')
   panel.setAttribute('aria-hidden', 'true')
   ocPendenteAtivoId = null
+  window.__dgApplyViaAgente = false
   const acoes = $('diff-panel-actions')
   if (acoes) acoes.hidden = true
   const lista = $('oc-pendentes-lista')
@@ -929,6 +930,9 @@ function fecharPainelDiff() {
 let ocPendentes = []
 /** @type {string | null} */
 let ocPendenteAtivoId = null
+/** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string }[]} */
+let agentPropostas = []
+let agentProgressUnsub = null
 
 function mostrarDiffOpenClaw(pendente) {
   const panel = $('diff-panel')
@@ -1010,13 +1014,19 @@ async function pedirOpenClawUi() {
 async function aplicarPendenteOc() {
   if (!ocPendenteAtivoId) return
   if (!window.confirm('Aplicar este diff no disco? Acao irreversivel sem git.')) return
-  const r = await window.api.invoke('openclaw:aplicar', ocPendenteAtivoId, pastasPermitidas())
+  const viaAgente = !!window.__dgApplyViaAgente
+  const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
+  const r = await window.api.invoke(canal, ocPendenteAtivoId, pastasPermitidas())
   if (!r?.ok) {
     alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
     return
   }
   const id = ocPendenteAtivoId
   ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (viaAgente) {
+    agentPropostas = agentPropostas.filter((p) => p.id !== id)
+    mostrarPropostasAgent(agentPropostas)
+  }
   if (r.absPath && abaAtiva === r.absPath && editor) {
     const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
     if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
@@ -1026,15 +1036,21 @@ async function aplicarPendenteOc() {
     mostrarDiffOpenClaw(ocPendentes[0])
   } else {
     fecharPainelDiff()
-    alert('Diff aplicado.')
+    alert(viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.')
   }
 }
 
 async function rejeitarPendenteOc() {
   if (!ocPendenteAtivoId) return
-  await window.api.invoke('openclaw:rejeitar', ocPendenteAtivoId)
+  const viaAgente = !!window.__dgApplyViaAgente
+  const canal = viaAgente ? 'agente:rejeitar-proposta' : 'openclaw:rejeitar'
+  await window.api.invoke(canal, ocPendenteAtivoId)
   const id = ocPendenteAtivoId
   ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  if (viaAgente) {
+    agentPropostas = agentPropostas.filter((p) => p.id !== id)
+    mostrarPropostasAgent(agentPropostas)
+  }
   if (ocPendentes.length) {
     renderListaPendentesOc()
     mostrarDiffOpenClaw(ocPendentes[0])
@@ -2538,6 +2554,19 @@ $('btn-oc-limpar-token')?.addEventListener('click', async () => {
 $('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 
+function atualizarStatusAgent(modelo, ms, fila) {
+  const el = $('sb-agent')
+  if (!el) return
+  const partes = []
+  if (modelo) partes.push(modelo)
+  if (ms != null) partes.push(ms + 'ms')
+  if (fila) {
+    if (fila.ocupado) partes.push('fila●')
+    else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
+  }
+  el.textContent = partes.length ? 'Agent: ' + partes.join(' · ') : 'Agent: —'
+}
+
 async function carregarAgentesUi() {
   const sel = $('agent-select')
   if (!sel || !pastaAtual) return
@@ -2558,8 +2587,9 @@ async function carregarAgentesUi() {
       ? 'fila: ocupado (' + st.tamanho + ')'
       : st.tamanho
         ? 'fila: ' + st.tamanho
-        : ''
+        : 'pronto'
   }
+  atualizarStatusAgent(null, null, st)
 }
 
 function renderAgentTrace(passos) {
@@ -2583,6 +2613,115 @@ function renderAgentTrace(passos) {
     }
     box.appendChild(div)
   }
+  box.scrollTop = box.scrollHeight
+}
+
+function appendAgentTraceLive(line) {
+  const box = $('agent-trace')
+  if (!box) return
+  if (box.querySelector('.muted')) box.innerHTML = ''
+  const div = document.createElement('div')
+  div.className = 'step'
+  div.textContent = line
+  box.appendChild(div)
+  box.scrollTop = box.scrollHeight
+}
+
+function mostrarPropostasAgent(propostas) {
+  agentPropostas = propostas || []
+  const box = $('agent-propostas-resumo')
+  if (!box) return
+  if (!agentPropostas.length) {
+    box.hidden = true
+    box.innerHTML = ''
+    box.removeAttribute('aria-label')
+    return
+  }
+  box.hidden = false
+  const n = agentPropostas.length
+  const linhas = agentPropostas
+    .map((p) => {
+      const add = (String(p.unifiedDiff || '').match(/^\+/gm) || []).length
+      const del = (String(p.unifiedDiff || '').match(/^-/gm) || []).length
+      return (
+        '<li><code>' +
+        String(p.path || '').replace(/</g, '&lt;') +
+        '</code> <span class="muted">+' +
+        Math.max(0, add - 1) +
+        '/−' +
+        Math.max(0, del - 1) +
+        '</span></li>'
+      )
+    })
+    .join('')
+  box.setAttribute('aria-label', n + ' proposta(s) de edição pendentes')
+  box.innerHTML =
+    '<div class="agent-propostas-titulo"><strong>' +
+    n +
+    ' proposta(s)</strong></div><ul class="agent-propostas-lista">' +
+    linhas +
+    '</ul>'
+  const acoes = document.createElement('div')
+  acoes.className = 'agent-propostas-acoes'
+  const btnVer = document.createElement('button')
+  btnVer.type = 'button'
+  btnVer.className = 'btn-small'
+  btnVer.textContent = 'Revisar diffs'
+  btnVer.addEventListener('click', () => abrirFilaPropostasAgent())
+  const btnAll = document.createElement('button')
+  btnAll.type = 'button'
+  btnAll.className = 'btn-small'
+  btnAll.textContent = 'Aplicar todas'
+  btnAll.addEventListener('click', () => void aplicarTodasPropostasAgent())
+  acoes.appendChild(btnVer)
+  acoes.appendChild(btnAll)
+  box.appendChild(acoes)
+}
+
+function abrirFilaPropostasAgent() {
+  if (!agentPropostas.length) return
+  ocPendentes = agentPropostas.map((p) => ({
+    id: p.id,
+    path: p.path,
+    absPath: p.absPath || p.path,
+    unifiedDiff: p.unifiedDiff
+  }))
+  // reutilizar painel OpenClaw mas apply via agente:aplicar-proposta
+  renderListaPendentesOc()
+  mostrarDiffOpenClaw(ocPendentes[0])
+  window.__dgApplyViaAgente = true
+}
+
+async function aplicarTodasPropostasAgent() {
+  if (!agentPropostas.length) return
+  if (!window.confirm('Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.'))
+    return
+  for (const p of [...agentPropostas]) {
+    const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
+    if (!r?.ok) {
+      alert('Falha em ' + p.path + ': ' + (r?.erro || ''))
+      break
+    }
+  }
+  const rest = await window.api.invoke('agente:propostas')
+  mostrarPropostasAgent(rest?.pendentes || [])
+  alert('Apply concluído.')
+}
+
+function ligarProgressoAgent() {
+  if (agentProgressUnsub) agentProgressUnsub()
+  agentProgressUnsub = window.api.on('agente:progresso', (_e, ev) => {
+    if (!ev || typeof ev !== 'object') return
+    if (ev.tipo === 'status') appendAgentTraceLive('… ' + ev.texto)
+    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('⚙ ' + ev.nome + '…')
+    else if (ev.tipo === 'tool' && ev.fase === 'fim')
+      appendAgentTraceLive('✓ ' + ev.nome + (ev.detalhe ? ' → ' + String(ev.detalhe).slice(0, 80) : ''))
+    else if (ev.tipo === 'proposta') appendAgentTraceLive('📝 proposta ' + ev.path)
+    else if (ev.tipo === 'texto') {
+      const out = $('agent-output')
+      if (out) out.textContent = String(ev.texto || '')
+    }
+  })
 }
 
 async function executarAgentUi(orquestrar) {
@@ -2600,6 +2739,14 @@ async function executarAgentUi(orquestrar) {
   if (send) send.disabled = true
   if (out) out.textContent = plan ? 'Gerando plano…' : 'Executando…'
   renderAgentTrace([])
+  mostrarPropostasAgent([])
+  ligarProgressoAgent()
+  let selecao = ''
+  try {
+    if (editor && editor.getSelecao) selecao = editor.getSelecao() || ''
+  } catch {
+    /* */
+  }
   try {
     let r
     if (orquestrar) {
@@ -2619,7 +2766,11 @@ async function executarAgentUi(orquestrar) {
         raiz: pastaAtual,
         pergunta: texto,
         modo: plan ? 'plan' : 'agent',
-        agente
+        agente,
+        pastas: pastasPermitidas(),
+        selecao,
+        arquivoAtivo: abaAtiva || undefined,
+        proposeWrites: true
       })
       if (!r?.ok) {
         if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
@@ -2632,6 +2783,8 @@ async function executarAgentUi(orquestrar) {
           (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
       }
       renderAgentTrace(r.passos || [])
+      mostrarPropostasAgent(r.propostas || [])
+      atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
     }
     await carregarAgentesUi()
   } catch (e) {
@@ -2643,6 +2796,29 @@ async function executarAgentUi(orquestrar) {
 
 $('agent-send')?.addEventListener('click', () => void executarAgentUi(false))
 $('btn-agent-orquestrar')?.addEventListener('click', () => void executarAgentUi(true))
+$('btn-agent-stop')?.addEventListener('click', async () => {
+  const r = await window.api.invoke('agente:cancelar')
+  appendAgentTraceLive('■ cancelado (' + (r?.cancelados || 0) + ')')
+  await carregarAgentesUi()
+})
+$('btn-agent-exec-plano')?.addEventListener('click', async () => {
+  if (!pastaAtual) return
+  ligarProgressoAgent()
+  const out = $('agent-output')
+  if (out) out.textContent = 'Executando plano salvo…'
+  const r = await window.api.invoke('agente:executar-plano', {
+    raiz: pastaAtual,
+    pastas: pastasPermitidas()
+  })
+  if (!r?.ok) {
+    alert(r?.erro || 'falha')
+    return
+  }
+  if (out) out.textContent = r.texto || ''
+  renderAgentTrace(r.passos || [])
+  mostrarPropostasAgent(r.propostas || [])
+  atualizarStatusAgent(r.modelo, r.duracaoMs, null)
+})
 $('btn-agent-undo')?.addEventListener('click', async () => {
   const r = await window.api.invoke('agente:checkpoint-desfazer')
   alert(r?.ok ? 'Checkpoint restaurado (' + r.restaurados + ' arquivo(s)).' : 'Falha: ' + (r?.erro || ''))

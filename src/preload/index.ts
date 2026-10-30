@@ -37,6 +37,8 @@ const invokeChannels = [
   'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',
   'openclaw:auditoria-listar',
   'agente:pedir', 'agente:orquestrar', 'agente:listar', 'agente:fila-status',
+  'agente:cancelar', 'agente:propostas', 'agente:aplicar-proposta', 'agente:rejeitar-proposta',
+  'agente:plano-salvar', 'agente:plano-ler', 'agente:plano-limpar', 'agente:executar-plano',
   'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
   'agente:checkpoint-desfazer', 'contexto:projeto',
   'navegador:embed-status'
@@ -48,7 +50,8 @@ const eventOnChannels = [
   'terminal:exit',
   'brain:fallback',
   'navegador:aberto',
-  'navegador:fechado'
+  'navegador:fechado',
+  'agente:progresso'
 ] as const
 
 const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']

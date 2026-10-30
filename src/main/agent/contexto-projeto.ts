@@ -50,7 +50,7 @@ function amostraCodigo(raiz: string, limite = 8): string[] {
   return blocos
 }
 
-export function montarContextoProjeto(raiz: string, consulta?: string): string {
+export async function montarContextoProjeto(raiz: string, consulta?: string): Promise<string> {
   const partes: string[] = ['### @projeto']
   partes.push('Raiz: ' + raiz)
   partes.push('Estrutura (rasa):\n' + listarRaso(raiz).join('\n'))
@@ -62,6 +62,18 @@ export function montarContextoProjeto(raiz: string, consulta?: string): string {
         'Arquivos relevantes à consulta:\n' +
           hits.itens.map((h) => '- ' + h.rel).join('\n')
       )
+    }
+    try {
+      const { buscarSemelhantes } = await import('../memory/embeddings')
+      const sem = await buscarSemelhantes(raiz, consulta.trim(), 5, 0.35)
+      if (sem.length) {
+        partes.push(
+          'Memória semântica (embeddings):\n' +
+            sem.map((e) => '- [' + e.role + '] ' + e.texto.slice(0, 280)).join('\n')
+        )
+      }
+    } catch {
+      /* embeddings opcionais se Ollama/nomic ausente */
     }
   }
 

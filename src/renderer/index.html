@@ -147,22 +147,26 @@
       </div>
 
       <div id="center-pane-agent" class="center-pane">
-        <div id="pane-agent" class="center-pane-inner agent-pane">
+        <div id="pane-agent" class="center-pane-inner agent-pane" role="region" aria-label="Painel do agente">
           <header class="agent-header">
             <label class="agent-mode">
-              <input type="checkbox" id="agent-plan-mode" />
+              <input type="checkbox" id="agent-plan-mode" aria-describedby="agent-plan-hint" />
               Plan mode
             </label>
-            <select id="agent-select" aria-label="Agente"></select>
-            <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor">Orquestrar</button>
-            <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint">Desfazer apply</button>
-            <span id="agent-fila-status" class="muted agent-fila"></span>
+            <span id="agent-plan-hint" class="sr-only">Quando ativo, o agente só gera plano sem editar arquivos</span>
+            <select id="agent-select" aria-label="Escolher agente"></select>
+            <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
+            <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
+            <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
+            <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
+            <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
           </header>
-          <div id="agent-trace" class="agent-trace" aria-live="polite"></div>
-          <div id="agent-output" class="agent-output"></div>
+          <div id="agent-trace" class="agent-trace" aria-live="polite" aria-relevant="additions" aria-label="Tool trace" tabindex="0"></div>
+          <div id="agent-output" class="agent-output" tabindex="0" role="log" aria-label="Resposta do agente" aria-live="polite"></div>
+          <div id="agent-propostas-resumo" class="agent-propostas-resumo muted" hidden role="region"></div>
           <footer class="agent-input-bar">
-            <textarea id="agent-input" rows="2" placeholder="Pedido ao agente… use @projeto para contexto do workspace"></textarea>
-            <button type="button" id="agent-send" class="btn-primary">Executar</button>
+            <textarea id="agent-input" rows="2" aria-label="Pedido ao agente" placeholder="Pedido… @projeto @arquivo:path @nota:Nome @selecao"></textarea>
+            <button type="button" id="agent-send" class="btn-primary" aria-label="Executar pedido do agente">Executar</button>
           </footer>
         </div>
       </div>
@@ -271,6 +275,7 @@
       </div>
       <div class="sb-center">
         <span id="sb-ambiente">This PC</span>
+        <span id="sb-agent" title="Agente: modelo / latência / fila">Agent: —</span>
       </div>
       <div class="sb-right">
         <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">

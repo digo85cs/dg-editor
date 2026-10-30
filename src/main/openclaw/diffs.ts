@@ -41,7 +41,8 @@ export function registrarPendentes(
         }
       }
       if (!resolvido || !resolvido.ok) {
-        rejeitados.push({ path: e.path, erro: seg.erro })
+        const erroSeg = 'erro' in seg ? String(seg.erro) : 'path fora das pastas'
+        rejeitados.push({ path: e.path, erro: erroSeg })
         continue
       }
       const id = randomBytes(8).toString('hex')
@@ -191,7 +192,9 @@ export async function aplicarPendenteAprovado(
   if (!p) return { ok: false, erro: 'pendente inexistente' }
   if (p.status !== 'pendente') return { ok: false, erro: 'ja processado: ' + p.status }
   const seg = caminhoSeguro(p.absPath, pastas)
-  if (!seg.ok) return { ok: false, erro: seg.erro }
+  if (!seg.ok) {
+    return { ok: false, erro: 'erro' in seg ? String(seg.erro) : 'path fora das pastas' }
+  }
 
   let original = ''
   try {

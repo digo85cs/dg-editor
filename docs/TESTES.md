@@ -22,7 +22,7 @@ Entre rodadas: matar processos `electron` residuais e esperar alguns segundos.
 2. `npm run build`
 3. `npm test`
 4. `npm run qa:ipc`
-5. `npm run qa:e2e`
+5. `npm run qa:e2e` (inclui Agent Plan/Parar/Undo + Browser embed-status)
 6. `DG_NAV_SMOKE=1 npx electron out/main/index.js` (**3×, ISOLADO**)
 7. `npx electron out/main/index.js` → `[auditoria:boot] ok=52 warn=0 erro=0`
 

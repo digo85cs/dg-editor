@@ -622,6 +622,48 @@ body {
   font: inherit;
 }
 .agent-fila { font-size: 11px; margin-left: auto; }
+.agent-propostas-resumo {
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px dashed var(--dg-border-subtle);
+  border-radius: 6px;
+}
+.agent-propostas-titulo { margin-bottom: 4px; }
+.agent-propostas-lista {
+  margin: 0 0 6px;
+  padding-left: 1.2em;
+  max-height: 96px;
+  overflow: auto;
+}
+.agent-propostas-lista li { margin: 2px 0; }
+.agent-propostas-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-propostas-resumo button { margin-left: 0; }
+.agent-trace:focus-visible,
+.agent-output:focus-visible,
+#agent-input:focus-visible,
+#agent-select:focus-visible {
+  outline: 2px solid var(--dg-accent-brand);
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+#sb-agent {
+  margin-left: 12px;
+  font-size: 11px;
+  color: var(--dg-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-trace .step { transition: none; animation: none; }
+}
 #center-pane-editor #editor-host {
   flex: 1;
   min-height: 0;
