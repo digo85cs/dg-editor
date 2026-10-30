@@ -104,12 +104,21 @@ function Test-SatisfazFaixa {
   try { return ($v -eq [version]$limpa) } catch { return $false }
 }
 
+# Pacotes so de packaging — nao devem bloquear o boot diario
+$ignorarNoBoot = @(
+  'electron-builder',
+  '@electron/rebuild',
+  'playwright-core',
+  'esbuild'
+)
+
 $todas = @()
 if ($pkg.dependencies)    { $todas += $pkg.dependencies.PSObject.Properties }
 if ($pkg.devDependencies) { $todas += $pkg.devDependencies.PSObject.Properties }
 
 $divergentes = @()
 foreach ($d in $todas) {
+  if ($ignorarNoBoot -contains $d.Name) { continue }
   $modPkg = Join-Path $nm ($d.Name + '\package.json')
   if (-not (Test-Path $modPkg)) {
     $divergentes += [pscustomobject]@{ Nome = $d.Name; Motivo = 'nao instalado'; Declarado = $d.Value; Instalado = '-' }
