@@ -95,6 +95,7 @@ body {
   cursor: pointer;
   opacity: 0.88;
   -webkit-app-region: no-drag;
+  user-select: none;
 }
 .mb-btn:hover,
 .mb-btn[aria-expanded="true"] {

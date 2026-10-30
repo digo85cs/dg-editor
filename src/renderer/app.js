@@ -3835,6 +3835,10 @@ function initMenubar() {
 
   bar.querySelectorAll('.mb-btn').forEach((btn) => {
     const nome = btn.getAttribute('data-menu')
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+    })
     btn.addEventListener('click', (e) => {
       e.preventDefault()
       e.stopPropagation()
