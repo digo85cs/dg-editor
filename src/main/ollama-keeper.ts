@@ -20,8 +20,27 @@ export async function ensureOllama(): Promise<boolean> {
   if (await ollamaAlive()) return true
   dglog('[keeper] Ollama morto - subindo oculto e persistente...')
   const exe = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
-  keeperProc = spawn(exe, ['serve'], { env: Object.assign({}, process.env, { OLLAMA_NUM_PARALLEL: '1', OLLAMA_MAX_LOADED_MODELS: '1', OLLAMA_KEEP_ALIVE: '5m' }), detached: true, stdio: 'ignore', windowsHide: true })
-  keeperProc.unref()
+  try {
+    keeperProc = spawn(exe, ['serve'], {
+      env: Object.assign({}, process.env, {
+        OLLAMA_NUM_PARALLEL: '1',
+        OLLAMA_MAX_LOADED_MODELS: '1',
+        OLLAMA_KEEP_ALIVE: '5m'
+      }),
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true
+    })
+    // Sem isto, spawn ENOENT vira dialog modal e trava a UI.
+    keeperProc.on('error', (err) => {
+      dglog('[keeper] spawn ollama falhou: ' + String((err as NodeJS.ErrnoException)?.message || err))
+      keeperProc = null
+    })
+    keeperProc.unref()
+  } catch (e) {
+    dglog('[keeper] nao foi possivel iniciar ollama: ' + String(e))
+    return false
+  }
   // espera subir (ate 10s)
   for (let i = 0; i < 10; i++) {
     await new Promise((r) => setTimeout(r, 1000))
