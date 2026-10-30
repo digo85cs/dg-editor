@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { dossieDir as appDossieDir } from './paths'
 import { dglog } from './dglog'
+import { OWNER_EMAIL, OWNER_USERNAME, OWNER_DISPLAY } from '../shared/owner'
 
 export const ADAPTA_URLS = {
   one: 'https://adapta.org/',
@@ -124,6 +125,11 @@ export function montarBlocoDossie(conteudoDossie: string): string {
   b.push('# Contexto de Continuidade — DG Editor')
   b.push('')
   b.push('> Gerado pelo DG Editor (`continuidade.md`) para Adapta ONE (Contextos) e Maestro.')
+  b.push('')
+  b.push('## Conta')
+  b.push('')
+  b.push(`- **Dono:** ${OWNER_DISPLAY} (\`${OWNER_USERNAME}\`)`)
+  b.push(`- **E-mail canônico (único):** \`${OWNER_EMAIL}\``)
   b.push('')
   b.push('## Resumo do dossiê')
   b.push('')

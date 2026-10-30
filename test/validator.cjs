@@ -54,14 +54,13 @@ function loadModule(relPath) {
       }
       return loadModule(alvo)
     }
-    if (spec.startsWith('./')) {
+    if (spec.startsWith('./') || spec.startsWith('../')) {
       const dir = path.dirname(relPath)
-      let alvo = path.join(dir, spec.slice(2))
-      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) alvo += '.ts'
+      let alvo = path.normalize(path.join(dir, spec)).replace(/\\/g, '/')
+      if (!fs.existsSync(path.join(SRC, alvo)) && fs.existsSync(path.join(SRC, alvo + '.ts'))) {
+        alvo += '.ts'
+      }
       return loadModule(alvo)
-    }
-    if (spec.startsWith('../')) {
-      return loadModule('main/' + spec.slice(3) + '.ts')
     }
     return require(spec)
   }
@@ -1092,6 +1091,10 @@ async function main() {
       path.join(dossieDir, 'dossie.txt'),
       '=== DOSSIE DG EDITOR ===\nAtualizado em: 2026-01-01\nRaiz: /proj\nTotal de mensagens no chat: 1\nProvedor mais recente: ollama\n\n--- ULTIMAS MENSAGENS ---\n[2026-01-01T00:00:00.000Z] DONO: oi\n=== FIM DO DOSSIE ===\n',
       'utf8'
+    )
+    assert(
+      'continuidade inclui email canonico',
+      /digo85cs@gmail\.com/.test(bridge.montarBlocoDossie(fs.readFileSync(path.join(dossieDir, 'dossie.txt'), 'utf8')))
     )
     const ger = bridge.gerarContinuidade(dossieDir)
     assert('gerar continuidade ok', ger.ok === true && fs.existsSync(ger.destino))
