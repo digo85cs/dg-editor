@@ -1,6 +1,18 @@
 # dg-editor
 DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)
 
+## Abrir no Windows
+
+Use o atalho **`abrir-dg-editor.bat`** ou **`dg-boot.bat`** na raiz do projeto (`D:\CURSOR\DG Editor\`).
+
+Não use `node_modules\electron\dist` — isso abre o Electron cru / build velho e a UI (Contas na base, menus, etc.) não atualiza.
+
+```bat
+cd /d "D:\CURSOR\DG Editor"
+git pull
+abrir-dg-editor.bat
+```
+
 ## Terminal
 
 Painel inferior com **PowerShell 7** (`pwsh`) via node-pty + xterm.js (atalho **Ctrl+`**).

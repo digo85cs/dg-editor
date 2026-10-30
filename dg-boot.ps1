@@ -130,6 +130,20 @@ if ($divergentes.Count -gt 0) {
   Log 'todas as dependencias batem com package.json' 'Green'
 }
 
-# ---------- 3. abrir o app ----------
-Log 'iniciando DG Editor...' 'Cyan'
-npm run dev
+# ---------- 3. branch + build fresco (UI vem de out/renderer) ----------
+try {
+  $branch = (git -C $raiz rev-parse --abbrev-ref HEAD 2>$null)
+  if ($branch) { Log ('branch: ' + $branch) 'Cyan' }
+} catch {}
+
+Log 'gerando build (npm run build) para aplicar UI local...' 'Cyan'
+npm run build
+if ($LASTEXITCODE -ne 0) {
+  Log 'build falhou -- abortando (nao abra electron\\dist direto)' 'Red'
+  exit 1
+}
+Log 'build ok' 'Green'
+
+# ---------- 4. abrir o app (NUNCA use node_modules\electron\dist como atalho) ----------
+Log 'iniciando DG Editor via npm start (atalho correto = esta pasta\dg-boot.bat)...' 'Cyan'
+npm start
