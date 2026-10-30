@@ -1054,13 +1054,13 @@ async function main() {
       )
     )
     assert(
-      'sincronizar-remoto.cjs existe',
-      fs.existsSync(path.join(ROOT, 'scripts/sincronizar-remoto.cjs'))
-    )
-    assert(
       'paths prioriza windows-canonica',
       /fix:windows-canonica/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8')) &&
         /RAIZ_WINDOWS_CANONICA/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8'))
+    )
+    assert(
+      'sem sync remoto obrigatorio',
+      !fs.existsSync(path.join(ROOT, 'scripts/sincronizar-remoto.cjs'))
     )
   }
 

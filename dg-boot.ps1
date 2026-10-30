@@ -142,17 +142,6 @@ $pkgPath = Join-Path $raiz 'package.json'
 if (-not (Test-Path $pkgPath)) { Fail 'package.json nao encontrado' }
 $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
 
-# Sincroniza D:\CURSOR\DG Editor com o remoto (espelho do /workspace)
-$syncJs = Join-Path $raiz 'scripts\sincronizar-remoto.cjs'
-if ((Test-Path $syncJs) -and ($raiz -eq 'D:\CURSOR\DG Editor')) {
-  try {
-    $sc = Invoke-NodeHidden -ScriptPath $syncJs
-    Log ('sync remoto exit=' + $sc) 'Green'
-  } catch {
-    Log ('sync remoto: ' + $_.Exception.Message) 'Yellow'
-  }
-}
-
 # Garante VBS + shim (npm start antigo → iniciar-app, nunca vite preview)
 $garantirJs = Join-Path $raiz 'scripts\garantir-launchers.cjs'
 if (Test-Path $garantirJs) {

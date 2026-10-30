@@ -1,11 +1,8 @@
 /**
- * Pasta de trabalho OBRIGATÓRIA e permanente do DG Editor no Windows.
- * Cloud Agent (/workspace) espelha o git; no PC a raiz é sempre esta.
+ * Pasta de trabalho OBRIGATÓRIA e permanente do DG Editor.
+ * O app roda SOMENTE local no Windows — sem depender de nuvem/espelho.
  */
 export const RAIZ_WINDOWS_CANONICA = 'D:\\CURSOR\\DG Editor'
-
-/** Branch que o PC sincroniza a partir do remoto (espelho do /workspace). */
-export const BRANCH_TRABALHO = 'feat/vault-markdown'
 
 export function ehRaizWindowsCanonica(caminho: string): boolean {
   const n = (caminho || '').replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()

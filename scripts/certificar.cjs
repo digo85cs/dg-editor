@@ -49,7 +49,6 @@ const essenciais = [
   'scripts/sincronizar-windows.ps1',
   'scripts/iniciar-app.cjs',
   'scripts/garantir-launchers.cjs',
-  'scripts/sincronizar-remoto.cjs',
   'src/shared/raiz-canonica.ts',
   'src/main/win-self-heal.ts',
   'src/main/index.ts',

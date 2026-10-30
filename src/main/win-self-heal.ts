@@ -113,12 +113,6 @@ export function selfHealWindowsLaunchers(): { ok: boolean; escritos: string[] } 
     /* ignore */
   }
 
-  const sync = join(raiz, 'scripts', 'sincronizar-remoto.cjs')
-  if (existsSync(sync)) {
-    spawnHidden(process.execPath, [sync], raiz)
-    dglog('[win-self-heal] sync remoto agendado → ' + RAIZ_CANONICA)
-  }
-
   const garantir = join(raiz, 'scripts', 'garantir-launchers.cjs')
   if (existsSync(garantir)) {
     spawnHidden(process.execPath, [garantir], raiz)

@@ -117,12 +117,6 @@ try {
   Set-Content -LiteralPath (Join-Path $raiz '.dg-root') -Value $raiz -Encoding ASCII -Force
 } catch {}
 
-$syncJs = Join-Path $raiz 'scripts\sincronizar-remoto.cjs'
-if (Test-Path $syncJs) {
-  Write-Step 'sincronizando com remoto (espelho /workspace)...'
-  & node.exe $syncJs
-}
-
 $garantir = Join-Path $raiz 'scripts\garantir-launchers.cjs'
 if (Test-Path $garantir) {
   Write-Step 'garantindo launchers silenciosos...'
@@ -136,7 +130,7 @@ if (Test-Path $atalho) {
 }
 
 Write-Host ''
-Write-Host 'Pronto. Pasta oficial: D:\CURSOR\DG Editor' -ForegroundColor Cyan
+Write-Host 'Pronto. DG Editor roda somente local em D:\CURSOR\DG Editor' -ForegroundColor Cyan
 Write-Host ('Use o atalho DG Editor (wscript + abrir-dg-editor.vbs).')
 Write-Host ('Pasta: ' + $raiz)
 exit 0

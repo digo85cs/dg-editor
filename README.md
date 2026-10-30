@@ -3,10 +3,8 @@ Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
-**Pasta oficial permanente:** `D:\CURSOR\DG Editor`  
-Cloud Agent edita em `/workspace` e publica na branch `feat/vault-markdown`. No boot Windows o app **sincroniza** essa pasta com o remoto e self-heal do atalho (`wscript` + `abrir-dg-editor.vbs`, sem console).
-
-Não abra `node_modules\electron\dist`.
+**Pasta oficial (somente local):** `D:\CURSOR\DG Editor`  
+O DG Editor roda **só no PC** (Electron). Atalho: `wscript` + `abrir-dg-editor.vbs` (sem console). Não abra `node_modules\electron\dist`.
 
 Certificação: `npm run certificar`. Faxina: `npm run limpeza:organica`.
 

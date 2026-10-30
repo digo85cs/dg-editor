@@ -178,7 +178,7 @@ function main() {
   if (!fs.existsSync(markerDir)) fs.mkdirSync(markerDir, { recursive: true })
   fs.writeFileSync(
     path.join(markerDir, 'boot-silent.flag'),
-    'version=4\nraiz=' + alvo + '\nstart=iniciar-app\natalho=wscript+vbs\nbranch=feat/vault-markdown\n',
+    'version=5\nraiz=' + alvo + '\nmodo=somente-local\nstart=iniciar-app\natalho=wscript+vbs\n',
     'utf8'
   )
   if (process.argv.includes('--verbose') || feitos.length) {
