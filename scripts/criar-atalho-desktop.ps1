@@ -1,5 +1,5 @@
 # Cria/corrige o atalho "DG Editor" na Area de Trabalho do Windows.
-# Alvo: D:\CURSOR\DG Editor\abrir-dg-editor.bat  (NUNCA node_modules\electron\dist)
+# Alvo: wscript.exe → abrir-dg-editor.vbs (NUNCA node_modules\electron\dist).
 # Desktop canônico deste PC: C:\Users\digo8\OneDrive\Desktop
 $ErrorActionPreference = 'Stop'
 
@@ -14,7 +14,8 @@ function Get-RaizProjeto {
     if (-not $c) { continue }
     $atual = $c
     for ($i = 0; $i -lt 6; $i++) {
-      if ((Test-Path (Join-Path $atual 'package.json')) -and (Test-Path (Join-Path $atual 'abrir-dg-editor.bat'))) {
+      $temLauncher = (Test-Path (Join-Path $atual 'abrir-dg-editor.vbs')) -or (Test-Path (Join-Path $atual 'abrir-dg-editor.bat'))
+      if ((Test-Path (Join-Path $atual 'package.json')) -and $temLauncher) {
         return $atual
       }
       if (Test-Path (Join-Path $atual 'package.json')) { return $atual }
@@ -60,8 +61,8 @@ function Test-AlvoRuim {
   if ($alvo -match 'node_modules[\\/]+electron([\\/]+dist)?') { return $true }
   if ($alvo -match '(^|[\\/])electron\.exe$') { return $true }
   if ($alvo -match '[\\/]electron[\\/]dist([\\/]|$)') { return $true }
-  # atalho DG Editor apontando para qualquer coisa que nao seja abrir-dg-editor.bat
-  if ($nome -eq 'DG Editor.lnk' -and $alvo -notmatch 'abrir-dg-editor\.bat$') { return $true }
+  # atalho DG Editor deve apontar para o launcher sem console (.vbs)
+  if ($nome -eq 'DG Editor.lnk' -and $alvo -notmatch 'abrir-dg-editor\.(vbs|bat)$') { return $true }
   return $false
 }
 
@@ -77,9 +78,12 @@ if (-not $raiz) {
   exit 1
 }
 
-$bat = Join-Path $raiz 'abrir-dg-editor.bat'
-if (-not (Test-Path $bat)) {
-  Write-Host '[ERRO] falta abrir-dg-editor.bat em ' $raiz -ForegroundColor Red
+$launcher = Join-Path $raiz 'abrir-dg-editor.vbs'
+if (-not (Test-Path $launcher)) {
+  $launcher = Join-Path $raiz 'abrir-dg-editor.bat'
+}
+if (-not (Test-Path $launcher)) {
+  Write-Host '[ERRO] falta abrir-dg-editor.vbs/bat em ' $raiz -ForegroundColor Red
   Write-Host '[dica] git pull origin feat/vault-markdown' -ForegroundColor Yellow
   exit 1
 }
@@ -129,16 +133,23 @@ foreach ($desktop in $desktops) {
   $lnkPath = Join-Path $desktop $nome
   $w = New-Object -ComObject WScript.Shell
   $lnk = $w.CreateShortcut($lnkPath)
-  $lnk.TargetPath = $bat
+  # .vbs via wscript = nenhuma janela de terminal
+  if ($launcher -like '*.vbs') {
+    $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+    $lnk.Arguments = '//nologo "' + $launcher + '"'
+  } else {
+    $lnk.TargetPath = $launcher
+    $lnk.Arguments = ''
+  }
   $lnk.WorkingDirectory = $raiz
-  $lnk.WindowStyle = 1
+  $lnk.WindowStyle = 7
   $lnk.Description = 'DG Editor'
   if (Test-Path $icoCandidate) {
     $lnk.IconLocation = $icoCandidate + ',0'
   }
   $lnk.Save()
   Write-Host ('[ok] Atalho: ' + $lnkPath) -ForegroundColor Green
-  Write-Host ('[ok] Alvo:  ' + $bat) -ForegroundColor Green
+  Write-Host ('[ok] Alvo:  ' + $launcher) -ForegroundColor Green
   if (-not $lnkPrincipal) { $lnkPrincipal = $lnkPath }
 }
 

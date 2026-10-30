@@ -1,5 +1,5 @@
 # Splash moderno "Carregando" + boot silencioso (sem janela preta do cmd/vite).
-# Chamado por abrir-dg-editor.bat com -WindowStyle Hidden.
+# Chamado por abrir-dg-editor.vbs (wscript 0) com powershell -WindowStyle Hidden.
 $ErrorActionPreference = 'Continue'
 
 Add-Type -AssemblyName System.Windows.Forms

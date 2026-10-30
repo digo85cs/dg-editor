@@ -69,6 +69,29 @@ function Fail([string]$msg) {
 Log 'DG Editor -- verificacao de boot' 'Cyan'
 Log ('raiz fixa/windows: ' + $raiz)
 
+function Invoke-NpmHidden {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$NpmArgs,
+    [string]$OutFile = ''
+  )
+  # npm.cmd abre console se chamado direto — usa cmd oculto
+  $cmdline = 'npm ' + (($NpmArgs | ForEach-Object {
+        if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ }
+      }) -join ' ')
+  if ($OutFile) {
+    $cmdline = $cmdline + ' > "' + $OutFile + '" 2>&1'
+  } else {
+    $cmdline = $cmdline + ' > NUL 2>&1'
+  }
+  $p = Start-Process -FilePath 'cmd.exe' `
+    -ArgumentList @('/d', '/s', '/c', $cmdline) `
+    -WorkingDirectory $raiz `
+    -WindowStyle Hidden `
+    -Wait `
+    -PassThru
+  return [int]$p.ExitCode
+}
+
 $pkgPath = Join-Path $raiz 'package.json'
 if (-not (Test-Path $pkgPath)) { Fail 'package.json nao encontrado' }
 $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
@@ -77,8 +100,8 @@ $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
 $nm = Join-Path $raiz 'node_modules'
 if (-not (Test-Path $nm)) {
   Log 'node_modules ausente -- instalando' 'Yellow'
-  npm install --no-audit --no-fund *> $null
-  if ($LASTEXITCODE -ne 0) { Fail 'npm install falhou' }
+  $code = Invoke-NpmHidden -NpmArgs @('install', '--no-audit', '--no-fund')
+  if ($code -ne 0) { Fail 'npm install falhou' }
   Log 'dependencias instaladas' 'Green'
 } else {
   Log 'node_modules presente' 'Green'
@@ -133,8 +156,8 @@ foreach ($d in $todas) {
 
 if ($divergentes.Count -gt 0) {
   Log ('sincronizando deps: ' + ($divergentes -join ', ')) 'Yellow'
-  npm install --no-audit --no-fund *> $null
-  if ($LASTEXITCODE -ne 0) { Log 'npm install falhou -- seguindo' 'Yellow' }
+  $code = Invoke-NpmHidden -NpmArgs @('install', '--no-audit', '--no-fund')
+  if ($code -ne 0) { Log 'npm install falhou -- seguindo' 'Yellow' }
   else { Log 'dependencias sincronizadas' 'Green' }
 } else {
   Log 'dependencias ok' 'Green'
@@ -144,7 +167,9 @@ if ($divergentes.Count -gt 0) {
 $atalhoScript = Join-Path $raiz 'scripts\criar-atalho-desktop.ps1'
 if (Test-Path $atalhoScript) {
   try {
-    & powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $atalhoScript *> $null
+    Start-Process -FilePath 'powershell.exe' `
+      -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $atalhoScript) `
+      -WindowStyle Hidden -Wait | Out-Null
     Log 'atalho atualizado' 'Green'
   } catch {
     Log ('atalho: ' + $_.Exception.Message) 'Yellow'
@@ -175,8 +200,8 @@ function Test-BuildNecessario {
 if (Test-BuildNecessario) {
   Log 'gerando build (npm run build)...' 'Cyan'
   $buildLog = Join-Path $logDir 'build-last.log'
-  npm run build *> $buildLog
-  if ($LASTEXITCODE -ne 0) { Fail 'build falhou — veja .dg-editor/logs/build-last.log' }
+  $code = Invoke-NpmHidden -NpmArgs @('run', 'build') -OutFile $buildLog
+  if ($code -ne 0) { Fail 'build falhou — veja .dg-editor/logs/build-last.log' }
   Log 'build ok' 'Green'
 } else {
   Log 'build em dia — pulando' 'Green'
