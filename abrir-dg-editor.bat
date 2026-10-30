@@ -1,14 +1,14 @@
 @echo off
-REM Atalho correto do DG Editor (Windows).
-REM Pasta de trabalho FIXA: D:\CURSOR\DG Editor
-REM NAO use:  ...\node_modules\electron\dist
+REM Abre o DG Editor sem janela preta — so splash "Carregando".
+REM Pasta fixa: D:\CURSOR\DG Editor
 set "DG_ROOT=D:\CURSOR\DG Editor"
 if not exist "%DG_ROOT%\package.json" (
   echo [ERRO] Pasta fixa nao encontrada: %DG_ROOT%
-  echo Verifique se o projeto esta em D:\CURSOR\DG Editor
   pause
   exit /b 1
 )
 cd /d "%DG_ROOT%"
 echo %DG_ROOT%> "%DG_ROOT%\.dg-root"
-call "%DG_ROOT%\dg-boot.bat"
+REM start + Hidden = sem console; splash cuida do boot
+start "" powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%DG_ROOT%\scripts\splash-boot.ps1"
+exit /b 0

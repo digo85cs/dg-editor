@@ -1,8 +1,7 @@
 @echo off
-REM Boot do DG Editor — sempre na pasta fixa do Windows.
+REM Boot com console (debug). Uso diario: abrir-dg-editor.bat (splash).
 set "DG_ROOT=D:\CURSOR\DG Editor"
 if not exist "%DG_ROOT%\package.json" (
-  REM fallback: pasta deste .bat (dev/CI)
   cd /d "%~dp0"
   set "DG_ROOT=%CD%"
 ) else (
