@@ -70,14 +70,17 @@ $lnk = $w.CreateShortcut($lnkPath)
 $lnk.TargetPath = $bat
 $lnk.WorkingDirectory = $raiz
 $lnk.WindowStyle = 1
-$lnk.Description = 'DG Editor (build + start via dg-boot)'
-# Icone do Electron se existir
-$icoCandidate = Join-Path $raiz 'node_modules\electron\dist\electron.exe'
+$lnk.Description = 'DG Editor'
+# Ícone próprio do DG Editor (nunca o ícone genérico do runtime)
+$icoCandidate = Join-Path $raiz 'resources\dg-editor.ico'
+if (-not (Test-Path $icoCandidate)) {
+  $icoCandidate = Join-Path $raiz 'resources\dg-studio.ico'
+}
 if (Test-Path $icoCandidate) {
   $lnk.IconLocation = $icoCandidate + ',0'
 }
 $lnk.Save()
 
-Write-Host ('[ok] Atalho criado/atualizado: ' + $lnkPath) -ForegroundColor Green
-Write-Host ('[ok] Aponta para: ' + $bat) -ForegroundColor Green
+Write-Host ('[ok] Atalho DG Editor: ' + $lnkPath) -ForegroundColor Green
+Write-Host ('[ok] Alvo: ' + $bat) -ForegroundColor Green
 exit 0

@@ -1,5 +1,5 @@
-# dg-editor
-DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)
+# DG Editor
+Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
@@ -14,6 +14,17 @@ cd /d "D:\CURSOR\DG Editor"
 git pull origin feat/vault-markdown
 corrigir-atalho-desktop.bat
 ```
+
+### App instalável (Windows, sem pasta electron)
+
+Gera `DG Editor.exe` com ícone e nome próprios:
+
+```bat
+npm install
+npm run dist:win:installer
+```
+
+Saída em `dist-app\`. O atalho do instalador aponta para **DG Editor**, não para o runtime interno.
 
 ## Terminal
 

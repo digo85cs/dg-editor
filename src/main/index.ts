@@ -3,7 +3,11 @@ import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import { existsSync } from 'fs'
+import { aplicarIdentidadeDg, resolverIconeApp, DG_APP_NAME } from './branding'
 import { getAuthStore } from './auth'
+
+// Identidade DG Editor (sem marca Electron na UI / taskbar)
+aplicarIdentidadeDg()
 import { getSystemProfile, formatBytes, profileStrength } from './profile'
 import { scanFolder, formatScanSummary } from './scanner'
 import { getBrain } from './brain/module'
@@ -119,16 +123,17 @@ function abrirNavegadorAncorado(url?: string): { ok: boolean } {
 }
 
 function createWindow(): void {
+  const icon = resolverIconeApp()
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'DG Editor',
+    title: DG_APP_NAME,
     frame: false,
     backgroundColor: '#141414',
     show: false,
-    icon: join(app.getAppPath(), 'resources', 'dg-studio.ico'),
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: resolvePreload(),
       contextIsolation: true,

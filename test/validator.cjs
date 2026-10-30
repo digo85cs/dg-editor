@@ -911,7 +911,19 @@ async function main() {
   }
 
   // ---------- Vault Markdown ----------
-  section('Vault Markdown')
+  
+  section('Branding DG Editor')
+  {
+    const brand = fs.readFileSync(path.join(SRC, 'main/branding.ts'), 'utf8')
+    assert('branding setName DG Editor', /DG_APP_NAME\s*=\s*'DG Editor'/.test(brand))
+    assert('branding appId', /com\.dgeditor\.app/.test(brand))
+    assert('icone dg-editor.ico', fs.existsSync(path.join(ROOT, 'resources/dg-editor.ico')))
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert('productName DG Editor', pkg.productName === 'DG Editor')
+    assert('build appId', pkg.build && pkg.build.appId === 'com.dgeditor.app')
+  }
+
+section('Vault Markdown')
   {
     const fsAtom = loadModule('main/fs-atomico.ts')
     assert('detectarEol crlf', fsAtom.detectarEol('a\r\nb') === 'crlf')

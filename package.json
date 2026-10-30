@@ -1,7 +1,12 @@
 {
     "name": "dg-editor",
+    "productName": "DG Editor",
     "version": "0.2.0",
-    "description": "DG Editor - editor de sistemas com IA (Electron + TypeScript + Ollama local)",
+    "description": "DG Editor — editor de sistemas com IA local",
+    "author": {
+        "name": "Rodrigo Soares",
+        "email": "digo85cs@gmail.com"
+    },
     "main": "out/main/index.js",
     "scripts": {
         "dev": "electron-vite preview",
@@ -22,7 +27,59 @@
         "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
         "qa:report": "node scripts/run-qa.cjs --report-only",
         "qa:ia": "node scripts/qa-autocorrigir.cjs",
-        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run"
+        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run",
+        "dist:win": "npm run build && electron-builder --win --dir",
+        "dist:win:installer": "npm run build && electron-builder --win nsis"
+    },
+    "build": {
+        "appId": "com.dgeditor.app",
+        "productName": "DG Editor",
+        "copyright": "Copyright © Rodrigo Soares",
+        "directories": {
+            "output": "dist-app",
+            "buildResources": "resources"
+        },
+        "files": [
+            "out/**/*",
+            "resources/**/*",
+            "package.json"
+        ],
+        "extraMetadata": {
+            "name": "dg-editor",
+            "main": "out/main/index.js"
+        },
+        "win": {
+            "executableName": "DG Editor",
+            "icon": "resources/dg-editor.ico",
+            "artifactName": "DG-Editor-${version}-${arch}.${ext}",
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ]
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "shortcutName": "DG Editor",
+            "uninstallDisplayName": "DG Editor",
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "installerIcon": "resources/dg-editor.ico",
+            "uninstallerIcon": "resources/dg-editor.ico"
+        },
+        "portable": {
+            "artifactName": "DG-Editor-Portable-${version}.exe"
+        }
     },
     "dependencies": {
         "@codemirror/lang-css": "^6.3.1",
@@ -47,6 +104,7 @@
         "@electron/rebuild": "^4.2.1",
         "@types/node": "^20.11.0",
         "electron": "^33.2.1",
+        "electron-builder": "^25.1.8",
         "electron-vite": "^2.1.0",
         "esbuild": "^0.20.0",
         "playwright-core": "^1.49.1",

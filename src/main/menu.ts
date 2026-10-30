@@ -1,4 +1,5 @@
-import { app, Menu, MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron'
+import { DG_APP_NAME, mostrarSobreDg } from './branding'
 
 export type MenuHooks = {
   onAbrirNavegador?: () => void
@@ -47,7 +48,13 @@ export function installPtBrMenu(hooks: MenuHooks = {}): void {
       { label: 'Navegador embutido', accelerator: 'CmdOrCtrl+Shift+N', click: () => hooks.onAbrirNavegador?.() }
     ]},
     { label: 'Ajuda', submenu: [
-      { label: 'Sobre o DG Editor', click: () => { app.showAboutPanel?.() } }
+      {
+        label: 'Sobre o ' + DG_APP_NAME,
+        click: () => {
+          const win = BrowserWindow.getFocusedWindow()
+          void mostrarSobreDg(win)
+        }
+      }
     ]}
   ]
 
