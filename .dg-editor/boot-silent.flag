@@ -1,3 +1,5 @@
-version=3
+version=5
+raiz=D:\CURSOR\DG Editor
+modo=somente-local
 start=iniciar-app
 atalho=wscript+vbs
