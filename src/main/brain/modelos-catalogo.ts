@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Catálogo de modelos (.dg-editor/modelos.default.json + modelos.json runtime)
  * + detecção Ollama + health + fallback leve.
  */
@@ -557,6 +557,13 @@ const TAREFAS_SEM_EMBEDDING = new Set([
 
 export function modeloParaTarefa(raiz: string, tarefa: string): string | null {
   const cat = lerCatalogo(raiz)
+  // Analise exige o maior porte disponivel (longo > grande > padrao > pequeno)
+  if (tarefa === 'analise' || tarefa === 'analisar') {
+    const fortes = cat.modelos
+      .filter((m) => m.ativo && m.instalado !== false && m.status !== 'down' && m.status !== 'offline' && m.tipo !== 'embedding')
+      .sort((a, b) => (PORTE_RANK[b.porte] ?? -1) - (PORTE_RANK[a.porte] ?? -1))
+    if (fortes[0]) return fortes[0].id
+  }
   const excluirEmbedding = TAREFAS_SEM_EMBEDDING.has(tarefa) || !tarefa
   const porte = cat.roteamento[tarefa] || cat.roteamento.codigo || 'padrao'
   const cand = cat.modelos.find(
@@ -603,3 +610,5 @@ export function pararHealthPeriodico(): void {
   if (healthTimer) clearInterval(healthTimer)
   healthTimer = null
 }
+
+

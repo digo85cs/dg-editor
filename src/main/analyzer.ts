@@ -37,6 +37,8 @@ function hashFile(path: string): string {
   }
 }
 
+const HASH_IGNORAR = /(^|[\\/])(\.dg-editor|node_modules|\.git|dist|out|build|chats?)([\\/]|$)|\.log$|boot-silent\.flag$|analise\.json$/i
+
 export function computeFileHashes(root: string, scan: FolderScanResult): Record<string, string> {
   const hashes: Record<string, string> = {}
   hashes['__scan__'] = `${scan.totalFiles}:${scan.totalDirs}`
@@ -44,6 +46,7 @@ export function computeFileHashes(root: string, scan: FolderScanResult): Record<
     ? scan.topFiles.filter((f) => !!f && typeof f.path === 'string' && f.path.length > 0)
     : []
   for (const f of lista.slice(0, 50)) {
+    if (HASH_IGNORAR.test(f.path)) continue
     try {
       hashes[f.path] = hashFile(f.path)
     } catch (e) {

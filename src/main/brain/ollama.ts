@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unico ponto de contato com o Ollama local.
  * URL, escolha de modelo e chat simples vivem aqui.
  */
@@ -379,7 +379,7 @@ export async function askOllama(
         { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
       ],
       stream: false,
-      keep_alive: cfg.ollama?.keepAlive || '30s',
+      keep_alive: cfg.ollama?.keepAlive || '30m',
       options: {
         num_ctx: 8192,
         temperature: 0.3,
