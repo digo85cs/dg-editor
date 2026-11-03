@@ -2,6 +2,7 @@ node_modules/
 out/
 dist-app/
 dg-config.json
+.vs/
 # Marca visual do DG Editor fica em resources/ (versionada)
 *.local
 .env

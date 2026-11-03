@@ -1374,7 +1374,7 @@ export async function rodarAuditoria(
   }
 
   // Passo 2: uma unica re-verificacao dos achados aplicaveis, sem autoAtualizar.
-  const houveCorrecao = achados.some((a) => a.status === 'corrigido')
+  const houveCorrecao = achados.some((a) => a.status === 'corrigido' && a.severidade !== 'ok')
   if (houveCorrecao) {
     console.log('[auditoria] re-verificando apos correcoes...')
     const segunda = await executarChecagens({ autoAtualizar: false })
