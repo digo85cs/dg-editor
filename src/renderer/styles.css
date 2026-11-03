@@ -1747,6 +1747,49 @@ button:focus-visible { outline: 2px solid var(--dg-accent-brand); outline-offset
   box-shadow: var(--dg-shadow-3);
 }
 
+.prompt-modal-box {
+  width: min(760px, 92vw);
+}
+
+.prompt-modal-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.prompt-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--dg-fs-sm);
+  color: var(--dg-text-muted);
+}
+
+.prompt-modal-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-sm);
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 120px;
+  font: inherit;
+}
+
+.prompt-modal-field textarea:focus {
+  outline: 2px solid var(--dg-accent-brand);
+  outline-offset: 2px;
+}
+
+.prompt-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
 .modal-box h3 { font-size: var(--dg-fs-lg); font-weight: 600; margin-bottom: 18px; }
 
 /* Janelas flutuantes (Config / Contas): arrastáveis e sempre à frente */

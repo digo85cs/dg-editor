@@ -2125,8 +2125,107 @@ function novaConversaUi() {
   renderizarChat([])
 }
 
+let focoEditorAntesDoPrompt = null
+
+function abrirOrientadorPrompt() {
+  const modal = $('modal-prompt-orientador')
+  const input = $('prompt-orientador-input')
+  const output = $('prompt-orientador-output')
+  if (!modal || !input || !output) return
+  const ativo = document.activeElement
+  focoEditorAntesDoPrompt = ativo instanceof HTMLElement && ativo.closest('.cm-editor') ? ativo : null
+  input.value = $('chat-input')?.value?.trim() || ''
+  output.value = ''
+  modal.classList.remove('hidden')
+  setTimeout(() => input.focus(), 0)
+}
+
+function fecharOrientadorPrompt() {
+  const modal = $('modal-prompt-orientador')
+  if (modal) modal.classList.add('hidden')
+}
+
+async function melhorarPromptLocal() {
+  const input = $('prompt-orientador-input')
+  const output = $('prompt-orientador-output')
+  const btn = $('btn-prompt-melhorar')
+  if (!input || !output || !btn) return
+  const valor = input.value.trim()
+  if (!valor) {
+    output.value = 'Digite um prompt para melhorar.'
+    return
+  }
+  const raiz = pastaAtual || pastasRecentes[0]
+  if (!raiz) {
+    output.value = 'Abra uma pasta de projeto antes de melhorar o prompt.'
+    return
+  }
+  btn.disabled = true
+  btn.textContent = 'Melhorando...'
+  try {
+    const r = await window.api.invoke('prompt:melhorar', raiz, valor)
+    if (r?.ok === true && typeof r.resultado === 'string' && r.resultado.trim()) {
+      output.value = r.resultado
+    } else {
+      const erro = r?.erro === 'timeout' ? 'Tempo limite de 15 segundos excedido.' : (r?.erro || 'Não foi possível melhorar o prompt.')
+      output.value = erro
+      mostrarToast(erro, 'erro')
+    }
+  } catch (err) {
+    const mensagem = err instanceof Error ? err.message : String(err)
+    output.value = 'Falha ao melhorar o prompt: ' + mensagem
+    mostrarToast('Falha ao melhorar o prompt: ' + mensagem, 'erro')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Melhorar prompt'
+  }
+}
+
+function usarPromptNoChat() {
+  const output = $('prompt-orientador-output')
+  const input = $('chat-input')
+  if (!output || !input) return
+  const valor = output.value.trim()
+  if (!valor) return
+  input.value = valor
+  fecharOrientadorPrompt()
+  if (focoEditorAntesDoPrompt?.isConnected) focoEditorAntesDoPrompt.focus({ preventScroll: true })
+  focoEditorAntesDoPrompt = null
+}
+
+async function copiarPromptOrientador() {
+  const output = $('prompt-orientador-output')
+  if (!output) return
+  const valor = output.value.trim()
+  if (!valor) return
+  let copiado = false
+  try {
+    await navigator.clipboard.writeText(valor)
+    copiado = true
+  } catch {
+    const campo = document.createElement('textarea')
+    campo.value = valor
+    document.body.appendChild(campo)
+    try {
+      campo.select()
+      copiado = document.execCommand('copy')
+    } finally {
+      campo.remove()
+    }
+  }
+  if (!copiado) {
+    mostrarToast('Não foi possível copiar o prompt para a área de transferência.', 'erro')
+    return
+  }
+  mostrarToast('Prompt copiado.', 'ok')
+}
 
 $('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
+$('btn-prompt-orientador')?.addEventListener('click', () => abrirOrientadorPrompt())
+$('btn-prompt-fechar')?.addEventListener('click', () => fecharOrientadorPrompt())
+$('btn-prompt-melhorar')?.addEventListener('click', () => void melhorarPromptLocal())
+$('btn-prompt-usar')?.addEventListener('click', () => usarPromptNoChat())
+$('btn-prompt-copiar')?.addEventListener('click', () => void copiarPromptOrientador())
 
 // ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------let dgFloatZ = 20000
 
@@ -2728,13 +2827,13 @@ function executarComando(id) {
     if (abaAtiva) fecharAba(abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
+  else if (id === 'orientar-prompt') abrirOrientadorPrompt()
   else if (id === 'navegador') {
     toggleRight(true)
     ativarAbaDireita('browser')
     void abrirNavegadorUi()
   }
 }
-
 async function rodarBuscaGlobal() {
   const raiz = pastaAtual || pastasRecentes[0]
   const q = ($('busca-input')?.value || '').trim()
@@ -3449,6 +3548,11 @@ document.addEventListener('keydown', (e) => {
     toggleRight()
     return
   }
+  if (mod && e.altKey && key === 'p') {
+    e.preventDefault()
+    abrirOrientadorPrompt()
+    return
+  }
   if (mod && e.shiftKey && key === 'e') {
     e.preventDefault()
     toggleSidebar(true)
@@ -3491,6 +3595,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     fecharPaleta()
     fecharBuscaGlobal()
+    $('modal-prompt-orientador')?.classList.add('hidden')
     $('modal-config').classList.add('hidden')
     $('modal-contas').classList.add('hidden')
   }

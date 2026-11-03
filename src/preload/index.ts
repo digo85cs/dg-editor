@@ -8,7 +8,7 @@ const invokeChannels = [
   'analysis:run', 'analysis:cached',
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template',
-  'chat:load', 'chat:send', 'chat:clear',
+  'chat:load', 'chat:send', 'chat:clear', 'prompt:melhorar',
   'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
   'git:status', 'git:diff', 'git:repos',
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',

@@ -37,7 +37,7 @@ import {
   ADAPTA_URLS
 } from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
-import { askOllama } from './brain/ollama'
+import { askOllama, ollamaHttpJson, OLLAMA_URL } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
 import {
   criarJanelaNavegador,
@@ -727,6 +727,72 @@ ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown) => {
 ipcMain.handle('chat:clear', (_e, root: string) => {
   clearChat(root)
   return { ok: true }
+})
+
+ipcMain.handle('prompt:melhorar', async (_e, root: unknown, prompt: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const p = exigirString(prompt, 'prompt')
+  if (isErroPayload(p)) return p
+  if (!p.trim()) return { ok: false, erro: 'prompt vazio' }
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+
+  const prazo = Date.now() + 15000
+  try {
+    if (!(await ensureOllama())) {
+      return { ok: false, erro: Date.now() >= prazo ? 'timeout' : 'Ollama indisponível' }
+    }
+    const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+    const candidatos = [
+      { modelo: modeloParaTarefa(seg.abs, 'chat'), tarefa: 'chat' },
+      { modelo: modeloParaTarefa(seg.abs, 'codigo'), tarefa: 'codigo' }
+    ].filter((candidato): candidato is { modelo: string; tarefa: string } => Boolean(candidato.modelo))
+    if (!candidatos.length) return { ok: false, erro: 'Nenhum modelo de chat instalado' }
+
+    const system = 'Você é um engenheiro de prompt. Receba a ideia do usuário e devolva um prompt mais claro, específico e acionável, mantendo a intenção original. Devolva APENAS o prompt refinado, sem preâmbulo, sem explicações. Preserve o idioma do usuário.'
+    const erros: string[] = []
+    for (let i = 0; i < candidatos.length; i++) {
+      const restante = prazo - Date.now()
+      if (restante <= 0) {
+        erros.push('timeout')
+        break
+      }
+      const candidato = candidatos[i]
+      const timeoutMs = Math.max(1, Math.floor(restante / (candidatos.length - i)))
+      dglog('[prompt] modelo escolhido=' + candidato.modelo + ' tarefa=' + candidato.tarefa)
+      try {
+        const resposta = await ollamaHttpJson(
+          OLLAMA_URL + '/api/chat',
+          {
+            model: candidato.modelo,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: p.trim() }
+            ],
+            stream: false,
+            options: { num_ctx: 8192, temperature: 0.3, num_predict: 512 }
+          },
+          'POST',
+          timeoutMs
+        ) as { message?: { content?: string } }
+        const refinado = resposta.message?.content?.trim()
+        if (!refinado) throw new Error('O modelo retornou uma resposta vazia')
+        return { ok: true, resultado: refinado, modelo: candidato.modelo }
+      } catch (err) {
+        const mensagem = err instanceof Error ? err.message : String(err)
+        erros.push(mensagem)
+        dglog('[prompt] falha tarefa=' + candidato.tarefa + ': ' + mensagem)
+      }
+    }
+
+    const timeout = erros.some((erro) => /timeout|abort/i.test(erro)) || Date.now() >= prazo
+    return { ok: false, erro: timeout ? 'timeout' : (erros[erros.length - 1] || 'Erro ao melhorar prompt') }
+  } catch (err) {
+    const mensagem = err instanceof Error ? err.message : String(err)
+    dglog('[prompt] erro: ' + mensagem)
+    return { ok: false, erro: /timeout|abort/i.test(mensagem) ? 'timeout' : mensagem }
+  }
 })
 
 // ---------- Git status / diff / repos ----------

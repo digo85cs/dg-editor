@@ -50,6 +50,7 @@ export function installPtBrMenu(hooks: MenuHooks = {}): void {
         { type: 'separator' },
         { label: 'Alternar Explorer', accelerator: 'CmdOrCtrl+B', click: acao('toggle-sidebar') },
         { label: 'Alternar painel direito', accelerator: 'CmdOrCtrl+Alt+B', click: acao('toggle-right') },
+        { label: 'Orientar prompt do chat', accelerator: 'CmdOrCtrl+Alt+P', click: acao('orientar-prompt') },
         { label: 'Alternar terminal', accelerator: 'CmdOrCtrl+`', click: acao('toggle-terminal') },
         { label: 'Alternar tema', click: acao('tema') },
         { type: 'separator' },

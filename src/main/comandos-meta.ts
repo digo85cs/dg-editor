@@ -15,6 +15,7 @@ export const COMANDOS_META: ComandoMeta[] = [
   { id: 'fechar-aba', titulo: 'Fechar aba ativa', atalho: 'Ctrl+W', area: 'sistema' },
   { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', area: 'navegacao' },
   { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', area: 'chat' },
+  { id: 'orientar-prompt', titulo: 'Orientar prompt do chat', atalho: 'Ctrl+Alt+P', area: 'chat' },
   { id: 'toggle-terminal', titulo: 'Alternar terminal', atalho: 'Ctrl+`', area: 'terminal' },
   { id: 'analisar', titulo: 'Analisar sistema aberto', area: 'chat' },
   { id: 'limpar-chat', titulo: 'Limpar chat desta pasta', area: 'chat' },
