@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unico ponto de contato com o Ollama local.
  * URL, escolha de modelo e chat simples vivem aqui.
  */
@@ -153,6 +153,23 @@ export async function escolherModelo(
   tarefa: string = 'codigo',
   opts: EscolherModeloOpts = {}
 ): Promise<string> {
+  try {
+    const { resolverRaizProjeto } = await import('../paths')
+    const { modeloParaTarefa, lerCatalogo } = await import('./modelos-catalogo')
+    const raiz = resolverRaizProjeto()
+    const doCat = modeloParaTarefa(raiz, tarefa)
+    if (doCat) {
+      dglog('[ollama] escolherModelo(' + tarefa + ') = ' + doCat + ' via=modeloParaTarefa')
+      return doCat
+    }
+    const cat = lerCatalogo(raiz)
+    const temChat = cat.modelos.some((m) => m.instalado !== false && m.tipo !== 'embedding')
+    if (!temChat && cat.modelos.some((m) => m.tipo === 'embedding')) {
+      throw new Error('Nenhum modelo de chat instalado')
+    }
+  } catch (e) {
+    if (e instanceof Error && /Nenhum modelo de chat/.test(e.message)) throw e
+  }
   const { escolherModeloPorTarefa } = await import('./registry')
   const escolhido = await escolherModeloPorTarefa(tarefa, opts)
   dglog('[ollama] escolherModelo(' + tarefa + ') = ' + escolhido +
@@ -178,6 +195,118 @@ export async function ollamaPing(): Promise<boolean> {
   return status === 200
 }
 
+/** Latência real de um modelo (POST /api/generate num_predict=1), não do endpoint. */
+export type VersaoRemotaInfo = {
+  localTag: string
+  remotas: string[]
+  atualizadoDisponivel: boolean
+  erro?: string
+}
+
+/**
+ * Consulta tags públicas no registry.ollama.ai (NÃO baixa modelo).
+ * Usado por modelos:versoes-remotas / badge "atualização disponível".
+ */
+export async function consultarVersoesRemotas(
+  ids: string[]
+): Promise<Record<string, VersaoRemotaInfo>> {
+  const out: Record<string, VersaoRemotaInfo> = {}
+  for (const id of ids) {
+    const [nome, tag = 'latest'] = String(id).split(':')
+    const localTag = tag || 'latest'
+    if (!nome) {
+      out[id] = { localTag, remotas: [], atualizadoDisponivel: false, erro: 'id invalido' }
+      continue
+    }
+    try {
+      // Página pública de tags (HTML) — registry v2 /tags/list responde 404 para library/*
+      const url = 'https://ollama.com/library/' + encodeURIComponent(nome) + '/tags'
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), 10000)
+      const res = await fetch(url, { signal: ac.signal, headers: { Accept: 'text/html' } })
+      clearTimeout(timer)
+      if (!res.ok) {
+        out[id] = {
+          localTag,
+          remotas: [],
+          atualizadoDisponivel: false,
+          erro: 'http ' + res.status
+        }
+        continue
+      }
+      const html = await res.text()
+      const remotasSet = new Set<string>()
+      const re = new RegExp('/library/' + nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':([a-zA-Z0-9._-]+)', 'g')
+      let m: RegExpExecArray | null
+      while ((m = re.exec(html))) remotasSet.add(m[1])
+      const remotas = [...remotasSet]
+      const temLocal = remotas.includes(localTag)
+      const atualizadoDisponivel = remotas.length > 0 && !temLocal
+      out[id] = { localTag, remotas: remotas.slice(0, 40), atualizadoDisponivel }
+    } catch (e) {
+      out[id] = {
+        localTag,
+        remotas: [],
+        atualizadoDisponivel: false,
+        erro: String((e as Error)?.message || e).slice(0, 200)
+      }
+    }
+  }
+  return out
+}
+
+export type ErroLatenciaKind = 'timeout' | 'offline' | 'not_found' | 'outro'
+
+/** Modelos carregados na RAM (/api/ps). */
+export async function listarModelosResidentes(): Promise<string[]> {
+  const { status, body } = await httpGet('/api/ps', 5000)
+  if (status !== 200) return []
+  try {
+    const json = JSON.parse(body) as { models?: { name?: string; model?: string }[] }
+    return (json.models || [])
+      .map((m) => String(m.name || m.model || '').trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function classificarErroLatencia(msg: string): ErroLatenciaKind {
+  const s = String(msg || '')
+  if (/ECONNREFUSED|ENOTFOUND|ECONNRESET|socket hang up|network/i.test(s)) return 'offline'
+  if (/HTTP 404|model ['"]?[\w.:-]+['"]? not found|not found/i.test(s)) return 'not_found'
+  if (/timeout|abort ollama/i.test(s)) return 'timeout'
+  return 'outro'
+}
+
+export async function medirLatenciaModelo(
+  id: string,
+  timeoutMs = 90_000
+): Promise<
+  | { ok: true; ms: number }
+  | { ok: false; erro: string; kind: ErroLatenciaKind; ms: null }
+> {
+  const t0 = Date.now()
+  try {
+    await ollamaHttpJson(
+      OLLAMA_URL + '/api/generate',
+      {
+        model: id,
+        prompt: 'ok',
+        stream: false,
+        keep_alive: '24h',
+        options: { num_predict: 1 }
+      },
+      'POST',
+      timeoutMs
+    )
+    return { ok: true, ms: Date.now() - t0 }
+  } catch (e) {
+    const erro = String((e as Error)?.message || e)
+    return { ok: false, erro, kind: classificarErroLatencia(erro), ms: null }
+  }
+}
+
 export async function listModelos(): Promise<string[]> {
   const { status, body } = await httpGet('/api/tags', 5000)
   if (status !== 200) return []
@@ -186,6 +315,18 @@ export async function listModelos(): Promise<string[]> {
     return (json.models || []).map((m) => m.name)
   } catch {
     return []
+  }
+}
+
+/** Uma única GET /api/tags (timeout curto) — via preferida do catálogo. null = Ollama down. */
+export async function listarModelosOllama(): Promise<string[] | null> {
+  const { status, body } = await httpGet('/api/tags', 1500)
+  if (status !== 200) return null
+  try {
+    const json = JSON.parse(body) as { models?: { name: string }[] }
+    return (json.models || []).map((m) => m.name)
+  } catch {
+    return null
   }
 }
 
@@ -210,10 +351,22 @@ export async function askOllama(
   opts: EscolherModeloOpts = {}
 ): Promise<BrainResponse> {
   const { limitesPorTarefa } = await import('./registry')
-  const model = await escolherModelo(tarefa, opts)
+  // Roteamento real do catálogo (nunca embedding em chat/analise/completar/codigo)
+  let model: string | null = null
+  try {
+    const { resolverRaizProjeto } = await import('../paths')
+    const { modeloParaTarefa } = await import('./modelos-catalogo')
+    model = modeloParaTarefa(resolverRaizProjeto(), tarefa)
+  } catch {
+    model = null
+  }
+  if (!model) {
+    throw new Error('Nenhum modelo de chat instalado')
+  }
   const lim = limitesPorTarefa(tarefa)
+  dglog('[ollama] modelo escolhido=' + model)
   dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
-    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs)
+    ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs + ' via=modeloParaTarefa')
   const cfg = loadDgConfig()
   const r = (await ollamaHttpJson(
     OLLAMA_URL + '/api/chat',
@@ -227,7 +380,7 @@ export async function askOllama(
         { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
       ],
       stream: false,
-      keep_alive: cfg.ollama?.keepAlive || '30s',
+      keep_alive: cfg.ollama?.keepAlive || '30m',
       options: {
         num_ctx: 8192,
         temperature: 0.3,

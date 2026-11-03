@@ -1,8 +1,15 @@
 import { defineConfig } from 'electron-vite'
 import { resolve } from 'path'
 
+const sharedAlias = {
+  '@': resolve('src'),
+  '@main': resolve('src/main'),
+  '@shared': resolve('src/shared')
+}
+
 export default defineConfig({
   main: {
+    resolve: { alias: sharedAlias },
     build: {
       target: 'node20',
       rollupOptions: {
@@ -13,6 +20,7 @@ export default defineConfig({
     plugins: []
   },
   preload: {
+    resolve: { alias: sharedAlias },
     build: {
       target: 'node20',
       rollupOptions: {

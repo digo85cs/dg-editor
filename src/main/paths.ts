@@ -3,8 +3,11 @@
 // Estado por projeto (cache, chat) -> pasta do projeto
 
 import { join, resolve, relative, dirname, isAbsolute, normalize } from 'path'
-import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
+import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica'
+
+export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica'
 
 interface ElectronAppLike {
   getPath: (name: string) => string
@@ -70,6 +73,7 @@ export function cwdDiagnostico(): { cwd: string; userData: string; divergente: b
 
 export type FonteRaiz =
   | 'env:DG_ROOT'
+  | 'fix:windows-canonica'
   | 'arquivo:.dg-root'
   | 'subida:package+dg-editor'
   | 'cwd'
@@ -84,20 +88,48 @@ function ehRaizProjeto(dir: string): boolean {
 
 /**
  * Cascata deterministica de raiz do projeto.
+ * 0) Windows: D:\CURSOR\DG Editor SEMPRE que existir (pasta oficial permanente)
  * 1) process.env.DG_ROOT (se existir em disco)
  * 2) arquivo .dg-root na cwd (conteudo = caminho)
  * 3) subir a partir de __dirname ate achar package.json + .dg-editor/
  * 4) process.cwd() se for raiz valida
  * 5) erro explicito
  */
+function fixarEnvEDgRoot(abs: string): void {
+  try {
+    process.env.DG_ROOT = abs
+  } catch { /* ignore */ }
+  try {
+    writeFileSync(join(abs, '.dg-root'), abs + '\n', 'utf8')
+  } catch { /* ignore */ }
+}
+
 export function resolverRaizProjeto(forcar = false): string {
   if (_raizCache && !forcar) return _raizCache.raiz
+
+  // 0. Windows — pasta oficial permanente (ganha de tudo)
+  if (process.platform === 'win32' && existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
+    const abs = resolve(RAIZ_WINDOWS_CANONICA)
+    _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
+    fixarEnvEDgRoot(abs)
+    logRaizUmaVez()
+    return abs
+  }
 
   // 1. env
   const env = (process.env.DG_ROOT || '').trim()
   if (env && existsSync(env)) {
     const abs = resolve(env)
     _raizCache = { raiz: abs, fonte: 'env:DG_ROOT' }
+    logRaizUmaVez()
+    return abs
+  }
+
+  // 1b. canonica tambem fora de win32 se a pasta existir (ex.: wine)
+  if (existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
+    const abs = resolve(RAIZ_WINDOWS_CANONICA)
+    _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
+    fixarEnvEDgRoot(abs)
     logRaizUmaVez()
     return abs
   }

@@ -3,6 +3,7 @@ import { getSystemProfile, profileStrength } from './profile'
 import { getBrain } from './brain/module'
 import { guardianSnapshot } from './guardian'
 import type { AccountsState } from '@shared/types'
+import { OWNER_EMAIL, OWNER_USERNAME } from '../shared/owner'
 
 // Tela de Contas (Fase 2): estado consolidado de identidade, maquina, IA e guardiao
 export async function getAccountsState(): Promise<AccountsState> {
@@ -14,6 +15,8 @@ export async function getAccountsState(): Promise<AccountsState> {
 
   return {
     identidade: {
+      username: auth.user?.username || OWNER_USERNAME,
+      email: auth.user?.email || OWNER_EMAIL,
       tokenPrefix: auth.session ? auth.session.token.slice(0, 8) : '—',
       criadoEm: auth.user ? auth.user.createdAt : 0
     },

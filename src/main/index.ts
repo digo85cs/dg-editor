@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+﻿import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import { existsSync } from 'fs'
+import { aplicarIdentidadeDg, resolverIconeApp, DG_APP_NAME } from './branding'
 import { getAuthStore } from './auth'
+
+// Identidade DG Editor (sem marca Electron na UI / taskbar)
+aplicarIdentidadeDg()
 import { getSystemProfile, formatBytes, profileStrength } from './profile'
 import { scanFolder, formatScanSummary } from './scanner'
 import { getBrain } from './brain/module'
@@ -14,7 +18,7 @@ import { ensureOllama } from './ollama-keeper'
 import { dglog } from './dglog'
 import { installPtBrMenu } from './menu'
 
-import { runAnalysis, getCachedAnalysis } from './analyzer'
+import { runAnalysis, getCachedAnalysis, invalidarCacheAnalise } from './analyzer'
 import { whereIs, formatWhereIs } from './whereis'
 import { readRules, rulesExist, createRulesTemplate } from './dgrules'
 import { loadChat, appendChat, clearChat } from './chatstore'
@@ -24,23 +28,52 @@ import { getAccountsState } from './accounts'
 import { guardianSnapshot, guardianResumo } from './guardian'
 import { bootSaudeIAs } from './boot-saude'
 import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie'
-import { gerarContinuidade, dossieDirDoApp } from './bridge-adapta'
+import {
+  gerarContinuidade,
+  dossieDirDoApp,
+  statusAdapta,
+  lerContinuidade,
+  urlAdaptaPermitida,
+  ADAPTA_URLS
+} from './bridge-adapta'
 import { diagnosticoCompleto } from './diagnostico'
-import { askOllama } from './brain/ollama'
+import { askOllama, ollamaHttpJson, OLLAMA_URL } from './brain/ollama'
 import { lerTema, salvarTema } from './tema'
 import {
   criarJanelaNavegador,
   fecharJanelaNavegador,
-  lerUltimaUrlNavegador
+  destruirJanelaNavegador,
+  lerUltimaUrlNavegador,
+  definirJanelaPrincipalNavegador,
+  layoutNavegador,
+  mostrarNavegadorEmbutido,
+  onNavegadorEventos,
+  statusEmbedNavegador
 } from './navegador/janela'
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle'
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token'
 import {
   lerArquivo,
+  lerArquivoBase64,
   salvarArquivo,
   listarDiretorio,
   arquivoExiste
 } from './arquivos'
+import {
+  caminhoSeguro,
+  exigirString,
+  exigirBoolean,
+  exigirArrayStrings,
+  exigirObjeto,
+  isErroPayload
+} from './ipc-seguro'
+import { ativarSafeMode, emSafeMode, detectarSafeModeArgv } from './safe-mode'
+
+/** Flag de processo — safe-mode desliga watcher, health, agentes e MCP. */
+const SAFE_MODE = detectarSafeModeArgv(process.argv)
+if (SAFE_MODE) ativarSafeMode()
+import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from './busca'
+import { listarComandosMeta } from './comandos-meta'
 import {
   createTerminal,
   writeTerminal,
@@ -50,6 +83,9 @@ import {
   shellAtivo
 } from './terminal'
 import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect'
+import { registerVaultIpc } from './vault/ipc'
+import { registerOpenClawIpc } from './openclaw/ipc'
+import { registerAgentExtrasIpc } from './agent/ipc'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -68,17 +104,46 @@ function resolvePreload(): string {
 
 let mainWindow: BrowserWindow | null = null
 
+function emSmokeNav(): boolean {
+  return process.env.DG_NAV_SMOKE === '1'
+}
+
+/** Abre/garante o navegador embutido (ou BaseWindow no smoke). */
+function abrirNavegadorAncorado(url?: string): { ok: boolean } {
+  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
+  dglog('[navegador] abrir embutido url=' + dest)
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      definirJanelaPrincipalNavegador(mainWindow)
+    }
+    criarJanelaNavegador(dest, { mostrar: true })
+    if (!emSmokeNav()) {
+      mostrarNavegadorEmbutido(true)
+      try {
+        mainWindow?.webContents?.send('navegador:aberto')
+      } catch {
+        /* ignore */
+      }
+    }
+    return { ok: true }
+  } catch (e) {
+    dglog('[navegador] abrir falhou: ' + String((e as Error)?.message || e))
+    return { ok: false }
+  }
+}
+
 function createWindow(): void {
+  const icon = resolverIconeApp()
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'DG Editor',
+    title: DG_APP_NAME,
     frame: false,
     backgroundColor: '#141414',
     show: false,
-    icon: join(app.getAppPath(), 'resources', 'dg-studio.ico'),
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: resolvePreload(),
       contextIsolation: true,
@@ -95,7 +160,10 @@ function createWindow(): void {
     mainWindow.once('ready-to-show', () => { mainWindow?.show() })
   }
 
+  definirJanelaPrincipalNavegador(mainWindow)
+
   mainWindow.on('closed', () => {
+    definirJanelaPrincipalNavegador(null)
     mainWindow = null
   })
 
@@ -106,27 +174,99 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (SAFE_MODE) {
+    dglog('[boot] SAFE MODE — sem agentes/MCP/watcher/health')
+  }
+  void import('./logs-estruturados').then(({ logEstruturado }) => {
+    logEstruturado('info', 'boot', emSafeMode() || SAFE_MODE ? 'inicio safe-mode' : 'inicio normal')
+  })
+  // Windows: garante VBS/atalho sem pedir nada ao usuario
+  if (process.platform === 'win32' && !SAFE_MODE) {
+    void import('./win-self-heal')
+      .then(({ selfHealWindowsLaunchers }) => {
+        selfHealWindowsLaunchers()
+      })
+      .catch((e) => {
+        dglog('[boot] win-self-heal: ' + String(e))
+      })
+  }
   // Token de sessão ANTES do servidor de controle (sempre novo)
   garantirTokenSessao()
   installPtBrMenu({
     onAbrirNavegador: () => {
       const url = lerUltimaUrlNavegador() || 'about:blank'
       dglog('[navegador] menu abrir url=' + url)
-      criarJanelaNavegador(url, { mostrar: true })
+      abrirNavegadorAncorado(url)
+    },
+    onAcao: (id) => {
+      try {
+        mainWindow?.webContents?.send('menu:acao', id)
+      } catch {
+        /* ignore */
+      }
     }
   })
-  bootSaudeIAs()
-  iniciarControleNavegador()
+  onNavegadorEventos({
+    onClose: () => {
+      try {
+        mainWindow?.webContents?.send('navegador:fechado')
+      } catch {
+        /* ignore */
+      }
+    }
+  })
+  const qaE2e = process.env.DG_QA_E2E === '1'
+  if (!SAFE_MODE) {
+    // Nao competir com terminal:create no boot — Ollama sobe depois
+    if (!qaE2e) {
+      setTimeout(() => {
+        void bootSaudeIAs()
+      }, 15000)
+    }
+    iniciarControleNavegador()
+  } else {
+    dglog('[safe-mode] watcher=off health=off agentes=off mcp-controle=off')
+  }
   const auth = getAuthStore()
   const session = auth.ensureDeviceIdentity()
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
+  if (!SAFE_MODE && !qaE2e) {
+    // Detecção de modelos NÃO no boot — libera o event loop para terminal:create.
+    void import('./paths').then(({ resolverRaizProjeto }) => {
+      const raiz = resolverRaizProjeto()
+      setTimeout(() => {
+        void import('./brain/modelos-catalogo').then(async (mod) => {
+          try {
+            const cat = await mod.detectarModelosLocais(raiz)
+            const v = mod.validarCatalogo(cat)
+            if (!v.ok) dglog('[modelos] validarCatalogo: ' + v.problemas.join('; '))
+            else dglog('[modelos] validarCatalogo: ok')
+            if (!SAFE_MODE) mod.iniciarHealthPeriodico(raiz, 30000)
+          } catch (e) {
+            dglog('[modelos] boot falhou: ' + String(e))
+          }
+        })
+      }, 15000)
+    })
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
   // Smoke headless do navegador embutido (DG_NAV_SMOKE=1)
+  // Com DG_NAV_SMOKE_EMBED=1: injeta BrowserWindow pai e usa host View (produção).
   if (process.env.DG_NAV_SMOKE === '1') {
+    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+      // Pai oculto (não offscreen) — WebContentsView precisa de paint real p/ screenshot.
+      const smokeParent = new BrowserWindow({
+        width: 1280,
+        height: 800,
+        show: false,
+        backgroundColor: '#1a1a1a'
+      })
+      definirJanelaPrincipalNavegador(smokeParent)
+    }
     void import('./navegador/smoke').then((m) => m.rodarSmokeESair())
   }
 })
@@ -138,15 +278,48 @@ app.on('before-quit', () => {
 
 app.on('window-all-closed', () => {
   pararControleNavegador()
-  fecharJanelaNavegador()
+  destruirJanelaNavegador()
   if (process.platform !== 'darwin') app.quit()
 })
 
 ipcMain.handle('navegador:abrir', (_e, url?: string) => {
-  const dest = (url && String(url).trim()) || lerUltimaUrlNavegador() || 'about:blank'
-  dglog('[navegador] ipc abrir url=' + dest)
-  // singleton: criarJanelaNavegador não cria segunda instância
-  criarJanelaNavegador(dest, { mostrar: true })
+  return abrirNavegadorAncorado(url)
+})
+
+ipcMain.handle('navegador:embed-status', () => {
+  return { ok: true, ...statusEmbedNavegador() }
+})
+
+ipcMain.on('navegador:bounds', (_e, b: unknown) => {
+  if (!b || typeof b !== 'object') return
+  const o = b as Record<string, unknown>
+  if (
+    typeof o.x !== 'number' ||
+    typeof o.y !== 'number' ||
+    typeof o.width !== 'number' ||
+    typeof o.height !== 'number'
+  ) {
+    return
+  }
+  layoutNavegador({
+    x: o.x,
+    y: o.y,
+    width: o.width,
+    height: o.height
+  })
+})
+
+ipcMain.on('navegador:mostrar', (_e, mostrar: unknown) => {
+  mostrarNavegadorEmbutido(mostrar === true || mostrar === 'true' || mostrar === 1)
+})
+
+ipcMain.handle('navegador:fechar', () => {
+  fecharJanelaNavegador()
+  try {
+    mainWindow?.webContents?.send('navegador:fechado')
+  } catch {
+    /* ignore */
+  }
   return { ok: true }
 })
 
@@ -197,24 +370,61 @@ ipcMain.handle('terminal:setShellPadrao', (_e, id: string | null) => {
   }
 })
 
-// ---------- Arquivos (IDE) ----------
-ipcMain.handle(
-  'arquivo:ler',
-  (_e, caminho: string, pastas: string[]) => lerArquivo(caminho, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:salvar',
-  (_e, caminho: string, conteudo: string, pastas: string[]) =>
-    salvarArquivo(caminho, conteudo, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:listar',
-  (_e, dir: string, pastas: string[]) => listarDiretorio(dir, pastas || [])
-)
-ipcMain.handle(
-  'arquivo:existe',
-  (_e, caminho: string, pastas: string[]) => arquivoExiste(caminho, pastas || [])
-)
+// ---------- Arquivos (IDE) — path sanitizado + payload tipado ----------
+ipcMain.handle('arquivo:ler', async (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return lerArquivo(seg.abs, p)
+})
+ipcMain.handle('arquivo:ler-base64', async (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return lerArquivoBase64(seg.abs, p)
+})
+ipcMain.handle('arquivo:salvar', async (_e, caminho: unknown, conteudo: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const body = exigirString(conteudo, 'conteudo')
+  if (isErroPayload(body)) return body
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return salvarArquivo(seg.abs, body, p)
+})
+ipcMain.handle('arquivo:listar', async (_e, dir: unknown, pastas: unknown) => {
+  const d = exigirString(dir, 'dir')
+  if (isErroPayload(d)) return d
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(d, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return listarDiretorio(seg.abs, p)
+})
+ipcMain.handle('arquivo:existe', async (_e, caminho: unknown, pastas: unknown) => {
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const p = exigirArrayStrings(pastas, 'pastas')
+  if (isErroPayload(p)) return p
+  const seg = caminhoSeguro(c, p)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return arquivoExiste(seg.abs, p)
+})
+
+// ---------- Vault Markdown (Obsidian-compat) ----------
+registerVaultIpc()
+// ---------- OpenClaw (diffs + aprovacao humana; sem shell) ----------
+registerOpenClawIpc()
+// ---------- Agent: checkpoint, @projeto, orquestracao, fila ----------
+registerAgentExtrasIpc()
 
 // ---------- Auth IPC ----------
 ipcMain.handle('auth:get-state', () => {
@@ -240,8 +450,12 @@ ipcMain.handle('system:profile-strength', () => {
 })
 
 // ---------- Folder scan IPC ----------
-ipcMain.handle('folder:scan', async (_e, root: string) => {
-  return scanFolder(root)
+ipcMain.handle('folder:scan', async (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return scanFolder(seg.abs)
 })
 
 ipcMain.handle('folder:format-summary', (_e, result: ReturnType<typeof scanFolder>) => {
@@ -261,6 +475,17 @@ ipcMain.handle('folder:select', async () => {
   return { canceled: false, path: result.filePaths[0] }
 })
 
+/** Raiz canônica do DG Editor (ex.: D:\CURSOR\DG Editor) — para autoabrir no Explorer. */
+ipcMain.handle('app:raiz-projeto', async () => {
+  try {
+    const { resolverRaizProjeto, fonteRaizResolvida } = await import('./paths')
+    const raiz = resolverRaizProjeto()
+    return { ok: true, raiz, fonte: fonteRaizResolvida() }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error)?.message || e) }
+  }
+})
+
 // ---------- Brain IPC ----------
 ipcMain.handle('brain:ask', async (_e, prompt: string, context: string) => {
   return getBrain().ask(prompt, context)
@@ -278,46 +503,151 @@ ipcMain.handle('brain:models', async () => {
   return getBrain().listActiveModels()
 })
 
+ipcMain.handle('modelos:listar', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { lerCatalogo, detectarModelosLocais, validarCatalogo } = await import('./brain/modelos-catalogo')
+  const raiz = resolverRaizProjeto()
+  try {
+    const catalogo = await detectarModelosLocais(raiz)
+    const v = validarCatalogo(catalogo)
+    return { ok: true, catalogo, problemas: v.problemas }
+  } catch {
+    const catalogo = lerCatalogo(raiz)
+    const v = validarCatalogo(catalogo)
+    return { ok: true, catalogo, problemas: v.problemas }
+  }
+})
+
+ipcMain.handle('modelos:recarregar', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { detectarModelosLocais, healthCheckModelos, validarCatalogo } = await import('./brain/modelos-catalogo')
+  const raiz = resolverRaizProjeto()
+  await detectarModelosLocais(raiz)
+  const cat = await healthCheckModelos(raiz)
+  const v = validarCatalogo(cat)
+  return { ok: true, catalogo: cat, problemas: v.problemas }
+})
+
+ipcMain.handle('modelos:para-tarefa', async (_e, tarefa: unknown) => {
+  const t = exigirString(tarefa, 'tarefa')
+  if (isErroPayload(t)) return t
+  const { resolverRaizProjeto } = await import('./paths')
+  const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+  return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t) }
+})
+
+ipcMain.handle('modelos:versoes-remotas', async () => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { marcarVersoesRemotas, validarCatalogo } = await import('./brain/modelos-catalogo')
+  const cat = await marcarVersoesRemotas(resolverRaizProjeto())
+  const v = validarCatalogo(cat)
+  return { ok: true, catalogo: cat, problemas: v.problemas }
+})
+
+ipcMain.handle('brain:avaliar', async (_e, modeloId?: unknown) => {
+  const { resolverRaizProjeto } = await import('./paths')
+  const { lerCatalogo } = await import('./brain/modelos-catalogo')
+  const { rodarAvaliacao } = await import('./brain/avaliacao')
+  const raiz = resolverRaizProjeto()
+  const cat = lerCatalogo(raiz)
+  const id =
+    typeof modeloId === 'string' && modeloId.trim()
+      ? modeloId.trim()
+      : cat.ativo || ''
+  if (!id) return { ok: false, erro: 'nenhum modelo ativo' }
+  const r = await rodarAvaliacao(raiz, id)
+  return { ok: true, avaliacao: r }
+})
+
 // ---------- Fase 1: analise, onde-esta, regras, chat ----------
-ipcMain.handle('analysis:run', async (_e, root: string, force: boolean) => {
+ipcMain.handle('analysis:run', async (_e, root: unknown, force: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const f = exigirBoolean(force, 'force', false)
+  if (isErroPayload(f)) return f
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
   dglog('[analysis] handler acionado')
-  await ensureOllama()
-  return runAnalysis(root, force === true)
+  try {
+    await ensureOllama()
+    return await runAnalysis(seg.abs, f === true)
+  } catch (e) {
+    const mensagem = String((e as Error)?.message || e)
+    if (/timeout|abort/i.test(mensagem)) {
+      dglog('[analysis] timeout retornado ao renderer')
+      return { ok: false, erro: 'timeout' }
+    }
+    throw e
+  }
 })
 
-ipcMain.handle('analysis:cached', (_e, root: string) => {
-  return getCachedAnalysis(root)
+ipcMain.handle('analysis:cached', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return getCachedAnalysis(seg.abs)
 })
 
-ipcMain.handle('whereis:ask', async (_e, root: string, query: string) => {
-  const result = whereIs(root, query)
+ipcMain.handle('whereis:ask', async (_e, root: unknown, query: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const q = exigirString(query, 'query')
+  if (isErroPayload(q)) return q
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  const result = whereIs(seg.abs, q)
   return { result, formatted: formatWhereIs(result) }
 })
 
-ipcMain.handle('rules:exists', (_e, root: string) => {
-  return rulesExist(root)
+ipcMain.handle('rules:exists', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return rulesExist(seg.abs)
 })
 
-ipcMain.handle('rules:read', (_e, root: string) => {
-  return readRules(root)
+ipcMain.handle('rules:read', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return readRules(seg.abs)
 })
 
-ipcMain.handle('rules:create-template', (_e, root: string) => {
-  return createRulesTemplate(root)
+ipcMain.handle('rules:create-template', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return createRulesTemplate(seg.abs)
 })
 
-ipcMain.handle('chat:load', (_e, root: string) => {
-  return loadChat(root)
+ipcMain.handle('chat:load', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  return loadChat(seg.abs)
 })
 
-ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
-  const userMsg = { role: 'user' as const, content, at: Date.now() }
-  appendChat(root, userMsg)
+ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return { ok: false, message: { role: 'assistant', content: r.erro, at: Date.now(), provider: 'erro' } }
+  const texto = exigirString(content, 'content')
+  if (isErroPayload(texto)) return { ok: false, message: { role: 'assistant', content: texto.erro, at: Date.now(), provider: 'erro' } }
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, message: { role: 'assistant', content: seg.erro, at: Date.now(), provider: 'erro' } }
+  const rootOk = seg.abs
+  const userMsg = { role: 'user' as const, content: texto, at: Date.now() }
+  appendChat(rootOk, userMsg)
 
   const { readRules: rr } = await import('./dgrules')
   const { getCachedAnalysis: gca } = await import('./analyzer')
-  const rules = rr(root)
-  const analysis = gca(root)
+  const { contextoChatHibrido, executarHibrido } = await import('./brain/hibrido')
+  const rules = rr(rootOk)
+  const analysis = gca(rootOk)
 
   let context = ''
   if (analysis) {
@@ -326,19 +656,69 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
   if (rules) {
     context += `\nREGRAS DO PROJETO (.dgrules - respeite):\n${rules}\n`
   }
+  // Fase 1 hibrida (sempre): predicao factual no contexto do chat
+  try {
+    context += '\n' + contextoChatHibrido(rootOk, texto) + '\n'
+  } catch {
+    /* briefing opcional */
+  }
+
+  const trim = texto.trim()
+  const forceHibrido = /^\/hibrido\b/i.test(trim)
+  const forceOk = /\bconfirmo\b/i.test(trim)
+  const pedidoHibrido = forceHibrido ? trim.replace(/^\/hibrido\b/i, '').trim() || trim : trim
 
   try {
+    if (forceHibrido) {
+      const h = await executarHibrido(rootOk, pedidoHibrido, {
+        pastaAberta: analysis?.root || rootOk,
+        force: forceOk
+      })
+      const assistantMsg = {
+        role: 'assistant' as const,
+        content: h.texto,
+        at: Date.now(),
+        provider: 'hibrido:' + (h.modelo || 'core')
+      }
+      appendChat(rootOk, assistantMsg)
+      await gravarDossie(loadChat(rootOk), { root: rootOk })
+      gerarContinuidade(dossieDirDoApp())
+      return { ok: h.ok !== false, message: assistantMsg, hibrido: h.briefing }
+    }
+
     await ensureOllama()
-    const response = await askOllama(content, context, 'chat')
-    const assistantMsg = { role: 'assistant' as const, content: response.text, at: Date.now(), provider: response.provider }
-    appendChat(root, assistantMsg)
-    await gravarDossie(loadChat(root), { root })
+    const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+    const { resolverRaizProjeto } = await import('./paths')
+    const modeloChat = modeloParaTarefa(resolverRaizProjeto(), 'chat')
+    if (!modeloChat) {
+      const msg = {
+        role: 'assistant' as const,
+        content: 'Nenhum modelo de chat instalado',
+        at: Date.now(),
+        provider: 'erro'
+      }
+      appendChat(rootOk, msg)
+      return { ok: false, message: msg }
+    }
+    const response = await askOllama(texto, context, 'chat')
+    const assistantMsg = {
+      role: 'assistant' as const,
+      content: response.text,
+      at: Date.now(),
+      provider: response.provider + ':' + modeloChat
+    }
+    appendChat(rootOk, assistantMsg)
+    await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
     return { ok: true, message: assistantMsg }
   } catch (err) {
-    const fallback = { role: 'assistant' as const, content: `Nao consegui responder agora: ${err instanceof Error ? err.message : String(err)}`, at: Date.now(), provider: 'erro' }
-    appendChat(root, fallback)
-    await gravarDossie(loadChat(root), { root })
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const friendly = /Nenhum modelo de chat/.test(errMsg)
+      ? 'Nenhum modelo de chat instalado'
+      : `Nao consegui responder agora: ${errMsg}`
+    const fallback = { role: 'assistant' as const, content: friendly, at: Date.now(), provider: 'erro' }
+    appendChat(rootOk, fallback)
+    await gravarDossie(loadChat(rootOk), { root: rootOk })
     gerarContinuidade(dossieDirDoApp())
     return { ok: false, message: fallback }
   }
@@ -347,6 +727,148 @@ ipcMain.handle('chat:send', async (_e, root: string, content: string) => {
 ipcMain.handle('chat:clear', (_e, root: string) => {
   clearChat(root)
   return { ok: true }
+})
+
+ipcMain.handle('prompt:melhorar', async (_e, root: unknown, prompt: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const p = exigirString(prompt, 'prompt')
+  if (isErroPayload(p)) return p
+  if (!p.trim()) return { ok: false, erro: 'prompt vazio' }
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+
+  const prazo = Date.now() + 15000
+  try {
+    if (!(await ensureOllama())) {
+      return { ok: false, erro: Date.now() >= prazo ? 'timeout' : 'Ollama indisponível' }
+    }
+    const { modeloParaTarefa } = await import('./brain/modelos-catalogo')
+    const candidatos = [
+      { modelo: modeloParaTarefa(seg.abs, 'chat'), tarefa: 'chat' },
+      { modelo: modeloParaTarefa(seg.abs, 'codigo'), tarefa: 'codigo' }
+    ].filter((candidato): candidato is { modelo: string; tarefa: string } => Boolean(candidato.modelo))
+    if (!candidatos.length) return { ok: false, erro: 'Nenhum modelo de chat instalado' }
+
+    const system = 'Você é um engenheiro de prompt. Receba a ideia do usuário e devolva um prompt mais claro, específico e acionável, mantendo a intenção original. Devolva APENAS o prompt refinado, sem preâmbulo, sem explicações. Preserve o idioma do usuário.'
+    const erros: string[] = []
+    for (let i = 0; i < candidatos.length; i++) {
+      const restante = prazo - Date.now()
+      if (restante <= 0) {
+        erros.push('timeout')
+        break
+      }
+      const candidato = candidatos[i]
+      const timeoutMs = Math.max(1, Math.floor(restante / (candidatos.length - i)))
+      dglog('[prompt] modelo escolhido=' + candidato.modelo + ' tarefa=' + candidato.tarefa)
+      try {
+        const resposta = await ollamaHttpJson(
+          OLLAMA_URL + '/api/chat',
+          {
+            model: candidato.modelo,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: p.trim() }
+            ],
+            stream: false,
+            options: { num_ctx: 8192, temperature: 0.3, num_predict: 512 }
+          },
+          'POST',
+          timeoutMs
+        ) as { message?: { content?: string } }
+        const refinado = resposta.message?.content?.trim()
+        if (!refinado) throw new Error('O modelo retornou uma resposta vazia')
+        return { ok: true, resultado: refinado, modelo: candidato.modelo }
+      } catch (err) {
+        const mensagem = err instanceof Error ? err.message : String(err)
+        erros.push(mensagem)
+        dglog('[prompt] falha tarefa=' + candidato.tarefa + ': ' + mensagem)
+      }
+    }
+
+    const timeout = erros.some((erro) => /timeout|abort/i.test(erro)) || Date.now() >= prazo
+    return { ok: false, erro: timeout ? 'timeout' : (erros[erros.length - 1] || 'Erro ao melhorar prompt') }
+  } catch (err) {
+    const mensagem = err instanceof Error ? err.message : String(err)
+    dglog('[prompt] erro: ' + mensagem)
+    return { ok: false, erro: /timeout|abort/i.test(mensagem) ? 'timeout' : mensagem }
+  }
+})
+
+// ---------- Git status / diff / repos ----------
+ipcMain.handle('git:status', async (_e, raiz: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const { gitStatus } = await import('./git')
+  return gitStatus(r)
+})
+
+ipcMain.handle('git:diff', async (_e, raiz: unknown, caminho: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const c = exigirString(caminho, 'caminho')
+  if (isErroPayload(c)) return c
+  const { gitDiff } = await import('./git')
+  return gitDiff(r, c)
+})
+
+ipcMain.handle('git:repos', async (_e, payload: unknown) => {
+  try {
+    const o = exigirObjeto(payload, 'payload')
+    if (isErroPayload(o)) return []
+    const pastas = exigirArrayStrings(o.pastas, 'pastas')
+    if (isErroPayload(pastas)) return []
+    const { gitRepos } = await import('./git')
+    return gitRepos(pastas)
+  } catch {
+    return []
+  }
+})
+
+// ---------- Historico multi-chat (.dg-editor/chats/) ----------
+ipcMain.handle('chat:salvar', async (_e, raiz: unknown, doc: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const o = exigirObjeto(doc, 'doc')
+  if (isErroPayload(o)) return o
+  const id = exigirString(o.id, 'id')
+  if (isErroPayload(id)) return id
+  const titulo = typeof o.titulo === 'string' ? o.titulo : 'Sem titulo'
+  const mensagens = Array.isArray(o.mensagens) ? o.mensagens : []
+  const { salvarChat } = await import('./chats')
+  const salvo = salvarChat(r, {
+    id,
+    titulo,
+    mensagens: mensagens as { role: string; content: string; provider?: string; em?: string }[],
+    criadoEm: typeof o.criadoEm === 'string' ? o.criadoEm : undefined
+  })
+  return { ok: true, chat: salvo }
+})
+
+ipcMain.handle('chat:listar', async (_e, raiz: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const { listarChats } = await import('./chats')
+  return { ok: true, chats: listarChats(r) }
+})
+
+ipcMain.handle('chat:carregar', async (_e, raiz: unknown, id: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  const { carregarChat } = await import('./chats')
+  const chat = carregarChat(r, i)
+  return chat ? { ok: true, chat } : { ok: false, erro: 'chat nao encontrado' }
+})
+
+ipcMain.handle('chat:apagar', async (_e, raiz: unknown, id: unknown) => {
+  const r = exigirString(raiz, 'raiz')
+  if (isErroPayload(r)) return r
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  const { apagarChat } = await import('./chats')
+  return { ok: true, apagado: apagarChat(r, i) }
 })
 
 // ---------- Fase 2: contas, guardiao, tema ----------
@@ -395,16 +917,47 @@ ipcMain.handle('dossie:caminho', () => {
   return caminhoDossie()
 })
 
+// ---------- Adapta ONE / Maestro ----------
+ipcMain.handle('adapta:status', async (_e, raiz?: unknown) => {
+  let r = typeof raiz === 'string' && raiz.trim() ? raiz.trim() : ''
+  if (!r) {
+    const { resolverRaizProjeto } = await import('./paths')
+    r = resolverRaizProjeto()
+  }
+  return statusAdapta(r)
+})
+
+ipcMain.handle('adapta:gerar', () => {
+  return gerarContinuidade(dossieDirDoApp())
+})
+
+ipcMain.handle('adapta:ler-continuidade', (_e, regenerar?: unknown) => {
+  if (regenerar === true) {
+    const g = gerarContinuidade(dossieDirDoApp())
+    if (!g.ok) return { ok: false, erro: g.erro }
+  }
+  return lerContinuidade()
+})
+
+ipcMain.handle('adapta:abrir', async (_e, alvo: unknown) => {
+  let url = ''
+  if (alvo === 'one') url = ADAPTA_URLS.one
+  else if (alvo === 'hub') url = ADAPTA_URLS.hub
+  else if (alvo === 'maestro') url = ADAPTA_URLS.maestro
+  else if (alvo === 'docs') url = ADAPTA_URLS.docs
+  else if (typeof alvo === 'string' && urlAdaptaPermitida(alvo)) url = alvo
+  else return { ok: false, erro: 'url nao permitida' }
+  await shell.openExternal(url)
+  return { ok: true, url }
+})
+
 // ---------- Diagnostico ao vivo ----------
 ipcMain.handle('diagnostico:rodar', async (_e, root: string | null) => {
   return diagnosticoCompleto(root)
 })
 
 // ---------- App ----------
-ipcMain.on('app:get-version', (e) => {
-  e.reply('app:version', app.getVersion())
-})
-
+ipcMain.handle('app:get-version', () => app.getVersion())
 
 // ---------- Controles da barra de titulo propria ----------
 ipcMain.handle('janela:minimizar', () => { mainWindow?.minimize() })
@@ -415,6 +968,30 @@ ipcMain.handle('janela:maximizar', () => {
 })
 ipcMain.handle('janela:fechar', () => { mainWindow?.close() })
 ipcMain.handle('janela:estado', () => ({ maximizado: !!mainWindow?.isMaximized() }))
+ipcMain.handle('janela:recarregar', (_e, forcar?: boolean) => {
+  const wc = mainWindow?.webContents
+  if (!wc) return { ok: false }
+  if (forcar) wc.reloadIgnoringCache()
+  else wc.reload()
+  return { ok: true }
+})
+ipcMain.handle('janela:zoom', (_e, op?: string) => {
+  const wc = mainWindow?.webContents
+  if (!wc) return { ok: false, fator: 1 }
+  const atual = wc.getZoomFactor()
+  let prox = atual
+  if (op === 'in') prox = Math.min(3, Math.round((atual + 0.1) * 100) / 100)
+  else if (op === 'out') prox = Math.max(0.5, Math.round((atual - 0.1) * 100) / 100)
+  else prox = 1
+  wc.setZoomFactor(prox)
+  return { ok: true, fator: prox }
+})
+ipcMain.handle('janela:tela-cheia', () => {
+  if (!mainWindow) return { ok: false, cheia: false }
+  const cheia = !mainWindow.isFullScreen()
+  mainWindow.setFullScreen(cheia)
+  return { ok: true, cheia }
+})
 
 ipcMain.on('app:quit', () => {
   app.quit()
@@ -424,9 +1001,11 @@ ipcMain.on('app:quit', () => {
 ipcMain.handle('auditoria:rodar', async (_e, opcoes?: any) => {
   try {
     const mod = await import('./auto-auditoria')
+    // Mesma regua do boot (OPCOES_AUDITORIA_PADRAO). autoAtualizar so se UI pedir explicitamente.
     return await mod.rodarAuditoria({
-      autoAtualizar: !!opcoes?.autoAtualizar,
-      reiniciarAoFim: opcoes?.reiniciarAoFim !== false
+      ...mod.OPCOES_AUDITORIA_PADRAO,
+      autoAtualizar: opcoes?.autoAtualizar === true,
+      reiniciarAoFim: opcoes?.reiniciarAoFim === true
     })
   } catch (e: any) {
     return { erro: String(e?.message || e) }
@@ -444,26 +1023,157 @@ ipcMain.handle('auditoria:periodica', async (_e, ativar: boolean) => {
 
 
 // ---------- Agente com MCP + memoria generativa ----------
-ipcMain.handle('agente:executar', async (_e, root: string, pergunta: string, modelo?: string) => {
-  try {
-    const r = await executarAgente(root, pergunta, modelo)
-    return { ok: true, texto: r.texto, modelo: r.modelo, passos: r.passos }
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    dglog('[agente:executar] falhou: ' + msg)
-    return { ok: false, erro: msg }
+ipcMain.handle(
+  'agente:executar',
+  async (
+    _e,
+    root: string,
+    pergunta: string,
+    modeloOuOpcoes?: string | { modelo?: string; modo?: string; agente?: string; contextoExtra?: string }
+  ) => {
+    if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    try {
+      const opcoes =
+        typeof modeloOuOpcoes === 'string'
+          ? { modeloForcado: modeloOuOpcoes }
+          : modeloOuOpcoes && typeof modeloOuOpcoes === 'object'
+            ? {
+                modeloForcado: typeof modeloOuOpcoes.modelo === 'string' ? modeloOuOpcoes.modelo : undefined,
+                modo: modeloOuOpcoes.modo === 'plan' ? ('plan' as const) : ('agent' as const),
+                agente: typeof modeloOuOpcoes.agente === 'string' ? modeloOuOpcoes.agente : undefined,
+                contextoExtra:
+                  typeof modeloOuOpcoes.contextoExtra === 'string' ? modeloOuOpcoes.contextoExtra : undefined
+              }
+            : {}
+      const r = await executarAgente(root, pergunta, opcoes)
+      return {
+        ok: true,
+        texto: r.texto,
+        modelo: r.modelo,
+        passos: r.passos,
+        duracaoMs: r.duracaoMs,
+        modo: opcoes.modo || 'agent'
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      dglog('[agente:executar] falhou: ' + msg)
+      return { ok: false, erro: msg }
+    }
   }
-})
+)
 
 ipcMain.handle('agente:modelo', async () => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   try { return { ok: true, modelo: await escolherModelo() } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
 
 ipcMain.handle('agente:historico', async (_e, root: string) => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
   try { return { ok: true, mensagens: await historico(root) } }
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
+
+// ---------- Busca / comandos (Quick Open, busca global, paleta) ----------
+ipcMain.handle('busca:arquivos', (_e, root: unknown, query: unknown, limite?: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const q = exigirString(query, 'query')
+  if (isErroPayload(q)) return q
+  const lim = typeof limite === 'number' ? limite : 80
+  return buscaArquivos(r, q, lim)
+})
+
+ipcMain.handle(
+  'busca:conteudo',
+  async (_e, root: unknown, query: unknown, opcoes?: { regex?: boolean; limite?: number; id?: string }) => {
+    const r = exigirString(root, 'root')
+    if (isErroPayload(r)) return r
+    const q = exigirString(query, 'query')
+    if (isErroPayload(q)) return q
+    return buscaConteudo(r, q, opcoes)
+  }
+)
+
+ipcMain.handle('busca:cancelar', (_e, id: unknown) => {
+  const i = exigirString(id, 'id')
+  if (isErroPayload(i)) return i
+  cancelarBuscaConteudo(i)
+  return { ok: true }
+})
+
+ipcMain.handle('comandos:listar', () => ({ ok: true, comandos: listarComandosMeta() }))
+
+ipcMain.handle('config:backup', async (_e, motivo?: unknown) => {
+  const { backupConfigs } = await import('./config-backup')
+  const m = typeof motivo === 'string' && motivo.trim() ? motivo.trim() : 'manual'
+  return backupConfigs(m)
+})
+
+ipcMain.handle('sistema:safe-mode', async () => {
+  return { ok: true, safeMode: emSafeMode() || SAFE_MODE }
+})
+
+ipcMain.handle('app:is-safe-mode', () => {
+  return { ok: true, safeMode: emSafeMode() || SAFE_MODE }
+})
+
+ipcMain.handle('indice:iniciar', (_e, root: unknown) => {
+  if (SAFE_MODE || emSafeMode()) {
+    dglog('[safe-mode] indice/watcher bloqueado')
+    return { ok: false, total: 0, erro: 'safe-mode' }
+  }
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  return import('./indice-arquivos').then((m) => m.iniciarIndice(r))
+})
+
+ipcMain.handle('indice:listar', (_e, filtro?: unknown) => {
+  const f = filtro == null ? '' : typeof filtro === 'string' ? filtro : ''
+  return import('./indice-arquivos').then((m) => ({ ok: true, itens: m.listarIndice(f), ...m.statusIndice() }))
+})
+
+ipcMain.handle('indice:status', () =>
+  import('./indice-arquivos').then((m) => ({ ok: true, ...m.statusIndice() }))
+)
+
+ipcMain.handle('analysis:invalidar', (_e, root: unknown) => {
+  const r = exigirString(root, 'root')
+  if (isErroPayload(r)) return r
+  const seg = caminhoSeguro(r, r)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  invalidarCacheAnalise(seg.abs)
+  return { ok: true }
+})
+
+// ---------- Agente Hibrido Core (Fase 1 predicao + Fase 2 geracao) ----------
+ipcMain.handle('hibrido:analisar', async (_e, root: string, pedido?: string, pastaAberta?: string) => {
+  if (SAFE_MODE || emSafeMode()) return { ok: false, erro: 'safe-mode' }
+  const { prepararBriefing } = await import('./brain/hibrido')
+  return prepararBriefing(root || process.cwd(), pedido || 'status do workspace', pastaAberta)
+})
+
+ipcMain.handle(
+  'hibrido:executar',
+  async (
+    _e,
+    root: string,
+    pedido: string,
+    opcoes?: { force?: boolean; modeloForcado?: string; pastaAberta?: string }
+  ) => {
+    if (SAFE_MODE || emSafeMode()) {
+      return { ok: false, texto: 'safe-mode', modelo: '', passos: [], briefing: null }
+    }
+    try {
+      const { executarHibrido } = await import('./brain/hibrido')
+      return await executarHibrido(root, pedido, opcoes)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      dglog('[hibrido:executar] falhou: ' + msg)
+      return { ok: false, texto: msg, modelo: '', passos: [], briefing: null }
+    }
+  }
+)
 
 ipcMain.handle('mcp:tools', async () => {
   try {
@@ -490,15 +1200,60 @@ ipcMain.handle('memoria:indexar', async (_e, root: string, role: 'user' | 'assis
   catch (e: unknown) { return { ok: false, erro: String(e) } }
 })
 
-// ---------- Auto auditoria no boot + periodica ----------
-setTimeout(async () => {
+// ---------- Agente de QA (subprocesso Node; nao carrega Playwright no main) ----------
+ipcMain.handle('qa:run', async (_e, opcoes?: { suite?: string }) => {
   try {
-    const mod = await import('./auto-auditoria')
-    const r = await mod.rodarAuditoria({ autoAtualizar: false })
-    console.log('[auditoria:boot] ok=' + r.resumo.ok + ' warn=' + r.resumo.warn + ' erro=' + r.resumo.erro + ' corrigidos=' + r.resumo.corrigidos)
-    mod.iniciarAuditoriaPeriodica(1800000)
-    console.log('[auditoria:boot] periodica ativa (30 min)')
-  } catch (e: any) {
-    console.warn('[auditoria:boot] falhou:', String(e?.message || e))
+    const { execFileSync } = await import('child_process')
+    const { readFileSync, existsSync } = await import('fs')
+    const { join } = await import('path')
+    const { resolverRaizProjeto } = await import('./paths')
+    const raiz = resolverRaizProjeto()
+    const script = join(raiz, 'scripts', 'run-qa.cjs')
+    const suite = (opcoes && opcoes.suite) || 'ipc'
+    const nodeBin = process.env.npm_node_execpath || 'node'
+    execFileSync(nodeBin, [script, '--suite=' + suite, '--no-e2e'], {
+      cwd: raiz,
+      encoding: 'utf-8',
+      timeout: 180000,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const latest = join(raiz, 'qa-artifacts', 'latest', 'relatorio.json')
+    if (!existsSync(latest)) return { ok: false, erro: 'relatorio nao gerado' }
+    return JSON.parse(readFileSync(latest, 'utf-8'))
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) }
   }
-}, 4000)
+})
+
+// ---------- Auto auditoria no boot + periodica ----------
+// Adiada: checarOllama/listarShells no boot competiam com terminal:create (spawnSync).
+if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
+  setTimeout(async () => {
+    try {
+      const mod = await import('./auto-auditoria')
+      // Mesma regua que o botao Auditar (OPCOES_AUDITORIA_PADRAO / autoAtualizar=false)
+      const r = await mod.rodarAuditoria({ ...mod.OPCOES_AUDITORIA_PADRAO })
+      console.log(
+        '[auditoria:boot] ok=' +
+          r.resumo.ok +
+          ' warn=' +
+          r.resumo.warn +
+          ' erro=' +
+          r.resumo.erro +
+          ' corrigidos=' +
+          r.resumo.corrigidos
+      )
+      if (r.resumo.pendencias && r.resumo.pendencias.length > 0) {
+        console.log(
+          '[auditoria:boot] pendencias: ' + r.resumo.pendencias.map((p) => p.id).join(', ')
+        )
+      }
+      mod.iniciarAuditoriaPeriodica(1800000)
+      console.log('[auditoria:boot] periodica ativa (30 min)')
+    } catch (e: any) {
+      console.warn('[auditoria:boot] falhou:', String(e?.message || e))
+    }
+  }, 30000)
+} else if (SAFE_MODE) {
+  console.log('[safe-mode] auditoria=off health=off watcher=off')
+}

@@ -39,11 +39,12 @@ function compararSemver(a: string, b: string): number {
 }
 
 function lerVersaoPwsh(exe: string): string | null {
+  // Timeout curto: spawnSync bloqueia o event loop do Electron (IPC/terminal).
   try {
     const r = spawnSync(
       exe,
       ['-NoLogo', '-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'],
-      { encoding: 'utf8', timeout: 3000, windowsHide: true }
+      { encoding: 'utf8', timeout: 800, windowsHide: true }
     )
     const out = String(r.stdout || '').trim()
     if (out && /^\d+\.\d+/.test(out)) return out.split(/\r?\n/)[0].trim()
@@ -83,7 +84,7 @@ function candidatosProgramFiles(nomeExe: 'pwsh.exe' | 'pwsh-preview.exe'): { exe
 
 function which(cmd: string): string | null {
   try {
-    const r = execFileSync('where.exe', [cmd], { encoding: 'utf8', windowsHide: true, timeout: 3000 })
+    const r = execFileSync('where.exe', [cmd], { encoding: 'utf8', windowsHide: true, timeout: 1000 })
     const line = String(r)
       .split(/\r?\n/)
       .map((l) => l.trim())
@@ -125,15 +126,16 @@ export function listarCandidatosShell(): ShellInfo[] {
     lista.push(info)
   }
 
+  // Usa pastaVer do Program Files — sem spawnSync (nao bloqueia o event loop).
   for (const c of candidatosProgramFiles('pwsh.exe')) {
-    push(montar(c.exe, 'pwsh', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+    push(montar(c.exe, 'pwsh', 'ProgramFiles', c.pastaVer))
   }
   for (const c of candidatosProgramFiles('pwsh-preview.exe')) {
-    push(montar(c.exe, 'pwsh-preview', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+    push(montar(c.exe, 'pwsh-preview', 'ProgramFiles', c.pastaVer))
   }
 
   const pathPwsh = which('pwsh.exe') || which('pwsh')
-  if (pathPwsh) push(montar(pathPwsh, 'pwsh', 'PATH'))
+  if (pathPwsh) push(montar(pathPwsh, 'pwsh', 'PATH', null))
 
   const wa = join(
     process.env.LOCALAPPDATA || '',
@@ -141,10 +143,10 @@ export function listarCandidatosShell(): ShellInfo[] {
     'WindowsApps',
     'pwsh.exe'
   )
-  if (wa && existsSync(wa)) push(montar(wa, 'pwsh', 'WindowsApps'))
+  if (wa && existsSync(wa)) push(montar(wa, 'pwsh', 'WindowsApps', null))
 
   const ps = which('powershell.exe') || join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-  if (ps && existsSync(ps)) push(montar(ps, 'powershell', 'fallback', lerVersaoPwsh(ps)))
+  if (ps && existsSync(ps)) push(montar(ps, 'powershell', 'fallback', '5.1'))
 
   const cmd = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe')
   push(montar(cmd, 'cmd', 'fallback', null))
@@ -234,12 +236,13 @@ export function listarShells(): ShellOpcao[] {
       }
     }
 
+    // Versão via nome da pasta (Program Files) — evita spawnSync no caminho quente do terminal.
     for (const c of candidatosProgramFiles('pwsh.exe')) {
-      push(montar(c.exe, 'pwsh', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+      push(montar(c.exe, 'pwsh', 'ProgramFiles', c.pastaVer))
     }
 
     const pathPwsh = which('pwsh.exe') || which('pwsh')
-    if (pathPwsh) push(montar(pathPwsh, 'pwsh', 'PATH'))
+    if (pathPwsh) push(montar(pathPwsh, 'pwsh', 'PATH', null))
 
     const wa = join(
       process.env.LOCALAPPDATA || '',
@@ -247,10 +250,10 @@ export function listarShells(): ShellOpcao[] {
       'WindowsApps',
       'pwsh.exe'
     )
-    if (wa) push(montar(wa, 'pwsh', 'WindowsApps'))
+    if (wa) push(montar(wa, 'pwsh', 'WindowsApps', null))
 
     for (const c of candidatosProgramFiles('pwsh-preview.exe')) {
-      push(montar(c.exe, 'pwsh-preview', 'ProgramFiles', lerVersaoPwsh(c.exe)))
+      push(montar(c.exe, 'pwsh-preview', 'ProgramFiles', c.pastaVer))
     }
 
     const ps =
@@ -262,7 +265,7 @@ export function listarShells(): ShellOpcao[] {
         'v1.0',
         'powershell.exe'
       )
-    if (ps) push(montar(ps, 'powershell', 'fallback', lerVersaoPwsh(ps)))
+    if (ps) push(montar(ps, 'powershell', 'fallback', '5.1'))
 
     const cmd = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'cmd.exe')
     push(montar(cmd, 'cmd', 'fallback', null))

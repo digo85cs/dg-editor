@@ -10,6 +10,15 @@
 - NUNCA afirmar a stack, tecnologias, arquitetura ou estrutura de um projeto sem antes consultar os arquivos reais (package.json, src/, README, .dgrules).
 - Se não confirmou a tecnologia, diga explicitamente "não verifiquei a stack deste projeto" em vez de assumir React, Node, MongoDB, etc.
 - Responder sobre o projeto apenas com base no que foi lido/verificado; se não houver informação, dizer que não sabe.
+# === IDIOMA (padrao permanente) ===
+- Idioma padrao do projeto: portugues do Brasil (pt-BR).
+- Responder SEMPRE em pt-BR (chat, relatorios, commits, PRs, mensagens ao usuario).
+- Programar em pt-BR: comentarios, logs, textos de UI, mensagens de erro, docs e nomes de regras/skills quando forem texto humano.
+- Codigo (APIs, identificadores ja existentes em ingles) pode manter ingles tecnico; texto voltado a pessoa fica em pt-BR.
+- Nao misturar idiomas na mesma resposta ao usuario.
+# === PASTA DE TRABALHO (permanente, somente local) ===
+- Pasta oficial do DG Editor: D:\CURSOR\DG Editor (sempre).
+- O app roda SOMENTE local (Electron no PC). Nao depender de nuvem, espelho Cursor /workspace nem sync remoto no boot.
+- Nunca usar node_modules\electron\dist como atalho ou raiz.
 # === QUALIDADE DO CHAT ===
-- Responder na língua do usuário.
-- Respostas diretas e acionáveis, em bloco único pronto para uso.
+- Respostas diretas e acionaveis, em bloco unico pronto para uso.

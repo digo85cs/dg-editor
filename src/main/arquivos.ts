@@ -1,10 +1,11 @@
 /**
  * IPC de arquivos do DG Editor — nunca expor fs cru ao renderer.
- * Validação: relative() + isAbsolute() (não path.startsWith).
+ * Validação: caminhoSeguro (relative + isAbsolute).
+ * I/O assíncrono — não bloqueia o main process no painel.
  */
-import { existsSync, readFileSync, writeFileSync, statSync } from 'fs'
-import { readdir } from 'fs/promises'
-import { join, resolve, relative, isAbsolute, extname, basename, dirname } from 'path'
+import { promises as fsp } from 'fs'
+import { join, resolve, extname, basename, dirname } from 'path'
+import { caminhoSeguro } from './ipc-seguro'
 
 const LIMITE_BYTES = 5 * 1024 * 1024
 const EXT_EDITAVEIS = new Set([
@@ -36,23 +37,31 @@ const EXT_EDITAVEIS = new Set([
   '.conf'
 ])
 
-export function validarCaminho(caminho: string, pastasPermitidas: string[]): boolean {
-  if (!caminho || typeof caminho !== 'string') return false
-  let abs: string
+const EXT_IMAGEM = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp'])
+
+async function pathExists(p: string): Promise<boolean> {
   try {
-    abs = resolve(caminho)
+    await fsp.access(p)
+    return true
   } catch {
     return false
   }
-  for (const pasta of pastasPermitidas || []) {
-    if (!pasta) continue
-    const raiz = resolve(pasta)
-    const rel = relative(raiz, abs)
-    if (rel === '') return true
-    if (!rel.startsWith('..') && !isAbsolute(rel)) return true
-  }
-  return false
 }
+
+export function extensoesImagem(): string[] {
+  return [...EXT_IMAGEM]
+}
+
+export function ehImagem(caminho: string): boolean {
+  return EXT_IMAGEM.has(extname(String(caminho || '')).toLowerCase())
+}
+
+export function validarCaminho(caminho: string, pastasPermitidas: string[]): boolean {
+  return caminhoSeguro(caminho, pastasPermitidas).ok
+}
+
+/** Alias explícito pedido pelo hardening IPC. */
+export { caminhoSeguro }
 
 function ehBinario(buf: Buffer): boolean {
   const n = Math.min(512, buf.length)
@@ -62,28 +71,28 @@ function ehBinario(buf: Buffer): boolean {
   return false
 }
 
-export function arquivoExiste(
+export async function arquivoExiste(
   caminho: string,
   pastas: string[]
-): { ok: boolean; existe?: boolean; erro?: string } {
+): Promise<{ ok: boolean; existe?: boolean; erro?: string }> {
   if (!validarCaminho(caminho, pastas)) {
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
-  return { ok: true, existe: existsSync(resolve(caminho)) }
+  return { ok: true, existe: await pathExists(resolve(caminho)) }
 }
 
-export function lerArquivo(
+export async function lerArquivo(
   caminho: string,
   pastas: string[]
-): { ok: boolean; conteudo?: string; erro?: string; bytes?: number } {
+): Promise<{ ok: boolean; conteudo?: string; erro?: string; bytes?: number }> {
   if (!validarCaminho(caminho, pastas)) {
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
   const abs = resolve(caminho)
-  if (!existsSync(abs)) return { ok: false, erro: 'arquivo nao encontrado' }
+  if (!(await pathExists(abs))) return { ok: false, erro: 'arquivo nao encontrado' }
   let st
   try {
-    st = statSync(abs)
+    st = await fsp.stat(abs)
   } catch (e) {
     return { ok: false, erro: String((e as Error).message || e) }
   }
@@ -104,7 +113,7 @@ export function lerArquivo(
   }
   let buf: Buffer
   try {
-    buf = readFileSync(abs)
+    buf = await fsp.readFile(abs)
   } catch (e) {
     return { ok: false, erro: String((e as Error).message || e) }
   }
@@ -112,11 +121,47 @@ export function lerArquivo(
   return { ok: true, conteudo: buf.toString('utf8'), bytes: buf.length }
 }
 
-export function salvarArquivo(
+/** Lê imagem como data-URL (base64) — só EXT_IMAGEM. */
+export async function lerArquivoBase64(
+  caminho: string,
+  pastas: string[]
+): Promise<{ ok: boolean; dataUrl?: string; mime?: string; erro?: string }> {
+  if (!validarCaminho(caminho, pastas)) {
+    return { ok: false, erro: 'caminho fora das pastas permitidas' }
+  }
+  const abs = resolve(caminho)
+  if (!(await pathExists(abs))) return { ok: false, erro: 'arquivo nao encontrado' }
+  const ext = extname(abs).toLowerCase()
+  if (!EXT_IMAGEM.has(ext)) return { ok: false, erro: 'nao e imagem suportada' }
+  let st
+  try {
+    st = await fsp.stat(abs)
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+  if (!st.isFile()) return { ok: false, erro: 'nao e arquivo' }
+  if (st.size > LIMITE_BYTES) return { ok: false, erro: 'arquivo maior que 5MB' }
+  const mime =
+    ext === '.png'
+      ? 'image/png'
+      : ext === '.gif'
+        ? 'image/gif'
+        : ext === '.webp'
+          ? 'image/webp'
+          : 'image/jpeg'
+  try {
+    const buf = await fsp.readFile(abs)
+    return { ok: true, mime, dataUrl: 'data:' + mime + ';base64,' + buf.toString('base64') }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+}
+
+export async function salvarArquivo(
   caminho: string,
   conteudo: string,
   pastas: string[]
-): { ok: boolean; erro?: string } {
+): Promise<{ ok: boolean; erro?: string }> {
   if (!validarCaminho(caminho, pastas)) {
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
@@ -125,9 +170,9 @@ export function salvarArquivo(
   if (bytes > LIMITE_BYTES) return { ok: false, erro: 'conteudo maior que 5MB' }
   const abs = resolve(caminho)
   const dir = dirname(abs)
-  if (!existsSync(dir)) return { ok: false, erro: 'diretorio pai nao existe' }
+  if (!(await pathExists(dir))) return { ok: false, erro: 'diretorio pai nao existe' }
   try {
-    writeFileSync(abs, conteudo, 'utf8')
+    await fsp.writeFile(abs, conteudo, 'utf8')
     return { ok: true }
   } catch (e) {
     return { ok: false, erro: String((e as Error).message || e) }
@@ -149,10 +194,10 @@ export async function listarDiretorio(
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
   const abs = resolve(dir)
-  if (!existsSync(abs)) return { ok: false, erro: 'diretorio nao encontrado' }
+  if (!(await pathExists(abs))) return { ok: false, erro: 'diretorio nao encontrado' }
   let st
   try {
-    st = statSync(abs)
+    st = await fsp.stat(abs)
   } catch (e) {
     return { ok: false, erro: String((e as Error).message || e) }
   }
@@ -169,7 +214,7 @@ export async function listarDiretorio(
     'vendor'
   ])
   try {
-    const dirents = await readdir(abs, { withFileTypes: true })
+    const dirents = await fsp.readdir(abs, { withFileTypes: true })
     const entradas: EntradaDir[] = []
     for (const d of dirents) {
       const nome = d.name
@@ -181,6 +226,7 @@ export async function listarDiretorio(
       const editavel =
         tipo === 'file' &&
         (EXT_EDITAVEIS.has(ext) ||
+          EXT_IMAGEM.has(ext) ||
           !ext ||
           nome.startsWith('.') ||
           nome === 'Dockerfile' ||

@@ -6,10 +6,17 @@ import { app } from 'electron'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import fs from 'node:fs'
+import { promises as fsp } from 'node:fs'
 import path from 'node:path'
+import { dglog } from './dglog'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
-import { detectarShell } from './shell-detect'
+import {
+  detectarShell,
+  listarShells,
+  lerShellPadrao,
+  acharShellPorId
+} from './shell-detect'
 
 const execFileP = promisify(execFile)
 
@@ -28,14 +35,38 @@ export interface Achado {
   erro?: string
 }
 
+export interface PendenciaAuditoria {
+  id: string
+  severidade: 'warn' | 'erro'
+  titulo: string
+}
+
+export interface ResumoAuditoria {
+  ok: number
+  warn: number
+  erro: number
+  corrigidos: number
+  falhas: number
+  /** Achados warn/erro que nao foram corrigidos com sucesso. */
+  pendencias: PendenciaAuditoria[]
+  /** Arquivos tmp travados (EBUSY/EPERM) — nao contam como warn. */
+  travados: number
+}
+
 export interface RelatorioAuditoria {
   inicio: string
   duracaoMs: number
   achados: Achado[]
-  resumo: { ok: number; warn: number; erro: number; corrigidos: number; falhas: number }
+  resumo: ResumoAuditoria
   reiniciarPendente: boolean
   motivoReinicio?: string
 }
+
+/** Opcoes padrao — boot e UI usam a mesma regua de checagem. */
+export const OPCOES_AUDITORIA_PADRAO = {
+  autoAtualizar: false,
+  reiniciarAoFim: false
+} as const
 
 const DIR_DADOS = app.getPath('userData')
 const DIR_LOGS = path.join(DIR_DADOS, 'logs')
@@ -82,11 +113,67 @@ async function checarOllama(): Promise<Achado[]> {
   return out
 }
 
-function limparTemporarios(): Achado[] {
+/** Rotina leve: scripts/limpeza-workspace.cjs --leve (qa dumps, logs, imgs tmp). */
+async function limparWorkspaceLeve(): Promise<Achado> {
+  try {
+    const raiz = resolverRaizProjeto()
+    const script = path.join(raiz, 'scripts', 'limpeza-workspace.cjs')
+    try {
+      await fsp.access(script)
+    } catch {
+      return {
+        id: 'limpeza:workspace',
+        area: 'limpeza',
+        titulo: 'Script limpeza-workspace ausente',
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
+      }
+    }
+    const { stdout, stderr } = await execFileP(process.execPath, [script, '--leve'], {
+      cwd: raiz,
+      timeout: 60000,
+      windowsHide: true,
+      maxBuffer: 2 * 1024 * 1024
+    })
+    const texto = String(stdout || '') + String(stderr || '')
+    const m = texto.match(/Removidos:\s*(\d+)\s*itens\s*·\s*([^\n]+)/)
+    return {
+      id: 'limpeza:workspace',
+      area: 'limpeza',
+      titulo: m ? 'Limpeza leve: ' + m[1] + ' itens (' + m[2].trim() + ')' : 'Limpeza leve executada',
+      detalhe: texto.trim().split(/\r?\n/).slice(-4).join(' | ').slice(0, 240),
+      severidade: 'ok',
+      corrigivel: true,
+      status: 'corrigido',
+      acao: 'npm run limpeza:leve'
+    }
+  } catch (e: any) {
+    return {
+      id: 'limpeza:workspace',
+      area: 'limpeza',
+      titulo: 'Limpeza leve falhou',
+      severidade: 'warn',
+      corrigivel: true,
+      status: 'falhou',
+      acao: 'npm run limpeza:leve',
+      erro: String(e?.message || e)
+    }
+  }
+}
+
+async function limparTemporarios(): Promise<{ achados: Achado[]; travados: number }> {
   const out: Achado[] = []
+  let travadosTotal = 0
   for (const dir of [DIR_TMP, path.join(app.getPath('temp'), 'dg-editor')]) {
     try {
-      if (!fs.existsSync(dir)) {
+      let existe = true
+      try {
+        await fsp.access(dir)
+      } catch {
+        existe = false
+      }
+      if (!existe) {
         out.push({
           id: 'tmp:' + path.basename(dir),
           area: 'limpeza',
@@ -98,38 +185,68 @@ function limparTemporarios(): Achado[] {
         continue
       }
       if (ehProtegido(dir)) continue
+      const nomes = await fsp.readdir(dir)
+      const settled = await Promise.allSettled(
+        nomes.map(async (nome) => {
+          const alvo = path.join(dir, nome)
+          if (ehProtegido(alvo)) return { skipped: true as const }
+          try {
+            const st = await fsp.stat(alvo)
+            await fsp.rm(alvo, { recursive: true, force: true })
+            return { ok: true as const, bytes: st.size }
+          } catch (e: any) {
+            const code = String(e?.code || '')
+            // EBUSY/EPERM no Windows e esperado (arquivo em uso) — nao vira warn
+            if (code === 'EBUSY' || code === 'EPERM') {
+              dglog('[auditoria] tmp travado: ' + alvo + ' (' + code + ')')
+              return { travado: true as const }
+            }
+            return { falha: true as const, nome, erro: String(e?.message || e), code }
+          }
+        })
+      )
       let removidos = 0
       let bytes = 0
+      let travados = 0
       const falhas: string[] = []
-      for (const nome of fs.readdirSync(dir)) {
-        const alvo = path.join(dir, nome)
-        if (ehProtegido(alvo)) continue
-        try {
-          bytes += fs.statSync(alvo).size
-          fs.rmSync(alvo, { recursive: true, force: true })
+      for (const r of settled) {
+        if (r.status !== 'fulfilled') {
+          falhas.push(String(r.reason))
+          continue
+        }
+        const v = r.value
+        if ('skipped' in v && v.skipped) continue
+        if ('ok' in v && v.ok) {
           removidos++
-        } catch (e: any) {
-          falhas.push(nome + ': ' + String(e?.message || e))
+          bytes += v.bytes
+        } else if ('travado' in v && v.travado) {
+          travados++
+        } else if ('falha' in v && v.falha) {
+          falhas.push(v.nome + ': ' + v.erro)
         }
       }
+      travadosTotal += travados
       if (falhas.length > 0) {
         out.push({
           id: 'tmp:' + path.basename(dir),
           area: 'limpeza',
           titulo: 'Limpeza parcial (' + removidos + ' ok, ' + falhas.length + ' falha)',
-          detalhe: falhas.slice(0, 3).join(' | '),
+          detalhe: falhas.slice(0, 3).join(' | ') + (travados ? ' | travados=' + travados : ''),
           severidade: 'warn',
           corrigivel: true,
           status: 'falhou',
           acao: 'rm tmp',
           erro: falhas[0]
         })
-      } else if (removidos > 0) {
+      } else if (removidos > 0 || travados > 0) {
         out.push({
           id: 'tmp:' + path.basename(dir),
           area: 'limpeza',
           titulo: removidos + ' temporario(s) removido(s)',
-          detalhe: (bytes / 1048576).toFixed(1) + ' MB liberados',
+          detalhe:
+            (bytes / 1048576).toFixed(1) +
+            ' MB liberados' +
+            (travados ? ' | travados=' + travados + ' (EBUSY/EPERM, nao-warn)' : ''),
           severidade: 'ok',
           corrigivel: true,
           status: 'corrigido',
@@ -158,7 +275,7 @@ function limparTemporarios(): Achado[] {
       })
     }
   }
-  return out
+  return { achados: out, travados: travadosTotal }
 }
 
 function resolverRaizProjeto(): string {
@@ -344,9 +461,10 @@ async function checarModelos(): Promise<Achado[]> {
       out.push({
         id: 'modelos:14b-parado',
         area: 'modelos',
-        titulo: 'qwen2.5-coder:14b instalado mas nunca usado em pipeline',
-        detalhe: 'Contagem so pipeline (auditoria/teste excluidos). Fila raciocinio ou preferirQualidade.',
-        severidade: 'warn',
+        titulo: 'qwen2.5-coder:14b instalado (qualidade sob demanda)',
+        detalhe:
+          'Intencional: 14b nao precisa rodar no pipeline. Use preferirQualidade / fila raciocinio quando quiser.',
+        severidade: 'ok',
         corrigivel: false,
         status: 'nao-aplicavel'
       })
@@ -852,23 +970,24 @@ function checarIntegridadeCompleta(): Achado[] {
         status: 'nao-aplicavel'
       })
     } else {
+      // Estado inicial normal — indice ainda nao gerado
       out.push({
         id: 'integridade:indice',
         area: 'integridade',
-        titulo: 'Indice de simbolos ausente',
+        titulo: 'Indice de simbolos ainda nao gerado',
         detalhe: 'rode npm run indice',
-        severidade: 'warn',
-        corrigivel: true,
-        status: 'nao-aplicavel',
-        acao: 'npm run indice'
+        severidade: 'ok',
+        corrigivel: false,
+        status: 'nao-aplicavel'
       })
     }
   } catch (e: any) {
+    // Arquivo existe mas JSON.parse falhou — corrompido
     out.push({
       id: 'integridade:indice',
       area: 'integridade',
       titulo: 'Indice divergente/corrompido',
-      severidade: 'erro',
+      severidade: 'warn',
       corrigivel: true,
       status: 'falhou',
       erro: String(e?.message || e),
@@ -922,7 +1041,8 @@ function checarIntegridadeCompleta(): Achado[] {
       cwd: raiz,
       encoding: 'utf8',
       windowsHide: true,
-      timeout: 15000
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore']
     }).trim()
     out.push({
       id: 'integridade:git',
@@ -1115,15 +1235,15 @@ function checarTerminal(): Achado[] {
     })
   }
   try {
-    const { listarShells, lerShellPadrao, acharShellPorId } = require('./shell-detect') as typeof import('./shell-detect')
     const perfis = listarShells()
     const n = perfis.length
+    const ids = perfis.map((p) => p.id).join(', ')
     out.push({
       id: 'terminal:perfis',
       area: 'terminal',
-      titulo: n >= 2 ? 'perfis: ' + n + ' shells detectados' : 'perfis: apenas ' + n + ' shell(s)',
-      detalhe: perfis.map((p) => p.id).join(', '),
-      severidade: n >= 2 ? 'ok' : 'warn',
+      titulo: 'perfis: ' + n + ' shell(s): ' + ids,
+      detalhe: ids,
+      severidade: n >= 1 ? 'ok' : 'erro',
       corrigivel: false,
       status: 'nao-aplicavel'
     })
@@ -1161,14 +1281,23 @@ function checarTerminal(): Achado[] {
   return out
 }
 
-async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{ achados: Achado[]; reiniciarPendente: boolean; motivoReinicio?: string }> {
+async function executarChecagens(opcoes: {
+  autoAtualizar?: boolean
+}): Promise<{
+  achados: Achado[]
+  reiniciarPendente: boolean
+  motivoReinicio?: string
+  travados: number
+}> {
   const achados: Achado[] = []
   achados.push(garantirPasta(DIR_DADOS))
   achados.push(garantirPasta(DIR_LOGS))
   achados.push(garantirPasta(DIR_TMP))
   achados.push(garantirPasta(path.join(DIR_DADOS, 'backup')))
   achados.push(...checarIntegridadeDados())
-  achados.push(...limparTemporarios())
+  const limpeza = await limparTemporarios()
+  achados.push(...limpeza.achados)
+  achados.push(await limparWorkspaceLeve())
   achados.push(...checarDependencias())
   achados.push(...(await checarOllama()))
   achados.push(...(await checarModelos()))
@@ -1183,6 +1312,7 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
+  // autoAtualizar fora da regua padrao (boot/UI) — so se pedido explicitamente
   if (opcoes.autoAtualizar) {
     const rUp = await autoAtualizar()
     achados.push(rUp)
@@ -1191,24 +1321,40 @@ async function executarChecagens(opcoes: { autoAtualizar?: boolean }): Promise<{
       motivoReinicio = 'Dependencias atualizadas - reinicio recomendado para aplicar'
     }
   }
-  return { achados, reiniciarPendente, motivoReinicio }
+  return { achados, reiniciarPendente, motivoReinicio, travados: limpeza.travados }
 }
 
-function resumir(achados: Achado[]) {
+function resumir(achados: Achado[], travados = 0): ResumoAuditoria {
+  const pendencias: PendenciaAuditoria[] = achados
+    .filter(
+      (a) =>
+        (a.severidade === 'warn' || a.severidade === 'erro') && a.status !== 'corrigido'
+    )
+    .map((a) => ({
+      id: a.id,
+      severidade: a.severidade as 'warn' | 'erro',
+      titulo: a.titulo
+    }))
   return {
     ok: achados.filter((a) => a.severidade === 'ok').length,
     warn: achados.filter((a) => a.severidade === 'warn').length,
     erro: achados.filter((a) => a.severidade === 'erro').length,
     corrigidos: achados.filter((a) => a.status === 'corrigido').length,
-    falhas: achados.filter((a) => a.status === 'falhou').length
+    falhas: achados.filter((a) => a.status === 'falhou').length,
+    pendencias,
+    travados
   }
 }
 
-export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reiniciarAoFim?: boolean } = {}): Promise<RelatorioAuditoria> {
+export async function rodarAuditoria(
+  opcoes: { autoAtualizar?: boolean; reiniciarAoFim?: boolean } = {}
+): Promise<RelatorioAuditoria> {
   const t0 = Date.now()
+  // Mescla com padrao: boot e UI compartilham a mesma regua (autoAtualizar=false)
+  const opts = { ...OPCOES_AUDITORIA_PADRAO, ...opcoes }
 
   // Passo 1: detectar (+ corrigir inline onde ja existe)
-  let { achados, reiniciarPendente, motivoReinicio } = await executarChecagens(opcoes)
+  let { achados, reiniciarPendente, motivoReinicio, travados } = await executarChecagens(opts)
 
   const problemasIniciais = achados.filter((a) => a.severidade !== 'ok')
   if (problemasIniciais.length) {
@@ -1227,14 +1373,21 @@ export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reinicia
     }
   }
 
-  // Passo 2: se houve correcao, re-verificar
-  const houveCorrecao = achados.some((a) => a.status === 'corrigido')
+  // Passo 2: uma unica re-verificacao dos achados aplicaveis, sem autoAtualizar.
+  const houveCorrecao = achados.some((a) => a.status === 'corrigido' && a.severidade !== 'ok')
   if (houveCorrecao) {
     console.log('[auditoria] re-verificando apos correcoes...')
     const segunda = await executarChecagens({ autoAtualizar: false })
-    const aindaRuim = segunda.achados.filter((a) => a.severidade !== 'ok')
+    const achadosProcessados = new Set<string>()
+    const aindaRuim = segunda.achados.filter((a) => {
+      if (a.severidade === 'ok' || a.status === 'nao-aplicavel' || achadosProcessados.has(a.id)) {
+        return false
+      }
+      achadosProcessados.add(a.id)
+      return true
+    })
     if (aindaRuim.length === 0) {
-      console.log('[auditoria] re-verificacao: todos ok')
+      console.log('[auditoria] re-verificacao: nenhum achado aplicavel pendente')
     } else {
       console.log('[auditoria] re-verificacao ainda com problemas:')
       for (const a of aindaRuim) {
@@ -1243,11 +1396,12 @@ export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reinicia
     }
     // Relatorio final reflete o estado POS re-verificacao
     achados = segunda.achados
+    travados = segunda.travados
     reiniciarPendente = reiniciarPendente || segunda.reiniciarPendente
     motivoReinicio = motivoReinicio || segunda.motivoReinicio
   }
 
-  const resumo = resumir(achados)
+  const resumo = resumir(achados, travados)
   const relatorio: RelatorioAuditoria = {
     inicio: new Date().toISOString(),
     duracaoMs: Date.now() - t0,
@@ -1262,11 +1416,17 @@ export async function rodarAuditoria(opcoes: { autoAtualizar?: boolean; reinicia
     fs.appendFileSync(path.join(DIR_LOGS, 'auto-auditoria.log'), JSON.stringify(relatorio) + '\n', 'utf8')
   } catch {}
 
+  // Prefixo generico — o boot em index.ts loga [auditoria:boot] + pendencias
   console.log(
-    '[auditoria:boot] ok=' + resumo.ok +
-    ' warn=' + resumo.warn +
-    ' erro=' + resumo.erro +
-    ' corrigidos=' + resumo.corrigidos
+    '[auditoria] ok=' +
+      resumo.ok +
+      ' warn=' +
+      resumo.warn +
+      ' erro=' +
+      resumo.erro +
+      ' corrigidos=' +
+      resumo.corrigidos +
+      (resumo.travados ? ' travados=' + resumo.travados : '')
   )
 
   if (resumo.warn > 0 || resumo.erro > 0) {

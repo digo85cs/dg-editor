@@ -1,7 +1,7 @@
-﻿{
+{
   "compilerOptions": {
-    "outDir": "D:\\\\CURSOR\\\\DG Editor\\\.dg-editor\\bin",
-    "rootDir": "D:\\\\CURSOR\\\\DG Editor\\src",
+    "outDir": "../../../.dg-editor/bin",
+    "rootDir": "../..",
     "module": "commonjs",
     "target": "es2022",
     "moduleResolution": "node",
@@ -9,8 +9,14 @@
     "skipLibCheck": true,
     "strict": false,
     "baseUrl": "..",
-    "paths": { "@shared/*": ["../shared/*"] },
-    "types": ["node"]
+    "paths": {
+      "@shared/*": [
+        "../shared/*"
+      ]
+    },
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "server.ts",

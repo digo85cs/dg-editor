@@ -1,5 +1,5 @@
 ﻿import { createHash } from 'crypto'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { scanFolder } from './scanner'
 import { readRules } from './dgrules'
@@ -37,6 +37,8 @@ function hashFile(path: string): string {
   }
 }
 
+const HASH_IGNORAR = /(^|[\\/])(\.dg-editor|node_modules|\.git|dist|out|build|chats?)([\\/]|$)|\.log$|boot-silent\.flag$|analise\.json$/i
+
 export function computeFileHashes(root: string, scan: FolderScanResult): Record<string, string> {
   const hashes: Record<string, string> = {}
   hashes['__scan__'] = `${scan.totalFiles}:${scan.totalDirs}`
@@ -44,6 +46,7 @@ export function computeFileHashes(root: string, scan: FolderScanResult): Record<
     ? scan.topFiles.filter((f) => !!f && typeof f.path === 'string' && f.path.length > 0)
     : []
   for (const f of lista.slice(0, 50)) {
+    if (HASH_IGNORAR.test(f.path)) continue
     try {
       hashes[f.path] = hashFile(f.path)
     } catch (e) {
@@ -101,6 +104,17 @@ SUGESTOES: (3-5 melhorias praticas; uma por linha comecando com "- ")`
   for (const k of keyFiles) {
     context += `\n--- ${k.name} ---\n${k.content}\n`
   }
+  const tamanhoTotal = prompt.length + context.length
+  const tokensEstimados = Math.ceil(tamanhoTotal / 4)
+  const usoContextoPct = Math.round((tokensEstimados / 8192) * 100)
+  dglog(
+    '[analysis] prompt.length=' + prompt.length + ' context.length=' + context.length +
+    ' total.length=' + tamanhoTotal + ' tokens_estimados=' + tokensEstimados +
+    '/8192 (' + usoContextoPct + '%)'
+  )
+  if (tokensEstimados > 8192 * 0.7) {
+    dglog('[analysis] prompt acima de 70% do num_ctx; avaliar num_ctx=16384 ou reduzir MAX_KEY_FILES')
+  }
   return { prompt, context }
 }
 
@@ -141,6 +155,7 @@ function saveCache(root: string, cache: AnalysisCache): void {
 }
 
 export async function runAnalysis(root: string, force = false): Promise<AnalysisRunResult> {
+  const inicioMs = Date.now()
   const scan = scanFolder(root)
   if (!scan || !Array.isArray(scan.topFiles)) {
     throw new Error('scanFolder retornou varredura invalida para: ' + root)
@@ -153,6 +168,7 @@ export async function runAnalysis(root: string, force = false): Promise<Analysis
     if (cached && cached.root === root) {
       const changed = Object.keys(hashes).filter((k) => cached.fileHashes[k] !== hashes[k])
       if (changed.length === 0) {
+        dglog('[analysis] tempo_ms=' + (Date.now() - inicioMs) + ' cache=hit')
         return { fromCache: true, changedFiles: [], report: cached.report }
       }
       // mudou algo: re-analisa (analise sempre completa nesta fase; cache guarda historico)
@@ -167,10 +183,24 @@ export async function runAnalysis(root: string, force = false): Promise<Analysis
   const report = parseReport(response.text, root, response.provider, response.model)
 
   saveCache(root, { root, analyzedAt: report.analyzedAt, provider: report.provider, report, fileHashes: hashes })
+  dglog(
+    '[analysis] tempo_ms=' + (Date.now() - inicioMs) + ' cache=miss provider=' + report.provider +
+    ' modelo=' + (report.model || 'desconhecido')
+  )
   return { fromCache: false, changedFiles: [], report }
 }
 
 export function getCachedAnalysis(root: string): AnalysisReport | null {
   const cached = loadCache(root)
   return cached ? cached.report : null
+}
+
+/** Invalida cache de análise (ex.: após edição). */
+export function invalidarCacheAnalise(root: string): void {
+  const p = cachePath(root)
+  try {
+    if (existsSync(p)) unlinkSync(p)
+  } catch {
+    /* */
+  }
 }

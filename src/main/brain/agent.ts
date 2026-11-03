@@ -47,6 +47,12 @@ export interface TentativaProvider {
   resultado: string
 }
 
+export type EventoAgente =
+  | { tipo: 'status'; texto: string }
+  | { tipo: 'tool'; nome: string; fase: 'inicio' | 'fim'; detalhe?: string }
+  | { tipo: 'texto'; texto: string }
+  | { tipo: 'proposta'; id: string; path: string }
+
 export interface RespostaAgente {
   texto: string
   modelo: string
@@ -54,12 +60,22 @@ export interface RespostaAgente {
   tentativas?: TentativaProvider[]
   duracaoMs?: number
   ok?: boolean
+  propostas?: Array<{ id: string; path: string; absPath: string; unifiedDiff: string }>
 }
 
 export interface OpcoesExecutarAgente {
   modeloForcado?: string
   agente?: string
   tarefa?: Tarefa
+  /** plan = só plano em markdown, sem tools; agent = loop com MCP */
+  modo?: 'plan' | 'agent'
+  /** Contexto extra (@projeto etc.) injetado no system */
+  contextoExtra?: string
+  /** Se true (default no painel), writes viram propostas em vez de disco */
+  proposeWrites?: boolean
+  pastas?: string[]
+  onEvent?: (ev: EventoAgente) => void
+  signal?: AbortSignal
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
@@ -70,7 +86,9 @@ Regras:
 - Use as tools para ler e escrever arquivos do projeto, consultar o dossie e a arvore.
 - Nunca invente conteudo de arquivo: leia antes de afirmar.
 - Respostas curtas, tecnicas, em portugues do Brasil.
-- Se a tool falhar, relate o erro e proponha alternativa.`
+- Se a tool falhar, relate o erro e proponha alternativa.
+- NUNCA anunciar acao sem executar no mesmo turno.
+- NUNCA incluir o nome do modelo (ollama:/qwen/llama) no corpo da resposta.`
 
 /**
  * Modelos pequenos em CPU confundem o schema da tool com os argumentos,
@@ -281,6 +299,21 @@ function sintetizarDeTools(passos: PassoAgente[]): string {
   return partes.join('\n\n')
 }
 
+/** Remove eco de id de modelo no corpo (metadado só em dglog/provider). */
+function removerEcoModelo(texto: string, modelo?: string): string {
+  let t = String(texto || '')
+  if (modelo) {
+    const esc = modelo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    t = t.replace(new RegExp('\\b' + esc + '\\b', 'gi'), '')
+  }
+  // linha propria: "ollama:qwen2.5-coder:3b"
+  t = t.replace(/^\s*(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+\s*$/gim, '')
+  // inline provider:modelo
+  t = t.replace(/\b(?:ollama|openrouter|cursor-cli)\s*:\s*[\w./:+-]+/gi, '')
+  t = t.replace(/\b(?:modelo|provider)\s*[:=]\s*[\w./:+-]+/gi, '')
+  return t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 async function finalizarAgente(
   raiz: string,
   pergunta: string,
@@ -292,6 +325,7 @@ async function finalizarAgente(
   if (pareceJsonTool(final) || !final.trim()) {
     final = sintetizarDeTools(passos)
   }
+  final = removerEcoModelo(final, modelo)
   passos.push({ tipo: 'texto', texto: final })
   appendChat(raiz, { role: 'user', content: pergunta, at: Date.now(), provider: modelo })
   appendChat(raiz, { role: 'assistant', content: final, at: Date.now(), provider: modelo })
@@ -305,7 +339,13 @@ async function rodarLoopComProvider(
   pergunta: string,
   cfg: ProviderConfig,
   tools: McpTool[],
-  systemExtra: string
+  systemExtra: string,
+  opts?: {
+    proposeWrites?: boolean
+    pastas?: string[]
+    onEvent?: (ev: EventoAgente) => void
+    signal?: AbortSignal
+  }
 ): Promise<RespostaAgente> {
   const mensagens: Message[] = [
     { role: 'system', content: SYSTEM + systemExtra },
@@ -320,11 +360,30 @@ async function rodarLoopComProvider(
     : undefined
 
   const passos: PassoAgente[] = []
+  const propostasAcc: NonNullable<RespostaAgente['propostas']> = []
   const assinaturasFeitas = new Set<string>()
   let pediuResumo = false
   const labelModelo = cfg.modelo
+  const emit = (ev: EventoAgente) => {
+    try {
+      opts?.onEvent?.(ev)
+    } catch {
+      /* */
+    }
+  }
 
   for (let i = 0; i < MAX_ITER; i++) {
+    if (opts?.signal?.aborted) {
+      emit({ tipo: 'status', texto: 'cancelado' })
+      return {
+        texto: 'Execucao cancelada pelo usuario.',
+        modelo: labelModelo,
+        passos,
+        propostas: propostasAcc,
+        ok: false
+      }
+    }
+    emit({ tipo: 'status', texto: 'iteracao ' + (i + 1) + '/' + MAX_ITER })
     const jaUsouTool = passos.some((p) => p.tipo === 'tool')
     if (jaUsouTool && !pediuResumo) {
       mensagens.push({
@@ -337,6 +396,7 @@ async function rodarLoopComProvider(
 
     const toolsAgora = !jaUsouTool ? toolDefs : undefined
     const r = await chamarProviderSharp(cfg, mensagens, toolsAgora)
+    if (r.content) emit({ tipo: 'texto', texto: r.content.slice(0, 2000) })
 
     let chamadas = r.tool_calls.map((c) => ({
       function: {
@@ -373,12 +433,14 @@ async function rodarLoopComProvider(
 
     if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(r.content || '')) {
       dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
-      return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+      return { ...fin, propostas: propostasAcc }
     }
 
     if (chamadas.length === 0) {
       dglog('[agente] final apos ' + (i + 1) + ' iteracoes via ' + cfg.id)
-      return finalizarAgente(raiz, pergunta, labelModelo, r.content || '', passos)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, r.content || '', passos)
+      return { ...fin, propostas: propostasAcc }
     }
 
     if (r.tool_calls.length > 0) {
@@ -397,6 +459,16 @@ async function rodarLoopComProvider(
     }
 
     for (let ti = 0; ti < chamadas.length; ti++) {
+      if (opts?.signal?.aborted) {
+        emit({ tipo: 'status', texto: 'cancelado' })
+        return {
+          texto: 'Execucao cancelada pelo usuario.',
+          modelo: labelModelo,
+          passos,
+          propostas: propostasAcc,
+          ok: false
+        }
+      }
       const ch = chamadas[ti]
       const nome = ch.function?.name || ''
       const schemaDaTool = tools.find((t) => t.name === nome)?.inputSchema
@@ -404,24 +476,87 @@ async function rodarLoopComProvider(
       const sig = nome + '|' + JSON.stringify(args)
       if (assinaturasFeitas.has(sig)) {
         dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
-        return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+        const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+        return { ...fin, propostas: propostasAcc }
       }
       assinaturasFeitas.add(sig)
       dglog('[agente] tool ' + nome + ' ' + JSON.stringify(args).slice(0, 120))
-      const res = await chamarTool(nome, args)
-      passos.push({ tipo: 'tool', nome, args, resultado: res.texto })
+      emit({ tipo: 'tool', nome, fase: 'inicio' })
+
+      let textoRes = ''
+      const propostasMod = await import('../agent/propostas')
+      const { ehToolEscrita, proporCodigoEditar, proporEscritaCompleta } = propostasMod
+      if (opts?.proposeWrites && ehToolEscrita(nome)) {
+        const pastas = opts.pastas?.length ? opts.pastas : [raiz]
+        if (nome === 'codigo_editar') {
+          const p = proporCodigoEditar(raiz, args as { arquivo?: string; ancora?: string; novo?: string }, pastas)
+          textoRes = p.texto
+          if (p.pendente) {
+            propostasAcc.push({
+              id: p.pendente.id,
+              path: p.pendente.path,
+              absPath: p.pendente.absPath,
+              unifiedDiff: p.pendente.unifiedDiff
+            })
+            emit({ tipo: 'proposta', id: p.pendente.id, path: p.pendente.path })
+          }
+        } else {
+          const caminho = String(
+            (args as { caminho?: string }).caminho || (args as { path?: string }).path || ''
+          )
+          const conteudo = String((args as { conteudo?: string }).conteudo ?? '')
+          const p = proporEscritaCompleta(raiz, caminho, conteudo, pastas)
+          textoRes = p.texto
+          if (p.pendente) {
+            propostasAcc.push({
+              id: p.pendente.id,
+              path: p.pendente.path,
+              absPath: p.pendente.absPath,
+              unifiedDiff: p.pendente.unifiedDiff
+            })
+            emit({ tipo: 'proposta', id: p.pendente.id, path: p.pendente.path })
+          }
+        }
+      } else {
+        if (ehToolEscrita(nome)) {
+          try {
+            const { criarCheckpoint } = await import('../agent/checkpoint')
+            const caminho =
+              String(
+                (args as { arquivo?: string }).arquivo ||
+                  (args as { caminho?: string }).caminho ||
+                  (args as { path?: string }).path ||
+                  ''
+              )
+            if (caminho) {
+              const abs = caminho.includes('/') || caminho.includes('\\')
+                ? caminho
+                : raiz + '/' + caminho
+              await criarCheckpoint([abs], 'agente:tool:' + nome)
+            }
+          } catch {
+            /* best-effort */
+          }
+        }
+        const res = await chamarTool(nome, args)
+        textoRes = res.texto
+      }
+
+      emit({ tipo: 'tool', nome, fase: 'fim', detalhe: textoRes.slice(0, 200) })
+      passos.push({ tipo: 'tool', nome, args, resultado: textoRes })
       mensagens.push({
         role: 'tool',
         tool_name: nome,
         tool_call_id: 'call_' + ti,
         name: nome,
-        content: res.texto.slice(0, 6000)
+        content: textoRes.slice(0, 6000)
       })
     }
   }
 
   dglog('[agente] limite de iteracoes; sintetizando')
-  return finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+  return { ...fin, propostas: propostasAcc }
 }
 
 export async function executarAgente(
@@ -464,16 +599,39 @@ export async function executarAgente(
     const blocoSkills = skills.length
       ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao).join('\n')
       : ''
-    const systemExtra = blocoAgente + (memoria ? '\n\n' + memoria : '') + blocoSkills
+    const modo = opcoes.modo === 'plan' ? 'plan' : 'agent'
+    const proposeWrites = opcoes.proposeWrites !== false && modo === 'agent'
+    const blocoPlan =
+      modo === 'plan'
+        ? '\n\n### MODO PLAN\nVoce esta em modo PLAN. NAO chame tools. NAO edite arquivos. ' +
+          'Responda APENAS com um plano em markdown: objetivo, passos numerados, ' +
+          'arquivos envolvidos, riscos. Aguarde aprovacao humana antes de executar.'
+        : ''
+    const blocoPropose = proposeWrites
+      ? '\n\n### MODO PROPOSTA\nEdicoes (codigo_editar/vault_write/dossie_write) NAO gravam no disco: ' +
+        'viram propostas para o usuario aprovar. Voce pode chamar essas tools normalmente; ' +
+        'o runtime convertera em diff pendente.'
+      : ''
+    const systemExtra =
+      blocoAgente +
+      (memoria ? '\n\n' + memoria : '') +
+      blocoSkills +
+      blocoPlan +
+      blocoPropose +
+      (opcoes.contextoExtra ? '\n\n' + opcoes.contextoExtra : '')
 
     let tools: McpTool[] = []
-    try {
-      tools = await listarTools()
-      // Anti-recursao: nunca expor agente_executar ao loop interno
-      tools = tools.filter((t) => t.name !== 'agente_executar')
-      dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
-    } catch (e) {
-      dglog('[agente] MCP indisponivel: ' + String(e))
+    if (modo === 'agent') {
+      try {
+        tools = await listarTools()
+        // Anti-recursao: nunca expor agente_executar ao loop interno
+        tools = tools.filter((t) => t.name !== 'agente_executar')
+        dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
+      } catch (e) {
+        dglog('[agente] MCP indisponivel: ' + String(e))
+      }
+    } else {
+      dglog('[agente] modo plan — tools desligadas')
     }
 
     await garantirCatalogoOpenRouter()
@@ -537,7 +695,12 @@ export async function executarAgente(
             '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
             ' motivo=tentativa resultado=...'
           )
-          const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra)
+          const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra, {
+            proposeWrites,
+            pastas: opcoes.pastas,
+            onEvent: opcoes.onEvent,
+            signal: opcoes.signal
+          })
           const ms = Date.now() - t0
           dglog(
             '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
