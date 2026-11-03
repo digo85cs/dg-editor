@@ -364,6 +364,7 @@ export async function askOllama(
     throw new Error('Nenhum modelo de chat instalado')
   }
   const lim = limitesPorTarefa(tarefa)
+  dglog('[ollama] modelo escolhido=' + model)
   dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
     ' num_predict=' + lim.num_predict + ' timeoutMs=' + lim.timeoutMs + ' via=modeloParaTarefa')
   const cfg = loadDgConfig()

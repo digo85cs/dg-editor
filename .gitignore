@@ -81,6 +81,11 @@ tmp/
 
 # Avaliacoes de modelo (runtime)
 .dg-editor/avaliacoes/
+.dg-editor/analise.json
+.dg-editor/*.flag
+
+*.bak
+*.ps1.bak
 
 .dg-editor/_backups/
 .dg-editor/modelos.json.bak-*

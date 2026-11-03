@@ -175,6 +175,13 @@ function toggleSidebar(forcar) {
   setActivityActive('explorer', !app.classList.contains('sidebar-collapsed'))
 }
 
+function sincronizarBotoesPainelDireito() {
+  const recolhido = $('app').classList.contains('right-collapsed')
+  const pressed = String(recolhido)
+  $('btn-right-collapse')?.setAttribute('aria-pressed', pressed)
+  $('btn-right-expand')?.setAttribute('aria-pressed', pressed)
+}
+
 function toggleRight(forcar) {
   const app = $('app')
   if (typeof forcar === 'boolean') {
@@ -183,6 +190,7 @@ function toggleRight(forcar) {
     app.classList.toggle('right-collapsed')
   }
   salvarLayout()
+  sincronizarBotoesPainelDireito()
 }
 
 function setActivityActive(action, on) {
@@ -1971,6 +1979,9 @@ async function rodarAnalise(root, force) {
   ativarAbaDireita('analise')
   try {
     const r = await window.api.invoke('analysis:run', root, force)
+    if (r?.ok === false) {
+      throw new Error(r.erro || 'falha na análise')
+    }
     renderizarAnalise(r.report, r.fromCache)
     $('analysis-content').dataset.jaAnalisou = '1'
   } catch (err) {
@@ -3909,6 +3920,9 @@ function initMenubar() {
 
 // ---------- Boot ----------
 carregarLayout()
+sincronizarBotoesPainelDireito()
+$('btn-right-collapse')?.addEventListener('click', () => toggleRight(false))
+$('btn-right-expand')?.addEventListener('click', () => toggleRight(true))
 carregarPastas()
 initResizers()
 initActivityBar()

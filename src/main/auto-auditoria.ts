@@ -1373,14 +1373,21 @@ export async function rodarAuditoria(
     }
   }
 
-  // Passo 2: se houve correcao, re-verificar (mesma regua, sem autoAtualizar)
+  // Passo 2: uma unica re-verificacao dos achados aplicaveis, sem autoAtualizar.
   const houveCorrecao = achados.some((a) => a.status === 'corrigido')
   if (houveCorrecao) {
     console.log('[auditoria] re-verificando apos correcoes...')
     const segunda = await executarChecagens({ autoAtualizar: false })
-    const aindaRuim = segunda.achados.filter((a) => a.severidade !== 'ok')
+    const achadosProcessados = new Set<string>()
+    const aindaRuim = segunda.achados.filter((a) => {
+      if (a.severidade === 'ok' || a.status === 'nao-aplicavel' || achadosProcessados.has(a.id)) {
+        return false
+      }
+      achadosProcessados.add(a.id)
+      return true
+    })
     if (aindaRuim.length === 0) {
-      console.log('[auditoria] re-verificacao: todos ok')
+      console.log('[auditoria] re-verificacao: nenhum achado aplicavel pendente')
     } else {
       console.log('[auditoria] re-verificacao ainda com problemas:')
       for (const a of aindaRuim) {

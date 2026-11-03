@@ -568,8 +568,17 @@ ipcMain.handle('analysis:run', async (_e, root: unknown, force: unknown) => {
   const seg = caminhoSeguro(r, r)
   if (!seg.ok) return { ok: false, erro: seg.erro }
   dglog('[analysis] handler acionado')
-  await ensureOllama()
-  return runAnalysis(seg.abs, f === true)
+  try {
+    await ensureOllama()
+    return await runAnalysis(seg.abs, f === true)
+  } catch (e) {
+    const mensagem = String((e as Error)?.message || e)
+    if (/timeout|abort/i.test(mensagem)) {
+      dglog('[analysis] timeout retornado ao renderer')
+      return { ok: false, erro: 'timeout' }
+    }
+    throw e
+  }
 })
 
 ipcMain.handle('analysis:cached', (_e, root: unknown) => {
