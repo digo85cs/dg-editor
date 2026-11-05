@@ -1,5 +1,5 @@
 /**
- * Módulo de Caminhos do DG Editor
+ * Modulo de Caminhos do DG Editor
  * Refatorado para usar path.resolve() e evitar caminhos hardcoded
  */
 
@@ -8,14 +8,14 @@ import { homedir } from 'os';
 import { existsSync } from 'fs';
 
 // ============================================================================
-// FUNÇÕES DE CAMINHOS PRINCIPAIS
+// FUNCOES DE CAMINHOS PRINCIPAIS
 // ============================================================================
 
 /**
  * Resolve o caminho raiz do DG Editor
  * 
- * Hierarquia de resolução:
- * 1. DG_ROOT (variável de ambiente)
+ * Hierarquia de resolucao:
+ * 1. DG_ROOT (variavel de ambiente)
  * 2. D:\CURSOR\DG Editor (Windows)
  * 3. ~/DG Editor (Linux/macOS)
  * 4. Pasta atual (fallback)
@@ -27,7 +27,7 @@ export function resolverRaizDGEditor(): string {
     return resolve(dgRoot);
   }
 
-  // 2. Padrão Windows
+  // 2. Padrao Windows
   if (process.platform === 'win32') {
     const windowsPath = 'D:\\CURSOR\\DG Editor';
     if (existsSync(windowsPath)) {
@@ -35,7 +35,7 @@ export function resolverRaizDGEditor(): string {
     }
   }
 
-  // 3. Padrão Linux/macOS
+  // 3. Padrao Linux/macOS
   const homePath = join(homedir(), 'DG Editor');
   if (existsSync(homePath)) {
     return resolve(homePath);
@@ -49,13 +49,13 @@ export function resolverRaizDGEditor(): string {
  * Resolve o caminho raiz do projeto atual
  * 
  * Tentativa:
- * 1. Caminho do package.json mais próximo
+ * 1. Caminho do package.json mais proximo
  * 2. Raiz do DG Editor
  * 3. Pasta atual
  */
 export function resolverRaizProjeto(): string {
   try {
-    // Tentar encontrar package.json mais próximo
+    // Tentar encontrar package.json mais proximo
     let currentDir = process.cwd();
     const maxDepth = 10;
     let depth = 0;
@@ -91,7 +91,7 @@ export function resolverRaizProjeto(): string {
 }
 
 /**
- * Retorna a fonte da resolução da raiz do projeto
+ * Retorna a fonte da resolucao da raiz do projeto
  */
 export function fonteRaizResolvida(): string {
   try {
@@ -127,7 +127,7 @@ export function fonteRaizResolvida(): string {
 }
 
 // ============================================================================
-// FUNÇÕES DE CAMINHOS DO SISTEMA
+// FUNCOES DE CAMINHOS DO SISTEMA
 // ============================================================================
 
 /**
@@ -145,14 +145,14 @@ export function resolveFromProject(...caminhos: string[]): string {
 }
 
 /**
- * Resolve um caminho relativo a partir do diretório home do usuário
+ * Resolve um caminho relativo a partir do diretorio home do usuario
  */
 export function resolveFromHome(...caminhos: string[]): string {
   return resolve(homedir(), ...caminhos);
 }
 
 /**
- * Verifica se um caminho está dentro de outro caminho
+ * Verifica se um caminho esta dentro de outro caminho
  */
 export function isInsidePath(caminho: string, container: string): boolean {
   const resolvedCaminho = resolve(caminho);
@@ -161,13 +161,13 @@ export function isInsidePath(caminho: string, container: string): boolean {
   // Normalizar para comparar
   const relativePath = relative(resolvedContainer, resolvedCaminho);
   
-  // Se a relativePath não começar com '..', então está dentro
+  // Se a relativePath nao comecar com '..', entao esta dentro
   return !relativePath.startsWith('..') && 
          !relativePath.includes('..' + (process.platform === 'win32' ? '\\' : '/'));
 }
 
 /**
- * Verifica se um caminho é seguro (dentro da raiz do projeto)
+ * Verifica se um caminho e seguro (dentro da raiz do projeto)
  */
 export function isSafePath(caminho: string, raiz?: string): boolean {
   const raizProjeto = raiz || resolverRaizProjeto();
@@ -178,7 +178,7 @@ export function isSafePath(caminho: string, raiz?: string): boolean {
     return isInsidePath(resolved, raizProjeto);
   }
   
-  // Caminho absoluto - verificar se está dentro da raiz
+  // Caminho absoluto - verificar se esta dentro da raiz
   return isInsidePath(caminho, raizProjeto);
 }
 
@@ -194,60 +194,60 @@ export function normalizePath(caminho: string): string {
 }
 
 // ============================================================================
-// CAMINHOS ESPECÍFICOS DO DG EDITOR
+// CAMINHOS ESPECIFICOS DO DG EDITOR
 // ============================================================================
 
 /**
- * Caminho do diretório .dg-editor
+ * Caminho do diretorio .dg-editor
  */
 export function getDgEditorDir(): string {
   return resolveFromRaiz('.dg-editor');
 }
 
 /**
- * Caminho do diretório de logs
+ * Caminho do diretorio de logs
  */
 export function getLogsDir(): string {
   return resolveFromRaiz('.dg-editor', 'logs');
 }
 
 /**
- * Caminho do diretório de backups
+ * Caminho do diretorio de backups
  */
 export function getBackupsDir(): string {
   return resolveFromRaiz('.dg-editor', 'backup');
 }
 
 /**
- * Caminho do diretório de memórias
+ * Caminho do diretorio de memorias
  */
 export function getMemoriaDir(): string {
   return resolveFromRaiz('.dg-editor', 'memoria');
 }
 
 /**
- * Caminho do diretório de chats
+ * Caminho do diretorio de chats
  */
 export function getChatsDir(): string {
   return resolveFromRaiz('.dg-editor', 'chats');
 }
 
 /**
- * Caminho do diretório de índices
+ * Caminho do diretorio de indices
  */
 export function getIndiceDir(): string {
   return resolveFromRaiz('.dg-editor', 'indice');
 }
 
 /**
- * Caminho do diretório de modelos
+ * Caminho do diretorio de modelos
  */
 export function getModelosDir(): string {
   return resolveFromRaiz('.dg-editor', 'modelos');
 }
 
 /**
- * Caminho do arquivo de configuração principal
+ * Caminho do arquivo de configuracao principal
  */
 export function getConfigPath(): string {
   return resolveFromRaiz('dg-config.json');
@@ -270,7 +270,7 @@ export function getPackageJsonPath(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório node_modules
+ * Caminho do diretorio node_modules
  */
 export function getNodeModulesPath(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -278,7 +278,7 @@ export function getNodeModulesPath(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório out (build)
+ * Caminho do diretorio out (build)
  */
 export function getOutDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -286,7 +286,7 @@ export function getOutDir(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório src
+ * Caminho do diretorio src
  */
 export function getSrcDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -294,7 +294,7 @@ export function getSrcDir(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório resources
+ * Caminho do diretorio resources
  */
 export function getResourcesDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -302,7 +302,7 @@ export function getResourcesDir(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório scripts
+ * Caminho do diretorio scripts
  */
 export function getScriptsDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -310,7 +310,7 @@ export function getScriptsDir(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório docs
+ * Caminho do diretorio docs
  */
 export function getDocsDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -318,7 +318,7 @@ export function getDocsDir(raizProjeto?: string): string {
 }
 
 /**
- * Caminho do diretório qa-artifacts
+ * Caminho do diretorio qa-artifacts
  */
 export function getQaArtifactsDir(raizProjeto?: string): string {
   const raiz = raizProjeto || resolverRaizProjeto();
@@ -330,7 +330,7 @@ export function getQaArtifactsDir(raizProjeto?: string): string {
 // ============================================================================
 
 /**
- * Caminho do diretório de dados do usuário (appData)
+ * Caminho do diretorio de dados do usuario (appData)
  */
 export function getUserDataPath(): string {
   const { app } = require('electron');
@@ -338,7 +338,7 @@ export function getUserDataPath(): string {
 }
 
 /**
- * Caminho do diretório de cache do usuário
+ * Caminho do diretorio de cache do usuario
  */
 export function getCachePath(): string {
   const { app } = require('electron');
@@ -346,7 +346,7 @@ export function getCachePath(): string {
 }
 
 /**
- * Caminho do diretório de logs do Electron
+ * Caminho do diretorio de logs do Electron
  */
 export function getElectronLogsPath(): string {
   const { app } = require('electron');
@@ -354,7 +354,7 @@ export function getElectronLogsPath(): string {
 }
 
 /**
- * Caminho do executável do Electron
+ * Caminho do executavel do Electron
  */
 export function getElectronExecutable(): string {
   const { app } = require('electron');
@@ -362,14 +362,14 @@ export function getElectronExecutable(): string {
 }
 
 // ============================================================================
-// FUNÇÕES DE VALIDAÇÃO DE CAMINHOS
+// FUNCOES DE VALIDACAO DE CAMINHOS
 // ============================================================================
 
 /**
  * Valida e resolve um caminho de forma segura
  * 
  * @param caminho - Caminho a ser validado
- * @param raiz - Raiz de referência (opcional, padrão: raiz do projeto)
+ * @param raiz - Raiz de referencia (opcional, padrao: raiz do projeto)
  * @returns { ok: boolean, abs?: string, erro?: string }
  */
 export function validarCaminho(caminho: string, raiz?: string): { ok: boolean, abs?: string, erro?: string } {
@@ -387,7 +387,7 @@ export function validarCaminho(caminho: string, raiz?: string): { ok: boolean, a
       ? resolve(caminho)
       : resolve(raizProjeto, caminho);
     
-    // Verificar se está dentro da raiz
+    // Verificar se esta dentro da raiz
     if (!isInsidePath(resolved, raizProjeto)) {
       return { ok: false, erro: 'Caminho fora da raiz permitida' };
     }
@@ -399,7 +399,7 @@ export function validarCaminho(caminho: string, raiz?: string): { ok: boolean, a
 }
 
 /**
- * Valida e resolve múltiplos caminhos
+ * Valida e resolve multiplos caminhos
  */
 export function validarCaminhos(caminhos: string[], raiz?: string): { ok: boolean, abs: string[], erros: string[] } {
   const result: string[] = [];
@@ -422,7 +422,7 @@ export function validarCaminhos(caminhos: string[], raiz?: string): { ok: boolea
 }
 
 // ============================================================================
-// FUNÇÕES DE RESOLUÇÃO DE CAMINHOS RELATIVOS
+// FUNCOES DE RESOLUCAO DE CAMINHOS RELATIVOS
 // ============================================================================
 
 /**
@@ -433,7 +433,7 @@ export function resolveRelative(caminhoBase: string, caminhoRelativo: string): s
 }
 
 /**
- * Obtém o caminho relativo entre dois caminhos absolutos
+ * Obtem o caminho relativo entre dois caminhos absolutos
  */
 export function getRelativePath(caminhoBase: string, caminhoAlvo: string): string {
   return relative(caminhoBase, caminhoAlvo);
@@ -444,28 +444,28 @@ export function getRelativePath(caminhoBase: string, caminhoAlvo: string): strin
 // ============================================================================
 
 export default {
-  // Funções principais
+  // Funcoes principais
   resolverRaizDGEditor,
   resolverRaizProjeto,
   fonteRaizResolvida,
   
-  // Funções de resolve
+  // Funcoes de resolve
   resolveFromRaiz,
   resolveFromProject,
   resolveFromHome,
   
-  // Funções de validação
+  // Funcoes de validacao
   isInsidePath,
   isSafePath,
   validarCaminho,
   validarCaminhos,
   
-  // Funções de caminho relativo
+  // Funcoes de caminho relativo
   resolveRelative,
   getRelativePath,
   normalizePath,
   
-  // Caminhos específicos
+  // Caminhos especificos
   getDgEditorDir,
   getLogsDir,
   getBackupsDir,
