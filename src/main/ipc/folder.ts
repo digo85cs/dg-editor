@@ -34,7 +34,7 @@ export async function handleFolderScan(
 ): Promise<IpcResult & { ok: boolean; erro?: string }> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return r;
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {

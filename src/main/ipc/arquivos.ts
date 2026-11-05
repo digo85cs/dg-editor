@@ -33,11 +33,11 @@ export async function handleArquivoLer(
   const p = exigirArrayStrings(pastas, 'pastas');
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
-  const seg = caminhoSeguro(c.valor, p.valores);
+  const seg = caminhoSeguro(c, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = await lerArquivo(seg.abs, p.valores);
+    const result = await lerArquivo(seg.abs, p);
     if (result.ok) {
       return { ok: true, conteudo: result.conteudo };
     }
@@ -63,11 +63,11 @@ export async function handleArquivoLerBase64(
   const p = exigirArrayStrings(pastas, 'pastas');
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
-  const seg = caminhoSeguro(c.valor, p.valores);
+  const seg = caminhoSeguro(c, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = await lerArquivoBase64(seg.abs, p.valores);
+    const result = await lerArquivoBase64(seg.abs, p);
     if (result.ok) {
       return { ok: true, conteudo: result.conteudo };
     }
@@ -97,11 +97,11 @@ export async function handleArquivoSalvar(
   const p = exigirArrayStrings(pastas, 'pastas');
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
-  const seg = caminhoSeguro(c.valor, p.valores);
+  const seg = caminhoSeguro(c, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = await salvarArquivo(seg.abs, body.valor, p.valores);
+    const result = await salvarArquivo(seg.abs, body, p);
     if (result.ok) {
       return { ok: true };
     }
@@ -127,11 +127,11 @@ export async function handleArquivoListar(
   const p = exigirArrayStrings(pastas, 'pastas');
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
-  const seg = caminhoSeguro(d.valor, p.valores);
+  const seg = caminhoSeguro(d, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = await listarDiretorio(seg.abs, p.valores);
+    const result = await listarDiretorio(seg.abs, p);
     if (result.ok) {
       return { ok: true, arquivos: result.arquivos };
     }
@@ -157,11 +157,11 @@ export async function handleArquivoExiste(
   const p = exigirArrayStrings(pastas, 'pastas');
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
-  const seg = caminhoSeguro(c.valor, p.valores);
+  const seg = caminhoSeguro(c, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = await arquivoExiste(seg.abs, p.valores);
+    const result = await arquivoExiste(seg.abs, p);
     return { ok: true, existe: result.existe };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);

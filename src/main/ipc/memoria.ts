@@ -21,7 +21,7 @@ export function handleMemoriaListar(
 ): Promise<IpcResult & { ok: boolean; erro?: string; itens?: unknown }> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return Promise.resolve(r);
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return Promise.resolve({ ok: false, erro: seg.erro });
   return import('../memorias').then((m) => ({ ok: true, itens: m.listarMemorias(seg.abs) }));
 }
@@ -36,7 +36,7 @@ export function handleMemoriaPropor(
 ): Promise<IpcResult> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return Promise.resolve(r);
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return Promise.resolve({ ok: false, erro: seg.erro });
   const t = typeof texto === 'string' ? texto : '';
   return import('../memorias').then((m) => m.proporMemoria(seg.abs, t));
@@ -53,7 +53,7 @@ export function handleMemoriaDecidir(
 ): Promise<IpcResult> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return Promise.resolve(r);
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return Promise.resolve({ ok: false, erro: seg.erro });
   const mid = typeof id === 'string' ? id : '';
   return import('../memorias').then((m) => m.decidirMemoria(seg.abs, mid, aceitar === true));

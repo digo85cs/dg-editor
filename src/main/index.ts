@@ -27,7 +27,7 @@ let mainWindow: BrowserWindow | null = null;
 // ============================================================================
 
 // Importar funcoes de safe mode
-import { SAFE_MODE as SAFE_MODE_CONFIG, emSafeMode, detectarSafeModeArgv, ativarSafeMode } from './safe-mode';
+import { emSafeMode, detectarSafeModeArgv, ativarSafeMode } from './safe-mode';
 
 // Flag de processo para safe-mode
 const SAFE_MODE = detectarSafeModeArgv(process.argv);

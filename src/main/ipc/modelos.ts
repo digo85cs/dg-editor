@@ -67,7 +67,7 @@ export async function handleModelosParaTarefa(
   try {
     const { resolverRaizProjeto } = await import('../paths');
     const { modeloParaTarefa } = await import('../brain/modelos-catalogo');
-    return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t.valor) };
+    return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t) };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
   }

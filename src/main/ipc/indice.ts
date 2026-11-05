@@ -6,7 +6,6 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
-import { SAFE_MODE } from '../safe-mode';
 import { emSafeMode } from '../safe-mode';
 import type { IpcResult } from './types';
 
@@ -21,13 +20,13 @@ export function handleIndiceIniciar(
   _event: Electron.IpcMainInvokeEvent,
   root: unknown
 ): Promise<IpcResult & { ok: boolean; erro?: string; total?: number }> {
-  if (SAFE_MODE || emSafeMode()) {
+  if (emSafeMode()) {
     dglog('[safe-mode] indice/watcher bloqueado');
     return Promise.resolve({ ok: false, total: 0, erro: 'safe-mode' });
   }
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return Promise.resolve(r);
-  return import('../indice-arquivos').then((m) => m.iniciarIndice(r.valor));
+  return import('../indice-arquivos').then((m) => m.iniciarIndice(r));
 }
 
 /**
@@ -39,7 +38,7 @@ export function handleIndiceCriar(
 ): Promise<IpcResult & { ok: boolean; erro?: string }> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return Promise.resolve(r);
-  return import('../indice-arquivos').then((m) => m.iniciarIndice(r.valor));
+  return import('../indice-arquivos').then((m) => m.iniciarIndice(r));
 }
 
 /**

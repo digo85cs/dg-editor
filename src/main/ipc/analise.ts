@@ -56,14 +56,14 @@ export async function handleAnaliseRun(
 
   const escopo: EscopoAnalise = escopoValue === 'completa' ? 'completa' : 'rapida';
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   dglog('[analysis] handler acionado escopo=' + escopo);
 
   try {
     await ensureOllama();
-    const result = await runAnalysis(seg.abs, escopo, f.valor === true);
+    const result = await runAnalysis(seg.abs, escopo, f);
     return { ok: true, result };
   } catch (e) {
     const mensagem = String(e instanceof Error ? e.message : e);
@@ -134,7 +134,7 @@ export async function handleAnaliseCached(
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
@@ -161,11 +161,11 @@ export async function handleWhereisAsk(
   const q = exigirString(query, 'query');
   if (isErroPayload(q)) return { ok: false, erro: q.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
-    const result = whereIs(seg.abs, q.valor);
+    const result = whereIs(seg.abs, q);
     return { ok: true, result, formatted: formatWhereIs(result) };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -184,7 +184,7 @@ export async function handleAnaliseInvalidar(
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   invalidarCacheAnalise(seg.abs);
@@ -205,7 +205,7 @@ export async function handleRegrasExists(
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
@@ -228,7 +228,7 @@ export async function handleRegrasRead(
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
@@ -251,7 +251,7 @@ export async function handleRegrasCreateTemplate(
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
@@ -279,7 +279,7 @@ export async function handleRegrasWrite(
     return { ok: false, erro: 'texto invalido' };
   }
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {

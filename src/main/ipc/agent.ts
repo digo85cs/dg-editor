@@ -5,7 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { executarAgente, escolherModelo, historico } from '../brain/agent';
-import { SAFE_MODE, emSafeMode } from '../safe-mode';
+import { emSafeMode } from '../safe-mode';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
 
@@ -29,7 +29,7 @@ export async function handleAgenteExecutar(
   modo?: string;
   erro?: string;
 }> {
-  if (SAFE_MODE || emSafeMode()) {
+  if (emSafeMode()) {
     return { ok: false, erro: 'safe-mode' };
   }
 
@@ -67,7 +67,7 @@ export async function handleAgenteExecutar(
  * Handler para obter modelo do agente
  */
 export async function handleAgenteModelo(): Promise<IpcResult & { modelo?: string; erro?: string }> {
-  if (SAFE_MODE || emSafeMode()) {
+  if (emSafeMode()) {
     return { ok: false, erro: 'safe-mode' };
   }
 
@@ -86,7 +86,7 @@ export async function handleAgenteHistorico(
   _event: Electron.IpcMainInvokeEvent,
   root: string
 ): Promise<IpcResult & { mensagens?: unknown[]; erro?: string }> {
-  if (SAFE_MODE || emSafeMode()) {
+  if (emSafeMode()) {
     return { ok: false, erro: 'safe-mode' };
   }
 

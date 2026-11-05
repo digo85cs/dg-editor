@@ -24,7 +24,7 @@ export async function handleSkillsListar(
   const { listarSkills } = await import('../brain/skills');
   return {
     ok: true,
-    skills: listarSkills(r.valor).map((s: { id: string; titulo: string; gatilho: string }) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }))
+    skills: listarSkills(r).map((s: { id: string; titulo: string; gatilho: string }) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }))
   };
 }
 

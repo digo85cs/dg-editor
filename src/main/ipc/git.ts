@@ -23,7 +23,7 @@ export async function handleGitStatus(
   const r = exigirString(raiz, 'raiz');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
-  const seg = caminhoSeguro(r.valor, r.valor);
+  const seg = caminhoSeguro(r, r);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   try {
@@ -50,10 +50,10 @@ export async function handleGitDiff(
   const c = exigirString(caminho, 'caminho');
   if (isErroPayload(c)) return { ok: false, erro: c.erro };
 
-  const segRaiz = caminhoSeguro(r.valor, r.valor);
+  const segRaiz = caminhoSeguro(r, r);
   if (!segRaiz.ok) return { ok: false, erro: segRaiz.erro };
 
-  const segCaminho = caminhoSeguro(c.valor, r.valor);
+  const segCaminho = caminhoSeguro(c, r);
   if (!segCaminho.ok) return { ok: false, erro: segCaminho.erro };
 
   try {
@@ -82,7 +82,7 @@ export async function handleGitRepos(
     const pastas = exigirArrayStrings(o.pastas, 'pastas');
     if (isErroPayload(pastas)) return { ok: true, repos: [] };
 
-    const repos = await gitRepos(pastas.valores);
+    const repos = await gitRepos(pastas);
     return { ok: true, repos };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
