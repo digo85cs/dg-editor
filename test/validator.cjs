@@ -192,7 +192,7 @@ async function main() {
   assert('selecionarPasta usa Promise.all', /Promise\.all\s*\(/.test(corpoSel))
   // anti-regressão C: as 3 chamadas IPC estão DENTRO do Promise.all
   assert('selecionarPasta chama chat:load dentro de Promise.all', /Promise\.all\s*\([\s\S]*chat:load/.test(corpoSel))
-  assert('renderizarChat aceita envelope IPC mensagens', /Array\.isArray\(msgs\?\.mensagens\)/.test(appJs))
+  assert('renderizarChat aceita envelope IPC mensagens', /Array\.isArray\(msgs\?\.mensagens\)/.test(appSrc))
   assert('selecionarPasta chama analysis:cached dentro de Promise.all', /Promise\.all\s*\([\s\S]*analysis:cached/.test(corpoSel))
   // anti-regressão D: carregarFilhos só é chamado condicionalmente (childElementCount === 0)
   const temCarregarFilhos = /carregarFilhos\s*\(/.test(corpoSel)

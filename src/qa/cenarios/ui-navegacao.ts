@@ -5,9 +5,15 @@ export async function cenariosUiNavegacao(page: Page): Promise<ResultadoCenario[
   const out: ResultadoCenario[] = []
   const errosConsole: string[] = []
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errosConsole.push(msg.text())
+    if (msg.type() === 'error') {
+      const local = msg.location()
+      errosConsole.push(msg.text() + (local.url ? ' @ ' + local.url + ':' + local.lineNumber : ''))
+    }
   })
   page.on('pageerror', (err) => errosConsole.push(String(err)))
+  page.on('requestfailed', (request) => {
+    errosConsole.push('request failed: ' + request.url() + ' (' + (request.failure()?.errorText || 'unknown') + ')')
+  })
 
   {
     const t0 = Date.now()
