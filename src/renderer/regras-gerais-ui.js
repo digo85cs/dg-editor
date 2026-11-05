@@ -5,7 +5,7 @@
     if(document.getElementById('regras-gerais-box')) return;
     const box = document.createElement('div');
     box.id = 'regras-gerais-box';
-    box.innerHTML = '<div class="secao"><h3>Regras Gerais para todos os trabalhos</h3><p style="opacity:.8">Estas regras são aplicadas a todos os agentes, skills e ferramentas do DG Editor.</p><div id="rg-list" class="lista"></div><div class="rg-add"><input id="rg-titulo" placeholder="Título"><input id="rg-desc" placeholder="Descrição"><button id="rg-add">Adicionar</button><button id="rg-salvar">Salvar</button></div></div>';
+    box.innerHTML = '<div class="secao"><h3>Regras Gerais para todos os trabalhos</h3><p style="opacity:.8">Estas regras so aplicadas a todos os agentes, skills e ferramentas do DG Editor.</p><div id="rg-list" class="lista"></div><div class="rg-add"><input id="rg-titulo" placeholder="Ttulo"><input id="rg-desc" placeholder="Descrio"><button id="rg-add">Adicionar</button><button id="rg-salvar">Salvar</button></div></div>';
     const host = document.querySelector('#configuracoes, .painel-config, [data-painel="config"]') || document.body;
     host.appendChild(box);
     document.getElementById('rg-add').onclick = add;

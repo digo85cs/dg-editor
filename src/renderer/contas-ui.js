@@ -56,7 +56,7 @@
   }
   function set(svc, con, who){
     const st = document.getElementById('st-'+svc); const c=document.getElementById('btn-'+svc); const d=document.getElementById('btn-'+svc+'-disc');
-    if(con){ st.innerHTML='Conectado' + (who?' · '+who:''); c.style.display='none'; d.style.display='inline-block'; } else { st.innerHTML='Não conectado'; c.style.display='inline-block'; d.style.display='none'; }
+    if(con){ st.innerHTML='Conectado' + (who?'  '+who:''); c.style.display='none'; d.style.display='inline-block'; } else { st.innerHTML='No conectado'; c.style.display='inline-block'; d.style.display='none'; }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', criarSecao); else criarSecao();
 })();
