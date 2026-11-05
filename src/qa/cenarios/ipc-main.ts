@@ -1,4 +1,6 @@
 import type { ResultadoCenario } from '../tipos'
+import { join } from 'path'
+import { tmpdir } from 'os'
 
 function ok(
   id: string,
@@ -226,7 +228,8 @@ export async function rodarCenariosIpc(temTTY = true): Promise<{
     const t0 = Date.now()
     try {
       const { backupConfigs } = await import('../../main/config-backup')
-      const r = backupConfigs('qa-ipc')
+      const dadosTeste = join(tmpdir(), 'dg-editor-qa-ipc-' + process.pid + '-' + Date.now())
+      const r = backupConfigs('qa-ipc', dadosTeste)
       if (!r.ok) throw new Error(r.erro || 'backup falhou')
       resultados.push(ok('ipc.config.backup', 'config:backup', t0, 'n=' + (r.arquivos?.length || 0)))
     } catch (e) {

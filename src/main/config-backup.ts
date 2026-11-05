@@ -6,8 +6,8 @@ import { join, basename } from 'path'
 import { appDataDir, resolverRaizProjeto } from './paths'
 import { logEstruturado } from './logs-estruturados'
 
-function dirBackups(): string {
-  const d = join(appDataDir(), 'backups')
+function dirBackups(diretorioDados = appDataDir()): string {
+  const d = join(diretorioDados, 'backups')
   if (!existsSync(d)) mkdirSync(d, { recursive: true })
   return d
 }
@@ -16,19 +16,20 @@ function stamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
 }
 
-export function backupConfigs(motivo = 'manual'): {
+export function backupConfigs(motivo = 'manual', diretorioDados?: string): {
   ok: boolean
   pasta?: string
   arquivos?: string[]
   erro?: string
 } {
   try {
-    const dest = join(dirBackups(), stamp() + '_' + motivo.replace(/[^\w-]+/g, '_').slice(0, 40))
+    const dados = diretorioDados || appDataDir()
+    const dest = join(dirBackups(dados), stamp() + '_' + motivo.replace(/[^\w-]+/g, '_').slice(0, 40))
     mkdirSync(dest, { recursive: true })
     const copiados: string[] = []
     const raiz = resolverRaizProjeto()
     const candidatos = [
-      join(appDataDir(), 'dg-editor.json'),
+      join(dados, 'dg-editor.json'),
       join(raiz, 'qa-artifacts', 'baseline.json'),
       join(raiz, '.dg-editor', 'modelos.json')
     ]
