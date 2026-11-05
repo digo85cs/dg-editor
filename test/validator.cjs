@@ -1003,6 +1003,10 @@ async function main() {
     const preload = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
     const mainIdx = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     const menu = fs.readFileSync(path.join(SRC, 'main/menu.ts'), 'utf8')
+    const ipcIndex = fs.readFileSync(path.join(SRC, 'main/ipc/index.ts'), 'utf8')
+    const windowIpc = fs.readFileSync(path.join(SRC, 'main/ipc/janela.ts'), 'utf8')
+    const appIpc = fs.readFileSync(path.join(SRC, 'main/ipc/app.ts'), 'utf8')
+    const ferramentasIpc = fs.readFileSync(path.join(SRC, 'main/ipc/ferramentas.ts'), 'utf8')
 
     assert('html tem #menubar', /id="menubar"/.test(html))
     assert('html menus Arquivo..Ajuda', /data-menu="arquivo"/.test(html) && /data-menu="ajuda"/.test(html))
@@ -1032,12 +1036,22 @@ async function main() {
     assert('preload menu:acao', /menu:acao/.test(preload))
     assert('preload app:get-version', /app:get-version/.test(preload))
     assert('preload app:raiz-projeto', /app:raiz-projeto/.test(preload))
-    assert('main janela:recarregar', /janela:recarregar/.test(mainIdx))
-    assert('main janela:zoom', /janela:zoom/.test(mainIdx))
-    assert('main janela:tela-cheia', /janela:tela-cheia/.test(mainIdx))
+    assert(
+      'main registra handlers de janela',
+      /janela:recarregar/.test(windowIpc) && /janela:zoom/.test(windowIpc) &&
+        /janela:tela-cheia/.test(windowIpc) && /registrarHandlersJanela\(\)/.test(ipcIndex)
+    )
     assert('main envia menu:acao', /send\(\s*['"]menu:acao['"]/.test(mainIdx))
-    assert('main app:get-version handle', /ipcMain\.handle\(\s*['"]app:get-version['"]/.test(mainIdx))
-    assert('main app:raiz-projeto handle', /app:raiz-projeto/.test(mainIdx))
+    assert(
+      'main app:get-version handle',
+      /ipcMain\.handle\(\s*['"]app:get-version['"]/.test(ferramentasIpc) &&
+        /registrarHandlersFerramentas\(\)/.test(ipcIndex)
+    )
+    assert(
+      'main app:raiz-projeto handle',
+      /ipcMain\.handle\(\s*['"]app:raiz-projeto['"]/.test(appIpc) &&
+        /registrarHandlersApp\(\)/.test(ipcIndex)
+    )
     assert('renderer garante pasta raiz', /garantirPastaRaizProjeto/.test(appJs))
     assert('menu onAcao', /onAcao\??\s*:/.test(menu) || /onAcao\?:/.test(menu))
     assert('atalho abrir-dg-editor.bat', fs.existsSync(path.join(ROOT, 'abrir-dg-editor.bat')))
@@ -1076,10 +1090,12 @@ async function main() {
         fs.readFileSync(path.join(SRC, 'shared/raiz-canonica.ts'), 'utf8')
       )
     )
+    const pathsCanonicos = fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8')
     assert(
-      'paths prioriza windows-canonica',
-      /fix:windows-canonica/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8')) &&
-        /RAIZ_WINDOWS_CANONICA/.test(fs.readFileSync(path.join(SRC, 'main/paths.ts'), 'utf8'))
+      'paths prioriza raiz Windows canonica apos DG_ROOT',
+      pathsCanonicos.indexOf('if (dgRoot') < pathsCanonicos.indexOf('existsSync(RAIZ_WINDOWS_CANONICA)') &&
+        /existsSync\(RAIZ_WINDOWS_CANONICA\)/.test(pathsCanonicos) &&
+        /resolve\(RAIZ_WINDOWS_CANONICA\)/.test(pathsCanonicos)
     )
     assert(
       'sem sync remoto obrigatorio',
@@ -1244,7 +1260,10 @@ async function main() {
     assert('url estranha bloqueada', !bridge.urlAdaptaPermitida('https://evil.example/'))
     assert('url http bloqueada', !bridge.urlAdaptaPermitida('http://adapta.org/'))
     const st0 = bridge.statusAdapta(ROOT)
-    assert('status ok', st0.ok === true && st0.dossieDir.indexOf(ud) >= 0)
+    assert(
+      'status usa diretorio do dossie do app',
+      st0.ok === true && st0.dossieDir === bridge.dossieDirDoApp()
+    )
     assert('mcp comando json', /"command": "node"/.test(st0.mcpComando) && /server\.js/.test(st0.mcpComando))
     const sem = bridge.gerarContinuidade(bridge.dossieDirDoApp())
     assert('gerar sem dossie falha', sem.ok === false)
