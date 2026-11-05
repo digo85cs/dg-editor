@@ -68,3 +68,5 @@ Continuidade para Contextos do ONE + MCP para o Maestro: painel em **Contas** / 
 Ordem da suíte e regra do smoke **isolado**: [docs/TESTES.md](docs/TESTES.md).
 
 Índice de símbolos (MCP): [docs/brain-indice.md](docs/brain-indice.md).
+
+Ollama local e Cloud nas ferramentas MCP `ollama_ask` / `ollama_script`, com fallback local: [docs/ollama-mcp.md](docs/ollama-mcp.md).

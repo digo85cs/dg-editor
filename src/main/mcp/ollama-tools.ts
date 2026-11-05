@@ -87,7 +87,7 @@ class RequestError extends Error {
 }
 
 function isCloudName(name: string): boolean {
-  return /(?::cloud|[-:]cloud(?:-|:|$)|-cloud$)/i.test(name)
+  return /(?::cloud|-cloud)$/i.test(name)
 }
 
 function isRemote(model?: Model): boolean {
@@ -178,15 +178,17 @@ export async function executeOllamaTool(
       })
       const text = await response.text()
       checkAbort()
+      const availability = /remote|cloud|temporar|unavailable|not found|not available|sign.?in|unauthor|forbidden|authentication|api.?key|access token|disabled|rate.limit|quota|capacity|timeout|timed out|connection/i
+      const invalidPayload = /invalid|bad request|malformed|must (?:be|contain)|required|unsupported (?:format|option|parameter)/i
+      const canRetry = (message: string) => [401, 403, 404, 408, 409, 429].includes(response.status) || response.status >= 500 ||
+        ((response.ok || response.status === 400) && availability.test(message)) || (response.ok && !invalidPayload.test(message))
       let data: any
       try { data = text ? JSON.parse(text) : {} } catch {
-        throw new RequestError('Ollama retornou JSON inválido (HTTP ' + response.status + ').')
+        throw new RequestError('Ollama retornou JSON inválido (HTTP ' + response.status + ').', canRetry(text))
       }
       if (!response.ok || data.error) {
         const message = redact(String(data.error || response.statusText || 'erro do upstream'))
-        const availability = /remote|cloud|temporar|unavailable|not found|not available|sign.?in|unauthor|forbidden|disabled|rate.limit|quota|capacity|timeout|timed out|connection/i.test(message)
-        const retryable = response.ok || [401, 403, 404, 408, 409, 429].includes(response.status) || response.status >= 500 || (response.status === 400 && availability)
-        throw new RequestError('HTTP ' + response.status + ': ' + message, retryable)
+        throw new RequestError('HTTP ' + response.status + ': ' + message, canRetry(message))
       }
       return data
     } catch (error) {
@@ -227,10 +229,14 @@ export async function executeOllamaTool(
       return null
     }
   }
-  const metadata = daemonReachable ? await show(requested) || installed(requested) : installed(requested)
+  const requestedDetail = daemonReachable ? await show(requested) : null
+  const metadata = requestedDetail || installed(requested)
   const cloudRequested = input.backend === 'cloud' || preferCloud || isCloudName(requested) || isRemote(metadata)
   if (input.backend === 'local' && cloudRequested) {
     throw new Error('backend=local não aceita modelos cloud/remotos.')
+  }
+  if (input.backend === 'local' && !requestedDetail) {
+    throw new Error('backend=local exige confirmação do modelo em /api/show; nenhuma chamada de geração foi enviada.')
   }
   if (metadata && isEmbedding(metadata)) throw new Error('O modelo solicitado só oferece embeddings, não geração de texto.')
   if (input.fallback_model) {
@@ -300,7 +306,11 @@ export async function executeOllamaTool(
     throw new Error('Não foi possível resolver o seletor cloud sem ambiguidade. Use o nome canônico de ollama.com com backend=cloud ou disponibilize o remote no daemon local.')
   }
 
-  if (input.backend !== 'cloud' && !preferCloud) {
+  const unsupportedRemote = !!metadata?.remote_host && !officialCloudHost(metadata.remote_host)
+  if (unsupportedRemote && input.backend !== 'cloud') {
+    attempts.push({ model: requested, backend: 'daemon-cloud', ok: false, error: 'remote_host fora do Ollama Cloud oficial; o prompt não foi enviado a esse remote.' })
+  }
+  if (input.backend !== 'cloud' && !preferCloud && !unsupportedRemote) {
     const result = await generate(requested, 'daemon', cloudRequested, false)
     if (result) return result
   }
