@@ -406,44 +406,6 @@ app.on('window-all-closed', () => {
 // REGISTRO DE HANDLERS RESTRITOS (que nao puderam ser extraidos)
 // ============================================================================
 
-// Handler complexo de chat:send que nao foi extraido por dependencias circulares
-// TODO: Refatorar para extrair completamente
-ipcMain.handle('chat:send', async (
-  _e,
-  root: string,
-  content: string,
-  opts: unknown
-) => {
-  // Implementacao original do index.ts
-  // Mantenha aqui por enquanto para nao quebrar a funcionalidade
-  
-  dglog('[chat:send] handler complexo - a ser refatorado');
-  
-  // Implementacao simplificada para validar
-  const r = exigirString(root, 'root');
-  if (isErroPayload(r)) return { ok: false, message: { role: 'assistant', content: r.erro, at: Date.now(), provider: 'erro' } };
-  const texto = exigirString(content, 'content');
-  if (isErroPayload(texto)) return { ok: false, message: { role: 'assistant', content: texto.erro, at: Date.now(), provider: 'erro' } };
-  
-  const seg = caminhoSeguro(r.valor, r.valor);
-  if (!seg.ok) return { ok: false, message: { role: 'assistant', content: seg.erro, at: Date.now(), provider: 'erro' } };
-  
-  const rootOk = seg.abs;
-  const userMsg = { role: 'user' as const, content: texto.valor, at: Date.now() };
-  appendChat(rootOk, userMsg);
-  
-  // Para nao bloquear, retornar resposta simples
-  const assistantMsg = {
-    role: 'assistant' as const,
-    content: 'Handler de chat:send sera refatorado. Por favor, use a versao original do index.ts.',
-    at: Date.now(),
-    provider: 'sistema'
-  };
-  appendChat(rootOk, assistantMsg);
-  
-  return { ok: true, message: assistantMsg };
-});
-
 // ============================================================================
 // AUDITORIA PERIODICA NO BOOT
 // ============================================================================

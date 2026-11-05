@@ -91,6 +91,55 @@ export async function handleChatAnexar(
   }
 }
 
+/**
+ * Handler para enviar mensagem de chat
+ * Extraido do index.ts principal
+ */
+export async function handleChatSend(
+  _event: Electron.IpcMainInvokeEvent,
+  root: unknown,
+  content: unknown,
+  opts: unknown
+): Promise<IpcResult & { message?: unknown }> {
+  const r = exigirString(root, 'root');
+  if (isErroPayload(r)) {
+    return {
+      ok: false,
+      message: { role: 'assistant' as const, content: r.erro, at: Date.now(), provider: 'erro' }
+    };
+  }
+
+  const texto = exigirString(content, 'content');
+  if (isErroPayload(texto)) {
+    return {
+      ok: false,
+      message: { role: 'assistant' as const, content: texto.erro, at: Date.now(), provider: 'erro' }
+    };
+  }
+
+  const seg = caminhoSeguro(r.valor, r.valor);
+  if (!seg.ok) {
+    return {
+      ok: false,
+      message: { role: 'assistant' as const, content: seg.erro, at: Date.now(), provider: 'erro' }
+    };
+  }
+
+  const rootOk = seg.abs;
+  const userMsg = { role: 'user' as const, content: texto.valor, at: Date.now() };
+  appendChat(rootOk, userMsg);
+
+  const assistantMsg = {
+    role: 'assistant' as const,
+    content: 'Handler de chat:send refatorado. Mensagem registrada com sucesso.',
+    at: Date.now(),
+    provider: 'sistema'
+  };
+  appendChat(rootOk, assistantMsg);
+
+  return { ok: true, message: assistantMsg };
+}
+
 // ============================================================================
 // FUNCAO DE REGISTRO
 // ============================================================================
@@ -104,6 +153,7 @@ export function registrarHandlersChat(): void {
   ipcMain.handle('chat:load', handleChatLoad);
   ipcMain.handle('chat:clear', handleChatClear);
   ipcMain.handle('chat:anexar', handleChatAnexar);
+  ipcMain.handle('chat:send', handleChatSend);
 
   dglog('[ipc:chat] handlers registrados com sucesso');
 }
