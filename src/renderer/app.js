@@ -3742,7 +3742,11 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
 $('btn-agent-verificar')?.addEventListener('click', async () => {
   if (!pastaAtual) return
   appendAgentTraceLive('â€¦ typecheck')
-  const r = await window.api.invoke('agente:verificar', { raiz: pastaAtual, modo: 'typecheck' })
+  const r = await window.api.invoke('agente:verificar', {
+    raiz: pastaAtual,
+    pastas: pastasPermitidas(),
+    modo: 'typecheck'
+  })
   const d = r?.diagnostico
   appendAgentTraceLive(d?.ok ? 'âœ“ typecheck ok' : 'âœ— ' + (d?.resumo || 'falha'))
   const out = $('agent-output')
