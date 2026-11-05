@@ -172,7 +172,7 @@
                 <span id="chat-title">Nenhuma pasta aberta</span>
                 <span id="chat-provider" class="provider-badge"></span>
               </div>
-              <div class="chat-header-actions">
+              <div id="chat-header-actions" class="chat-header-actions" role="group" aria-label="Controles e ações do chat">
                 <div id="chat-history-bar" class="chat-history-bar">
                   <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
                   <select id="chat-history-select" aria-label="Historico de chats"></select>
@@ -204,23 +204,27 @@
       <div id="center-pane-agent" class="center-pane">
         <div id="pane-agent" class="center-pane-inner agent-pane" role="region" aria-label="Painel do agente">
           <header class="agent-header">
-            <label class="agent-mode">
-              <input type="checkbox" id="agent-plan-mode" aria-describedby="agent-plan-hint" />
-              Plan mode
-            </label>
-            <span id="agent-plan-hint" class="sr-only">Quando ativo, o agente só gera plano sem editar arquivos</span>
-            <select id="agent-select" aria-label="Escolher agente"></select>
-            <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
-            <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
-            <button type="button" id="btn-agent-exec-passo" class="btn-small" title="Executar próximo passo do plano" aria-label="Executar próximo passo">Próximo passo</button>
-            <button type="button" id="btn-agent-verificar" class="btn-small" title="Rodar typecheck e alimentar diagnósticos" aria-label="Verificar typecheck">Verificar</button>
-            <label class="agent-mode" title="Após o turno, roda typecheck e pede correção se falhar">
-              <input type="checkbox" id="agent-verify-loop" />
-              Auto-verify
-            </label>
-            <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
-            <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
-            <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
+            <div class="agent-header-main" role="group" aria-label="Modo e execução do agente">
+              <label class="agent-mode">
+                <input type="checkbox" id="agent-plan-mode" aria-describedby="agent-plan-hint" />
+                Modo de plano
+              </label>
+              <span id="agent-plan-hint" class="sr-only">Quando ativo, o agente só gera plano sem editar arquivos</span>
+              <select id="agent-select" aria-label="Escolher agente"></select>
+              <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
+              <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
+              <button type="button" id="btn-agent-exec-passo" class="btn-small" title="Executar próximo passo do plano" aria-label="Executar próximo passo">Próximo passo</button>
+              <button type="button" id="btn-agent-verificar" class="btn-small" title="Rodar typecheck e alimentar diagnósticos" aria-label="Verificar typecheck">Verificar</button>
+              <label class="agent-mode" title="Após o turno, roda typecheck e pede correção se falhar">
+                <input type="checkbox" id="agent-verify-loop" />
+                Verificar automaticamente
+              </label>
+            </div>
+            <div class="agent-header-actions" role="group" aria-label="Ações da fila do agente">
+              <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
+              <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
+              <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
+            </div>
           </header>
           <div id="agent-plano-checklist" class="agent-plano-checklist" hidden role="region" aria-label="Checklist do plano"></div>
           <div id="agent-trace" class="agent-trace" aria-live="polite" aria-relevant="additions" aria-label="Tool trace" tabindex="0"></div>
@@ -282,8 +286,8 @@
       <div class="right-tabs">
         <button type="button" class="right-tab" data-pane="analise">Análise</button>
         <button type="button" class="right-tab active" data-pane="terminal">Terminal</button>
-        <button type="button" class="right-tab" data-pane="files">Files</button>
-        <button type="button" class="right-tab" data-pane="browser">Browser</button>
+          <button type="button" class="right-tab" data-pane="files">Arquivos</button>
+          <button type="button" class="right-tab" data-pane="browser">Navegador</button>
         <button type="button" id="btn-right-collapse" class="btn-icon" title="Recolher painel direito" aria-label="Recolher painel direito" aria-pressed="false">‹</button>
       </div>
 

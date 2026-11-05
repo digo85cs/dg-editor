@@ -3195,14 +3195,14 @@ function initChatAgentSelector() {
   if (!bar) return
   if (document.getElementById('chat-agent-select')) return
   const wrap = document.createElement('div')
-  wrap.style.display = 'flex'
-  wrap.style.gap = '4px'
-  wrap.style.alignItems = 'center'
+  wrap.className = 'chat-header-selectors'
   const agentSel = document.createElement('select')
   agentSel.id = 'chat-agent-select'
+  agentSel.className = 'chat-control-select'
   agentSel.setAttribute('aria-label', 'Agente')
   const modeSel = document.createElement('select')
   modeSel.id = 'chat-mode-select'
+  modeSel.className = 'chat-control-select'
   modeSel.setAttribute('aria-label', 'Modo')
   for (const m of chatModes) {
     const o = document.createElement('option')
@@ -3214,26 +3214,36 @@ function initChatAgentSelector() {
   wrap.appendChild(modeSel)
   // Botão Mais opções estilo Kilo
   const maisWrap = document.createElement('div')
-  maisWrap.style.position = 'relative'
+  maisWrap.className = 'chat-more-wrap'
   const btnMais = document.createElement('button')
   btnMais.type = 'button'
-  btnMais.className = 'btn-small'
+  btnMais.className = 'btn-small chat-more-toggle'
   btnMais.id = 'btn-chat-mais'
   btnMais.textContent = 'Mais opções'
+  btnMais.setAttribute('aria-haspopup', 'menu')
+  btnMais.setAttribute('aria-expanded', 'false')
+  btnMais.setAttribute('aria-controls', 'chat-mais-menu')
   const menu = document.createElement('div')
   menu.id = 'chat-mais-menu'
-  menu.style.cssText =
-    'position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow);display:none;flex-direction:column;min-width:220px;z-index:1000'
+  menu.className = 'chat-more-menu'
+  menu.setAttribute('role', 'menu')
+  menu.hidden = true
+  const setMenuOpen = (open) => {
+    menu.hidden = !open
+    btnMais.setAttribute('aria-expanded', open ? 'true' : 'false')
+  }
   const itemAuto = document.createElement('button')
   itemAuto.type = 'button'
-  itemAuto.className = 'btn-ghost'
-  itemAuto.style.cssText = 'text-align:left;padding:6px 10px'
+  itemAuto.className = 'chat-more-item'
+  itemAuto.setAttribute('role', 'menuitemcheckbox')
   function atualizarItemAuto() {
     try {
       const v = localStorage.getItem('dg-chat-autoapprove') === '1'
       itemAuto.textContent = v ? 'Desativar aprovação automática' : 'Ativar aprovação automática'
+      itemAuto.setAttribute('aria-checked', v ? 'true' : 'false')
     } catch {
       itemAuto.textContent = 'Ativar aprovação automática'
+      itemAuto.setAttribute('aria-checked', 'false')
     }
   }
   atualizarItemAuto()
@@ -3245,16 +3255,17 @@ function initChatAgentSelector() {
       else localStorage.setItem('dg-chat-autoapprove', '1')
     } catch {}
     atualizarItemAuto()
-    menu.style.display = 'none'
+    setMenuOpen(false)
+    btnMais.focus()
   })
   const itemPrompt = document.createElement('button')
   itemPrompt.type = 'button'
-  itemPrompt.className = 'btn-ghost'
-  itemPrompt.style.cssText = 'text-align:left;padding:6px 10px'
+  itemPrompt.className = 'chat-more-item'
+  itemPrompt.setAttribute('role', 'menuitem')
   itemPrompt.textContent = 'Melhorar prompt'
   itemPrompt.addEventListener('click', (e) => {
     e.stopPropagation()
-    menu.style.display = 'none'
+    setMenuOpen(false)
     try {
       if (typeof abrirOrientadorPrompt === 'function') abrirOrientadorPrompt()
       else document.getElementById('btn-prompt-orientador')?.click()
@@ -3264,10 +3275,18 @@ function initChatAgentSelector() {
   menu.appendChild(itemPrompt)
   btnMais.addEventListener('click', (e) => {
     e.stopPropagation()
-    menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex'
+    const open = btnMais.getAttribute('aria-expanded') !== 'true'
+    setMenuOpen(open)
+    if (open) itemAuto.focus()
   })
   document.addEventListener('click', (ev) => {
-    if (!maisWrap.contains(ev.target)) menu.style.display = 'none'
+    if (!maisWrap.contains(ev.target)) setMenuOpen(false)
+  })
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || menu.hidden) return
+    setMenuOpen(false)
+    btnMais.focus()
+    ev.stopPropagation()
   })
   maisWrap.appendChild(btnMais)
   maisWrap.appendChild(menu)
