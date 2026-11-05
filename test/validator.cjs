@@ -338,14 +338,15 @@ async function main() {
   section('10. Hardening IPC: path seguro e CSP sem unsafe-eval')
   const ipcSeguro = pathT.join(rootT, 'src', 'main', 'ipc-seguro.ts')
   const indexMain = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+  const arquivoIpc10 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'arquivos.ts'), 'utf-8')
   const htmlRend = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
   assert(
     'ipc-seguro.ts define caminhoSeguro',
     fsT.existsSync(ipcSeguro) && /export function caminhoSeguro/.test(fsT.readFileSync(ipcSeguro, 'utf-8'))
   )
   assert(
-    'index.ts usa caminhoSeguro nos handlers de arquivo',
-    /caminhoSeguro/.test(indexMain) && /arquivo:ler/.test(indexMain)
+    'IPC de arquivo valida caminhos com caminhoSeguro',
+    /caminhoSeguro/.test(arquivoIpc10) && /handleArquivoLer/.test(arquivoIpc10)
   )
   assert(
     'index.ts valida payload com exigirString',
@@ -522,6 +523,8 @@ async function main() {
     const main21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
     const ind21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'indice-arquivos.ts'), 'utf-8')
     const pre21 = fsT.readFileSync(pathT.join(rootT, 'src', 'preload', 'index.ts'), 'utf-8')
+    const ipcRegistry21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'index.ts'), 'utf-8')
+    const appExtra21 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'app-extra.ts'), 'utf-8')
     assert(
       'safe-mode desliga watcher',
       /SAFE_MODE/.test(main21) && (/emSafeMode|safe-mode/.test(ind21) || /indice\/watcher bloqueado/.test(main21))
@@ -532,7 +535,9 @@ async function main() {
     )
     assert(
       'IPC app:is-safe-mode existe',
-      /app:is-safe-mode/.test(main21) && /app:is-safe-mode/.test(pre21)
+      /ipcMain\.handle\(['"]app:is-safe-mode['"]/.test(appExtra21) &&
+        /registrarHandlersAppExtra\(\)/.test(ipcRegistry21) &&
+        /app:is-safe-mode/.test(pre21)
     )
   }
 
@@ -552,7 +557,8 @@ async function main() {
   section('23. Historico de chat')
   {
     const chatsTs = pathT.join(rootT, 'src', 'main', 'chats.ts')
-    const main23 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const main23 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'ferramentas.ts'), 'utf-8')
+    const ipcRegistry23 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'index.ts'), 'utf-8')
     const gi23 = fsT.readFileSync(pathT.join(rootT, '.gitignore'), 'utf-8')
     const html23 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
     assert('chats.ts existe', fsT.existsSync(chatsTs))
@@ -561,7 +567,8 @@ async function main() {
       /chat:salvar/.test(main23) &&
         /chat:listar/.test(main23) &&
         /chat:carregar/.test(main23) &&
-        /chat:apagar/.test(main23)
+        /chat:apagar/.test(main23) &&
+        /registrarHandlersFerramentas\(\)/.test(ipcRegistry23)
     )
     assert('.dg-editor/chats no gitignore', /\.dg-editor\/chats/.test(gi23))
     assert('renderer tem botao Nova conversa', /btn-chat-nova|Nova conversa/.test(html23))
@@ -571,11 +578,17 @@ async function main() {
   section('24. Diff visual')
   {
     const gitTs = pathT.join(rootT, 'src', 'main', 'git.ts')
-    const main24 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const main24 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'git.ts'), 'utf-8')
+    const ipcRegistry24 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'index.ts'), 'utf-8')
     const html24 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
     const app24 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
     assert('git.ts existe', fsT.existsSync(gitTs))
-    assert('git:status e git:diff handlers', /git:status/.test(main24) && /git:diff/.test(main24))
+    assert(
+      'git:status e git:diff handlers registrados',
+      /ipcMain\.handle\(['"]git:status['"]/.test(main24) &&
+        /ipcMain\.handle\(['"]git:diff['"]/.test(main24) &&
+        /registrarHandlersGit\(\)/.test(ipcRegistry24)
+    )
     assert(
       'renderer tem painel de diff',
       /diff-panel/.test(html24) && /abrirPainelDiff|diff-panel/.test(app24)
@@ -605,11 +618,12 @@ async function main() {
   section('26. Roteamento consumido')
   {
     const ollama26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
-    const main26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const main26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'chat.ts'), 'utf-8')
     const cat26 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'modelos-catalogo.ts'), 'utf-8')
     assert(
       'Nenhum call site hardcoded de modelo',
-      /modeloParaTarefa/.test(ollama26) && /modeloParaTarefa/.test(main26) && /askOllama/.test(main26)
+      /modeloParaTarefa/.test(ollama26) && /modeloParaTarefa/.test(main26) &&
+        /askOllama/.test(main26) && !/qwen2\.5-coder:1\.5b/.test(main26)
     )
     assert(
       'modeloParaTarefa retorna null quando so embedding',
@@ -625,10 +639,10 @@ async function main() {
   section('27. Avaliacao de modelo')
   {
     const av27 = pathT.join(rootT, 'src', 'main', 'brain', 'avaliacao.ts')
-    const main27 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const main27 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'brain.ts'), 'utf-8')
     const app27 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
     assert('avaliacao.ts existe', fsT.existsSync(av27))
-    assert('brain:avaliar handler existe', /brain:avaliar/.test(main27))
+    assert('brain:avaliar handler existe', /ipcMain\.handle\(['"]brain:avaliar['"]/.test(main27))
     assert('nota < 6 dispara toast', /nota < 6/.test(app27) && /abaixo do esperado/.test(app27))
   }
 
@@ -680,7 +694,7 @@ async function main() {
   {
     const app30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
     const html30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
-    const main30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const main30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'analise.ts'), 'utf-8')
     const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
     const agent30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'agent.ts'), 'utf-8')
     assert(
@@ -697,7 +711,8 @@ async function main() {
     )
     assert(
       'analise generica oferece dialogo com tres opcoes',
-      /buttons:\s*\['Análise rápida',\s*'Análise completa',\s*'Cancelar'\]/.test(main30) && /choose-scope/.test(app30)
+      /buttons:\s*\['Analise rapida',\s*'Analise completa',\s*'Cancelar'\]/.test(main30) &&
+        /choose-scope/.test(main30) && /choose-scope/.test(app30)
     )
     assert(
       'rodarAnalise marca jaAnalisou apos sucesso',
@@ -810,6 +825,7 @@ async function main() {
   {
     const arq32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'arquivos.ts'), 'utf-8')
     const idx32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
+    const arquivoIpc32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'arquivos.ts'), 'utf-8')
     const hib32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
     // Warm-up dedicado foi revertido (0db01d4); keep_alive+prompt vivem no health probe
     const ollama32 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'ollama.ts'), 'utf-8')
@@ -820,9 +836,10 @@ async function main() {
     assert('listarDiretorio usa withFileTypes', /withFileTypes:\s*true/.test(arq32))
     assert(
       'handlers arquivo:* sao async',
-      /arquivo:ler['"],\s*async/.test(idx32) &&
-        /arquivo:listar['"],\s*async/.test(idx32) &&
-        /arquivo:salvar['"],\s*async/.test(idx32)
+      /export async function handleArquivoLer\(/.test(arquivoIpc32) &&
+        /export async function handleArquivoListar\(/.test(arquivoIpc32) &&
+        /export async function handleArquivoSalvar\(/.test(arquivoIpc32) &&
+        /registrarHandlersArquivo\(\)/.test(fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'index.ts'), 'utf-8'))
     )
     assert(
       'hibrido.ts usa execFileSync com stdio ignore',
