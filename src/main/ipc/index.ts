@@ -39,6 +39,7 @@ import { registrarHandlersQa } from './qa';
 import { registrarHandlersModelos } from './modelos';
 import { registrarHandlersIndice } from './indice';
 import { registrarHandlersRegrasGerais } from './regras-gerais';
+import { registrarHandlersFerramentas } from './ferramentas';
 
 // ============================================================================
 // ESTADO
@@ -109,6 +110,7 @@ export function registrarTodosHandlers(): void {
     registrarHandlersModelos();
     registrarHandlersIndice();
     registrarHandlersRegrasGerais();
+    registrarHandlersFerramentas();
 
     dglog('[ipc:registry] <<< Todos os handlers IPC registrados com sucesso!');
   } catch (e) {
@@ -116,15 +118,6 @@ export function registrarTodosHandlers(): void {
     throw e;
   }
 }
-
-// ============================================================================
-// IMPORTS PARA FUNCOES DE VALIDACAO
-// ============================================================================
-
-// Importar funcoes de validacao do ipc-seguro
-import { caminhoSeguro, exigirString, exigirArrayStrings, isErroPayload } from '../ipc-seguro';
-import { SAFE_MODE } from '../safe-mode';
-import { emSafeMode } from '../safe-mode';
 
 // Re-exportar funcoes de cleanup
 export { cleanupTerminal, cleanupNavegador, ensureOllamaOnBoot };
