@@ -1,0 +1,29 @@
+
+[resource-limiter] { totalGB: '24.0', cpus: 8, maxRamMB: 2048 }
+[shell] pwsh ? em C:\Users\digo8\AppData\Local\Microsoft\WindowsApps\pwsh.exe (origem: PATH)
+[auditoria] detectados 4 achado(s) nao-ok:
+  id=skills:analisador sev=erro status=nao-aplicavel area=skills | analisador incompleta | chars=701 gatilho=true procedimento=true
+  id=skills:arquiteto-aux sev=erro status=nao-aplicavel area=skills | arquiteto-aux incompleta | chars=712 gatilho=true procedimento=true
+  id=skills:orquestrador sev=erro status=nao-aplicavel area=skills | orquestrador incompleta | chars=785 gatilho=true procedimento=true
+  id=integridade:git sev=warn status=nao-aplicavel area=integridade | git sujo (8 entradas) | M src/main/agent/ipc.ts |  M src/main/index.ts | ?? .dg-editor/instance.lock | ?? .gitattributes | ?? boot-final.stderr.log | ?? boot-final.stdout.log | ?? boot-pos-rebuild.log | ?? boot-pos-rebuild2.log
+[auditoria] ok=115 warn=1 erro=3 corrigidos=0
+[auditoria] 4 achado(s) nao-ok apos ciclo:
+  ERRO [skills] analisador incompleta | chars=701 gatilho=true procedimento=true
+  ERRO [skills] arquiteto-aux incompleta | chars=712 gatilho=true procedimento=true
+  ERRO [skills] orquestrador incompleta | chars=785 gatilho=true procedimento=true
+  WARN [integridade] git sujo (8 entradas) | M src/main/agent/ipc.ts |  M src/main/index.ts | ?? .dg-editor/instance.lock | ?? .gitattributes | ?? boot-final.stderr.log | ?? boot-final.stdout.log | ?? boot-pos-rebuild.log | ?? boot-pos-rebuild2.log
+[auditoria:boot] ok=115 warn=1 erro=3 corrigidos=0
+[auditoria:boot] pendencias: skills:analisador, skills:arquiteto-aux, skills:orquestrador, integridade:git
+[auditoria:boot] periodica ativa (30 min)
+[shell] pwsh ? em C:\Users\digo8\AppData\Local\Microsoft\WindowsApps\pwsh.exe (origem: PATH)
+[auditoria] detectados 4 achado(s) nao-ok:
+  id=skills:analisador sev=erro status=nao-aplicavel area=skills | analisador incompleta | chars=701 gatilho=true procedimento=true
+  id=skills:arquiteto-aux sev=erro status=nao-aplicavel area=skills | arquiteto-aux incompleta | chars=712 gatilho=true procedimento=true
+  id=skills:orquestrador sev=erro status=nao-aplicavel area=skills | orquestrador incompleta | chars=785 gatilho=true procedimento=true
+  id=integridade:git sev=warn status=nao-aplicavel area=integridade | git sujo (8 entradas) | M src/main/agent/ipc.ts |  M src/main/index.ts | ?? .dg-editor/instance.lock | ?? .gitattributes | ?? boot-final.stderr.log | ?? boot-final.stdout.log | ?? boot-pos-rebuild.log | ?? boot-pos-rebuild2.log
+[auditoria] ok=116 warn=1 erro=3 corrigidos=1
+[auditoria] 4 achado(s) nao-ok apos ciclo:
+  ERRO [skills] analisador incompleta | chars=701 gatilho=true procedimento=true
+  ERRO [skills] arquiteto-aux incompleta | chars=712 gatilho=true procedimento=true
+  ERRO [skills] orquestrador incompleta | chars=785 gatilho=true procedimento=true
+  WARN [integridade] git sujo (8 entradas) | M src/main/agent/ipc.ts |  M src/main/index.ts | ?? .dg-editor/instance.lock | ?? .gitattributes | ?? boot-final.stderr.log | ?? boot-final.stdout.log | ?? boot-pos-rebuild.log | ?? boot-pos-rebuild2.log
