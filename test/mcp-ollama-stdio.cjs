@@ -1,12 +1,20 @@
 const assert = require('node:assert/strict')
 const { createServer } = require('node:http')
-const { mkdtempSync, existsSync, rmSync } = require('node:fs')
+const { mkdtempSync, existsSync, readFileSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const path = require('node:path')
 
 async function main() {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js')
+  const external = process.argv.includes('--external-config')
+    ? JSON.parse(readFileSync(path.resolve('.dg-editor/mcp-config.json'), 'utf8')).mcpServers['dg-editor']
+    : undefined
+  if (external) {
+    assert(existsSync(external.command), 'runtime da configuração externa deve existir')
+    assert(existsSync(external.args[0]), 'servidor compilado da configuração externa deve existir')
+    assert(existsSync(external.env.DG_ROOT), 'raiz da configuração externa deve existir')
+  }
   const root = mkdtempSync(path.join(tmpdir(), 'dg-ollama-stdio-'))
   const calls = []
   const remote = { name: 'my-cloud-alias', remote_host: 'https://ollama.com:443', remote_model: 'cloud-model:large', size: 300 }
@@ -35,6 +43,7 @@ async function main() {
   await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve))
   const env = Object.fromEntries(Object.entries({
     ...process.env,
+    ...external?.env,
     DG_ROOT: root,
     OLLAMA_URL: 'http://127.0.0.1:' + upstream.address().port,
     OLLAMA_API_KEY: '',
@@ -42,8 +51,8 @@ async function main() {
     OLLAMA_FALLBACK_MODEL: local.name
   }).filter(([, value]) => typeof value === 'string'))
   const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: [path.resolve('.dg-editor/bin/main/mcp/server.js')],
+    command: external?.command || process.execPath,
+    args: external?.args || [path.resolve('.dg-editor/bin/main/mcp/server.js')],
     cwd: root,
     env,
     stderr: 'pipe'
@@ -79,7 +88,7 @@ async function main() {
     assert.equal(rejected.isError, true)
     assert(calls.every((call) => call.authorization === undefined))
     assert(calls.filter((call) => call.url === '/api/chat').every((call) => call.body.stream === false))
-    console.log('PASS MCP stdio: listTools, cloud, fallback local, script inerte, falha total e validação')
+    console.log('PASS MCP stdio (' + (external ? 'config externo/Electron' : 'Node') + '): listTools, cloud, fallback local, script inerte, falha total e validação')
   } finally {
     await client.close().catch(() => {})
     await transport.close().catch(() => {})
