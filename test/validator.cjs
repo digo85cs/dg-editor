@@ -1565,6 +1565,8 @@ async function main() {
       assert('preload libera ' + canal, preloadIpc.includes("'" + canal + "'"))
     }
     assert('regras gerais usa import empacotável', /import \{[^}]*listarRegrasGerais/.test(regrasIpc) && !/require\(['"]\.\.\/regras-gerais/.test(regrasIpc))
+    const auditoriaIpc = fs.readFileSync(path.join(SRC, 'main/ipc/auditoria.ts'), 'utf8')
+    assert('auditoria IPC encaminha modo leve', /bootLeve:\s*opts\?\.bootLeve === true/.test(auditoriaIpc))
     assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
     assert('smoke embed injeta BrowserWindow pai', /DG_NAV_SMOKE_EMBED/.test(idxMain))
     const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
