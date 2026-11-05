@@ -3,7 +3,7 @@
  * Centraliza o registro de todos os handlers do DG Editor
  */
 
-import { ipcMain, dialog, BrowserWindow, app as electronApp } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
 
 // Importar todos os registradores
@@ -18,7 +18,7 @@ import { registrarHandlersAnalise, setAnaliseMainWindow } from './analise';
 
 // Importar novos registradores extraidos
 import { registrarHandlersFolder } from './folder';
-import { registrarHandlersApp, setMainWindow as setAppMainWindow, handleAppQuit } from './app';
+import { registrarHandlersApp } from './app';
 import { registrarHandlersAppExtra } from './app-extra';
 import { registrarHandlersSystem } from './system';
 import { registrarHandlersAuth } from './auth';
@@ -55,7 +55,6 @@ export function setMainWindow(window: BrowserWindow | null): void {
   setNavegadorMainWindow(window);
   setAnaliseMainWindow(window);
   setJanelaMainWindow(window);
-  setAppMainWindow(window);
 }
 
 /**

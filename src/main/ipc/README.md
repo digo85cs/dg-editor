@@ -6,17 +6,41 @@ Este diretorio contem todos os **handlers IPC (Inter-Process Communication)** do
 
 ```
 ipc/
-├── types.ts          # Interfaces TypeScript para todos os payloads e resultados IPC
-├── utils.ts          # Utilitarios: validacao, error handling, logging
-├── index.ts          # Registrador central de todos os handlers
-├── arquivos.ts       # Handlers para operacoes de arquivo (ler, salvar, listar)
-├── terminal.ts       # Handlers para terminal embutido
-├── navegador.ts      # Handlers para navegador web embutido
-├── agent.ts          # Handlers para agentes de IA
-├── brain.ts          # Handlers para brain (Ollama, IA)
-├── git.ts            # Handlers para Git
-├── chat.ts           # Handlers para chat
-└── analise.ts        # Handlers para analise de codigo
+├── types.ts           # Interfaces TypeScript para todos os payloads e resultados IPC
+├── utils.ts           # Utilitarios: validacao, error handling, logging
+├── index.ts           # Registrador central de todos os handlers
+├── arquivos.ts        # Handlers para operacoes de arquivo (ler, salvar, listar)
+├── terminal.ts        # Handlers para terminal embutido
+├── navegador.ts       # Handlers para navegador web embutido
+├── agent.ts           # Handlers para agentes de IA
+├── brain.ts           # Handlers para brain (Ollama, IA)
+├── git.ts             # Handlers para Git
+├── chat.ts            # Handlers para chat
+├── analise.ts         # Handlers para analise de codigo
+├── folder.ts          # Handlers para pasta (scan, format-summary, select)
+├── app.ts             # Handlers para aplicacao (raiz-projeto, quit)
+├── app-extra.ts       # Handlers para aplicacao (is-safe-mode)
+├── system.ts          # Handlers para sistema (get-profile, profile-strength)
+├── auth.ts            # Handlers para autenticacao (get-state, ensure-identity, logout)
+├── accounts.ts        # Handlers para contas
+├── guardian.ts        # Handlers para guardian (snapshot, resumo)
+├── tema.ts            # Handlers para tema (get, set)
+├── dossie.ts          # Handlers para dossie (ler, gravar, snapshot, caminho)
+├── adapta.ts          # Handlers para Adapta (status, gerar, ler-continuidade, abrir)
+├── diagnostico.ts     # Handlers para diagnostico (rodar)
+├── janela.ts          # Handlers para janela (minimizar, maximizar, fechar, etc.)
+├── auditoria.ts       # Handlers para auditoria (rodar, periodica)
+├── hibrido.ts         # Handlers para hibrido (analisar, executar)
+├── mcp.ts             # Handlers para MCP (tools, status)
+├── editor.ts          # Handlers para editor (completar)
+├── memoria.ts         # Handlers para memoria (listar, propor, decidir, status, indexar)
+├── skills.ts          # Handlers para skills (listar)
+├── qa.ts              # Handlers para QA (run)
+├── modelos.ts         # Handlers para modelos (listar, recarregar, para-tarefa, versoes-remotas)
+├── indice.ts          # Handlers para indice (iniciar, criar, listar, status)
+├── regras-gerais.ts   # Handlers para regras gerais
+├── chat-extra.ts      # Handlers para chat (send)
+└── README.md           # Este arquivo de documentacao
 ```
 
 ## Visao Geral
