@@ -59,7 +59,11 @@ export function logEstruturado(
   contexto?: Record<string, unknown>
 ): void {
   if (!rotacionou) {
-    rotacionar()
+    try {
+      rotacionar()
+    } catch {
+      /* logging must never break the operation it observes */
+    }
     rotacionou = true
   }
   const entrada: EntradaLog = {
