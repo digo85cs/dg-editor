@@ -3,9 +3,12 @@
  * Refatorado para usar path.resolve() e evitar caminhos hardcoded
  */
 
-import { resolve, join, isAbsolute, relative } from 'path';
+import { resolve, join, isAbsolute, relative, normalize } from 'path';
 import { homedir } from 'os';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
+import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
+
+export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
 
 // ============================================================================
 // FUNCOES DE CAMINHOS PRINCIPAIS
@@ -437,6 +440,78 @@ export function resolveRelative(caminhoBase: string, caminhoRelativo: string): s
  */
 export function getRelativePath(caminhoBase: string, caminhoAlvo: string): string {
   return relative(caminhoBase, caminhoAlvo);
+}
+
+// ============================================================================
+// FUNCOES DE COMPATIBILIDADE COM paths.ts (legacy)
+// ============================================================================
+
+/**
+ * Diretorio raiz de estado do app - compatibilidade com paths.ts
+ */
+export function appDataDir(): string {
+  const dir = getUserDataPath();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de logs - compatibilidade com paths.ts
+ */
+export function logDir(): string {
+  const dir = getLogsDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de dossie - compatibilidade com paths.ts
+ */
+export function dossieDir(): string {
+  const dir = getDossieDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de estado dentro do projeto
+ */
+export function projectStateDir(root: string): string {
+  const dir = join(root, '.dg-editor');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diagnostico de cwd
+ */
+export function cwdDiagnostico(): { cwd: string; userData: string; divergente: boolean } {
+  const cwd = process.cwd();
+  const userData = appDataDir();
+  return { cwd, userData, divergente: !cwd.startsWith(userData) };
+}
+
+/**
+ * Resolve caminho dentro da raiz - compatibilidade
+ */
+export function caminhoDentroDaRaiz(raiz: string, alvo: string): { abs: string; rel: string } {
+  const abs = isAbsolute(alvo) ? normalize(resolve(alvo)) : normalize(resolve(raiz, alvo));
+  const rel = relative(raiz, abs).replace(/\\/g, '/');
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error('caminho fora da raiz do projeto: ' + alvo);
+  }
+  return { abs, rel };
+}
+
+/**
+ * Verifica se o texto parece caminho de arquivo
+ */
+export function pareceCaminhoArquivo(s: string): boolean {
+  const t = (s || '').trim();
+  if (!t) return false;
+  if (/[\\/]/.test(t)) return true;
+  if(/\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(t)) return true;
+  return false;
 }
 
 // ============================================================================
