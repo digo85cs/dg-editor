@@ -1,4 +1,4 @@
-// dglog.ts — log em arquivo do DG Editor
+// dglog.ts - log em arquivo do DG Editor
 import { appendFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { logDir } from './paths'

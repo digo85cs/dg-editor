@@ -1,5 +1,5 @@
 /**
- * Sanitização de path e validação leve de payload IPC.
+ * Sanitizacao de path e validacao leve de payload IPC.
  * Nunca acessar disco se o caminho sair da raiz aberta.
  */
 import { resolve, relative, isAbsolute, normalize } from 'path'
@@ -8,7 +8,7 @@ export type ResultadoCaminho =
   | { ok: true; abs: string; rel: string }
   | { ok: false; erro: string }
 
-/** Resolve e garante que o caminho está dentro de uma das raízes abertas. */
+/** Resolve e garante que o caminho esta dentro de uma das raizes abertas. */
 export function caminhoSeguro(
   p: unknown,
   raizesAbertas: string | string[] | null | undefined
