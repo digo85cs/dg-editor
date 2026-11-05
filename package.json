@@ -15,6 +15,7 @@
         "prestart": "node scripts/garantir-launchers.cjs",
         "start": "node scripts/iniciar-app.cjs",
         "test": "node test/validator.cjs",
+        "test:mcp-ollama": "npm run build:mcp && node test/ollama-mcp.cjs && node test/mcp-ollama-stdio.cjs",
         "typecheck": "tsc --noEmit",
         "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
         "mcp": "npm run build:mcp && node .dg-editor/bin/main/mcp/server.js",
