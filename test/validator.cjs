@@ -1030,6 +1030,11 @@ async function main() {
     assert('css modal-float', /\.modal\.modal-float/.test(css))
     assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
     assert('app ligarJanelaFlutuante', /function ligarJanelaFlutuante\s*\(/.test(appJs))
+    assert('tabs do centro sem inicializador inexistente', !/\binitAgentModes\s*\(/.test(appJs))
+    assert(
+      'regras gerais entram no bundle do renderer',
+      /<script type="module" src="\.\/regras-gerais-ui\.js"><\/script>/.test(html)
+    )
     assert('preload janela:recarregar', /janela:recarregar/.test(preload))
     assert('preload janela:zoom', /janela:zoom/.test(preload))
     assert('preload janela:tela-cheia', /janela:tela-cheia/.test(preload))

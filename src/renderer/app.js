@@ -369,7 +369,6 @@ window.addEventListener('resize', () => {
 })()
 
 function ativarAbaCentro(pane) {
-    initAgentModes();
   const alvo = pane === 'editor' || pane === 'agent' ? pane : 'chat'
   document.querySelectorAll('.center-tab').forEach((t) => {
   if(t.dataset.centerPane==='chat'){ try{initChatAgentSelector();}catch(e){} }
@@ -4472,6 +4471,3 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-try{ var sw=document.createElement('script'); sw.src='./window-controls.js'; document.body.appendChild(sw); }catch(e){}
-
-try{ var sr=document.createElement('script'); sr.src='./regras-gerais-ui.js'; document.body.appendChild(sr); }catch(e){}
