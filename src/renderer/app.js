@@ -659,6 +659,7 @@ async function garantirPastaRaizProjeto() {
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
   pastaAtual = path
+  void carregarOpcoesAgenteChat(path)
   ativarAbaCentro('chat')
   void atualizarStatusBar(path)
   $('chat-title').textContent = nomeArquivo(path)
@@ -731,6 +732,7 @@ function definirContextoPasta(p) {
     delete $('analysis-content')?.dataset.jaAnalisou
   }
   pastaAtual = p
+  void carregarOpcoesAgenteChat(p)
   $('chat-title').textContent = nomeArquivo(p)
   $('chat-send').disabled = false
   habilitarBotoesAnalise(true)
