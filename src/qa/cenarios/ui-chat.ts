@@ -6,6 +6,59 @@ export async function cenariosUiChat(page: Page): Promise<ResultadoCenario[]> {
 
   {
     const t0 = Date.now()
+    const titulo = 'qa-regras-' + Date.now()
+    try {
+      await page.waitForSelector('#regras-gerais-box', { timeout: 5000 })
+      await page.locator('#rg-titulo').fill(titulo)
+      await page.locator('#rg-desc').fill('validacao automatizada dos canais e botoes')
+      await page.locator('#rg-add').click({ timeout: 3000 })
+      const apareceu = (await page.locator('#rg-list .item').filter({ hasText: titulo }).count()) === 1
+      const dialogPromise = page.waitForEvent('dialog', { timeout: 5000 })
+      await page.locator('#rg-salvar').click({ timeout: 3000 })
+      const dialog = await dialogPromise
+      const confirmou = dialog.message().includes('salvas')
+      await dialog.accept()
+      const persistiu = await page.evaluate(async (nome) => {
+        const api = (window as any).api
+        const listado = await api.invoke('dg:regrasgerais:listar')
+        const ativas = await api.invoke('dg:regrasgerais:ativas')
+        return Array.isArray(listado?.regras) && listado.regras.some((r: any) => r.titulo === nome) &&
+          String(ativas?.texto || '').includes(nome)
+      }, titulo)
+      out.push({
+        id: 'ui.regras-gerais.salvar',
+        area: 'ui',
+        titulo: 'adicionar e salvar regras gerais via UI e preload',
+        severidade: apareceu && confirmou && persistiu ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'apareceu=' + apareceu + ' confirmou=' + confirmou + ' persistiu=' + persistiu
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.regras-gerais.salvar',
+        area: 'ui',
+        titulo: 'adicionar e salvar regras gerais via UI e preload',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    } finally {
+      await page.evaluate(async (nome) => {
+        try {
+          const api = (window as any).api
+          const listado = await api.invoke('dg:regrasgerais:listar')
+          if (Array.isArray(listado?.regras)) {
+            await api.invoke('dg:regrasgerais:salvar', listado.regras.filter((r: any) => r.titulo !== nome))
+          }
+        } catch {
+          // O teste nao deixa a regra temporaria no perfil isolado.
+        }
+      }, titulo).catch(() => {})
+    }
+  }
+
+  {
+    const t0 = Date.now()
     try {
       await page.locator('.center-tab[data-center-pane="chat"]').click()
       const agent = page.locator('#chat-agent-select')
