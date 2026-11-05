@@ -1,4 +1,4 @@
-﻿## 13:26-13:37 — Ciclo 1 / P1
+## 13:26-13:37 — Ciclo 1 / P1
 Arquivos: src/renderer/app.js, src/renderer/chat.js
 Testes: 173/173 · 14/14 · 11/11 · 22/22
 Commit: 901f559

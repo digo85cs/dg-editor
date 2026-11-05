@@ -1,4 +1,4 @@
-﻿# Latência da análise — decisão registrada em 03/11/2026
+# Latência da análise — decisão registrada em 03/11/2026
 
 ## Hardware medido
 - GPU: NVIDIA GeForce GT 710, 2 GB VRAM, driver 475.14, CUDA 11.4

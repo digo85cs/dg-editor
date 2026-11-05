@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
