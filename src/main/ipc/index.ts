@@ -17,7 +17,7 @@ import { registrarHandlersChat } from './chat';
 import { registrarHandlersAnalise, setAnaliseMainWindow } from './analise';
 
 // Importar novos registradores extraidos
-import { registrarHandlersFolder } from './folder';
+import { registrarHandlersFolder, setFolderMainWindow } from './folder';
 import { registrarHandlersApp } from './app';
 import { registrarHandlersAppExtra } from './app-extra';
 import { registrarHandlersSystem } from './system';
@@ -55,6 +55,7 @@ export function setMainWindow(window: BrowserWindow | null): void {
   setNavegadorMainWindow(window);
   setAnaliseMainWindow(window);
   setJanelaMainWindow(window);
+  setFolderMainWindow(window);
 }
 
 /**
