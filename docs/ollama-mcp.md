@@ -18,6 +18,8 @@ O runtime Electron precisa estar instalado nas dependências do projeto. Se move
 
 Compile antes de iniciar a conexão MCP e conecte o cliente diretamente ao servidor compilado por stdio. Reinicie a conexão após recompilar para carregar o código novo.
 
+Para validar o roteamento e o protocolo sem credenciais ou chamadas reais de inferência, execute `npm run test:mcp-ollama`. A suíte usa respostas simuladas e testa o servidor por stdio tanto com Node quanto com o runtime da configuração externa.
+
 ## Autenticação e nomes de modelos
 
 Há dois caminhos para o Cloud:
