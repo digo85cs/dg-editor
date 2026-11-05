@@ -35,8 +35,9 @@
         "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
         "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
         "certificar": "node scripts/certificar.cjs",
-        "dist:win": "npm run build && electron-builder --win --dir",
-        "dist:win:installer": "npm run build && electron-builder --win nsis"
+"dist:win": "npm run build && electron-builder --win --dir",
+          "dist:win:installer": "npm run build && electron-builder --win nsis",
+          "deploy": "npm run dist:win:installer"
     },
     "build": {
         "appId": "com.dgeditor.app",
