@@ -21,3 +21,11 @@ Pedido de desenho ou de decisao de estrutura antes de codar.
 ## O que NAO fazer
 - Nao aplicar diff nesta skill.
 - Nao criar camada nova se um modulo existente ja resolve.
+
+## Como comparar alternativas
+- Prefira uma interface e um módulo existentes quando já atenderem ao comportamento pedido.
+- Se houver mais de uma opção viável, compare custo de manutenção, compatibilidade e risco de regressão.
+- Marque claramente quais decisões vêm de código lido e quais ainda são hipóteses.
+- Mantenha o plano pequeno, com ordem de execução, arquivos afetados e critério verificável de conclusão.
+- Não edite arquivos nem execute comandos de escrita; entregue uma proposta que possa ser revisada.
+- Se faltar informação sobre a arquitetura, liste a dúvida junto do trecho que precisa ser inspecionado.

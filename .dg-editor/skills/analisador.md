@@ -21,3 +21,11 @@ Pedido de analise, diagnostico ou explicacao sem pedido explicito de editar.
 ## O que NAO fazer
 - Nao chamar `codigo_editar`.
 - Nao assumir React, banco ou nuvem sem evidencia.
+
+## Checagens antes de responder
+- Confirme que os arquivos consultados pertencem ao projeto aberto e que a pergunta pode ser respondida com eles.
+- Separe fatos observados de hipóteses; cite o caminho de cada arquivo usado como evidência.
+- Se faltar contexto, diga exatamente o que não foi verificado em vez de completar lacunas por suposição.
+- Se fontes divergirem, descreva a diferença e indique qual fonte sustenta cada afirmação.
+- Não inclua tokens, chaves ou outros valores confidenciais na resposta.
+- Termine com a conclusão prática e o próximo passo mais curto quando houver uma pendência.

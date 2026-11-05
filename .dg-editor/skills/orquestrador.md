@@ -22,3 +22,10 @@ Pedido grande que precisa de mais de um agente, na fila serial.
 ## O que NAO fazer
 - Nao disparar dois agentes ao mesmo tempo.
 - Nao inventar agente que nao esta no disco.
+
+## Controle de cada passo
+- Verifique dependências entre tarefas e mantenha a execução na ordem que permite conferir cada resultado.
+- Passe ao agente somente o contexto necessário, os arquivos relevantes e um critério objetivo de conclusão.
+- Depois de cada resposta, confira o diff e as verificações daquele passo antes de iniciar o seguinte.
+- Se um agente falhar ou não encontrar o id pedido, pare a cadeia e ajuste o plano com base na evidência.
+- Feche com o estado real de cada tarefa e com qualquer validação que ainda falte.
