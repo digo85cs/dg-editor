@@ -1,5 +1,13 @@
 import { ipcMain } from 'electron'
-import { exigirString, isErroPayload, exigirArrayStrings } from '../ipc-seguro'
+import { resolve } from 'path'
+import {
+  caminhoSeguro,
+  exigirArrayStrings,
+  exigirBoolean,
+  exigirObjeto,
+  exigirString,
+  isErroPayload
+} from '../ipc-seguro'
 import { criarCheckpoint, listarCheckpoints, restaurarCheckpoint, ultimoCheckpoint } from './checkpoint'
 try { const m = require('./mencoes-ipc'); if (m.registrarMencoesIpc) m.registrarMencoesIpc() } catch {}
 try { const m = require('./contexto-ipc'); if (m.registrarContextoIpc) m.registrarContextoIpc() } catch {}
@@ -65,6 +73,28 @@ function parseAbas(raw: unknown): AbaCtx[] {
     })
   }
   return out
+}
+
+type EscopoAgent = { raiz: string; pastas: string[] }
+
+function validarEscopoAgent(raizRaw: unknown, pastasRaw: unknown): EscopoAgent | { ok: false; erro: string } {
+  const raiz = exigirString(raizRaw, 'raiz')
+  if (isErroPayload(raiz)) return raiz
+  const pastas = exigirArrayStrings(pastasRaw, 'pastas')
+  if (isErroPayload(pastas)) return pastas
+  const permitidas = pastas.map((p) => p.trim()).filter(Boolean)
+  if (!permitidas.length) return { ok: false, erro: 'nenhuma pasta aberta' }
+  const segura = caminhoSeguro(raiz, permitidas)
+  if (!segura.ok) return { ok: false, erro: segura.erro }
+  return { raiz: segura.abs, pastas: permitidas }
+}
+
+function emitirProgresso(event: Electron.IpcMainInvokeEvent, ev: unknown): void {
+  try {
+    if (!event.sender.isDestroyed()) event.sender.send('agente:progresso', ev)
+  } catch {
+    /* a janela pode fechar durante a execução */
+  }
 }
 
 export function registerAgentExtrasIpc(): void {
