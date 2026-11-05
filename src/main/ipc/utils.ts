@@ -1,6 +1,6 @@
 /**
- * Utilitários para handlers IPC do DG Editor
- * Funções auxiliares para validação, error handling e registro
+ * Utilitarios para handlers IPC do DG Editor
+ * Funcoes auxiliares para validacao, error handling e registro
  */
 
 import { ipcMain, IpcMainInvokeHandler } from 'electron';
@@ -19,7 +19,7 @@ import type {
 
 /**
  * Wrapper para handlers IPC que garante error handling padronizado
- * @param handler - Função handler original
+ * @param handler - Funcao handler original
  * @param channel - Nome do canal IPC (para logging)
  * @returns Handler wrapper com error handling
  */
@@ -30,7 +30,7 @@ export function safeIpcHandler<T extends unknown[], R>(
   return async (...args: T) => {
     try {
       const result = await Promise.resolve(handler(...args));
-      // Se o resultado já tem a estrutura IpcResult, retorná-lo como está
+      // Se o resultado ja tem a estrutura IpcResult, retorna-lo como esta
       if (result && typeof result === 'object' && 'ok' in result) {
         return result as IpcResult<R>;
       }
@@ -44,7 +44,7 @@ export function safeIpcHandler<T extends unknown[], R>(
 }
 
 /**
- * Wrapper para handlers IPC síncronos
+ * Wrapper para handlers IPC sincronos
  */
 export function safeIpcHandlerSync<T extends unknown[], R>(
   handler: (...args: T) => R,
@@ -66,7 +66,7 @@ export function safeIpcHandlerSync<T extends unknown[], R>(
 }
 
 // ============================================================================
-// FUNÇÕES DE VALIDAÇÃO
+// FUNCOES DE VALIDACAO
 // ============================================================================
 
 /**
@@ -77,15 +77,15 @@ export function validarArquivoPayload(
   channel: string
 ): IpcResult<ArquivoLerPayload> {
   if (!payload || typeof payload !== 'object') {
-    dglog(`[ipc:${channel}] payload inválido: não é objeto`);
-    return { ok: false, erro: 'Payload inválido: esperado objeto' };
+    dglog(`[ipc:${channel}] payload invalido: nao e objeto`);
+    return { ok: false, erro: 'Payload invalido: esperado objeto' };
   }
 
   const p = payload as Record<string, unknown>;
 
   if (!('caminho' in p) || typeof p.caminho !== 'string' || p.caminho.trim() === '') {
-    dglog(`[ipc:${channel}] caminho ausente ou inválido`);
-    return { ok: false, erro: 'Caminho ausente ou inválido' };
+    dglog(`[ipc:${channel}] caminho ausente ou invalido`);
+    return { ok: false, erro: 'Caminho ausente ou invalido' };
   }
 
   const pastas = Array.isArray(p.pastas) ? p.pastas.filter((p): p is string => typeof p === 'string') : [];
@@ -108,8 +108,8 @@ export function validarString(
   channel: string
 ): IpcResult<string> {
   if (typeof valor !== 'string' || valor.trim() === '') {
-    dglog(`[ipc:${channel}] ${campo} inválido: ${String(valor)}`);
-    return { ok: false, erro: `${campo} ausente ou inválido` };
+    dglog(`[ipc:${channel}] ${campo} invalido: ${String(valor)}`);
+    return { ok: false, erro: `${campo} ausente ou invalido` };
   }
   return { ok: true, dados: valor.trim() };
 }
@@ -123,14 +123,14 @@ export function validarBoolean(
   channel: string
 ): IpcResult<boolean> {
   if (typeof valor !== 'boolean') {
-    dglog(`[ipc:${channel}] ${campo} inválido: ${String(valor)}`);
+    dglog(`[ipc:${channel}] ${campo} invalido: ${String(valor)}`);
     return { ok: false, erro: `${campo} deve ser booleano` };
   }
   return { ok: true, dados: valor };
 }
 
 /**
- * Valida payload de número
+ * Valida payload de numero
  */
 export function validarNumber(
   valor: unknown,
@@ -138,8 +138,8 @@ export function validarNumber(
   channel: string
 ): IpcResult<number> {
   if (typeof valor !== 'number' || isNaN(valor)) {
-    dglog(`[ipc:${channel}] ${campo} inválido: ${String(valor)}`);
-    return { ok: false, erro: `${campo} deve ser numérico` };
+    dglog(`[ipc:${channel}] ${campo} invalido: ${String(valor)}`);
+    return { ok: false, erro: `${campo} deve ser numerico` };
   }
   return { ok: true, dados: valor };
 }
@@ -153,13 +153,13 @@ export function validarStringArray(
   channel: string
 ): IpcResult<string[]> {
   if (!Array.isArray(valor)) {
-    dglog(`[ipc:${channel}] ${campo} inválido: não é array`);
+    dglog(`[ipc:${channel}] ${campo} invalido: nao e array`);
     return { ok: false, erro: `${campo} deve ser array` };
   }
 
   const validados = valor.filter((v): v is string => typeof v === 'string');
   if (validados.length !== valor.length) {
-    dglog(`[ipc:${channel}] ${campo} contém valores não-string`);
+    dglog(`[ipc:${channel}] ${campo} contem valores nao-string`);
     return { ok: false, erro: `${campo} deve conter apenas strings` };
   }
 
@@ -167,11 +167,11 @@ export function validarStringArray(
 }
 
 // ============================================================================
-// FUNÇÕES DE REGISTRO DE HANDLERS
+// FUNCOES DE REGISTRO DE HANDLERS
 // ============================================================================
 
 /**
- * Tipo para função de registro de handlers
+ * Tipo para funcao de registro de handlers
  */
 export type HandlerRegistry = {
   register: (channel: string, handler: IpcMainInvokeHandler) => void;
@@ -187,7 +187,7 @@ export function criarRegistrador(): HandlerRegistry {
   return {
     register: (channel: string, handler: IpcMainInvokeHandler) => {
       if (registeredChannels.has(channel)) {
-        dglog(`[ipc:registry] AVISO: canal "${channel}" já registrado`);
+        dglog(`[ipc:registry] AVISO: canal "${channel}" ja registrado`);
       }
       registeredChannels.add(channel);
       ipcMain.handle(channel, handler);
@@ -195,7 +195,7 @@ export function criarRegistrador(): HandlerRegistry {
     },
     registerSync: (channel: string, handler: (...args: unknown[]) => unknown) => {
       if (registeredChannels.has(channel)) {
-        dglog(`[ipc:registry] AVISO: canal "${channel}" já registrado`);
+        dglog(`[ipc:registry] AVISO: canal "${channel}" ja registrado`);
       }
       registeredChannels.add(channel);
       ipcMain.handle(channel, handler);
@@ -217,14 +217,14 @@ export function getRegistrador(): HandlerRegistry {
 }
 
 // ============================================================================
-// FUNÇÕES DE VALIDAÇÃO DE CAMINHOS
+// FUNCOES DE VALIDACAO DE CAMINHOS
 // ============================================================================
 
 import { join, resolve, isAbsolute, relative } from 'path';
 import { existsSync, statSync } from 'fs';
 
 /**
- * Verifica se um caminho é seguro (relativo ou absoluto dentro da raiz)
+ * Verifica se um caminho e seguro (relativo ou absoluto dentro da raiz)
  */
 export function caminhoSeguro(
   caminho: string,
@@ -236,19 +236,19 @@ export function caminhoSeguro(
     
     // Se for path traversal, bloquear
     if (normalizado.includes('../') || normalizado.startsWith('..')) {
-      return { ok: false, erro: 'Caminho inválido: path traversal detectado' };
+      return { ok: false, erro: 'Caminho invalido: path traversal detectado' };
     }
 
     // Resolver caminho absoluto
     const raizArray = Array.isArray(raiz) ? raiz : [raiz];
     const raizAbs = raizArray[0];
     
-    // Se caminho já é absoluto, verificar se está dentro da raiz
+    // Se caminho ja e absoluto, verificar se esta dentro da raiz
     if (isAbsolute(caminho)) {
       const caminhoAbs = resolve(caminho);
       const raizAbsResolvida = resolve(raizAbs);
       
-      // Verificar se caminho está dentro da raiz
+      // Verificar se caminho esta dentro da raiz
       const relativePath = relative(raizAbsResolvida, caminhoAbs);
       if (relativePath.startsWith('..')) {
         return { ok: false, erro: 'Caminho fora da raiz permitida' };
@@ -263,7 +263,7 @@ export function caminhoSeguro(
       };
     }
 
-    // Se caminho é relativo, resolver a partir da raiz
+    // Se caminho e relativo, resolver a partir da raiz
     const caminhoAbs = resolve(raizAbs, caminho);
     const raizAbsResolvida = resolve(raizAbs);
     const relativePath = relative(raizAbsResolvida, caminhoAbs);
@@ -288,7 +288,7 @@ export function caminhoSeguro(
 }
 
 /**
- * Verifica se um arquivo existe e é acessível
+ * Verifica se um arquivo existe e e acessivel
  */
 export function arquivoAcessivel(caminho: string): IpcResult<{ existe: boolean; caminho: string }> {
   try {
@@ -297,10 +297,10 @@ export function arquivoAcessivel(caminho: string): IpcResult<{ existe: boolean; 
       return { ok: true, dados: { existe: false, caminho } };
     }
     
-    // Verificar se é arquivo (não diretório)
+    // Verificar se e arquivo (nao diretorio)
     const stats = statSync(caminho);
     if (!stats.isFile()) {
-      return { ok: false, erro: 'Caminho não é um arquivo' };
+      return { ok: false, erro: 'Caminho nao e um arquivo' };
     }
     
     return { ok: true, dados: { existe: true, caminho } };
@@ -313,7 +313,7 @@ export function arquivoAcessivel(caminho: string): IpcResult<{ existe: boolean; 
 }
 
 // ============================================================================
-// FUNÇÕES DE LOGGING
+// FUNCOES DE LOGGING
 // ============================================================================
 
 /**
