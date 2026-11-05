@@ -1559,6 +1559,12 @@ async function main() {
     for (const canal of ['dg:modes:listar', 'dg:modes:salvar', 'dg:permissoes:obter', 'dg:permissoes:salvar', 'simbolos:indexar', 'simbolos:buscar']) {
       assert('preload libera ' + canal, preloadIpc.includes("'" + canal + "'"))
     }
+    const regrasIpc = fs.readFileSync(path.join(SRC, 'main/ipc/regras-gerais.ts'), 'utf8')
+    for (const canal of ['dg:regrasgerais:listar', 'dg:regrasgerais:salvar', 'dg:regrasgerais:ativas']) {
+      assert('handler regras gerais ' + canal, regrasIpc.includes("ipcMain.handle('" + canal + "'"))
+      assert('preload libera ' + canal, preloadIpc.includes("'" + canal + "'"))
+    }
+    assert('regras gerais usa import empacotável', /import \{[^}]*listarRegrasGerais/.test(regrasIpc) && !/require\(['"]\.\.\/regras-gerais/.test(regrasIpc))
     assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
     assert('smoke embed injeta BrowserWindow pai', /DG_NAV_SMOKE_EMBED/.test(idxMain))
     const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')

@@ -48,6 +48,7 @@ const invokeChannels = [
   'agente:plano-marcar-passo', 'agente:plano-atualizar-passos',
   'agente:verificar', 'agente:diagnosticos', 'agente:diagnostico-manual',
   'dg:modes:listar', 'dg:modes:salvar', 'dg:permissoes:obter', 'dg:permissoes:salvar',
+  'dg:regrasgerais:listar', 'dg:regrasgerais:salvar', 'dg:regrasgerais:ativas',
   'simbolos:indexar', 'simbolos:buscar',
   'propostas:listar', 'propostas:hunks', 'propostas:definir-hunks', 'propostas:preview',
   'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
