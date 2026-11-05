@@ -163,7 +163,243 @@ export function registerAgentExtrasIpc(): void {
     }
   })
 
+  ipcMain.handle('agente:pedir', async (event, payload: unknown) => {
+    if (emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    const o = exigirObjeto(payload, 'pedido')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const pergunta = exigirString(o.pergunta, 'pergunta')
+    if (isErroPayload(pergunta)) return pergunta
+    if (!pergunta.trim()) return { ok: false, erro: 'pedido vazio' }
+    const modo = o.modo === undefined ? 'agent' : o.modo
+    if (modo !== 'agent' && modo !== 'plan') return { ok: false, erro: 'modo invalido' }
+    const proposeWrites = exigirBoolean(o.proposeWrites, 'proposeWrites', true)
+    if (isErroPayload(proposeWrites)) return proposeWrites
+    const verificarApos = exigirBoolean(o.verificarApos, 'verificarApos', false)
+    if (isErroPayload(verificarApos)) return verificarApos
+    const incluirGit = exigirBoolean(o.incluirGit, 'incluirGit', true)
+    if (isErroPayload(incluirGit)) return incluirGit
+
+    const ativoRaw = typeof o.arquivoAtivo === 'string' ? o.arquivoAtivo : ''
+    const ativoSeguro = ativoRaw ? caminhoSeguro(ativoRaw, escopo.pastas) : null
+    if (ativoSeguro && !ativoSeguro.ok) return { ok: false, erro: ativoSeguro.erro }
+    const arquivoAtivo = ativoSeguro?.ok ? ativoSeguro.abs : undefined
+    const abas = parseAbas(o.abas)
+      .filter((aba) => caminhoSeguro(aba.path, escopo.pastas).ok)
+      .slice(0, 12)
+    const selecao = typeof o.selecao === 'string' ? o.selecao.slice(0, 8000) : ''
+    const errosEditor = typeof o.errosEditor === 'string' ? o.errosEditor.slice(0, 8000) : ''
+    const expansao = await expandirMencoes({
+      raiz: escopo.raiz,
+      pergunta,
+      selecao,
+      arquivoAtivo,
+      pastas: escopo.pastas
+    })
+    const contextoImplicito = await montarContextoImplicito({
+      raiz: escopo.raiz,
+      abas,
+      incluirGit,
+      incluirDiagnosticos: true,
+      errosEditor
+    })
+    const contextoExtra = [expansao.contextoExtra, contextoImplicito].filter(Boolean).join('\n\n')
+    const agente = typeof o.agente === 'string' && o.agente.trim() ? o.agente.trim() : undefined
+
+    return enfileirarAgente(async (signal) => {
+      const onEvent = (ev: unknown) => emitirProgresso(event, ev)
+      let resposta = await executarAgente(escopo.raiz, expansao.perguntaLimpa, {
+        modo,
+        agente,
+        proposeWrites,
+        pastas: escopo.pastas,
+        contextoExtra,
+        onEvent,
+        signal
+      })
+      let diagnostico
+      if (verificarApos && modo === 'agent' && !signal.aborted) {
+        emitirProgresso(event, { tipo: 'status', texto: 'Verificando o projeto…' })
+        diagnostico = await rodarTypecheck(escopo.raiz)
+        if (!diagnostico.ok && !signal.aborted) {
+          emitirProgresso(event, { tipo: 'status', texto: 'Typecheck falhou; preparando uma correção…' })
+          const correcao = await executarAgente(
+            escopo.raiz,
+            'Corrija os erros deste typecheck. Trabalhe apenas nas causas relacionadas e explique as alterações propostas.\n\n' + diagnostico.saida.slice(0, 9000),
+            {
+              modo: 'agent',
+              agente,
+              proposeWrites: true,
+              pastas: escopo.pastas,
+              contextoExtra,
+              onEvent,
+              signal
+            }
+          )
+          resposta = {
+            ...correcao,
+            passos: [...resposta.passos, ...correcao.passos],
+            propostas: [...(resposta.propostas || []), ...(correcao.propostas || [])]
+          }
+        }
+      }
+      if (modo === 'plan' && resposta.texto) {
+        salvarPlano({
+          texto: resposta.texto,
+          raiz: escopo.raiz,
+          salvoEm: new Date().toISOString(),
+          agente
+        })
+      }
+      return {
+        ...resposta,
+        ok: resposta.ok !== false,
+        fila: statusFilaAgente(),
+        diagnostico,
+        plano: modo === 'plan' ? lerPlano() : undefined
+      }
+    }).catch((err: unknown) => ({ ok: false, erro: String((err as Error)?.message || err) }))
+  })
+
   ipcMain.handle('agente:plano-ler', () => ({ ok: true, plano: lerPlano() }))
+
+  ipcMain.handle('agente:plano-salvar', (_e, payload: unknown) => {
+    const o = exigirObjeto(payload, 'plano')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const texto = exigirString(o.texto, 'texto')
+    if (isErroPayload(texto)) return texto
+    if (!texto.trim()) return { ok: false, erro: 'plano vazio' }
+    const agente = typeof o.agente === 'string' ? o.agente : undefined
+    salvarPlano({ texto, raiz: escopo.raiz, salvoEm: new Date().toISOString(), agente })
+    return { ok: true, plano: lerPlano() }
+  })
+
+  ipcMain.handle('agente:plano-limpar', () => {
+    limparPlano()
+    return { ok: true }
+  })
+
+  ipcMain.handle('agente:plano-atualizar-passos', (_e, passosRaw: unknown) => {
+    if (!Array.isArray(passosRaw)) return { ok: false, erro: 'passos deve ser uma lista' }
+    const passos: PassoPlano[] = []
+    for (const item of passosRaw.slice(0, 40)) {
+      if (!item || typeof item !== 'object') return { ok: false, erro: 'passo invalido' }
+      const p = item as Record<string, unknown>
+      if (typeof p.id !== 'string' || typeof p.texto !== 'string' || typeof p.feito !== 'boolean') {
+        return { ok: false, erro: 'passo deve ter id, texto e feito validos' }
+      }
+      passos.push({
+        id: p.id.slice(0, 64),
+        texto: p.texto.slice(0, 500),
+        feito: p.feito,
+        checkpointId: typeof p.checkpointId === 'string' ? p.checkpointId.slice(0, 128) : undefined
+      })
+    }
+    const plano = atualizarPassos(passos)
+    return plano ? { ok: true, plano } : { ok: false, erro: 'nenhum plano salvo' }
+  })
+
+  ipcMain.handle('agente:plano-marcar-passo', (_e, passoId: unknown, feitoRaw: unknown) => {
+    const id = exigirString(passoId, 'passoId')
+    if (isErroPayload(id)) return id
+    const feito = exigirBoolean(feitoRaw, 'feito')
+    if (isErroPayload(feito)) return feito
+    const plano = marcarPasso(id, feito)
+    return plano ? { ok: true, plano } : { ok: false, erro: 'passo nao encontrado' }
+  })
+
+  ipcMain.handle('agente:executar-plano', async (event, payload: unknown) => {
+    if (emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    const o = exigirObjeto(payload, 'plano')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const soProximo = exigirBoolean(o.soProximo, 'soProximo', false)
+    if (isErroPayload(soProximo)) return soProximo
+    const plano = lerPlano()
+    if (!plano?.passos?.length) return { ok: false, erro: 'nenhum plano salvo' }
+    if (resolve(plano.raiz).toLowerCase() !== resolve(escopo.raiz).toLowerCase()) {
+      return { ok: false, erro: 'o plano salvo pertence a outra pasta' }
+    }
+    const pendentes = plano.passos.filter((p) => !p.feito)
+    const selecionados = soProximo ? [proximoPassoPendente()].filter((p): p is PassoPlano => !!p) : pendentes
+    if (!selecionados.length) return { ok: false, erro: 'nao ha passos pendentes' }
+    const contextoExtra = await montarContextoImplicito({ raiz: escopo.raiz, incluirGit: true })
+
+    return enfileirarAgente(async (signal) => {
+      const inicio = Date.now()
+      const rastros: Awaited<ReturnType<typeof executarAgente>>['passos'] = []
+      const propostas: NonNullable<Awaited<ReturnType<typeof executarAgente>>['propostas']> = []
+      const textos: string[] = []
+      let ultimo: Awaited<ReturnType<typeof executarAgente>> | undefined
+      let passoExecutado: PassoPlano | undefined
+
+      for (const passo of selecionados) {
+        if (signal.aborted) return { ok: false, erro: 'execucao cancelada', passos: rastros, propostas }
+        emitirProgresso(event, { tipo: 'status', texto: 'Executando passo: ' + passo.texto })
+        const resposta = await executarAgente(
+          escopo.raiz,
+          'Execute este passo do plano salvo. Preserve o escopo e gere propostas para as alteracoes.\n\n' +
+            'Plano:\n' + plano.texto.slice(0, 7000) + '\n\nPasso selecionado:\n' + passo.texto,
+          {
+            modo: 'agent',
+            agente: plano.agente,
+            proposeWrites: true,
+            pastas: escopo.pastas,
+            contextoExtra,
+            onEvent: (ev) => emitirProgresso(event, ev),
+            signal
+          }
+        )
+        if (resposta.ok === false || signal.aborted) {
+          return { ok: false, erro: 'o agente nao concluiu o passo', passos: [...rastros, ...resposta.passos], propostas: [...propostas, ...(resposta.propostas || [])] }
+        }
+        marcarPasso(passo.id, true)
+        passoExecutado = passo
+        ultimo = resposta
+        rastros.push(...resposta.passos)
+        propostas.push(...(resposta.propostas || []))
+        textos.push('## ' + passo.texto + '\n\n' + resposta.texto)
+        if (soProximo) break
+      }
+
+      return {
+        ok: true,
+        texto: textos.join('\n\n'),
+        modelo: ultimo?.modelo,
+        duracaoMs: Date.now() - inicio,
+        passos: rastros,
+        propostas,
+        passoExecutado: soProximo ? passoExecutado : undefined,
+        plano: lerPlano(),
+        fila: statusFilaAgente()
+      }
+    }).catch((err: unknown) => ({ ok: false, erro: String((err as Error)?.message || err) }))
+  })
+
+  ipcMain.handle('agente:verificar', async (_e, payload: unknown) => {
+    if (emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    const o = exigirObjeto(payload, 'verificacao')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const modo = o.modo === undefined ? 'typecheck' : o.modo
+    if (modo !== 'typecheck' && modo !== 'test') return { ok: false, erro: 'modo de verificacao invalido' }
+    const diagnostico = modo === 'test' ? await rodarTestes(escopo.raiz) : await rodarTypecheck(escopo.raiz)
+    return { ok: true, diagnostico }
+  })
+
+  ipcMain.handle('agente:diagnosticos', () => ({ ok: true, recentes: listarDiagnosticosRecentes() }))
+
+  ipcMain.handle('agente:diagnostico-manual', (_e, textoRaw: unknown) => {
+    const texto = exigirString(textoRaw, 'texto')
+    if (isErroPayload(texto)) return texto
+    if (!texto.trim()) return { ok: false, erro: 'diagnostico vazio' }
+    return { ok: true, diagnostico: registrarDiagnosticoManual(texto) }
+  })
 
   ipcMain.handle('agente:fila-status', () => ({ ok: true, ...statusFilaAgente() }))
 

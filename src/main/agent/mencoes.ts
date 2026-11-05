@@ -3,6 +3,7 @@
  */
 import { existsSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { caminhoSeguro } from '../ipc-seguro'
 import { montarContextoProjeto } from './contexto-projeto'
 import { resolverWikiLink, getRaizVault } from '../vault/indice'
 
@@ -11,6 +12,7 @@ export type MencoesOpts = {
   pergunta: string
   selecao?: string
   arquivoAtivo?: string
+  pastas?: string[]
 }
 
 export async function expandirMencoes(opts: MencoesOpts): Promise<{
@@ -52,9 +54,15 @@ export async function expandirMencoes(opts: MencoesOpts): Promise<{
     const abs = resolve(
       raw.startsWith('/') || /^[A-Za-z]:/.test(raw) ? raw : join(opts.raiz, raw)
     )
+    const segura = opts.pastas ? caminhoSeguro(abs, opts.pastas) : null
+    if (segura && !segura.ok) {
+      blocos.push('### @arquivo:' + raw + '\n(caminho fora das pastas abertas)')
+      continue
+    }
     try {
-      if (existsSync(abs)) {
-        const body = readFileSync(abs, 'utf8').slice(0, 12000)
+      const caminho = segura?.ok ? segura.abs : abs
+      if (existsSync(caminho)) {
+        const body = readFileSync(caminho, 'utf8').slice(0, 12000)
         blocos.push('### @arquivo:' + raw + '\n```\n' + body + '\n```')
       } else {
         blocos.push('### @arquivo:' + raw + '\n(arquivo nao encontrado)')
