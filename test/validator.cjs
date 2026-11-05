@@ -1036,6 +1036,11 @@ async function main() {
       'regras gerais entram no bundle do renderer',
       /<script type="module" src="\.\/regras-gerais-ui\.js"><\/script>/.test(html)
     )
+    assert(
+      'tema rápido entra no bundle do renderer',
+      /<script type="module" src="\.\/tema-rapido\.js"><\/script>/.test(html) &&
+        !/\.src\s*=\s*['"]\.\/tema-rapido\.js/.test(appJs)
+    )
     assert('preload janela:recarregar', /janela:recarregar/.test(preload))
     assert('preload janela:zoom', /janela:zoom/.test(preload))
     assert('preload janela:tela-cheia', /janela:tela-cheia/.test(preload))
