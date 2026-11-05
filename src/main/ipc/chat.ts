@@ -258,7 +258,7 @@ export async function handleChatSend(
     };
 
     const resultado = await enfileirarAgente(async () => {
-      if (agenteSel && agenteSel !== 'auto') {
+      if (agenteSel && agenteSel !== 'auto' && modoValido !== 'ask') {
         try {
           const { lerAgente } = await import('../brain/agentes');
           const agente = lerAgente(rootOk, agenteSel);
@@ -282,8 +282,12 @@ export async function handleChatSend(
         return publicar(hibrido.texto, 'hibrido:' + (hibrido.modelo || 'core'), { hibrido: hibrido.briefing });
       }
 
-      if (modoValido !== 'ask' && modoValido !== 'plan' && rota.kind === 'agente' && rota.agente) {
-        try { return await rodarAgente(rota.agente, 'codigo'); }
+      if (modoValido === 'plan' || modoValido === 'code' || modoValido === 'debug' || (rota.kind === 'agente' && rota.agente && modoValido !== 'ask')) {
+        const idAgente = rota.kind === 'agente' && rota.agente
+          ? rota.agente
+          : modoValido === 'plan' ? 'free-auto' : 'free-coder';
+        const tarefa = modoValido === 'ask' ? 'chat' : 'codigo';
+        try { return await rodarAgente(idAgente, tarefa); }
         catch (error) { dglog('[chat] rota de codigo falhou; usando chat: ' + String(error)); }
       }
 
