@@ -88,6 +88,9 @@ function handlerDoCanal(raiz: string, canal: string): { arquivo: string; linha: 
 export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
   const out: AchadoIntegracao[] = []
   const pontos: Array<[string, string, string, string]> = [
+    ['integracao:registro-vault', 'Handlers do Vault registrados no boot', 'src/main/index.ts', 'registerVaultIpc();'],
+    ['integracao:registro-openclaw', 'Handlers do OpenClaw registrados no boot', 'src/main/index.ts', 'registerOpenClawIpc();'],
+    ['integracao:registro-agent-extra', 'Handlers extras do Agent registrados no boot', 'src/main/index.ts', 'registerAgentExtrasIpc();'],
     ['integracao:tab', 'Completar no editor usa o modelo 1.5b', 'src/main/completar-tab.ts', 'qwen2.5-coder:1.5b'],
     ['integracao:tab-guardiao', 'Completar respeita o guardiao', 'src/main/completar-tab.ts', 'guardianPodeOperar'],
     ['integracao:tab-ipc', 'Canal editor:completar no main', 'src/main/index.ts', "ipcMain.handle('editor:completar'"],
@@ -109,6 +112,30 @@ export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
   for (const [id, titulo, rel, busca] of pontos) out.push(trecho(raiz, rel, busca, id, titulo))
 
   const preload = ler(raiz, 'src/preload/index.ts')
+  for (const canal of [
+    'agente:pedir',
+    'agente:executar-plano',
+    'agente:plano-marcar-passo',
+    'agente:plano-salvar',
+    'agente:plano-limpar',
+    'agente:plano-atualizar-passos',
+    'agente:verificar',
+    'agente:diagnosticos',
+    'agente:diagnostico-manual'
+  ]) {
+    const noPreload = preload.includes("'" + canal + "'")
+    const handler = handlerDoCanal(raiz, canal)
+    const registrado = ler(raiz, 'src/main/index.ts').includes('registerAgentExtrasIpc();')
+    const ok = noPreload && !!handler && registrado
+    out.push(achado(
+      'integracao:agent-' + canal,
+      'Canal ' + canal + ' registrado de ponta a ponta',
+      ok,
+      [noPreload ? 'preload ok' : 'preload ausente', handler ? handler.arquivo + ':' + handler.linha : 'handler ausente', registrado ? 'registro no boot ok' : 'registro no boot ausente'].join(' | '),
+      true
+    ))
+  }
+
   out.push(trecho(raiz, 'src/preload/index.ts', "'editor:completar'", 'integracao:preload-tab', 'Preload libera editor:completar'))
   for (const canal of ['memoria:listar', 'memoria:propor', 'memoria:decidir']) {
     const ok = preload.includes("'" + canal + "'")
