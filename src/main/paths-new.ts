@@ -229,6 +229,13 @@ export function getMemoriaDir(): string {
 }
 
 /**
+ * Caminho do diretorio de dossie
+ */
+export function getDossieDir(): string {
+  return resolveFromRaiz('.dg-editor', 'dossie');
+}
+
+/**
  * Caminho do diretorio de chats
  */
 export function getChatsDir(): string {
@@ -540,11 +547,21 @@ export default {
   getRelativePath,
   normalizePath,
   
+  // Funcoes de compatibilidade (legacy)
+  appDataDir,
+  logDir,
+  dossieDir,
+  projectStateDir,
+  cwdDiagnostico,
+  caminhoDentroDaRaiz,
+  pareceCaminhoArquivo,
+  
   // Caminhos especificos
   getDgEditorDir,
   getLogsDir,
   getBackupsDir,
   getMemoriaDir,
+  getDossieDir,
   getChatsDir,
   getIndiceDir,
   getModelosDir,

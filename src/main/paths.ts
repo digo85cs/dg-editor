@@ -1,221 +1,584 @@
-// paths.ts - resolucao centralizada de paths do DG Editor
-// Estado do app (log, dossie, continuidade) -> userData
-// Estado por projeto (cache, chat) -> pasta do projeto
+/**
+ * Modulo de Caminhos do DG Editor
+ * Refatorado para usar path.resolve() e evitar caminhos hardcoded
+ */
 
-import { join, resolve, relative, dirname, isAbsolute, normalize } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { homedir } from 'os'
-import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica'
+import { resolve, join, isAbsolute, relative, normalize } from 'path';
+import { homedir } from 'os';
+import { existsSync, mkdirSync } from 'fs';
+import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
 
-export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica'
+export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
 
-interface ElectronAppLike {
-  getPath: (name: string) => string
-}
+// ============================================================================
+// FUNCOES DE CAMINHOS PRINCIPAIS
+// ============================================================================
 
 /**
- * Tenta obter o app do Electron.
- * Dentro do Electron -> modulo real.
- * Em Node puro (servidor MCP via stdio) -> electron nao existe e cai no fallback.
+ * Resolve o caminho raiz do DG Editor
+ * 
+ * Hierarquia de resolucao:
+ * 1. DG_ROOT (variavel de ambiente)
+ * 2. D:\CURSOR\DG Editor (Windows)
+ * 3. ~/DG Editor (Linux/macOS)
+ * 4. Pasta atual (fallback)
  */
-function getElectronApp(): ElectronAppLike | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const electron = require('electron') as { app?: ElectronAppLike } | string
-    if (typeof electron === 'object' && electron && electron.app && typeof electron.app.getPath === 'function') {
-      return electron.app
+export function resolverRaizDGEditor(): string {
+  // 1. Verificar DG_ROOT
+  const dgRoot = process.env.DG_ROOT;
+  if (dgRoot && isAbsolute(dgRoot)) {
+    return resolve(dgRoot);
+  }
+
+  // 2. Padrao Windows
+  if (process.platform === 'win32') {
+    const windowsPath = 'D:\\CURSOR\\DG Editor';
+    if (existsSync(windowsPath)) {
+      return resolve(windowsPath);
     }
-    return null
-  } catch {
-    return null
   }
-}
 
-function userDataFallback(): string {
-  const ap = process.env.APPDATA
-  if (ap) return join(ap, 'dg-editor')
-  return join(homedir(), '.config', 'dg-editor')
-}
+  // 3. Padrao Linux/macOS
+  const homePath = join(homedir(), 'DG Editor');
+  if (existsSync(homePath)) {
+    return resolve(homePath);
+  }
 
-function garantir(dir: string): string {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  return dir
-}
-
-/** Diretorio raiz de estado do app. %APPDATA%/dg-editor no Windows. */
-export function appDataDir(): string {
-  const app = getElectronApp()
-  const dir = app ? app.getPath('userData') : userDataFallback()
-  return garantir(dir)
-}
-
-/** Diretorio de logs do app (independe do cwd). */
-export function logDir(): string {
-  return garantir(join(appDataDir(), 'logs'))
-}
-
-/** Diretorio de dossie/continuidade do app. */
-export function dossieDir(): string {
-  return garantir(join(appDataDir(), 'dossie'))
-}
-
-/** Diretorio de estado DENTRO do projeto analisado (.dg-editor). */
-export function projectStateDir(root: string): string {
-  return garantir(join(root, '.dg-editor'))
-}
-
-/** Aviso se o cwd e diferente da pasta do projeto (diagnostico). */
-export function cwdDiagnostico(): { cwd: string; userData: string; divergente: boolean } {
-  const cwd = process.cwd()
-  const userData = appDataDir()
-  return { cwd, userData, divergente: !cwd.startsWith(userData) }
-}
-
-export type FonteRaiz =
-  | 'env:DG_ROOT'
-  | 'fix:windows-canonica'
-  | 'arquivo:.dg-root'
-  | 'subida:package+dg-editor'
-  | 'cwd'
-  | 'falha'
-
-let _raizCache: { raiz: string; fonte: FonteRaiz } | null = null
-let _raizLogada = false
-
-function ehRaizProjeto(dir: string): boolean {
-  return existsSync(join(dir, 'package.json')) && existsSync(join(dir, '.dg-editor'))
+  // 4. Fallback: pasta atual do processo
+  return resolve(process.cwd());
 }
 
 /**
- * Cascata deterministica de raiz do projeto.
- * 0) Windows: D:\CURSOR\DG Editor SEMPRE que existir (pasta oficial permanente)
- * 1) process.env.DG_ROOT (se existir em disco)
- * 2) arquivo .dg-root na cwd (conteudo = caminho)
- * 3) subir a partir de __dirname ate achar package.json + .dg-editor/
- * 4) process.cwd() se for raiz valida
- * 5) erro explicito
+ * Resolve o caminho raiz do projeto atual
+ * 
+ * Tentativa:
+ * 1. Caminho do package.json mais proximo
+ * 2. Raiz do DG Editor
+ * 3. Pasta atual
  */
-function fixarEnvEDgRoot(abs: string): void {
+export function resolverRaizProjeto(): string {
   try {
-    process.env.DG_ROOT = abs
-  } catch { /* ignore */ }
-  try {
-    writeFileSync(join(abs, '.dg-root'), abs + '\n', 'utf8')
-  } catch { /* ignore */ }
-}
+    // Tentar encontrar package.json mais proximo
+    let currentDir = process.cwd();
+    const maxDepth = 10;
+    let depth = 0;
 
-export function resolverRaizProjeto(forcar = false): string {
-  if (_raizCache && !forcar) return _raizCache.raiz
-
-  // 0. Windows - pasta oficial permanente (ganha de tudo)
-  if (process.platform === 'win32' && existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
-    const abs = resolve(RAIZ_WINDOWS_CANONICA)
-    _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
-    fixarEnvEDgRoot(abs)
-    logRaizUmaVez()
-    return abs
-  }
-
-  // 1. env
-  const env = (process.env.DG_ROOT || '').trim()
-  if (env && existsSync(env)) {
-    const abs = resolve(env)
-    _raizCache = { raiz: abs, fonte: 'env:DG_ROOT' }
-    logRaizUmaVez()
-    return abs
-  }
-
-  // 1b. canonica tambem fora de win32 se a pasta existir (ex.: wine)
-  if (existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
-    const abs = resolve(RAIZ_WINDOWS_CANONICA)
-    _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
-    fixarEnvEDgRoot(abs)
-    logRaizUmaVez()
-    return abs
-  }
-
-  // 2. .dg-root (procura em cwd e sobe ate 4 niveis)
-  let probe = process.cwd()
-  for (let i = 0; i < 6; i++) {
-    const marker = join(probe, '.dg-root')
-    if (existsSync(marker)) {
-      try {
-        const conteudo = readFileSync(marker, 'utf8').trim().split(/\r?\n/)[0].trim()
-        if (conteudo && existsSync(conteudo)) {
-          const abs = resolve(conteudo)
-          _raizCache = { raiz: abs, fonte: 'arquivo:.dg-root' }
-          logRaizUmaVez()
-          return abs
+    while (depth < maxDepth) {
+      const pkgPath = join(currentDir, 'package.json');
+      if (existsSync(pkgPath)) {
+        try {
+          const pkg = require(pkgPath);
+          if (pkg.name === 'dg-editor') {
+            return resolve(currentDir);
+          }
+        } catch {
+          // Ignorar erros de leitura
         }
-      } catch { /* ignora */ }
+      }
+
+      const parentDir = resolve(currentDir, '..');
+      if (parentDir === currentDir) {
+        // Chegou na raiz
+        break;
+      }
+      currentDir = parentDir;
+      depth++;
     }
-    const pai = dirname(probe)
-    if (pai === probe) break
-    probe = pai
-  }
 
-  // 3. subir a partir de __dirname
-  let dir = resolve(__dirname)
-  for (let i = 0; i < 10; i++) {
-    if (ehRaizProjeto(dir)) {
-      _raizCache = { raiz: dir, fonte: 'subida:package+dg-editor' }
-      logRaizUmaVez()
-      return dir
-    }
-    // tambem tenta pai imediato se __dirname for .../out/main ou .../bin/main
-    const pai = dirname(dir)
-    if (pai === dir) break
-    dir = pai
-  }
-
-  // 4. cwd se valido
-  const cwd = resolve(process.cwd())
-  if (ehRaizProjeto(cwd)) {
-    _raizCache = { raiz: cwd, fonte: 'cwd' }
-    logRaizUmaVez()
-    return cwd
-  }
-
-  // 5. falha
-  _raizCache = { raiz: '', fonte: 'falha' }
-  logRaizUmaVez()
-  throw new Error('DG_ROOT nao resolvido: defina DG_ROOT, crie .dg-root, ou rode dentro do projeto com package.json+.dg-editor/')
-}
-
-export function fonteRaizResolvida(): FonteRaiz {
-  if (!_raizCache) resolverRaizProjeto()
-  return _raizCache!.fonte
-}
-
-function logRaizUmaVez(): void {
-  if (_raizLogada || !_raizCache) return
-  _raizLogada = true
-  const msg = '[dg-paths] raiz=' + (_raizCache.raiz || '(vazia)') + ' fonte=' + _raizCache.fonte
-  try {
-    process.stderr.write(msg + '\n')
+    // Fallback: raiz do DG Editor
+    return resolverRaizDGEditor();
   } catch {
-    console.error(msg)
+    // Fallback final: pasta atual
+    return resolve(process.cwd());
   }
 }
 
 /**
- * Resolve caminho relativo/absoluto dentro da raiz.
- * Rejeita path traversal com erro claro.
+ * Retorna a fonte da resolucao da raiz do projeto
+ */
+export function fonteRaizResolvida(): string {
+  try {
+    let currentDir = process.cwd();
+    const maxDepth = 10;
+    let depth = 0;
+
+    while (depth < maxDepth) {
+      const pkgPath = join(currentDir, 'package.json');
+      if (existsSync(pkgPath)) {
+        try {
+          const pkg = require(pkgPath);
+          if (pkg.name === 'dg-editor') {
+            return `package.json em ${currentDir}`;
+          }
+        } catch {
+          // Ignorar
+        }
+      }
+
+      const parentDir = resolve(currentDir, '..');
+      if (parentDir === currentDir) {
+        break;
+      }
+      currentDir = parentDir;
+      depth++;
+    }
+
+    return `DG_ROOT (${resolverRaizDGEditor()})`;
+  } catch {
+    return `process.cwd() (${process.cwd()})`;
+  }
+}
+
+// ============================================================================
+// FUNCOES DE CAMINHOS DO SISTEMA
+// ============================================================================
+
+/**
+ * Resolve um caminho relativo a partir da raiz do DG Editor
+ */
+export function resolveFromRaiz(...caminhos: string[]): string {
+  return resolve(resolverRaizDGEditor(), ...caminhos);
+}
+
+/**
+ * Resolve um caminho relativo a partir da raiz do projeto
+ */
+export function resolveFromProject(...caminhos: string[]): string {
+  return resolve(resolverRaizProjeto(), ...caminhos);
+}
+
+/**
+ * Resolve um caminho relativo a partir do diretorio home do usuario
+ */
+export function resolveFromHome(...caminhos: string[]): string {
+  return resolve(homedir(), ...caminhos);
+}
+
+/**
+ * Verifica se um caminho esta dentro de outro caminho
+ */
+export function isInsidePath(caminho: string, container: string): boolean {
+  const resolvedCaminho = resolve(caminho);
+  const resolvedContainer = resolve(container);
+  
+  // Normalizar para comparar
+  const relativePath = relative(resolvedContainer, resolvedCaminho);
+  
+  // Se a relativePath nao comecar com '..', entao esta dentro
+  return !relativePath.startsWith('..') && 
+         !relativePath.includes('..' + (process.platform === 'win32' ? '\\' : '/'));
+}
+
+/**
+ * Verifica se um caminho e seguro (dentro da raiz do projeto)
+ */
+export function isSafePath(caminho: string, raiz?: string): boolean {
+  const raizProjeto = raiz || resolverRaizProjeto();
+  
+  if (!isAbsolute(caminho)) {
+    // Caminho relativo - verificar se resolve para dentro da raiz
+    const resolved = resolve(raizProjeto, caminho);
+    return isInsidePath(resolved, raizProjeto);
+  }
+  
+  // Caminho absoluto - verificar se esta dentro da raiz
+  return isInsidePath(caminho, raizProjeto);
+}
+
+/**
+ * Normaliza um caminho para uso no sistema de arquivos
+ */
+export function normalizePath(caminho: string): string {
+  // Converter para o formato do SO
+  if (process.platform === 'win32') {
+    return caminho.replace(/\//g, '\\');
+  }
+  return caminho.replace(/\\/g, '/');
+}
+
+// ============================================================================
+// CAMINHOS ESPECIFICOS DO DG EDITOR
+// ============================================================================
+
+/**
+ * Caminho do diretorio .dg-editor
+ */
+export function getDgEditorDir(): string {
+  return resolveFromRaiz('.dg-editor');
+}
+
+/**
+ * Caminho do diretorio de logs
+ */
+export function getLogsDir(): string {
+  return resolveFromRaiz('.dg-editor', 'logs');
+}
+
+/**
+ * Caminho do diretorio de backups
+ */
+export function getBackupsDir(): string {
+  return resolveFromRaiz('.dg-editor', 'backup');
+}
+
+/**
+ * Caminho do diretorio de memorias
+ */
+export function getMemoriaDir(): string {
+  return resolveFromRaiz('.dg-editor', 'memoria');
+}
+
+/**
+ * Caminho do diretorio de dossie
+ */
+export function getDossieDir(): string {
+  return resolveFromRaiz('.dg-editor', 'dossie');
+}
+
+/**
+ * Caminho do diretorio de chats
+ */
+export function getChatsDir(): string {
+  return resolveFromRaiz('.dg-editor', 'chats');
+}
+
+/**
+ * Caminho do diretorio de indices
+ */
+export function getIndiceDir(): string {
+  return resolveFromRaiz('.dg-editor', 'indice');
+}
+
+/**
+ * Caminho do diretorio de modelos
+ */
+export function getModelosDir(): string {
+  return resolveFromRaiz('.dg-editor', 'modelos');
+}
+
+/**
+ * Caminho do arquivo de configuracao principal
+ */
+export function getConfigPath(): string {
+  return resolveFromRaiz('dg-config.json');
+}
+
+/**
+ * Caminho do arquivo de .dgrules
+ */
+export function getDgRulesPath(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, '.dgrules');
+}
+
+/**
+ * Caminho do arquivo package.json
+ */
+export function getPackageJsonPath(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'package.json');
+}
+
+/**
+ * Caminho do diretorio node_modules
+ */
+export function getNodeModulesPath(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'node_modules');
+}
+
+/**
+ * Caminho do diretorio out (build)
+ */
+export function getOutDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'out');
+}
+
+/**
+ * Caminho do diretorio src
+ */
+export function getSrcDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'src');
+}
+
+/**
+ * Caminho do diretorio resources
+ */
+export function getResourcesDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'resources');
+}
+
+/**
+ * Caminho do diretorio scripts
+ */
+export function getScriptsDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'scripts');
+}
+
+/**
+ * Caminho do diretorio docs
+ */
+export function getDocsDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'docs');
+}
+
+/**
+ * Caminho do diretorio qa-artifacts
+ */
+export function getQaArtifactsDir(raizProjeto?: string): string {
+  const raiz = raizProjeto || resolverRaizProjeto();
+  return resolve(raiz, 'qa-artifacts');
+}
+
+// ============================================================================
+// CAMINHOS DO ELECTRON
+// ============================================================================
+
+/**
+ * Caminho do diretorio de dados do usuario (appData)
+ */
+export function getUserDataPath(): string {
+  const { app } = require('electron');
+  return app.getPath('userData');
+}
+
+/**
+ * Caminho do diretorio de cache do usuario
+ */
+export function getCachePath(): string {
+  const { app } = require('electron');
+  return app.getPath('cache');
+}
+
+/**
+ * Caminho do diretorio de logs do Electron
+ */
+export function getElectronLogsPath(): string {
+  const { app } = require('electron');
+  return join(app.getPath('userData'), 'logs');
+}
+
+/**
+ * Caminho do executavel do Electron
+ */
+export function getElectronExecutable(): string {
+  const { app } = require('electron');
+  return app.getPath('exe');
+}
+
+// ============================================================================
+// FUNCOES DE VALIDACAO DE CAMINHOS
+// ============================================================================
+
+/**
+ * Valida e resolve um caminho de forma segura
+ * 
+ * @param caminho - Caminho a ser validado
+ * @param raiz - Raiz de referencia (opcional, padrao: raiz do projeto)
+ * @returns { ok: boolean, abs?: string, erro?: string }
+ */
+export function validarCaminho(caminho: string, raiz?: string): { ok: boolean, abs?: string, erro?: string } {
+  try {
+    const raizProjeto = raiz || resolverRaizProjeto();
+    
+    // Verificar path traversal
+    if (caminho.includes('..') || 
+        (process.platform === 'win32' && caminho.includes('\\..'))) {
+      return { ok: false, erro: 'Path traversal detectado' };
+    }
+    
+    // Resolver caminho
+    const resolved = isAbsolute(caminho) 
+      ? resolve(caminho)
+      : resolve(raizProjeto, caminho);
+    
+    // Verificar se esta dentro da raiz
+    if (!isInsidePath(resolved, raizProjeto)) {
+      return { ok: false, erro: 'Caminho fora da raiz permitida' };
+    }
+    
+    return { ok: true, abs: normalizePath(resolved) };
+  } catch (e) {
+    return { ok: false, erro: `Erro ao validar caminho: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * Valida e resolve multiplos caminhos
+ */
+export function validarCaminhos(caminhos: string[], raiz?: string): { ok: boolean, abs: string[], erros: string[] } {
+  const result: string[] = [];
+  const erros: string[] = [];
+  
+  for (const caminho of caminhos) {
+    const validado = validarCaminho(caminho, raiz);
+    if (validado.ok && validado.abs) {
+      result.push(validado.abs);
+    } else {
+      erros.push(`${caminho}: ${validado.erro}`);
+    }
+  }
+  
+  return {
+    ok: erros.length === 0,
+    abs: result,
+    erros
+  };
+}
+
+// ============================================================================
+// FUNCOES DE RESOLUCAO DE CAMINHOS RELATIVOS
+// ============================================================================
+
+/**
+ * Resolve um caminho relativo a partir de outro caminho
+ */
+export function resolveRelative(caminhoBase: string, caminhoRelativo: string): string {
+  return resolve(caminhoBase, caminhoRelativo);
+}
+
+/**
+ * Obtem o caminho relativo entre dois caminhos absolutos
+ */
+export function getRelativePath(caminhoBase: string, caminhoAlvo: string): string {
+  return relative(caminhoBase, caminhoAlvo);
+}
+
+// ============================================================================
+// FUNCOES DE COMPATIBILIDADE COM paths.ts (legacy)
+// ============================================================================
+
+/**
+ * Diretorio raiz de estado do app - compatibilidade com paths.ts
+ */
+export function appDataDir(): string {
+  const dir = getUserDataPath();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de logs - compatibilidade com paths.ts
+ */
+export function logDir(): string {
+  const dir = getLogsDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de dossie - compatibilidade com paths.ts
+ */
+export function dossieDir(): string {
+  const dir = getDossieDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diretorio de estado dentro do projeto
+ */
+export function projectStateDir(root: string): string {
+  const dir = join(root, '.dg-editor');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Diagnostico de cwd
+ */
+export function cwdDiagnostico(): { cwd: string; userData: string; divergente: boolean } {
+  const cwd = process.cwd();
+  const userData = appDataDir();
+  return { cwd, userData, divergente: !cwd.startsWith(userData) };
+}
+
+/**
+ * Resolve caminho dentro da raiz - compatibilidade
  */
 export function caminhoDentroDaRaiz(raiz: string, alvo: string): { abs: string; rel: string } {
-  const abs = isAbsolute(alvo) ? normalize(resolve(alvo)) : normalize(resolve(raiz, alvo))
-  const rel = relative(raiz, abs).replace(/\\/g, '/')
+  const abs = isAbsolute(alvo) ? normalize(resolve(alvo)) : normalize(resolve(raiz, alvo));
+  const rel = relative(raiz, abs).replace(/\\/g, '/');
   if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error('caminho fora da raiz do projeto: ' + alvo)
+    throw new Error('caminho fora da raiz do projeto: ' + alvo);
   }
-  return { abs, rel }
+  return { abs, rel };
 }
 
-/** True se o texto parece caminho de arquivo (tem / ou \\ ou extensao .ts/.js/.md). */
+/**
+ * Verifica se o texto parece caminho de arquivo
+ */
 export function pareceCaminhoArquivo(s: string): boolean {
-  const t = (s || '').trim()
-  if (!t) return false
-  if (/[\\/]/.test(t)) return true
-  if(/\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(t)) return true
-  return false
+  const t = (s || '').trim();
+  if (!t) return false;
+  if (/[\\/]/.test(t)) return true;
+  if(/\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(t)) return true;
+  return false;
 }
+
+// ============================================================================
+// EXPORT DEFAULT
+// ============================================================================
+
+export default {
+  // Funcoes principais
+  resolverRaizDGEditor,
+  resolverRaizProjeto,
+  fonteRaizResolvida,
+  
+  // Funcoes de resolve
+  resolveFromRaiz,
+  resolveFromProject,
+  resolveFromHome,
+  
+  // Funcoes de validacao
+  isInsidePath,
+  isSafePath,
+  validarCaminho,
+  validarCaminhos,
+  
+  // Funcoes de caminho relativo
+  resolveRelative,
+  getRelativePath,
+  normalizePath,
+  
+  // Funcoes de compatibilidade (legacy)
+  appDataDir,
+  logDir,
+  dossieDir,
+  projectStateDir,
+  cwdDiagnostico,
+  caminhoDentroDaRaiz,
+  pareceCaminhoArquivo,
+  
+  // Caminhos especificos
+  getDgEditorDir,
+  getLogsDir,
+  getBackupsDir,
+  getMemoriaDir,
+  getDossieDir,
+  getChatsDir,
+  getIndiceDir,
+  getModelosDir,
+  getConfigPath,
+  getDgRulesPath,
+  getPackageJsonPath,
+  getNodeModulesPath,
+  getOutDir,
+  getSrcDir,
+  getResourcesDir,
+  getScriptsDir,
+  getDocsDir,
+  getQaArtifactsDir,
+  
+  // Caminhos do Electron
+  getUserDataPath,
+  getCachePath,
+  getElectronLogsPath,
+  getElectronExecutable,
+};
