@@ -2079,7 +2079,12 @@ function secaoLista(titulo, itens) {
 function renderizarChat(msgs) {
   const area = $('chat-messages')
   area.innerHTML = ''
-  for (const m of msgs) adicionarBolha(m.role, m.content, m.provider)
+  const mensagens = Array.isArray(msgs)
+    ? msgs
+    : Array.isArray(msgs?.mensagens)
+      ? msgs.mensagens
+      : []
+  for (const m of mensagens) adicionarBolha(m.role, m.content, m.provider)
   area.scrollTop = area.scrollHeight
 }
 
