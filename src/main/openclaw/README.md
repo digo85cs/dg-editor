@@ -1,76 +1,76 @@
-# Módulo OpenClaw - DG Editor
+# Modulo OpenClaw - DG Editor
 
-> **Integração com OpenClaw para Diffs e Aprovação Humana**
-> Versão: 0.2.0 | Status: 🟢 Ativo
+> **Integracao com OpenClaw para Diffs e Aprovacao Humana**
+> Versao: 0.2.0 | Status: Ativo
 
-## 🎯 Visão Geral
+## Visao Geral
 
-O módulo **OpenClaw** implementa a integração do DG Editor com o **OpenClaw**, um sistema de **diffs e aprovação humana** para mudanças de código geradas por IA.
+O modulo **OpenClaw** implementa a integracao do DG Editor com o **OpenClaw**, um sistema de **diffs e aprovacao humana** para mudancas de codigo geradas por IA.
 
-**Propósito:**
-- Permitir que **humanos revisem** mudanças propostas por agentes de IA
-- Fornecer um **fluxo de aprovação** seguro
+**Proposito:**
+- Permitir que **humanos revisem** mudancas propostas por agentes de IA
+- Fornecer um **fluxo de aprovacao** seguro
 - Integrar com o **ecossistema OpenClaw** (Gateway, HTTP, MCP)
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 openclaw/
 ├── ipc.ts              # Handlers IPC para OpenClaw
-├── audit.ts            # Auditoria de mudanças
+├── audit.ts            # Auditoria de mudancas
 ├── cliente.ts          # Cliente HTTP para OpenClaw Gateway
-├── contexto.ts         # Contexto para requisições OpenClaw
+├── contexto.ts         # Contexto para requisicoes OpenClaw
 ├── diffs.ts            # Sistema de diffs
 ├── hunks.ts            # Gerenciamento de hunks (partes de diffs)
 └── secrets.ts          # Gerenciamento de tokens e segredos
 ```
 
-## 🎭 Conceitos
+## Conceitos
 
 ### 1. OpenClaw Gateway
 
-O **OpenClaw Gateway** é um serviço que:
+O **OpenClaw Gateway** e um servico que:
 - Recebe **diffs** do DG Editor
-- Armazena para **revisão humana**
-- Permite **aprovação/rejeição** via interface web
+- Armazena para **revisao humana**
+- Permite **aprovacao/rejeicao** via interface web
 - Retorna o resultado para o DG Editor
 
 ### 2. Diffs
 
-Um **diff** representa uma mudança proposta:
+Um **diff** representa uma mudanca proposta:
 - **Arquivo**: Caminho do arquivo a ser modificado
-- **Conteúdo atual**: Versão atual do arquivo
-- **Conteúdo proposto**: Versão sugerida pelo agente
-- **Hunks**: Partes específicas da mudança
+- **Conteudo atual**: Versao atual do arquivo
+- **Conteudo proposto**: Versao sugerida pelo agente
+- **Hunks**: Partes especificas da mudanca
 - **Status**: `pendente`, `aprovado`, `rejeitado`
 
 ### 3. Hunks
 
-Um **hunk** é uma parte de um diff:
-- Representa uma **mudança atômica**
-- pode ser **aceito/rejeitado individualmente**
+Um **hunk** e uma parte de um diff:
+- Representa uma **mudanca atomica**
+- Pode ser **aceito/rejeitado individualmente**
 - Faz parte de um diff maior
 
-### 4. Fluxo de Aprovação
+### 4. Fluxo de Aprovacao
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                 OPENCLAW APPROVAL FLOW                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
-│  1. AGENTE PROPÕE MUDANÇA                                      │
-│     ├── Gera diff entre código atual e proposto               │
+│  1. AGENTE PROPOE MUDANCA                                      │
+│     ├── Gera diff entre codigo atual e proposto               │
 │     └── Envia para fila de propostas                           │
 │                                                               │
-│  2. USUÁRIO REVISA                                             │
+│  2. USUARIO REVISA                                             │
 │     ├── Visualiza diff no painel OpenClaw                      │
 │     ├── Analisa hunks individualmente                          │
 │     └── Decide: aprovar, rejeitar ou modificar                 │
 │                                                               │
 │  3. SISTEMA APLICA                                             │
-│     ├── Se aprovado: aplica todas as mudanças                  │
+│     ├── Se aprovado: aplica todas as mudancas                  │
 │     ├── Se parcialmente: aplica apenas hunks aprovados        │
-│     └── Se rejeitado: descarta todas as mudanças               │
+│     └── Se rejeitado: descarta todas as mudancas               │
 │                                                               │
 │  4. CHECKPOINT                                                 │
 │     ├── Cria checkpoint antes de aplicar                      │
@@ -79,9 +79,9 @@ Um **hunk** é uma parte de um diff:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Uso
+## Uso
 
-### 1. Configuração
+### 1. Configuracao
 
 Configure o endpoint e token do OpenClaw:
 
@@ -98,297 +98,380 @@ await configurarOpenClaw({
 Ou via ambiente:
 ```bash
 OC_ENDPOINT=http://127.0.0.1:18789
-OC_MODEL=openclaw/default
 OC_TOKEN=seu-token-bearer
+OC_MODEL=openclaw/default
 ```
 
-### 2. Enviar Diff para OpenClaw
+### 2. Status do Token
 
 ```typescript
-import { enviarParaOpenClaw } from './openclaw/cliente';
+import { getOpenClawTokenStatus } from './openclaw/ipc';
 
-const resposta = await enviarParaOpenClaw({
-  diffs: [
+const status = await getOpenClawTokenStatus();
+console.log(status); // { ok: true, status: 'valido' }
+```
+
+### 3. Enviar Diff para Aprovacao
+
+```typescript
+import { enviarParaAprovacao } from './openclaw/cliente';
+
+const diff = {
+  arquivo: 'src/services/user.ts',
+  atual: 'export const getUser = () => {...}',
+  proposto: 'export const getUser = async () => {...}',
+  hunks: [
     {
-      arquivo: 'src/main/index.ts',
-      atual: 'código atual...',
-      proposto: 'código proposto...',
-      hunks: [
-        {
-          inicio: 10,
-          linhas: 5,
-          tipo: 'modificado',
-          conteudoAtual: 'linhas atuais...',
-          conteudoProposto: 'linhas propostas...'
-        }
-      ]
+      oldStart: 1,
+      oldCount: 1,
+      newStart: 1,
+      newCount: 1,
+      oldLines: ['export const getUser = () => {...}'],
+      newLines: ['export const getUser = async () => {...}']
     }
-  ],
-  contexto: {
-    pedido: 'Adicione validação ao formulário',
-    agente: 'free-coder',
-    modelo: 'qwen2.5-coder:1.5b'
-  }
+  ]
+};
+
+const resultado = await enviarParaAprovacao(diff, {
+  contexto: 'Adicionar async para chamadas API'
 });
 
-console.log(resposta.id); // ID da requisição no OpenClaw
-console.log(resposta.status); // 'pendente' | 'aprovado' | 'rejeitado'
+console.log(resultado.id); // ID da solicitacao
+console.log(resultado.url); // URL para revisao
 ```
 
-### 3. Verificar Status
+### 4. Verificar Status do Diff
 
 ```typescript
-import { verificarStatus } from './openclaw/cliente';
+import { verificarStatusDiff } from './openclaw/cliente';
 
-const status = await verificarStatus('id-da-requisicao');
-console.log(status.status); // 'aprovado'
-console.log(status.aprovadoPor); // 'usuario@email.com'
-console.log(status.aprovadoEm); // '2024-01-01T12:00:00Z'
+const status = await verificarStatusDiff(idDaSolicitacao);
+console.log(status.status); // 'pendente', 'aprovado', 'rejeitado'
 ```
 
-### 4. Listar Propostas Pendentes
+### 5. Aplicar Mudancas Aprovadas
 
 ```typescript
-import { listarPendentes } from './openclaw/ipc';
+import { aplicarDiffAprovado } from './openclaw/diffs';
 
-const pendentes = await listarPendentes();
-console.log(pendentes.length); // 3
-console.log(pendentes[0].id); // 'req_123'
-console.log(pendentes[0].arquivos); // ['src/main/index.ts']
+const aplicado = await aplicarDiffAprovado(idDaSolicitacao);
+console.log(aplicado.ok); // true/false
 ```
 
-### 5. Aplicar Proposta Aprovada
+## Handler IPC
+
+O modulo OpenClaw expoe os seguintes handlers IPC:
+
+| Canal | Descricao | Retorno |
+|-------|-----------|---------|
+| `openclaw:config` | Configura OpenClaw | `{ ok, mensaje }` |
+| `openclaw:token-status` | Status do token | `{ ok, status }` |
+| `openclaw:enviar-diff` | Envia diff para aprovacao | `{ ok, id, url }` |
+| `openclaw:verificar-status` | Verifica status do diff | `{ ok, status }` |
+| `openclaw:listar` | Lista diffs pendentes | `{ ok, diffs }` |
+| `openclaw:aplicar` | Aplica diff aprovado | `{ ok, aplicado }` |
+
+## Cliente HTTP
+
+O cliente HTTP para OpenClaw Gateway:
 
 ```typescript
-import { aplicarProposta } from './openclaw/ipc';
+import { OpenClawClient } from './openclaw/cliente';
 
-const resultado = await aplicarProposta('req_123');
-console.log(resultado.ok); // true
-console.log(resultado.aplicados); // ['src/main/index.ts']
-console.log(resultado.checkpointId); // 'chk_456'
+const client = new OpenClawClient({
+  endpoint: 'http://127.0.0.1:18789',
+  token: 'seu-token',
+  model: 'openclaw/default'
+});
+
+// Enviar diff
+const response = await client.sendDiff(diff, contexto);
+
+// Verificar status
+const status = await client.getStatus(id);
+
+// Listar diffs
+const diffs = await client.listDiffs();
+
+// Cancelar diff
+const canceled = await client.cancelDiff(id);
 ```
 
-### 6. Rejeitar Proposta
+## Sistema de Diffs
+
+Gerenciamento de diffs local:
 
 ```typescript
-import { rejeitarProposta } from './openclaw/ipc';
+import { criarDiff, aplicarDiff, reverterDiff } from './openclaw/diffs';
 
-const resultado = await rejeitarProposta('req_123', 'Mudança não compatível');
-console.log(resultado.ok); // true
+// Criar diff
+const diff = criarDiff({
+  arquivo: 'src/index.ts',
+  atual: conteudoAtual,
+  proposto: conteudoProposto
+});
+
+// Aplicar diff
+const aplicado = aplicarDiff(diff);
+
+// Reverter diff
+const revertido = reverterDiff(diff);
 ```
 
-## 📥 Handlers IPC
+## Hunks
 
-### Configuração
+Trabalhando com hunks:
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `openclaw:config-get` | - | `{endpoint, model, hasToken}` | Obtém configuração |
-| `openclaw:config-set` | `{endpoint, model, token}` | `{ok}` | Define configuração |
+```typescript
+import { criarHunk, aplicarHunk, reverterHunk } from './openclaw/hunks';
 
-### Token
+// Criar hunk
+const hunk = criarHunk({
+  oldStart: 10,
+  oldCount: 5,
+  newStart: 10,
+  newCount: 5,
+  oldLines: ['linha 10', 'linha 11', 'linha 12', 'linha 13', 'linha 14'],
+  newLines: ['nova 10', 'nova 11', 'nova 12', 'nova 13', 'nova 14']
+});
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `openclaw:token-set` | `{token}` | `{ok}` | Define token |
-| `openclaw:token-clear` | - | `{ok}` | Limpa token |
-| `openclaw:token-status` | - | `{hasToken, endpoint}` | Status do token |
+// Aplicar hunk
+const aplicado = aplicarHunk(arquivo, hunk);
 
-### Diff
+// Reverter hunk
+const revertido = reverterHunk(arquivo, hunk);
+```
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `openclaw:pedir` | `{diffs, contexto}` | `{ok, id, status}` | Envia diff para OpenClaw |
-| `openclaw:pendentes` | - | `{ok, propostas}` | Lista propostas pendentes |
-| `openclaw:aplicar` | `{id}` | `{ok, aplicados, checkpointId}` | Aplica uma proposta |
-| `openclaw:rejeitar` | `{id, motivo}` | `{ok}` | Rejeita uma proposta |
+## Contexto
 
-### Auditoria
+Contexto para requisicoes OpenClaw:
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `openclaw:auditoria-listar` | - | `{ok, auditorias}` | Lista auditorias |
+```typescript
+import { criarContexto } from './openclaw/contexto';
 
-## 🎯 Integração com Agentes
+const contexto = criarContexto({
+  raizProjeto: '/path/to/project',
+  arquivoAtual: 'src/index.ts',
+  linguagem: 'typescript',
+  objetivo: 'Adicionar validacao de entrada',
+  restricoes: ['Nao quebrar testes existentes', 'Manter compatibilidade']
+});
+```
 
-Os agentes do DG Editor podem usar OpenClaw para **aprovação humana**:
+## Auditoria
+
+Auditoria de mudancas OpenClaw:
+
+```typescript
+import { auditarMudanca, registrarAprovacao } from './openclaw/audit';
+
+// Auditar mudanca
+const auditoria = auditarMudanca({
+  tipo: 'diff',
+  arquivo: 'src/index.ts',
+  mudancas: [...],
+  usuario: 'rodrigo'
+});
+
+// Registrar aprovacao
+const registrada = registrarAprovacao({
+  id: 'diff-123',
+  status: 'aprovado',
+  aprovador: 'rodrigo',
+  timestamp: Date.now()
+});
+```
+
+## Segredos
+
+Gerenciamento de tokens e segredos:
+
+```typescript
+import { salvarToken, lerToken, removerToken } from './openclaw/secrets';
+
+// Salvar token
+salvarToken('openclaw', 'seu-token-bearer');
+
+// Ler token
+const token = lerToken('openclaw');
+
+// Remover token
+removerToken('openclaw');
+```
+
+## Integracao com MCP
+
+Integracao com Model Context Protocol:
+
+```typescript
+import { registerOpenClawMcp } from './openclaw/mcp';
+
+// Registrar tools MCP
+registerOpenClawMcp({
+  endpoint: 'http://127.0.0.1:18789',
+  token: 'seu-token'
+});
+```
+
+## Fluxo Completo de Uso
+
+### 1. Agente Gera Mudanca
 
 ```typescript
 import { executarAgente } from './brain/agent';
-import { enviarParaOpenClaw } from './openclaw/cliente';
 
-// 1. Agente gera propostas
-const resultado = await executarAgente(
-  raizProjeto,
-  'Refatore o módulo de autenticação',
-  {
-    agente: 'engenheiro',
-    proposeWrites: true
-  }
+const { texto: codigoProposto } = await executarAgente(
+  '/path/to/project',
+  'Adicione validacao de email'
 );
-
-// 2. Enviar propostas para OpenClaw
-if (resultado.propostas && resultado.propostas.length > 0) {
-  const resposta = await enviarParaOpenClaw({
-    diffs: resultado.propostas,
-    contexto: {
-      pedido: 'Refatore o módulo de autenticação',
-      agente: 'engenheiro',
-      modelo: resultado.modelo
-    }
-  });
-  
-  // 3. Aguardar aprovação
-  const status = await aguardarAprovacao(resposta.id);
-  
-  // 4. Aplicar se aprovado
-  if (status.aprovado) {
-    await aplicarProposta(resposta.id);
-  }
-}
 ```
 
-## 🔄 Fluxo de Integração
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              DG EDITOR + OPENCLAW INTEGRATION                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  DG EDITOR                          OPENCLAW GATEWAY            │
-│  ───────────                          ───────────────            │
-│                                                               │
-│  1. AGENTE EXECUTA                                             │
-│     [Agent Module]─────┐                                       │
-│                         │                                       │
-│                         ▼                                       │
-│  2. PROPOSTAS GERADAS                                          │
-│     [Propostas Module]──┐                                      │
-│                         │                                       │
-│                         ▼                                       │
-│  3. ENVIAR PARA OPENCLAW                                       │
-│     [OpenClaw Client]───HTTP POST──▶ [Gateway]                  │
-│                         │              │                         │
-│                         │              ▼                         │
-│  4. SALVAR E NOTIFICAR                                         │
-│     [Gateway]──────────┐              │                         │
-│                         │              │                         │
-│                         ▼              ▼                         │
-│  5. USUÁRIO REVISA       [BD OpenClaw] ◄──────── [Gateway]      │
-│     [Interface Web]─────────────────────────────────────────▶│
-│                         │                                       │
-│                         ▼                                       │
-│  6. DECISÃO (Aprovar/Rejeitar)                                  │
-│     [Interface Web]─────┐                                       │
-│                         │                                       │
-│                         ▼                                       │
-│  7. NOTIFICAR DG EDITOR                                        │
-│     [Gateway]──────────HTTP GET──▶ [OpenClaw Client]           │
-│                         │                                       │
-│                         ▼                                       │
-│  8. APLICAR MUDANÇAS                                            │
-│     [OpenClaw IPC]──────▶ [Propostas Module]                    │
-│                         │                                       │
-│                         ▼                                       │
-│  9. CHECKPOINT                                                  │
-│     [Checkpoint Module]───────────────────────────────────────│
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🛡️ Segurança
-
-### 1. Validação de Diffs
-
-Todos os diffs são validados antes de serem enviados:
+### 2. Criar Diff
 
 ```typescript
-function validarDiff(diff: Diff): boolean {
-  // Verificar se arquivo existe
-  if (!fs.existsSync(diff.arquivo)) {
-    throw new Error(`Arquivo não existe: ${diff.arquivo}`);
-  }
-  
-  // Verificar se caminho é seguro
-  const seg = caminhoSeguro(diff.arquivo, raizProjeto);
-  if (!seg.ok) {
-    throw new Error(`Caminho inválido: ${diff.arquivo}`);
-  }
-  
-  // Verificar se conteúdo é válido
-  if (diff.atual.length === 0 || diff.proposto.length === 0) {
-    throw new Error('Conteúdo vazio');
-  }
-  
-  return true;
-}
-```
+import { criarDiff } from './openclaw/diffs';
+import { lerArquivo } from './arquivos';
 
-### 2. Token Management
-
-O token é armazenado de forma segura:
-
-```typescript
-import { salvarToken, lerToken, limparToken } from './openclaw/secrets';
-
-// Salvar token (criptografado)
-await salvarToken(token, 'openclaw');
-
-// Ler token
-await lerToken('openclaw');
-
-// Limpar token
-await limparToken('openclaw');
-```
-
-**Observação:** No momento, o token é armazenado em texto plano em `localStorage` do renderer. Para produção, deve ser usado um **keystore** seguro.
-
-### 3. HTTPS Recomendado
-
-Para produção, **sempre use HTTPS**:
-
-```typescript
-const endpoint = process.env.NODE_ENV === 'production'
-  ? 'https://gateway.openclaw.ai'
-  : 'http://127.0.0.1:18789';
-```
-
-## 📊 Métricas
-
-| Métrica | Valor |
-|---------|-------|
-| Handlers IPC | 8 |
-| Endpoints HTTP | 4 |
-| Tamanho do módulo | ~1.500 linhas |
-| Tempo médio de resposta | 500ms-2s |
-
-## 🎯 Integração com MCP
-
-O OpenClaw pode ser usado via **MCP (Model Context Protocol)**:
-
-```typescript
-import { McpClient } from '@modelcontextprotocol/sdk/client';
-
-const client = new McpClient({
-  name: 'openclaw-mcp',
-  url: 'http://127.0.0.1:18789/mcp'
-});
-
-// Chamar tool do OpenClaw
-await client.callTool('openclaw.pedir', {
-  diffs: [...],
-  contexto: {...}
+const atual = await lerArquivo('src/services/user.ts');
+const diff = criarDiff({
+  arquivo: 'src/services/user.ts',
+  atual,
+  proposto: codigoProposto
 });
 ```
 
-## 📚 Documentação Relacionada
+### 3. Enviar para OpenClaw
 
-- [Agent Module](../agent/README.md) - Agentes Autônomos
-- [IPC Handlers](../ipc/README.md) - Handlers IPC
-- [Brain Module](../brain/README.md) - Módulo de IA
+```typescript
+import { enviarParaAprovacao } from './openclaw/cliente';
 
-## 🔗 Links Úteis
+const { id, url } = await enviarParaAprovacao(diff, {
+  contexto: 'Validacao de email no servico de usuarios'
+});
 
-- [OpenClaw](https://openclaw.ai) - Sistema de aprovação humana
-- [OpenClaw Gateway](https://github.com/openclaw-ai/gateway) - Gateway HTTP
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP
+// Abrir navegador para revisao
+import { shell } from 'electron';
+await shell.openExternal(url);
+```
+
+### 4. Verificar e Aplicar
+
+```typescript
+import { verificarStatusDiff, aplicarDiffAprovado } from './openclaw/cliente';
+
+// Polling para verificar status
+let status = await verificarStatusDiff(id);
+while (status.status === 'pendente') {
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  status = await verificarStatusDiff(id);
+}
+
+// Se aprovado, aplicar
+if (status.status === 'aprovado') {
+  await aplicarDiffAprovado(id);
+}
+```
+
+## Configuracoes
+
+```typescript
+export const OPENCLAW_CONFIG = {
+  // Endpoint padrao
+  endpoint: process.env.OC_ENDPOINT || 'http://127.0.0.1:18789',
+  
+  // Modelo padrao
+  model: process.env.OC_MODEL || 'openclaw/default',
+  
+  // Token
+  token: process.env.OC_TOKEN,
+  
+  // Timeout
+  timeoutMs: 120000,
+  
+  // Retries
+  maxRetries: 3
+};
+```
+
+## Seguranca
+
+- Todos os tokens sao armazenados de forma segura
+- Diffs sao validados antes de serem aplicados
+- Checkpoints sao criados antes de aplicar mudancas
+- Log de todas as operacoes para auditoria
+
+## Depuracao
+
+### Logs
+
+```bash
+# Ver logs do OpenClaw
+cat /path/to/.dg-editor/logs/openclaw.log
+```
+
+### Debug Mode
+
+```typescript
+process.env.OPENCLAW_DEBUG = '1';
+process.env.OPENCLAW_VERBOSE = '1';
+```
+
+## Testes
+
+### Teste Basico
+
+```typescript
+import { criarDiff, aplicarDiff } from './openclaw/diffs';
+
+const diff = criarDiff({
+  arquivo: 'teste.txt',
+  atual: 'conteudo atual',
+  proposto: 'conteudo proposto'
+});
+
+const aplicado = aplicarDiff(diff);
+console.assert(aplicado.ok, 'Diff nao aplicado');
+```
+
+### Teste de Integracao
+
+```typescript
+import { OpenClawClient } from './openclaw/cliente';
+
+const client = new OpenClawClient({
+  endpoint: 'http://127.0.0.1:18789',
+  token: 'test-token'
+});
+
+const status = await client.getStatus('test-id');
+console.assert(status !== null, 'Nao retornou status');
+```
+
+## Roadmap
+
+- [x] Cliente HTTP para OpenClaw Gateway
+- [x] Sistema de diffs
+- [x] Gerenciamento de hunks
+- [x] Integracao IPC
+- [x] Auditoria de mudancas
+- [x] Gerenciamento de tokens
+- [ ] Integracao MCP completa
+- [ ] Interface web para revisao
+- [ ] Aprovacao em lote
+- [ ] Historico de mudancas
+
+## Contribuindo
+
+Para adicionar uma nova funcionalidade:
+
+1. Crie um arquivo no diretorio `openclaw/`
+2. Implemente a funcao
+3. Adicione testes
+4. Documentacao
+
+## Versao
+
+- **Versao**: 0.2.0
+- **Data**: Novembro de 2024
+- **Autor**: Rodrigo Soares
+- **Licenca**: MIT

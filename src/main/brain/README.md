@@ -1,40 +1,40 @@
-# Módulo Brain - DG Editor
+# Modulo Brain - DG Editor
 
-> **Cérebro de IA Local do DG Editor**
-> Versão: 0.2.0 | Status: 🟢 Ativo
+> **Cerebro de IA Local do DG Editor**
+> Versao: 0.2.0 | Status: Ativo
 
-## 🎯 Visão Geral
+## Visao Geral
 
-O módulo **Brain** é o **cérebro** do DG Editor, responsável por:
+O modulo **Brain** e o **cerebro** do DG Editor, responsavel por:
 
-- **Integração com Ollama** (IA local)
-- **Análise de código** com IA
-- **Geração de código** inteligente
-- **Híbrido (Fase 1 + Fase 2)** - Análise preditiva + geração
+- **Integracao com Ollama** (IA local)
+- **Analise de codigo** com IA
+- **Geracao de codigo** inteligente
+- **Hibrido (Fase 1 + Fase 2)** - Analise preditiva + geracao
 - **Gerenciamento de modelos** de IA
-- **Avaliação de modelos**
-- **Memória generativa** (embeddings)
-- **Skills** (habilidades específicas)
+- **Avaliacao de modelos**
+- **Memoria generativa** (embeddings)
+- **Skills** (habilidades especificas)
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 brain/
-├── module.ts            # Módulo principal (fábrica)
-├── agent.ts             # Execução de agentes
-├── agentes.ts           # Definição dos agentes
-├── avaliacao.ts         # Avaliação de modelos
-├── editar.ts            # Edição com IA
-├── hibrido.ts           # Sistema híbrido (análise + geração)
-├── indice.ts            # Indexação de código
-├── modelos-catalogo.ts  # Catálogo de modelos Ollama
-├── ollama.ts            # Integração com Ollama
+├── module.ts            # Modulo principal (fabrica)
+├── agent.ts             # Execucao de agentes
+├── agentes.ts           # Definicao dos agentes
+├── avaliacao.ts         # Avaliacao de modelos
+├── editar.ts            # Edicao com IA
+├── hibrido.ts           # Sistema hibrido (analise + geracao)
+├── indice.ts            # Indexacao de codigo
+├── modelos-catalogo.ts  # Catalogo de modelos Ollama
+├── ollama.ts            # Integracao com Ollama
 ├── providers.ts         # Providers de IA (Ollama, OpenAI)
 ├── registry.ts          # Registro de models e providers
 └── skills.ts            # Sistema de skills
 ```
 
-## 🧠 Arquitetura
+## Arquitetura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -62,26 +62,26 @@ brain/
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                    BRAIN MODULE                     │    │
 │  │  • ask() - Perguntas gerais                        │    │
-│  │  • analyze() - Análise de código                    │    │
-│  │  • generate() - Geração de código                  │    │
+│  │  • analyze() - Analise de codigo                    │    │
+│  │  • generate() - Geracao de codigo                  │    │
 │  │  • executeAgent() - Executa agentes                │    │
 │  └────────────┬────────────────────────┬────────────────┘    │
 │                │                            │                       │
 │                ▼                            ▼                       │
 │  ┌─────────────────────┐    ┌─────────────────────┐          │
 │  │    HIBRIDO          │    │      AGENTS          │          │
-│  │  • Fase 1: Análise │    │  • free-coder        │          │
-│  │  • Fase 2: Geração │    │  • revisor           │          │
+│  │  • Fase 1: Analise │    │  • free-coder        │          │
+│  │  • Fase 2: Geracao │    │  • revisor           │          │
 │  │  • Briefing         │    │  • engenheiro       │          │
-│  │  • Predição         │    │  • arquiteto         │          │
+│  │  • Predicao         │    │  • arquiteto         │          │
 │  └─────────────────────┘    └─────────────────────┘          │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Uso
+## Uso
 
-### 1. Inicialização
+### 1. Inicializacao
 
 ```typescript
 import { getBrain } from './brain/module';
@@ -99,359 +99,438 @@ const response = await brain.ask(
 
 console.log(response.text); // Resposta em pt-BR
 console.log(response.provider); // 'ollama'
-console.log(response.model); // 'qwen2.5-coder:3b'
+console.log(response.model); // 'qwen2.5-coder:1.5b'
 ```
 
-### 3. Análise de Código
+### 3. Analisar Codigo
 
 ```typescript
 const analysis = await brain.analyze(
-  raizProjeto,
-  'rapida' // 'rapida' | 'completa'
+  '/path/to/project',
+  'Identifique problemas de performance'
 );
 
-console.log(analysis.oQueE); // 'Aplicação Electron...'
-console.log(analysis.stack); // 'Electron, TypeScript...'
-console.log(analysis.problemas); // ['...']
+console.log(analysis.resumo);
+console.log(analysis.problemas);
+console.log(analysis.sugestoes);
 ```
 
-### 4. Geração de Código
+### 4. Gerar Codigo
 
 ```typescript
 const code = await brain.generate(
-  'Crie um componente React para lista de usuários',
+  '/path/to/project',
+  'Crie uma funcao utilitaria para formatar datas',
   {
     language: 'typescript',
-    framework: 'react',
-    style: 'tailwind'
+    context: 'Projeto React com Date-fns'
   }
 );
 
-console.log(code.generated); // Código gerado
-console.log(code.model); // Modelo usado
+console.log(code.texto);
 ```
 
-### 5. Híbrido (Análise + Geração)
+### 5. Executar Agente
 
 ```typescript
-import { executarHibrido } from './brain/hibrido';
-
-const result = await executarHibrido(
-  raizProjeto,
-  'Adicione autenticação JWT ao backend',
+const result = await brain.executeAgent(
+  '/path/to/project',
+  'Refatore este componente para usar hooks',
   {
-    force: true,
-    modeloForcado: 'qwen2.5-coder:3b'
+    agente: 'revisor',
+    modelo: 'qwen2.5-coder:3b'
   }
 );
 
-console.log(result.texto); // Resultado final
-console.log(result.briefing); // Briefing da análise
-console.log(result.passos); // Passos executados
+console.log(result.texto);
+console.log(result.passos);
 ```
 
-## 📥 Providers
+## Providers de IA
 
-### Ollama (Padrão)
+### Ollama
 
-O **Ollama** é o provider padrão para IA local:
+O provider Ollama e a integracao principal para IA local:
 
 ```typescript
-import { getOllamaConfig } from '../config';
+import { OllamaProvider } from './brain/providers';
 
-const config = getOllamaConfig();
-console.log(config.url); // 'http://127.0.0.1:11434'
-console.log(config.fastModel); // 'qwen2.5-coder:1.5b'
-console.log(config.chatModel); // 'qwen2.5-coder:3b'
+const provider = new OllamaProvider({
+  url: 'http://127.0.0.1:11434',
+  timeout: 120000,
+  maxTokens: 8192
+});
+
+// Perguntar
+const response = await provider.ask(prompt, context);
+
+// Gerar codigo
+const code = await provider.generate(prompt, options);
+
+// Stream
+const stream = await provider.askStream(prompt, context);
+for await (const chunk of stream) {
+  process.stdout.write(chunk);
+}
 ```
 
-### OpenAI (Opcional)
-
-Para usar OpenAI, configure as variáveis de ambiente:
-
-```bash
-OPENROUTER_API_KEY=sua_chave
-```
-
-## 🎯 Modelos
-
-### Catálogo de Modelos
-
-O sistema mantém um **catálogo** de modelos disponíveis:
+### OpenAI (Futuro)
 
 ```typescript
-import { detectarModelosLocais, lerCatalogo } from './brain/modelos-catalogo';
+import { OpenAIProvider } from './brain/providers';
 
-// Detectar modelos instalados localmente
-const catalogo = await detectarModelosLocais(raizProjeto);
-
-console.log(catalogo.ativo); // Modelo ativo
-console.log(catalogo.modelos); // Lista de modelos
-console.log(catalogo.problemas); // Problemas de validação
+const provider = new OpenAIProvider({
+  apiKey: process.env.OPENAI_API_KEY,
+  model: 'gpt-4',
+  timeout: 60000
+});
 ```
 
-### Modelos Padrão
+### Registry
 
-| Modelo | Tarefa | Tamanho | Descrição |
-|--------|--------|---------|-----------|
-| `qwen2.5-coder:1.5b` | Código rápido | 1.5B | Geração de código rápida |
-| `qwen2.5-coder:3b` | Código | 3B | Geração de código balanceada |
-| `qwen2.5-coder:7b` | Código complexo | 7B | Geração de código avançada |
-| `llama3:8b` | Chat | 8B | Conversação geral |
-
-### Seleção de Modelo por Tarefa
+O registry gerencia todos os providers e modelos:
 
 ```typescript
-import { modeloParaTarefa } from './brain/modelos-catalogo';
+import { registry } from './brain/registry';
 
-const modelo = modeloParaTarefa(raizProjeto, 'chat'); // 'qwen2.5-coder:3b'
-const modeloCod = modeloParaTarefa(raizProjeto, 'codigo'); // 'qwen2.5-coder:1.5b'
-const modeloAnalise = modeloParaTarefa(raizProjeto, 'analise'); // 'qwen2.5-coder:3b'
+// Listar providers
+registry.listProviders();
+
+// Listar modelos
+registry.listModels();
+
+// Obter provider padrao
+const defaultProvider = registry.getDefaultProvider();
+
+// Obter modelo padrao
+const defaultModel = registry.getDefaultModel();
 ```
 
-## 🔄 Sistema Híbrido
+## Sistema Hibrido
 
-O **sistema híbrido** combina **análise** (Fase 1) e **geração** (Fase 2):
+O sistema hibrido combina analise e geracao em duas fases:
 
-### Fase 1: Análise Preditiva
-
-- Analisa o código **sem gerar mudancas**
-- Identifica **problemas** e **oportunidades**
-- Gera **briefing** para a Fase 2
-
-### Fase 2: Geração
-
-- Recebe o **briefing** da Fase 1
-- Gera **código** ou **soluções**
-- Aplica **mudanças** se solicitado
-
-### Exemplo de Briefing
+### Fase 1: Analise
 
 ```typescript
 import { prepararBriefing } from './brain/hibrido';
 
 const briefing = await prepararBriefing(
-  raizProjeto,
-  'Adicione validação ao formulário',
-  pastaAberta
+  '/path/to/project',
+  'Crie um novo modulo de autenticacao'
 );
 
-console.log(briefing.problema); // 'Falta validação...'
-console.log(briefing.contexto); // 'Arquivos: src/components/...'
-console.log(briefing.sugestao); // 'Usar React Hook Form...'
+// briefing contem:
+// - oQueE: tipo do projeto
+// - stack: tecnologias usadas
+// - contexto: arquivos relevantes
+// - sugestao: modelo recomendado
 ```
 
-### Predição de Impacto
+### Fase 2: Geracao
 
 ```typescript
-import { predizerImpacto } from './brain/hibrido';
+import { executarHibrido } from './brain/hibrido';
 
-const predicao = predizerImpacto(
-  pedido,
-  analiseWorkspace(raizProjeto)
-);
-
-console.log(predicao.risco); // 'baixo' | 'médio' | 'alto'
-console.log(predicao.rota); // 'código' | 'chat'
-console.log(predicao.tempoEstimadoMs); // 5000
-```
-
-## 🎭 Agentes
-
-O módulo Brain integra com o módulo **Agent**:
-
-```typescript
-import { executarAgente } from './brain/agent';
-
-const resultado = await executarAgente(
-  raizProjeto,
-  'Refatore o módulo de autenticação',
+const resultado = await executarHibrido(
+  '/path/to/project',
+  'Crie um novo modulo de autenticacao',
   {
-    agente: 'engenheiro',
-    modo: 'agent',
-    proposeWrites: true
+    briefing: briefing, // Do passo anterior
+    force: true,
+    modeloForcado: 'qwen2.5-coder:3b'
   }
 );
+
+// resultado contem:
+// - ok: boolean
+// - texto: resposta do modelo
+// - modelo: modelo usado
+// - passos: passos executados
+// - briefing: briefing gerado
 ```
 
-## 🧠 Memória Generativa
+## Gerenciamento de Modelos
 
-O sistema de **memória generativa** usa **embeddings** para:
-
-- Indexar **turnos de conversa**
-- Recuperar **contexto relevante**
-- Manter **fatos aceitos**
-
-### Indexação
+### Catalogo de Modelos
 
 ```typescript
-import { indexarTurno } from './memory/embeddings';
+import { lerCatalogo, detectarModelosLocais, validarCatalogo } from './brain/modelos-catalogo';
 
-// Indexar um turno de conversa
-await indexarTurno(
-  raizProjeto,
-  'user',
-  'Lembre que o usuário prefere TypeScript'
+// Ler catalogo
+const catalogo = lerCatalogo('/path/to/project');
+
+// Detectar modelos locais
+const modelos = await detectarModelosLocais('/path/to/project');
+
+// Validar catalogo
+const { ok, problemas } = validarCatalogo(catalogo);
+
+// Salvar catalogo
+salvarCatalogo('/path/to/project', catalogo);
+```
+
+### Health Check
+
+```typescript
+import { healthCheckModelos, iniciarHealthPeriodico } from './brain/modelos-catalogo';
+
+// Check pontual
+const status = await healthCheckModelos('/path/to/project');
+
+// Check periodico
+iniciarHealthPeriodico('/path/to/project', 120000); // 2 minutos
+```
+
+### Escolha de Modelo
+
+```typescript
+import { escolherModelo, modeloParaTarefa } from './brain/agent';
+
+// Escolher modelo automaticamente
+const modelo = await escolherModelo();
+
+// Escolher modelo para tarefa especifica
+const modelo = modeloParaTarefa('/path/to/project', 'gerar documentacao');
+```
+
+## Avaliacao de Modelos
+
+```typescript
+import { rodarAvaliacao } from './brain/avaliacao';
+
+const resultado = await rodarAvaliacao(
+  '/path/to/project',
+  'qwen2.5-coder:3b'
+);
+
+// resultado contem:
+// - modelo: modelo avaliado
+// - pontuacao: 0-10
+// - testeCode: resultado do teste de geracao de codigo
+// - testeAnalise: resultado do teste de analise
+// - testeRefactor: resultado do teste de refatoracao
+// - recomendacoes: sugestoes de melhoria
+```
+
+## Skills
+
+O sistema de skills permite executar tarefas especificas:
+
+```typescript
+import { listarSkills, executarSkill } from './brain/skills';
+
+// Listar skills disponiveis
+const skills = listarSkills('/path/to/project');
+
+// Executar skill
+const resultado = await executarSkill(
+  '/path/to/project',
+  'skill-refatorar-funcoes-longe'
 );
 ```
 
-### Recuperação de Contexto
+### Skills Disponiveis
+
+| Skill | ID | Descricao |
+|-------|-----|-----------|
+| Refatorar | `skill-refatorar-funcoes-longe` | Refatora funcoes muito longas |
+| Documentar | `skill-documentar-modulo` | Gera documentacao do modulo |
+| Testar | `skill-gerar-testes` | Gera testes unitarios |
+| Otimizar | `skill-otimizar-imports` | Otimiza imports |
+| Tipar | `skill-adicionar-tipos` | Adiciona tipos TypeScript |
+
+## Indice de Codigo
+
+Indexacao de codigo para busca e analise:
 
 ```typescript
-import { buscarContextoRelevante } from './memory/embeddings';
+import { iniciarIndice, carregarIndice, buscarNoIndice } from './brain/indice';
 
-const contexto = await buscarContextoRelevante(
-  raizProjeto,
-  'Qual a preferência de linguagem do usuário?',
-  5 // Top 5 resultados
+// Iniciar indexacao
+await iniciarIndice('/path/to/project');
+
+// Carregar indice
+const indice = carregarIndice('/path/to/project');
+
+// Buscar no indice
+const resultados = buscarNoIndice(indice, 'funcao de validação');
+```
+
+## Integracao com Ollama
+
+### ensureOllama
+
+Garante que o Ollama esta rodando:
+
+```typescript
+import { ensureOllama } from './ollama-keeper';
+
+await ensureOllama();
+```
+
+### Status do Ollama
+
+```typescript
+import { getOllamaStatus } from './brain/ollama';
+
+const status = await getOllamaStatus();
+console.log(status.ativo); // true/false
+console.log(status.url); // 'http://127.0.0.1:11434'
+console.log(status.modelos); // ['qwen2.5-coder:1.5b', ...]
+```
+
+## Edicao com IA
+
+```typescript
+import { editarComIA } from './brain/editar';
+
+const resultado = await editarComIA(
+  '/path/to/file.ts',
+  'Adicione validacao de email',
+  {
+    startLine: 10,
+    endLine: 20
+  }
 );
 
-console.log(contexto[0].texto); // 'O usuário prefere TypeScript'
-console.log(contexto[0].similaridade); // 0.95
+// resultado contem:
+// - ok: boolean
+// - novoConteudo: codigo editado
+// - diff: diff entre antigo e novo
+// - erro: erro se houver
 ```
 
-## 🎯 Skills
+## Memoria Generativa
 
-**Skills** são **habilidades específicas** que os agentes podem usar:
-
-| Skill | Gatilho | Descrição |
-|-------|---------|-----------|
-| `analisar-sistema` | `/analisar` | Analisa o sistema atual |
-| `gerar-tests` | `/test` | Gera testes automatizados |
-| `documentar` | `/doc` | Gera documentação |
-| `refatorar` | `/refator` | Refatora código |
-| `debugger` | `/debug` | Identifica bugs |
-
-### Uso de Skills
+Memoria baseada em embeddings para contexto:
 
 ```typescript
-import { listarSkills } from './brain/skills';
+import { indexarTurno, buscarMemoria } from './memory/embeddings';
 
-const skills = listarSkills(raizProjeto);
-console.log(skills[0].id); // 'analisar-sistema'
-console.log(skills[0].titulo); // 'Analisar Sistema'
-console.log(skills[0].gatilho); // '/analisar'
+// Indexar conversa
+await indexarTurno('/path/to/project', 'user', 'Como usar o useEffect?');
+await indexarTurno('/path/to/project', 'assistant', 'O useEffect e um hook do React...');
+
+// Buscar na memoria
+const resultados = await buscarMemoria('/path/to/project', 'useEffect');
 ```
 
-## 📊 Fluxo de Dados
+## API IPC
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    BRAIN DATA FLOW                             │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1. ENTRADA                                                    │
-│     ├── Prompt do usuário                                      │
-│     ├── Contexto do projeto                                    │
-│     └── Configurações                                         │
-│                                                               │
-│  2. PRÉ-PROCESSAMENTO                                          │
-│     ├── Validação do prompt                                    │
-│     ├── Normalização                                           │
-│     └── Enriquecimento de contexto                             │
-│                                                               │
-│  3. ANÁLISE (Fase 1)                                           │
-│     ├── Tokenização                                            │
-│     ├── Embeddings (opcional)                                  │
-│     ├── Busca em índice                                         │
-│     └── Geração de briefing                                    │
-│                                                               │
-│  4. GERAÇÃO (Fase 2)                                            │
-│     ├── Seleção do modelo                                       │
-│     ├── Construção do prompt                                   │
-│     ├── Chamada ao provider (Ollama/OpenAI)                    │
-│     └── Pós-processamento da resposta                           │
-│                                                               │
-│  5. SAÍDA                                                      │
-│     ├── Texto gerado                                            │
-│     ├── Propostas de código                                     │
-│     └── Metadados (modelo, tokens, tempo)                       │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
-```
+### Handlers
 
-## 🛡️ Segurança
+| Canal | Descricao | Retorno |
+|-------|-----------|---------|
+| `brain:ask` | Pergunta ao brain | `{ ok, text, provider, modelo }` |
+| `brain:providers` | Lista providers | `{ ok, providers }` |
+| `brain:ollama-status` | Status do Ollama | `{ ok, ativo, url, modelos }` |
+| `brain:models` | Lista modelos | `{ ok, modelos }` |
+| `brain:avaliar` | Avalia modelo | `{ ok, avaliacao }` |
 
-### Validação de Entrada
+## Configuracao
 
-Todos os prompts são validados:
+### Configuracoes do Brain
 
 ```typescript
-// Validação de prompt
-if (!prompt || prompt.trim().length === 0) {
-  return { ok: false, erro: 'Prompt vazio' };
-}
-
-if (prompt.length > MAX_PROMPT_LENGTH) {
-  return { ok: false, erro: 'Prompt muito longo' };
-}
+export const BRAIN_CONFIG = {
+  defaultProvider: 'ollama',
+  defaultModel: 'qwen2.5-coder:1.5b',
+  fastModel: 'qwen2.5-coder:1.5b',
+  chatModel: 'qwen2.5-coder:3b',
+  maxTokens: 8192,
+  timeoutMs: 120000,
+  keepAlive: '30s'
+};
 ```
 
-### Safe Mode
-
-Em **safe mode**, o Brain opera com restrições:
+### Modelos Recomendados
 
 ```typescript
-import { emSafeMode } from '../safe-mode';
-
-if (emSafeMode()) {
-  // Desativa recursos que consomem muitos recursos
-  config.timeoutMs = 30000; // 30 segundos
-  config.maxTokens = 1024;
-}
+export const MODELOS_RECOMENDADOS = {
+  // Rapidos (1-2B parametros)
+  rapidos: ['qwen2.5-coder:1.5b', 'llama3.2:1b'],
+  
+  // Balanceados (3-7B parametros)
+  balanceados: ['qwen2.5-coder:3b', 'llama3.2:3b', 'mistral:7b'],
+  
+  // Potentes (7B+ parametros)
+  potentes: ['qwen2.5-coder:7b', 'llama3.2:11b', 'mistral:7b'],
+  
+  // Especializados
+  especializados: {
+    codigo: ['qwen2.5-coder:3b', 'codeqwen:7b'],
+    analise: ['qwen2.5-coder:3b', 'mistral:7b'],
+    geracao: ['qwen2.5-coder:7b', 'llama3.2:11b']
+  }
+};
 ```
 
-### Resource Limiter
+## Depuracao
 
-O sistema monitora uso de recursos:
+### Logs
+
+```bash
+# Ver logs do brain
+cat /path/to/.dg-editor/logs/brain.log
+```
+
+### Debug Mode
 
 ```typescript
-import { getResourceLimits } from '../config';
-
-const limits = getResourceLimits();
-if (memoryUsage > limits.memory.critical) {
-  throw new Error('Memória insuficiente para executar IA');
-}
+process.env.BRAIN_DEBUG = '1';
+process.env.BRAIN_VERBOSE = '1';
 ```
 
-## 📈 Métricas
+## Testes
 
-| Métrica | Valor |
-|---------|-------|
-| Providers disponíveis | 2 (Ollama, OpenAI) |
-| Modelos gerenciados | 10+ |
-| Skills disponíveis | 8 |
-| Tempo médio de resposta | 2-10 segundos |
-| Tokens por resposta | 512-2048 |
-| Tamanho do módulo | ~5.000 linhas |
+### Teste Basico
 
-## 🎯 Integrações
+```typescript
+import { getBrain } from './brain/module';
 
-### Com Módulo Agent
-- Execução de agentes
-- Roteamento inteligente
-- Orquestração
+const brain = getBrain();
+const response = await brain.ask('Qual e 2+2?', '');
 
-### Com Módulo MCP
-- Servidor MCP para integração com Maestro
-- Tools para leitura de arquivos
-- Tools para busca
+console.assert(response.ok, 'Pergunta falhou');
+console.assert(response.text.includes('4'), 'Resposta incorreta');
+```
 
-### Com Módulo Memory
-- Indexação de turnos
-- Busca semântica
-- Memória de longo prazo
+### Teste de Analise
 
-## 📚 Documentação Relacionada
+```typescript
+const analysis = await brain.analyze('/path/to/project', 'Analise este projeto');
 
-- [Agent Module](../agent/README.md) - Agentes Autônomos
-- [MCP Server](../mcp/server.ts) - Servidor MCP
-- [Memory Module](../memory/README.md) - Memória Generativa
-- [IPC Handlers](../ipc/README.md) - Handlers IPC
+console.assert(analysis.ok, 'Analise falhou');
+console.assert(analysis.resumo, 'Nao gerou resumo');
+```
 
-## 🔗 Links Úteis
+## Roadmap
 
-- [Ollama](https://ollama.ai) - IA local
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP
-- [Qwen2.5](https://huggingface.co/Qwen/Qwen2.5-Coder) - Modelos usados
-- [TypeScript](https://www.typescriptlang.org/) - Tipagem estática
+- [x] Integracao com Ollama
+- [x] Sistema de providers
+- [x] Registry de modelos
+- [x] Sistema hibrido
+- [x] Avaliacao de modelos
+- [x] Skills
+- [x] Indice de codigo
+- [x] Memoria generativa
+- [ ] Integracao com OpenAI
+- [ ] Integracao com Anthropic
+- [ ] Fine-tuning de modelos
+- [ ] Multi-provider load balancing
+
+## Contribuindo
+
+Para adicionar um novo provider:
+
+1. Implemente a interface `Provider`
+2. Adicione ao registry
+3. Adicione testes
+
+## Versao
+
+- **Versao**: 0.2.0
+- **Data**: Novembro de 2024
+- **Autor**: Rodrigo Soares
+- **Licenca**: MIT
