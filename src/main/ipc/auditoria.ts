@@ -6,6 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import type { RelatorioAuditoria } from '../auto-auditoria';
+import type { IpcResult } from './types';
 
 // ============================================================================
 // HANDLERS DE AUDITORIA

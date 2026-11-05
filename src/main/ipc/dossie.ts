@@ -7,6 +7,7 @@ import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { DossieSnapshot } from '../dossie';
+import type { IpcResult } from './types';
 
 // ============================================================================
 // HANDLERS DE DOSSIE

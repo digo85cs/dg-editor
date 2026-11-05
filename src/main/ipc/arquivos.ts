@@ -26,7 +26,7 @@ export async function handleArquivoLer(
   _event: Electron.IpcMainInvokeEvent,
   caminho: unknown,
   pastas: unknown
-): Promise<IpcResult & { dataUrl?: string; mime?: string; erro?: string }> {
+): Promise<IpcResult & { conteudo?: string; erro?: string }> {
   const c = exigirString(caminho, 'caminho');
   if (isErroPayload(c)) return { ok: false, erro: c.erro };
 
@@ -38,7 +38,7 @@ export async function handleArquivoLer(
 
   try {
     const result = await lerArquivo(seg.abs, p);
-    if (result.ok) return { ok: true, dataUrl: result.dataUrl, mime: result.mime };
+    if (result.ok) return { ok: true, conteudo: result.conteudo };
     return { ok: false, erro: result.erro || 'Erro ao ler arquivo' };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
@@ -54,7 +54,7 @@ export async function handleArquivoLerBase64(
   _event: Electron.IpcMainInvokeEvent,
   caminho: unknown,
   pastas: unknown
-): Promise<IpcResult & { conteudo?: string; erro?: string }> {
+): Promise<IpcResult & { dataUrl?: string; mime?: string; erro?: string }> {
   const c = exigirString(caminho, 'caminho');
   if (isErroPayload(c)) return { ok: false, erro: c.erro };
 
@@ -66,9 +66,7 @@ export async function handleArquivoLerBase64(
 
   try {
     const result = await lerArquivoBase64(seg.abs, p);
-    if (result.ok) {
-      return { ok: true, conteudo: result.conteudo };
-    }
+    if (result.ok) return { ok: true, dataUrl: result.dataUrl, mime: result.mime };
     return { ok: false, erro: result.erro || 'Erro ao ler arquivo' };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
