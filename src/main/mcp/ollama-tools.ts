@@ -145,13 +145,13 @@ export async function executeOllamaTool(
   }
   checkAbort()
   const fetchImpl = runtime.fetchImpl || fetch
-  const apiKey = runtime.apiKey ?? process.env.OLLAMA_API_KEY ?? ''
+  const apiKey = (runtime.apiKey ?? process.env.OLLAMA_API_KEY ?? '').trim()
   const configuredUrl = normalizeLocalUrl(runtime.localUrl || process.env.OLLAMA_URL || process.env.OLLAMA_HOST || LOCAL_URL)
   const preferCloud = officialCloudHost(configuredUrl)
   const localUrl = preferCloud ? LOCAL_URL : configuredUrl
   const active = catalogActive(root)
-  const defaultModel = runtime.defaultModel ?? process.env.OLLAMA_MODEL ?? active
-  const fallbackModel = runtime.fallbackModel ?? process.env.OLLAMA_FALLBACK_MODEL
+  const defaultModel = runtime.defaultModel?.trim() || process.env.OLLAMA_MODEL?.trim() || active
+  const fallbackModel = runtime.fallbackModel?.trim() || process.env.OLLAMA_FALLBACK_MODEL?.trim()
   const attempts: Attempt[] = []
   const redact = (value: string) => {
     let text = value
@@ -180,8 +180,12 @@ export async function executeOllamaTool(
       checkAbort()
       const availability = /remote|cloud|temporar|unavailable|not found|not available|sign.?in|unauthor|forbidden|authentication|api.?key|access token|disabled|rate.limit|quota|capacity|timeout|timed out|connection/i
       const invalidPayload = /invalid|bad request|malformed|must (?:be|contain)|required|unsupported (?:format|option|parameter)/i
-      const canRetry = (message: string) => [401, 403, 404, 408, 409, 429].includes(response.status) || response.status >= 500 ||
-        ((response.ok || response.status === 400) && availability.test(message)) || (response.ok && !invalidPayload.test(message))
+      const canRetry = (message: string) => {
+        const invalid = invalidPayload.test(message) && !/api.?key|access token|authentication|unauthor/i.test(message)
+        if (invalid && (response.ok || response.status === 400 || response.status === 422)) return false
+        return [401, 403, 404, 408, 409, 429].includes(response.status) || response.status >= 500 ||
+          ((response.ok || response.status === 400) && availability.test(message)) || (response.ok && !invalid)
+      }
       let data: any
       try { data = text ? JSON.parse(text) : {} } catch {
         throw new RequestError('Ollama retornou JSON inválido (HTTP ' + response.status + ').', canRetry(text))

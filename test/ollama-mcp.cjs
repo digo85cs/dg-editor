@@ -127,6 +127,22 @@ test('default local model keeps the existing daemon path', async () => {
   assert.equal(chats(mock, CLOUD).length, 0)
 })
 
+test('a local tag ending in cloudy is not mistaken for a cloud selector', async () => {
+  const model = 'foo:cloudy'
+  const mock = mockOllama({
+    models: [localModel(model)],
+    localChat: (call) => answer(call.body.model, 'ordinary local tag')
+  })
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model
+  }, fixtureRoot, runtime(mock, { defaultModel: model, fallbackModel: model }))
+  assert.equal(result.model, model)
+  assert.equal(result.provider, 'ollama-local')
+  assert.equal(result.transport, 'daemon')
+  assert.equal(result.fallback_used, false)
+  assert.equal(chats(mock, CLOUD).length, 0)
+})
+
 test('signed-in daemon serves a cloud suffix without an API key', async () => {
   const mock = mockOllama({
     localChat: (call) => {
@@ -164,6 +180,21 @@ test('remote metadata identifies an arbitrary alias as cloud', async () => {
   assert.equal(chats(mock, LOCAL)[0].body.model, alias)
 })
 
+test('/api/show detects a remote alias omitted from the tags metadata', async () => {
+  const alias = 'show-only-alias:latest'
+  const mock = mockOllama({
+    models: [localModel(alias), localModel()],
+    show: { [alias]: remoteModel(alias) },
+    localChat: (call) => answer(call.body.model, 'cloud from show metadata')
+  })
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: alias
+  }, fixtureRoot, runtime(mock))
+  assert.equal(result.provider, 'ollama-cloud')
+  assert.equal(result.transport, 'daemon')
+  assert.equal(result.fallback_used, false)
+})
+
 test('direct cloud uses the official host, Bearer key and remote_model', async () => {
   const alias = 'my-coding-alias:latest'
   const mock = mockOllama({
@@ -184,6 +215,34 @@ test('direct cloud uses the official host, Bearer key and remote_model', async (
   assert.equal(result.provider, 'ollama-cloud')
   assert.equal(result.transport, 'cloud')
   assert.equal(result.fallback_used, false)
+})
+
+test('direct cloud can answer while the local daemon is offline', async () => {
+  const mock = mockOllama({
+    cloudChat: (call) => answer(call.body.model, 'cloud without daemon')
+  })
+  const fetchImpl = async (input, init) => {
+    if (new URL(String(input)).origin === LOCAL) throw new TypeError('daemon is offline')
+    return mock.fetchImpl(input, init)
+  }
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_MODEL, backend: 'cloud'
+  }, fixtureRoot, { ...runtime(mock, { apiKey: SECRET }), fetchImpl })
+  assert.equal(result.text, 'cloud without daemon')
+  assert.equal(result.provider, 'ollama-cloud')
+  assert.equal(result.transport, 'cloud')
+  assert.equal(result.fallback_used, false)
+})
+
+test('explicit cloud without an API key falls back locally without leaking a request', async () => {
+  const mock = mockOllama({
+    localChat: (call) => answer(call.body.model, 'local without a key')
+  })
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
+  }, fixtureRoot, runtime(mock))
+  assertLocalResult(result, CLOUD_ALIAS)
+  assert.equal(chats(mock, CLOUD).length, 0)
 })
 
 test('legacy cloud suffix resolves through the official cloud catalog', async () => {
@@ -291,6 +350,37 @@ test('fallback discovery excludes remote aliases and embedding models', async ()
   assert.equal(chats(mock, LOCAL).some((c) => [remoteAlias, embedding].includes(c.body.model)), false)
 })
 
+test('fallback discovery checks show capabilities before using an embedding alias', async () => {
+  const alias = 'vector-alias:latest'
+  const mock = mockOllama({
+    models: [localModel(alias, { size: 1 }), localModel()],
+    show: { [alias]: { capabilities: ['embedding'] } },
+    cloudChat: () => json({ error: 'cloud offline' }, 502),
+    localChat: (call) => {
+      assert.equal(call.body.model, LOCAL_MODEL)
+      return answer(call.body.model, 'completion fallback')
+    }
+  })
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET, fallbackModel: '' }))
+  assertLocalResult(result, CLOUD_ALIAS)
+  assert.equal(chats(mock, LOCAL).some((c) => c.body.model === alias), false)
+})
+
+test('an explicit fallback cannot secretly be a cloud alias', async () => {
+  const alias = 'hidden-remote:latest'
+  const mock = mockOllama({
+    models: [remoteModel(alias), localModel()],
+    localChat: () => assert.fail('invalid fallback must be rejected before inference'),
+    cloudChat: () => assert.fail('invalid fallback must be rejected before inference')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud', fallback_model: alias
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })))
+  assert.equal(chats(mock).length, 0)
+})
+
 test('the daemon cloud failure also falls back without requiring a cloud API key', async () => {
   const mock = mockOllama({
     localChat: (call) => call.body.model === CLOUD_ALIAS
@@ -323,6 +413,55 @@ test('both cloud and local failing return an explicit failure', async () => {
   )
 })
 
+test('a malformed cloud request is surfaced instead of silently changing models', async () => {
+  const mock = mockOllama({
+    cloudChat: () => json({ error: 'invalid parameter temperature' }, 400),
+    localChat: () => assert.fail('invalid payload must not be hidden by fallback')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })), /400|invalid/i)
+  assert.equal(chats(mock, LOCAL).length, 0)
+})
+
+test('HTTP 200 with an invalid messages error does not trigger fallback', async () => {
+  const mock = mockOllama({
+    cloudChat: () => json({ error: 'invalid messages payload' }),
+    localChat: () => assert.fail('invalid messages must not be hidden by fallback')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })), /invalid|messages/i)
+  assert.equal(chats(mock, LOCAL).length, 0)
+})
+
+test('HTTP 400 with a non-JSON invalid response does not trigger fallback', async () => {
+  const mock = mockOllama({
+    cloudChat: () => new Response('Bad Request: invalid messages payload', { status: 400 }),
+    localChat: () => assert.fail('HTTP 400 payload errors must not be hidden by fallback')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })), /400|invalid|JSON/i)
+  assert.equal(chats(mock, LOCAL).length, 0)
+})
+
+test('an internal cloud timeout falls back while keeping user cancellation distinct', async () => {
+  const mock = mockOllama({
+    cloudChat: (call) => new Promise((_resolve, reject) => {
+      assert.ok(call.signal)
+      if (call.signal.aborted) reject(call.signal.reason || abortError())
+      else call.signal.addEventListener('abort', () => reject(call.signal.reason || abortError()), { once: true })
+    }),
+    localChat: (call) => answer(call.body.model, 'local after timeout')
+  })
+  const result = await executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud', timeout_ms: 100
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET }))
+  assertLocalResult(result, CLOUD_ALIAS)
+  assert.match(result.attempts.find((a) => !a.ok).error, /timeout|100/i)
+})
+
 test('cloud fallback preserves prompt, context, system and generation options', async () => {
   const mock = mockOllama({
     cloudChat: () => json({ error: 'try local' }, 502),
@@ -351,9 +490,10 @@ test('an arbitrary upstream host never receives requests or the cloud key', asyn
   const alias = 'custom-remote:latest'
   const mock = mockOllama({
     models: [remoteModel(alias, { remote_host: 'https://untrusted.invalid', remote_model: 'private-model' }), localModel()],
-    localChat: (call) => call.body.model === LOCAL_MODEL
-      ? answer(call.body.model, 'trusted local fallback')
-      : json({ error: 'remote unavailable' }, 502),
+    localChat: (call) => {
+      assert.equal(call.body.model, LOCAL_MODEL, 'untrusted remote alias must not be invoked through the daemon either')
+      return answer(call.body.model, 'trusted local fallback')
+    },
     cloudChat: () => json({ error: 'unknown alias' }, 404)
   })
   const result = await executeOllamaTool('ollama_ask', {
@@ -361,6 +501,7 @@ test('an arbitrary upstream host never receives requests or the cloud key', asyn
   }, fixtureRoot, runtime(mock, { apiKey: SECRET }))
   assertLocalResult(result, alias)
   assert.equal(mock.calls.some((c) => c.url.hostname === 'untrusted.invalid'), false)
+  assert.equal(chats(mock, LOCAL).some((c) => c.body.model === alias), false)
   for (const call of mock.calls) {
     if (call.headers.has('authorization')) assert.equal(call.url.origin, CLOUD)
   }
@@ -404,6 +545,29 @@ test('a pre-cancelled request does not start inference or fallback', async () =>
   await assert.rejects(executeOllamaTool('ollama_ask', {
     prompt: 'hello', model: CLOUD_ALIAS, backend: 'cloud'
   }, fixtureRoot, runtime(mock, { apiKey: SECRET, signal: controller.signal })))
+  assert.equal(chats(mock).length, 0)
+})
+
+test('backend local rejects a cloud selector before inference', async () => {
+  const mock = mockOllama({
+    localChat: () => assert.fail('local-only mode must not offload to cloud'),
+    cloudChat: () => assert.fail('local-only mode must not call the cloud API')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: CLOUD_ALIAS, backend: 'local'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })))
+  assert.equal(chats(mock).length, 0)
+})
+
+test('backend local refuses an unknown alias when show cannot prove it is local', async () => {
+  const mock = mockOllama({
+    models: [localModel()],
+    localChat: () => assert.fail('unknown alias must not be sent to generation in local-only mode'),
+    cloudChat: () => assert.fail('local-only mode must not send cloud inference')
+  })
+  await assert.rejects(executeOllamaTool('ollama_ask', {
+    prompt: 'hello', model: 'unknown-alias:latest', backend: 'local'
+  }, fixtureRoot, runtime(mock, { apiKey: SECRET })))
   assert.equal(chats(mock).length, 0)
 })
 
