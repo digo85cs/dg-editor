@@ -7,6 +7,7 @@ import { dglog } from '../dglog'
 import fs from 'fs'
 import path from 'path'
 import { spawnSync } from 'child_process'
+import { resolverBinarioCodex, statusCodexEmCache } from './codex-cli'
 import {
   type ProviderConfig,
   cursorCliAprovadoNaSessao,
@@ -16,6 +17,7 @@ import {
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'chat-rapido' | 'analise' | 'analisar' | 'codigo' | 'raciocinio' | 'revisao'
 export type Tarefa = TarefaModelo
+export type ProvedorEscolhido = 'auto' | 'ollama' | 'codex'
 
 export interface ModeloReg {
   nome: string
@@ -28,6 +30,7 @@ export interface ModeloReg {
 }
 
 export interface EscolherModeloOpts {
+  provider?: ProvedorEscolhido
   preferirQualidade?: boolean
   pedido?: string
   /** 'pipeline' = uso real; 'auditoria'|'teste' = nao conta no stats de 14b */
@@ -35,6 +38,7 @@ export interface EscolherModeloOpts {
 }
 
 export interface OpcoesFila {
+  provider?: ProvedorEscolhido
   preferirQualidade?: boolean
   pedido?: string
 }
@@ -82,6 +86,20 @@ function cfgCursorCli(): ProviderConfig {
     formato: 'cursor-cli',
     modelo: 'cursor-agent',
     baseUrl: '',
+    numPredict: 0,
+    timeoutMs: 180_000,
+    modo: 'ask'
+  })
+}
+
+export function cfgCodexCli(): ProviderConfig {
+  return cfg({
+    id: 'codex-cli:default',
+    tipo: 'cli',
+    formato: 'codex-cli',
+    modelo: process.env.CODEX_MODEL?.trim() || '',
+    baseUrl: '',
+    binario: resolverBinarioCodex() || undefined,
     numPredict: 0,
     timeoutMs: 180_000,
     modo: 'ask'
@@ -160,6 +178,11 @@ export async function garantirCatalogoOpenRouter(): Promise<void> {
  * OpenRouter: exige chave + modelo presente no catálogo (cache 10 min).
  */
 export function disponivel(cfg: ProviderConfig): StatusDisponivel {
+  if (cfg.formato === 'codex-cli') {
+    const status = statusCodexEmCache()
+    if (!status?.installed) return 'indisponivel'
+    return status.authenticated && status.available ? 'ok' : 'sem-chave'
+  }
   if (cfg.formato === 'cursor-cli' || cfg.tipo === 'cli') {
     const bin = cfg.binario || resolverBinarioCursorAgent()
     if (!bin) return 'indisponivel'
@@ -197,7 +220,7 @@ function cfg(
 }
 
 /** Fila ordenada por tarefa. Online sem chave permanece (disponivel=false em runtime). */
-export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): ProviderConfig[] {
+function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
   const t = normalizarTarefa(String(tarefa))
 
   if (t === 'analise' || t === 'analisar') {
@@ -424,6 +447,15 @@ export function filaDeModelos(tarefa: Tarefa | string, _opcoes?: OpcoesFila): Pr
   ]
 }
 
+/** A escolha explícita nunca altera a ordem automática já estabelecida. */
+export function filaDeModelos(tarefa: Tarefa | string, opcoes?: OpcoesFila): ProviderConfig[] {
+  const t = normalizarTarefa(String(tarefa))
+  const padrao = filaPadraoDeModelos(t)
+  if (!opcoes?.provider || opcoes.provider === 'auto') return padrao
+  const locais = padrao.filter((p) => p.tipo === 'local' && p.formato === 'ollama' && !modeloPesadoDemais(t, p))
+  return opcoes.provider === 'codex' ? [cfgCodexCli(), ...locais] : locais
+}
+
 /**
  * Filtra a fila para status === 'ok', loga pulos, e falha se nada sobrar.
  * Chat e analise nao carregam 7b/14b: o 14b permanece na lista-fonte e e pulado aqui.
@@ -434,9 +466,9 @@ function modeloPesadoDemais(tarefa: TarefaModelo, p: ProviderConfig): boolean {
   return /:(?:7b|14b)\b/.test(p.modelo)
 }
 
-export function primeiroProvider(tarefa: Tarefa | string): ProviderConfig | null {
+export function primeiroProvider(tarefa: Tarefa | string, opcoes?: OpcoesFila): ProviderConfig | null {
   const t = normalizarTarefa(String(tarefa))
-  for (const p of filaDeModelos(t)) {
+  for (const p of filaDeModelos(t, opcoes)) {
     if (modeloPesadoDemais(t, p)) continue
     if (disponivel(p) === 'ok') return p
   }

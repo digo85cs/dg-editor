@@ -11,11 +11,12 @@ import { URL } from 'url'
 import { dglog } from '../dglog'
 import { OLLAMA_URL } from './ollama'
 import { resolverRaizProjeto } from '../paths'
+import { executarCodex, CodexCliError, statusCodexEmCache } from './codex-cli'
 
 export interface ProviderConfig {
   id: string
   tipo: 'local' | 'online' | 'cli'
-  formato: 'ollama' | 'openai' | 'cursor-cli'
+  formato: 'ollama' | 'openai' | 'cursor-cli' | 'codex-cli'
   modelo: string
   baseUrl: string
   apiKeyEnv?: string
@@ -51,6 +52,7 @@ export type ErroProviderKind =
   | 'auth'
   | 'server'
   | 'timeout'
+  | 'cancelled'
   | 'rede'
   | 'modelo_morto'
   | 'outro'
@@ -541,9 +543,50 @@ export async function chamarCursorCli(
 export async function chamarProvider(
   cfg: ProviderConfig,
   mensagens: Message[],
-  tools?: ToolDef[]
+  tools?: ToolDef[],
+  signal?: AbortSignal
 ): Promise<RespostaProvider> {
+  if (signal?.aborted) throw new ErroProvider('cancelled', 'Execucao cancelada pelo usuario.', cfg.id)
+  if (cfg.formato === 'codex-cli') {
+    const transcript = mensagens.map((m) => {
+      const role = m.role + (m.tool_name ? ' [' + m.tool_name + ']' : '')
+      const calls = m.tool_calls?.length ? '\n' + JSON.stringify(m.tool_calls) : ''
+      return role + ':\n' + m.content + calls
+    }).join('\n\n')
+    try {
+      const result = await executarCodex({
+        prompt: 'Responda à conversa abaixo com a resposta final. Não emita chamadas de ferramentas do DG Editor.',
+        context: transcript,
+        model: cfg.modelo || undefined,
+        cwd: resolverRaizProjeto(),
+        timeoutMs: cfg.timeoutMs,
+        signal
+      })
+      return {
+        content: result.text,
+        tool_calls: [],
+        modeloUsado: result.model || cfg.modelo || 'codex',
+        providerId: cfg.id,
+        usage: result.usage ? {
+          prompt_tokens: result.usage.input_tokens,
+          completion_tokens: result.usage.output_tokens,
+          total_tokens: (result.usage.input_tokens || 0) + (result.usage.output_tokens || 0)
+        } : undefined
+      }
+    } catch (error) {
+      if (error instanceof CodexCliError) {
+        const kinds: Record<string, ErroProviderKind> = {
+          auth: 'auth', timeout: 'timeout', cancelled: 'cancelled',
+          unavailable: 'rede', server: 'server', protocol: 'outro'
+        }
+        throw new ErroProvider(kinds[error.kind] || 'outro', error.message, cfg.id)
+      }
+      throw error
+    }
+  }
   const ac = new AbortController()
+  const cancel = () => ac.abort()
+  signal?.addEventListener('abort', cancel, { once: true })
   const timer = setTimeout(() => ac.abort(), cfg.timeoutMs)
   try {
     if (cfg.formato === 'cursor-cli') {
@@ -557,6 +600,7 @@ export async function chamarProvider(
     return await adapterOpenAI(cfg, mensagens, tools, ac.signal)
   } finally {
     clearTimeout(timer)
+    signal?.removeEventListener('abort', cancel)
   }
 }
 
@@ -564,14 +608,16 @@ export async function chamarProvider(
 export async function chamarProviderSharp(
   cfg: ProviderConfig,
   mensagens: Message[],
-  tools?: ToolDef[]
+  tools?: ToolDef[],
+  signal?: AbortSignal
 ): Promise<RespostaProvider> {
-  const r = await chamarProvider(cfg, mensagens, tools)
+  const r = await chamarProvider(cfg, mensagens, tools, signal)
   dglog('[provider] sharp id=' + r.providerId + ' modelo=' + r.modeloUsado)
   return r
 }
 
 export function disponivel(cfg: ProviderConfig): boolean {
+  if (cfg.formato === 'codex-cli') return statusCodexEmCache()?.available === true
   if (cfg.formato === 'cursor-cli' || cfg.tipo === 'cli') {
     const bin = cfg.binario || resolverBinarioCursorAgent()
     return !!bin && cursorCliAprovadoNaSessao()
