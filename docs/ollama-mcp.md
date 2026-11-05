@@ -12,7 +12,9 @@ Na raiz do projeto, compile o servidor:
 npm run build:mcp
 ```
 
-Para um cliente MCP externo, use a configuração de [`.dg-editor/mcp-config.json`](../.dg-editor/mcp-config.json). Ela aponta para o servidor compilado em `.dg-editor/bin/main/mcp/server.js` e define `DG_ROOT` com a raiz atual do workspace. Se mover o projeto, atualize os dois caminhos. O comando `node` precisa estar no PATH do cliente externo; após instalar Node ou mudar variáveis de ambiente, reinicie esse cliente. O cliente interno do DG Editor usa o runtime do próprio aplicativo.
+Para um cliente MCP externo, use a configuração de [`.dg-editor/mcp-config.json`](../.dg-editor/mcp-config.json). Ela aponta para o servidor compilado em `.dg-editor/bin/main/mcp/server.js` e define `DG_ROOT` com a raiz atual do workspace. O comando usa o caminho absoluto de `node_modules/electron/dist/electron.exe` com `ELECTRON_RUN_AS_NODE=1`, o mesmo modo do cliente interno do DG Editor. Assim, a conexão externa não depende de `node` no PATH nem abre a interface gráfica do Electron.
+
+O runtime Electron precisa estar instalado nas dependências do projeto. Se mover a pasta, atualize `command`, `args` e `DG_ROOT` na configuração. Em uma instalação que tenha Node no PATH do cliente MCP, você pode trocar `command` para `node` e remover `ELECTRON_RUN_AS_NODE`. Reinicie o cliente após mudar o runtime ou as variáveis de ambiente.
 
 Compile antes de iniciar a conexão MCP e conecte o cliente diretamente ao servidor compilado por stdio. Reinicie a conexão após recompilar para carregar o código novo.
 
