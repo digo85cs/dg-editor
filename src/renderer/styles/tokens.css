@@ -58,6 +58,9 @@ body.tema-claro {
   --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08);
   --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.12);
   --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.16);
+  --dg-duration-fast: 120ms;
+  --dg-duration-ui: 180ms;
+  --dg-ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --dg-fs-xs: 11px;
   --dg-fs-sm: 12px;
   --dg-fs-md: 13px;

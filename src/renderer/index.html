@@ -57,14 +57,14 @@
 
   <div id="app">
     <!-- Activity bar: chat/busca/explorer · spacer · terminal/navegador/tema (Contas/Config na base do Explorer) -->
-    <nav id="activity-bar" aria-label="Activity bar">
+    <nav id="activity-bar" aria-label="Barra de atividades">
       <button type="button" class="ab-btn" data-action="chat" data-tip="Chat / IA (Ctrl+Alt+B)" aria-label="Chat">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3V5z"/></svg>
       </button>
       <button type="button" class="ab-btn" data-action="busca" data-tip="Buscar em arquivos" aria-label="Busca">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       </button>
-      <button type="button" class="ab-btn active" data-action="explorer" data-tip="Explorer (Ctrl+Shift+E)" aria-label="Explorer">
+        <button type="button" class="ab-btn active" data-action="explorer" data-tip="Arquivos (Ctrl+Shift+E)" aria-label="Arquivos">
         <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"/></svg>
       </button>
       <div class="ab-spacer"></div>
@@ -84,9 +84,9 @@
     <!-- Sidebar explorer -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-modes" role="tablist" aria-label="Modo da sidebar">
-          <button type="button" id="sidebar-mode-projects" class="sidebar-mode" role="tab" aria-selected="false">Projects</button>
-          <button type="button" id="sidebar-mode-explorer" class="sidebar-mode active" role="tab" aria-selected="true">Explorer</button>
+        <div class="sidebar-modes" role="tablist" aria-label="Modo da barra lateral">
+          <button type="button" id="sidebar-mode-projects" class="sidebar-mode" role="tab" aria-selected="false">Projetos</button>
+          <button type="button" id="sidebar-mode-explorer" class="sidebar-mode active" role="tab" aria-selected="true">Arquivos</button>
         </div>
         <div class="sidebar-actions">
           <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">
@@ -160,7 +160,7 @@
     <section id="center-panel">
       <div class="center-tabs" role="tablist" aria-label="Área central">
         <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
-        <button type="button" class="center-tab" data-center-pane="agent" role="tab" aria-selected="false">Agent</button>
+        <button type="button" class="center-tab" data-center-pane="agent" role="tab" aria-selected="false">Agente</button>
         <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
       </div>
 

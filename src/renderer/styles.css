@@ -640,20 +640,57 @@ body {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: 12px 16px;
+  gap: var(--dg-space-3);
 }
 .agent-header {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--dg-space-2);
+  padding: var(--dg-space-3);
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: var(--dg-radius-lg);
+  background: var(--dg-sidebar);
+}
+.agent-header-main,
+.agent-header-actions {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--dg-space-2);
+  min-width: 0;
+}
+.agent-header-actions {
+  justify-content: flex-end;
+  padding-top: var(--dg-space-2);
+  border-top: 1px solid var(--dg-border-subtle);
+}
+#agent-select {
+  min-width: 132px;
+  max-width: 220px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-sm);
+  background: var(--dg-surface);
+  color: var(--dg-text);
+  font: inherit;
+  font-size: var(--dg-fs-sm);
 }
 .agent-mode {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: var(--dg-radius-sm);
+  color: var(--dg-text-muted);
+  font-size: var(--dg-fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
 }
 .agent-trace {
   flex: 0 0 auto;
@@ -661,7 +698,7 @@ body {
   overflow: auto;
   font-size: 12px;
   border: 1px solid var(--dg-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--dg-radius-lg);
   padding: 6px 8px;
   background: var(--dg-sidebar);
 }
@@ -677,7 +714,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   border: 1px solid var(--dg-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--dg-radius-lg);
   padding: 10px 12px;
 }
 .agent-input-bar {
@@ -690,7 +727,7 @@ body {
   resize: vertical;
   min-height: 48px;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: var(--dg-radius-lg);
   border: 1px solid var(--dg-border);
   background: var(--dg-bg);
   color: var(--dg-text);
