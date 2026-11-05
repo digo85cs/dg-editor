@@ -61,7 +61,7 @@ export async function handleModelosRecarregar(
 export async function handleModelosParaTarefa(
   _event: Electron.IpcMainInvokeEvent,
   tarefa: unknown
-): Promise<IpcResult & { ok: boolean; erro?: string; modelo?: string }> {
+): Promise<IpcResult & { ok: boolean; erro?: string; modelo?: string | null }> {
   const t = exigirString(tarefa, 'tarefa');
   if (isErroPayload(t)) return t;
   try {

@@ -256,7 +256,7 @@ export async function handleRegrasCreateTemplate(
 
   try {
     const resultado = createRulesTemplate(seg.abs);
-    return { ok: resultado.ok, erro: resultado.erro };
+    return { ok: resultado };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     dglog(`[rules:create-template] erro: ${msg}`);

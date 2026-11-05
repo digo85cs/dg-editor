@@ -6,7 +6,8 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
-import type { IpcResult } from './types';
+import type { BriefingHibrido } from '../brain/hibrido';
+import type { RespostaAgente } from '../brain/agent';
 
 // ============================================================================
 // HANDLERS DE HIBRIDO
@@ -20,7 +21,7 @@ export async function handleHibridoAnalisar(
   root: string,
   pedido: string,
   pastaAberta: string
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<BriefingHibrido | { ok: false; erro: string }> {
   try {
     const { prepararBriefing } = await import('../brain/hibrido');
     return prepararBriefing(root || process.cwd(), pedido || 'status do workspace', pastaAberta);
@@ -37,7 +38,7 @@ export async function handleHibridoExecutar(
   root: string,
   pedido: string,
   opcoes: unknown
-): Promise<IpcResult & { ok: boolean; erro?: string; texto?: string; modelo?: string; passos?: unknown; briefing?: unknown }> {
+): Promise<(RespostaAgente & { briefing: BriefingHibrido }) | { ok: false; texto: string; modelo: string; passos: unknown[]; briefing: null }> {
   try {
     const opts = opcoes as Record<string, unknown>;
     const { executarHibrido } = await import('../brain/hibrido');

@@ -112,7 +112,8 @@ import { loadChat, appendChat, clearChat } from './chatstore';
 import { getAccountsState } from './accounts';
 import { guardianSnapshot, guardianResumo } from './guardian';
 import { bootSaudeIAs } from './boot-saude';
-import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie, dossieDirDoApp } from './dossie';
+import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie';
+import { dossieDirDoApp } from './bridge-adapta';
 import {
   gerarContinuidade,
   statusAdapta,

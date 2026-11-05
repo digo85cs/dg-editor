@@ -14,7 +14,7 @@ const MAX_TOTAL = 48_000
 export type AnexoEntrada = { nome?: string; tipo?: string; data?: string }
 
 export function textoDeAnexo(nome: string, base64: string): { nome: string; texto: string; binario: boolean; bytes: number } {
-  const ext = (nome.includes('.') ? nome.split('.').pop() : '' || '').toLowerCase()
+  const ext = (nome.includes('.') ? nome.split('.').pop() || '' : '').toLowerCase()
   let buf: Buffer
   try {
     buf = Buffer.from(String(base64 || ''), 'base64')

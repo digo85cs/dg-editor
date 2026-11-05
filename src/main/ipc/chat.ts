@@ -28,7 +28,7 @@ export async function handleChatLoad(
 
   try {
     const chat = loadChat(seg.abs);
-    return { ok: true, mensagens: chat.mensagens };
+    return { ok: true, mensagens: chat };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     dglog(`[chat:load] erro: ${msg}`);

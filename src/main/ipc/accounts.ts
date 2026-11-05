@@ -5,7 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import type { IpcResult } from './types';
+import type { AccountsState } from '@shared/types';
 
 // ============================================================================
 // HANDLERS DE CONTAS
@@ -16,12 +16,12 @@ import type { IpcResult } from './types';
  */
 export async function handleAccountsGetState(
   _event: Electron.IpcMainInvokeEvent
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<AccountsState> {
   try {
     const { getAccountsState } = await import('../accounts');
     return getAccountsState();
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    throw e;
   }
 }
 

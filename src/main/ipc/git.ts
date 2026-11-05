@@ -43,7 +43,7 @@ export async function handleGitDiff(
   _event: Electron.IpcMainInvokeEvent,
   raiz: unknown,
   caminho: unknown
-): Promise<IpcResult & { diff?: string; erro?: string }> {
+): Promise<{ ok: boolean; diff?: string; erro?: string }> {
   const r = exigirString(raiz, 'raiz');
   if (isErroPayload(r)) return { ok: false, erro: r.erro };
 
@@ -57,8 +57,8 @@ export async function handleGitDiff(
   if (!segCaminho.ok) return { ok: false, erro: segCaminho.erro };
 
   try {
-    const diff = await gitDiff(segRaiz.abs, segCaminho.abs);
-    return { ok: true, diff };
+    const result = await gitDiff(segRaiz.abs, segCaminho.abs);
+    return { ok: result.ok, diff: result.diff, erro: result.erro };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     dglog(`[git:diff] erro: ${msg}`);

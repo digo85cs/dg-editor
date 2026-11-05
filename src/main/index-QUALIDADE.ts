@@ -930,7 +930,7 @@ ipcMain.handle('chat:send', async (_e, root: unknown, content: unknown, opts: un
     const { primeiroProvider } = await import('./brain/registry')
     const modeloChat = modeloParaTarefa(resolverRaizProjeto(), 'chat')
     const { guardianPodeOperar } = await import('./guardian')
-    const modeloLocal = guardianPodeOperar() ? modeloChat : 'qwen2.5-coder:1.5b'
+    const modeloLocal = guardianPodeOperar() && modeloChat ? modeloChat : 'qwen2.5-coder:1.5b'
     const cfgRapido = primeiroProvider('chat')
     const systemChat = 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.'
     const userChat = (context ? 'Contexto:\n' + context + '\n\n' : '') + 'Pedido: ' + texto

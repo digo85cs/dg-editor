@@ -26,7 +26,7 @@ export async function handleArquivoLer(
   _event: Electron.IpcMainInvokeEvent,
   caminho: unknown,
   pastas: unknown
-): Promise<IpcResult & { conteudo?: string; erro?: string }> {
+): Promise<IpcResult & { dataUrl?: string; mime?: string; erro?: string }> {
   const c = exigirString(caminho, 'caminho');
   if (isErroPayload(c)) return { ok: false, erro: c.erro };
 
@@ -38,9 +38,7 @@ export async function handleArquivoLer(
 
   try {
     const result = await lerArquivo(seg.abs, p);
-    if (result.ok) {
-      return { ok: true, conteudo: result.conteudo };
-    }
+    if (result.ok) return { ok: true, dataUrl: result.dataUrl, mime: result.mime };
     return { ok: false, erro: result.erro || 'Erro ao ler arquivo' };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
@@ -120,7 +118,7 @@ export async function handleArquivoListar(
   _event: Electron.IpcMainInvokeEvent,
   dir: unknown,
   pastas: unknown
-): Promise<IpcResult & { arquivos?: unknown; erro?: string }> {
+): Promise<IpcResult & { entradas?: unknown; erro?: string }> {
   const d = exigirString(dir, 'dir');
   if (isErroPayload(d)) return { ok: false, erro: d.erro };
 
@@ -133,7 +131,7 @@ export async function handleArquivoListar(
   try {
     const result = await listarDiretorio(seg.abs, p);
     if (result.ok) {
-      return { ok: true, arquivos: result.arquivos };
+      return { ok: true, entradas: result.entradas };
     }
     return { ok: false, erro: result.erro || 'Erro ao listar diretorio' };
   } catch (e) {

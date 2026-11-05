@@ -20,7 +20,7 @@ export async function handleMcpTools(
   try {
     const { listarTools } = await import('../mcp/client');
     const tools = await listarTools();
-    return { ok: true, tools: tools.map((t: { name: string; description: string }) => ({ name: t.name, description: t.description })) };
+    return { ok: true, tools: tools.map((t) => ({ name: t.name, description: t.description || '' })) };
   } catch (e: unknown) {
     return { ok: false, erro: e instanceof Error ? e.message : String(e) };
   }

@@ -6,7 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
-import type { IpcResult } from './types';
+import type { DossieSnapshot } from '../dossie';
 
 // ============================================================================
 // HANDLERS DE DOSSIE
@@ -17,12 +17,12 @@ import type { IpcResult } from './types';
  */
 export async function handleDossieLer(
   _event: Electron.IpcMainInvokeEvent
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<string> {
   try {
     const { lerDossie } = await import('../dossie');
     return lerDossie();
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    return '';
   }
 }
 
@@ -48,12 +48,12 @@ export async function handleDossieGravar(
  */
 export async function handleDossieSnapshot(
   _event: Electron.IpcMainInvokeEvent
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<DossieSnapshot | null> {
   try {
     const { dossieSnapshot } = await import('../dossie');
     return dossieSnapshot();
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    return null;
   }
 }
 
@@ -62,7 +62,7 @@ export async function handleDossieSnapshot(
  */
 export function handleDossieCaminho(
   _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string } {
+): { ok: boolean; erro?: string; caminho?: string } {
   try {
     const { caminhoDossie } = require('../dossie');
     return { ok: true, caminho: caminhoDossie() };

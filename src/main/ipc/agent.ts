@@ -24,7 +24,7 @@ export async function handleAgenteExecutar(
 ): Promise<IpcResult & {
   texto?: string;
   modelo?: string;
-  passos?: string[];
+  passos?: unknown[];
   duracaoMs?: number;
   modo?: string;
   erro?: string;

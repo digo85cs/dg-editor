@@ -6,7 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
-import type { IpcResult } from './types';
+import type { DiagnosticoResultado } from '@shared/types';
 
 // ============================================================================
 // HANDLERS DE DIAGNOSTICO
@@ -18,12 +18,17 @@ import type { IpcResult } from './types';
 export async function handleDiagnosticoRodar(
   _event: Electron.IpcMainInvokeEvent,
   root: string | null
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<DiagnosticoResultado> {
   try {
     const { diagnosticoCompleto } = await import('../diagnostico');
     return diagnosticoCompleto(root || '');
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    return {
+      modulos: [{ id: 'diagnostico', nome: 'Diagnostico', ok: false, detalhe: String(e), ms: 0 }],
+      ok: 0,
+      total: 1,
+      at: Date.now()
+    };
   }
 }
 

@@ -7,6 +7,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { IpcResult } from './types';
+import type { FolderScanResult } from '@shared/types';
 
 // ============================================================================
 // ESTADO
@@ -31,7 +32,7 @@ export function setFolderMainWindow(window: BrowserWindow | null): void {
 export async function handleFolderScan(
   _event: Electron.IpcMainInvokeEvent,
   root: unknown
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<FolderScanResult | { ok: false; erro: string }> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) return r;
   const seg = caminhoSeguro(r, r);
@@ -51,12 +52,12 @@ export async function handleFolderScan(
 export function handleFolderFormatSummary(
   _event: Electron.IpcMainInvokeEvent,
   result: unknown
-): IpcResult & { ok: boolean; erro?: string } {
+): string {
   try {
     const { formatScanSummary } = require('../scanner');
     return formatScanSummary(result);
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    return 'Erro ao formatar resumo: ' + String(e);
   }
 }
 
@@ -95,5 +96,3 @@ export function registrarHandlersFolder(): void {
   dglog('[ipc:folder] handlers registrados!');
 }
 
-// Exportar função para definir janela
-export { setFolderMainWindow };

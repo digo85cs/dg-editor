@@ -5,7 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import type { IpcResult } from './types';
+import type { RelatorioAuditoria } from '../auto-auditoria';
 
 // ============================================================================
 // HANDLERS DE AUDITORIA
@@ -17,7 +17,7 @@ import type { IpcResult } from './types';
 export async function handleAuditoriaRodar(
   _event: Electron.IpcMainInvokeEvent,
   opcoes: unknown
-): Promise<IpcResult & { ok: boolean; erro?: string }> {
+): Promise<RelatorioAuditoria | { ok: false; erro: string }> {
   try {
     const mod = await import('../auto-auditoria');
     const opts = opcoes as Record<string, unknown>;

@@ -3,7 +3,7 @@
  * Funcoes auxiliares para validacao, error handling e registro
  */
 
-import { ipcMain, IpcMainInvokeHandler } from 'electron';
+import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import type {
   IpcResult,
@@ -174,7 +174,7 @@ export function validarStringArray(
  * Tipo para funcao de registro de handlers
  */
 export type HandlerRegistry = {
-  register: (channel: string, handler: IpcMainInvokeHandler) => void;
+  register: (channel: string, handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any) => void;
   registerSync: (channel: string, handler: (...args: unknown[]) => unknown) => void;
 };
 
@@ -185,7 +185,7 @@ export function criarRegistrador(): HandlerRegistry {
   const registeredChannels = new Set<string>();
 
   return {
-    register: (channel: string, handler: IpcMainInvokeHandler) => {
+    register: (channel: string, handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any) => {
       if (registeredChannels.has(channel)) {
         dglog(`[ipc:registry] AVISO: canal "${channel}" ja registrado`);
       }

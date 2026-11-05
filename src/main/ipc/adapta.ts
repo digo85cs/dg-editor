@@ -3,7 +3,7 @@
  * Extraido de src/main/ipc/index.ts
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, shell } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { IpcResult } from './types';
@@ -81,7 +81,7 @@ export async function handleAdaptaAbrir(
   else return { ok: false, erro: 'url nao permitida' };
 
   try {
-    const { shell, urlAdaptaPermitida, ADAPTA_URLS } = await import('../bridge-adapta');
+    const { urlAdaptaPermitida, ADAPTA_URLS } = await import('../bridge-adapta');
     if (url === 'https://one.ai') url = ADAPTA_URLS.one;
     else if (url === 'https://hub.one.ai') url = ADAPTA_URLS.hub;
     else if (url === 'https://maestro.one.ai') url = ADAPTA_URLS.maestro;
