@@ -1471,6 +1471,21 @@ async function main() {
     assert('preload propostas:preview', /propostas:preview/.test(pre))
     assert('preload agente:verificar', /agente:verificar/.test(pre))
     assert('preload agente:plano-marcar-passo', /agente:plano-marcar-passo/.test(pre))
+    const ipcFerramentas = fs.readFileSync(path.join(SRC, 'main/ipc/ferramentas.ts'), 'utf8')
+    const ipcRegistry = fs.readFileSync(path.join(SRC, 'main/ipc/index.ts'), 'utf8')
+    for (const canal of [
+      'app:get-version', 'busca:arquivos', 'busca:conteudo', 'busca:cancelar',
+      'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
+      'comandos:listar', 'config:backup', 'orientar:prompt', 'roteador:planejar', 'sistema:safe-mode'
+    ]) {
+      assert('handler de ferramenta ' + canal, ipcFerramentas.includes("ipcMain.handle('" + canal + "'"))
+      assert('preload libera ferramenta ' + canal, pre.includes("'" + canal + "'"))
+    }
+    assert('handlers de ferramentas registrados no boot', /registrarHandlersFerramentas\(\)/.test(ipcRegistry))
+    const ipcChat = fs.readFileSync(path.join(SRC, 'main/ipc/chat.ts'), 'utf8')
+    assert('chat:send usa stream Ollama e fallback de modelo', /streamOllamaChat/.test(ipcChat) && /askOllama\(textoPedido, context, 'chat'\)/.test(ipcChat))
+    assert('chat envia deltas pelo canal liberado', /send\('chat:delta'/.test(ipcChat) && /'chat:delta'/.test(pre))
+    assert('chat:send nao retorna texto placeholder', !/Handler de chat:send refatorado/.test(ipcChat))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
     assert('Vault registrado no boot', /registerVaultIpc\(\)/.test(idxMain))

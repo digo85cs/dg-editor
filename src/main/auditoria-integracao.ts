@@ -136,6 +136,34 @@ export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
     ))
   }
 
+  const ferramentas = ler(raiz, 'src/main/ipc/ferramentas.ts')
+  const registroIpc = ler(raiz, 'src/main/ipc/index.ts')
+  for (const canal of [
+    'app:get-version', 'busca:arquivos', 'busca:conteudo', 'busca:cancelar',
+    'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
+    'comandos:listar', 'config:backup', 'orientar:prompt', 'roteador:planejar', 'sistema:safe-mode'
+  ]) {
+    const noPreload = preload.includes("'" + canal + "'")
+    const handler = ferramentas.includes("ipcMain.handle('" + canal + "'")
+    const registrado = registroIpc.includes('registrarHandlersFerramentas();')
+    out.push(achado(
+      'integracao:ferramenta-' + canal,
+      'Canal ' + canal + ' registrado de ponta a ponta',
+      noPreload && handler && registrado,
+      [noPreload ? 'preload ok' : 'preload ausente', handler ? 'handler ipc/ferramentas.ts' : 'handler ausente', registrado ? 'registro no boot ok' : 'registro no boot ausente'].join(' | '),
+      true
+    ))
+  }
+  const chat = ler(raiz, 'src/main/ipc/chat.ts')
+  const chatStream = chat.includes("send('chat:delta'") && chat.includes('streamOllamaChat')
+  out.push(achado(
+    'integracao:chat-send-stream',
+    'Enviar chat chama modelo e transmite resposta',
+    chatStream && preload.includes("'chat:delta'"),
+    chatStream ? 'handler IPC e preload conectados' : 'handler de chat ou canal de stream ausente',
+    true
+  ))
+
   out.push(trecho(raiz, 'src/preload/index.ts', "'editor:completar'", 'integracao:preload-tab', 'Preload libera editor:completar'))
   for (const canal of ['memoria:listar', 'memoria:propor', 'memoria:decidir']) {
     const ok = preload.includes("'" + canal + "'")
