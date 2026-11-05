@@ -1,4 +1,3 @@
-try{var st=document.createElement('script');st.src='./tema-rapido.js';document.head.appendChild(st);}catch(e){}
 ﻿// DG Editor - renderer (IDE OpÃ§Ã£o B)
 import { mostrarRegrasUI } from './regras-ui.js'
 import { criarEditor } from './editor-cm.js'
