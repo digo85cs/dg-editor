@@ -1,41 +1,41 @@
 # IPC Handlers do DG Editor
 
-Este diretório contém todos os **handlers IPC (Inter-Process Communication)** do DG Editor, responsáveis pela comunicação entre o **main process** (backend Electron) e o **renderer process** (frontend).
+Este diretorio contem todos os **handlers IPC (Inter-Process Communication)** do DG Editor, responsaveis pela comunicacao entre o **main process** (backend Electron) e o **renderer process** (frontend).
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 ipc/
 ├── types.ts          # Interfaces TypeScript para todos os payloads e resultados IPC
-├── utils.ts          # Utilitários: validação, error handling, logging
+├── utils.ts          # Utilitarios: validacao, error handling, logging
 ├── index.ts          # Registrador central de todos os handlers
-├── arquivos.ts       # Handlers para operações de arquivo (ler, salvar, listar)
+├── arquivos.ts       # Handlers para operacoes de arquivo (ler, salvar, listar)
 ├── terminal.ts       # Handlers para terminal embutido
 ├── navegador.ts      # Handlers para navegador web embutido
 ├── agent.ts          # Handlers para agentes de IA
 ├── brain.ts          # Handlers para brain (Ollama, IA)
 ├── git.ts            # Handlers para Git
 ├── chat.ts           # Handlers para chat
-└── analise.ts        # Handlers para análise de código
+└── analise.ts        # Handlers para analise de codigo
 ```
 
-## 🎯 Visão Geral
+## Visao Geral
 
 O sistema IPC do DG Editor foi **refatorado** para:
 
-1. **Modularização**: Cada domínio (arquivos, terminal, navegador, etc.) tem seu próprio arquivo de handlers
-2. **Tipagem Estrita**: Todos os payloads e resultados são tipados via `types.ts`
-3. **Error Handling Padronizado**: Utilitários em `utils.ts` garantem tratamento consistente de erros
+1. **Modularizacao**: Cada dominio (arquivos, terminal, navegador, etc.) tem seu proprio arquivo de handlers
+2. **Tipagem Estrita**: Todos os payloads e resultados sao tipados via `types.ts`
+3. **Error Handling Padronizado**: Utilitarios em `utils.ts` garantem tratamento consistente de erros
 4. **Registro Centralizado**: `index.ts` registra todos os handlers de forma organizada
 
-## 📋 Arquivos
+## Arquivos
 
 ### `types.ts`
 
 Centraliza **todas as interfaces TypeScript** usadas nos handlers IPC:
 
 - **Payloads**: Objetos de entrada para cada handler (ex: `ArquivoLerPayload`, `TerminalCreatePayload`)
-- **Resultados**: Objetos de saída padronizados (ex: `IpcResult<T>`, `ArquivoLerResult`)
+- **Resultados**: Objetos de saida padronizados (ex: `IpcResult<T>`, `ArquivoLerResult`)
 - **Eventos**: Tipos para eventos IPC (ex: `TerminalDataEvent`, `ChatDeltaEvent`)
 
 **Exemplo:**
@@ -55,7 +55,7 @@ interface ArquivoLerResult extends IpcResult {
 
 ### `utils.ts`
 
-Fornece **utilitários** para os handlers:
+Fornece **utilitarios** para os handlers:
 
 - **`safeIpcHandler`**: Wrapper que garante error handling padronizado
 - **`validarArquivoPayload`**: Valida e normaliza payloads de arquivo
@@ -65,7 +65,7 @@ Fornece **utilitários** para os handlers:
 
 **Exemplo:**
 ```typescript
-// Handler com error handling automático
+// Handler com error handling automatico
 export const handleArquivoLer = safeIpcHandler(
   async (caminho: string, pastas: string[]) => {
     const seg = caminhoSeguro(caminho, pastas);
@@ -79,9 +79,9 @@ export const handleArquivoLer = safeIpcHandler(
 
 **Registrador central** que:
 
-1. Importa todos os módulos de handlers
-2. Chamadas `registrarHandlersX()` para cada domínio
-3. registra handlers adicionais que não puderam ser extraídos
+1. Importa todos os modulos de handlers
+2. Chama `registrarHandlersX()` para cada dominio
+3. Registra handlers adicionais que nao puderam ser extraidos
 4. Fornece `setMainWindow()` para compartilhar a janela principal
 
 **Exemplo de uso no `index.ts` principal:**
@@ -93,199 +93,162 @@ setMainWindow(mainWindow);
 registrarTodosHandlers();
 ```
 
-### Arquivos de Handlers por Domínio
+### Arquivos de Handlers por Dominio
 
-Cada arquivo segue o padrão:
+Cada arquivo segue o padrao:
 
 ```typescript
-/**
- * Handlers IPC para [domínio]
- */
+// ==========================================================================
+// HANDLERS DE [DOMINIO]
+// ==========================================================================
 
-import { ipcMain } from 'electron';
-import { dglog } from '../dglog';
-import type { IpcResult } from './types';
-
-// --- Handlers ---
-export async function handle[Operacao](
-  event: IpcMainInvokeEvent,
-  ...args: unknown[]
-): Promise<IpcResult> {
-  // Validação de args
-  // Chamada da função de negócios
-  // Error handling
-  // Logging
+export async function handle[Dominio][Acao](...): Promise<IpcResult> {
+  // Validacao de payloads
+  // Chamada para funcoes do dominio
+  // Retorno padronizado
 }
 
-// --- Registro ---
+// ==========================================================================
+// FUNCAO DE REGISTRO
+// ==========================================================================
+
 export function registrarHandlers[Dominio](): void {
-  ipcMain.handle('[canal]', handle[Operacao]);
-  dglog('[ipc:[dominio]] handlers registrados');
+  ipcMain.handle('dominio:acao1', handle[Dominio]Acao1);
+  ipcMain.handle('dominio:acao2', handle[Dominio]Acao2);
 }
 ```
 
-## 🔧 Canais IPC
+## Handlers por Dominio
 
 ### Arquivos (`arquivos.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `arquivo:ler` | `{caminho, pastas}` | `{ok, conteudo, erro}` | Lê um arquivo |
-| `arquivo:ler-base64` | `{caminho, pastas}` | `{ok, conteudo, erro}` | Lê arquivo em base64 |
-| `arquivo:salvar` | `{caminho, conteudo, pastas}` | `{ok, erro}` | Salva um arquivo |
-| `arquivo:listar` | `{caminho, pastas}` | `{ok, arquivos, erro}` | Lista diretório |
-| `arquivo:existe` | `{caminho, pastas}` | `{ok, existe, erro}` | Verifica se arquivo existe |
+- `arquivo:ler` - Le arquivo com validacao de caminho
+- `arquivo:ler-base64` - Le arquivo em base64
+- `arquivo:salvar` - Salva arquivo com validacao
+- `arquivo:listar` - Lista diretorios
+- `arquivo:existe` - Verifica existencia de arquivo
 
 ### Terminal (`terminal.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `terminal:create` | `{id, opts}` | `{ok, id, erro}` | Cria um terminal |
-| `terminal:write` | `{id, data}` | `{ok, erro}` | Escreve no terminal |
-| `terminal:resize` | `{id, cols, rows}` | `{ok, erro}` | Redimensiona terminal |
-| `terminal:kill` | `{id}` | `{ok, erro}` | Mata um terminal |
-| `terminal:shell` | - | `{ok, shell, erro}` | Obtém shell ativo |
-| `terminal:shells` | - | `{ok, shells, erro}` | Lista shells disponíveis |
-| `terminal:getShellPadrao` | - | `{ok, shell, erro}` | Obtém shell padrão |
-| `terminal:setShellPadrao` | `{id}` | `{ok, erro}` | Define shell padrão |
-
-**Eventos:**
-- `terminal:data` - Dados do terminal `{id, data}`
-- `terminal:exit` - Saída do terminal `{id, code}`
+- `terminal:create` - Cria novo terminal
+- `terminal:write` - Escreve no terminal
+- `terminal:resize` - Redimensiona terminal
+- `terminal:kill` - Fecha terminal
+- `terminal:shell` - Obtem shell ativo
+- `terminal:shells` - Lista shells disponiveis
+- `terminal:getShellPadrao` - Obtem shell padrao
+- `terminal:setShellPadrao` - Define shell padrao
 
 ### Navegador (`navegador.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `navegador:abrir` | `{url}` | `{ok, erro}` | Abre navegador |
-| `navegador:fechar` | - | `{ok, erro}` | Fechar navegador |
-| `navegador:embed-status` | - | `{ok, ...status}` | Status do navegador embutido |
-
-**Eventos:**
-- `navegador:aberto` - Navegador foi aberto
-- `navegador:fechado` - Navegador foi fechado
-
-**Handlers de evento (on):**
+- `navegador:abrir` - Abre navegador embutido
+- `navegador:embed-status` - Status do navegador embutido
+- `navegador:fechar` - Fecha navegador
 - `navegador:bounds` - Define bounds do navegador
 - `navegador:mostrar` - Mostra/oculta navegador
 
 ### Agente (`agent.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `agente:executar` | `{root, pergunta, opcoes}` | `{ok, texto, modelo, passos, duracaoMs, erro}` | Executa um agente |
-| `agente:modelo` | - | `{ok, modelo, erro}` | Obtém modelo do agente |
-| `agente:historico` | `{root}` | `{ok, mensagens, erro}` | Obtém histórico do agente |
+- `agente:executar` - Executa agente de IA
+- `agente:modelo` - Obtem modelo do agente
+- `agente:historico` - Obtem historico do agente
 
-### Brain (IA) (`brain.ts`)
+### Brain (`brain.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `brain:ask` | `{prompt, context}` | `{ok, text, provider, modelo, erro}` | Pergunta ao brain |
-| `brain:providers` | - | `{ok, providers, erro}` | Lista providers disponíveis |
-| `brain:ollama-status` | - | `{ok, ativo, url, modelos, erro}` | Status do Ollama |
-| `brain:models` | - | `{ok, modelos, erro}` | Lista modelos ativos |
-| `brain:avaliar` | `{modeloId}` | `{ok, avaliacao, erro}` | Avalia um modelo |
+- `brain:ask` - Pergunta ao brain
+- `brain:providers` - Lista providers disponiveis
+- `brain:ollama-status` - Status do Ollama
+- `brain:models` - Lista modelos ativos
+- `brain:avaliar` - Avalia modelo
 
 ### Git (`git.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `git:status` | `{raiz}` | `{ok, status, erro}` | Status do Git |
-| `git:diff` | `{raiz, caminho}` | `{ok, diff, erro}` | Diff do Git |
-| `git:repos` | `{pastas}` | `{ok, repos, erro}` | Lista repositórios |
+- `git:status` - Status do repositorio Git
+- `git:diff` - Diff entre arquivos
+- `git:repos` - Lista repositorios Git
 
 ### Chat (`chat.ts`)
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `chat:load` | `{root}` | `{ok, mensagens, erro}` | Carrega chat |
-| `chat:clear` | `{root}` | `{ok, erro}` | Limpa chat |
-| `chat:anexar` | `{payload}` | `{ok, anexo, erro}` | Anexa arquivo ao chat |
+- `chat:load` - Carrega historico de chat
+- `chat:clear` - Limpa chat
+- `chat:anexar` - Anexa arquivo ao chat
 
-**Eventos:**
-- `chat:delta` - Delta do chat `{delta, reset}`
+### Analise (`analise.ts`)
 
-### Análise (`analise.ts`)
+- `analysis:run` - Executa analise de codigo
+- `analysis:choose-scope` - Escolhe escopo de analise (dialog)
+- `analysis:cached` - Obtem analise cached
+- `analysis:invalidar` - Invalida cache de analise
+- `whereis:ask` - Busca onde uma funcao/variavel esta definida
+- `rules:exists` - Verifica existencia de regras
+- `rules:read` - Le regras
+- `rules:create-template` - Cria template de regras
+- `rules:write` - Escreve regras
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `analysis:run` | `{root, force, escopo}` | `{ok, result, erro}` | Executa análise |
-| `analysis:choose-scope` | `{mode}` | `{ok, response, erro}` | Dialog de escopo |
-| `analysis:cached` | `{root}` | `{ok, result, erro}` | Análise cached |
-| `analysis:invalidar` | `{root}` | `{ok, erro}` | Invalida cache |
-| `whereis:ask` | `{root, query}` | `{ok, result, formatted, erro}` | Busca whereis |
+## Padroes de Seguranca
 
-### Regras
+Todos os handlers seguem os padroes de seguranca:
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `rules:exists` | `{root}` | `{ok, existe, erro}` | Verifica se .dgrules existe |
-| `rules:read` | `{root}` | `{ok, texto, erro}` | Lê .dgrules |
-| `rules:create-template` | `{root}` | `{ok, erro}` | Cria template de regras |
-| `rules:write` | `{root, texto}` | `{ok, erro}` | Escreve .dgrules |
+1. **Validacao de entrada**: Todos os payloads sao validados com `exigirString`, `exigirBoolean`, etc.
+2. **Validacao de caminhos**: Todos os caminhos sao validados com `caminhoSeguro` para prevenir path traversal
+3. **Error handling**: Todos os handlers tem try/catch e retornam erros padronizados
+4. **Logging**: Todos os erros sao logados com `dglog`
 
-## 🛡️ Segurança
-
-### Validação de Payloads
-
-Todos os handlers validam seus payloads usando:
-
-1. **`exigirString`** - Garante que um valor é string não vazio
-2. **`exigirArrayStrings`** - Garante que um valor é array de strings
-3. **`caminhoSeguro`** - Previne path traversal e garante que caminhos estão dentro da raiz permitida
-
-### Error Handling
-
-O wrapper `safeIpcHandler` garante que:
-
-1. Erros são catchados e não propagam para o renderer
-2. Mensagens de erro são padronizadas
-3. Erros são logados via `dglog`
-4. O resultado sempre tem a estrutura `{ok: boolean, erro?: string, dados?: T}`
-
-### Safe Mode
-
-Em **safe mode**, os handlers que podem executar código perigoso (agentes, MCP) são desativados:
+## Exemplo de Handler
 
 ```typescript
-if (SAFE_MODE || emSafeMode()) {
-  return { ok: false, erro: 'safe-mode' };
+import { ipcMain } from 'electron';
+import { dglog } from '../dglog';
+import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
+import type { IpcResult } from './types';
+
+export async function handleArquivoLer(
+  _event: Electron.IpcMainInvokeEvent,
+  caminho: unknown,
+  pastas: unknown
+): Promise<IpcResult & { conteudo?: string }> {
+  // 1. Validar entrada
+  const c = exigirString(caminho, 'caminho');
+  if (isErroPayload(c)) return { ok: false, erro: c.erro };
+
+  const p = exigirArrayStrings(pastas, 'pastas');
+  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+
+  // 2. Validar caminho
+  const seg = caminhoSeguro(c.valor, p.valores);
+  if (!seg.ok) return { ok: false, erro: seg.erro };
+
+  // 3. Executar operacao
+  try {
+    const { lerArquivo } = await import('../arquivos');
+    const result = await lerArquivo(seg.abs, p.valores);
+    return { ok: true, conteudo: result.conteudo };
+  } catch (e) {
+    dglog(`[arquivo:ler] erro: ${String(e)}`);
+    return { ok: false, erro: String(e) };
+  }
 }
 ```
 
-## 📊 Métricas
+## Registro de Handlers
 
-### Antes da Refatoração
-- **`index.ts`**: ~1.590 linhas
-- **Complexidade**: Alta (múltiplas responsabilidades)
-- **Manutenção**: Difícil (hard to trace, debug difícil)
+Os handlers sao registrados no `index.ts` principal do main process:
 
-### Depois da Refatoração
-- **`ipc/`**: 11 arquivos, ~700-2.300 linhas cada
-- **`index.ts` (novo)**: ~450 linhas (apenas boot e orquestração)
-- **Complexidade**: Baixa (separação por domínio)
-- **Manutenção**: Fácil (cada arquivo tem uma responsabilidade clara)
+```typescript
+import { registrarTodosHandlers, setMainWindow } from './ipc/index';
 
-## 🔄 Migração
+app.whenReady().then(() => {
+  createWindow();
+  
+  // Registrar todos os handlers IPC
+  setMainWindow(mainWindow);
+  registrarTodosHandlers();
+});
+```
 
-Para usar os novos handlers:
+## Versao
 
-1. **Mantenha** o `index.ts` original como backup
-2. **Renomeie** `index-new.ts` para `index.ts`
-3. **Teste** todas as funcionalidades
-4. **Corrija** quaisquer problemas
-
-## 📝 Notas
-
-- Os handlers foram extraídos do `index.ts` original **sem alterar a lógica de negócios**
-- A refatoração focou em **organização de código**, não em mudança de funcionalidade
-- Alguns handlers complexos (ex: `chat:send`) ainda precisam ser extraídos completamente
-- O sistema de tipos foi **expanso** para cobrir todos os payloads IPC
-
-## 🎯 Próximos Passos
-
-1. **Completar extração**: Mover `chat:send` e outros handlers complexos
-2. **Tipagem estrita**: Adicionar mais tipos específicos para cada handler
-3. **Testes**: Criar testes unitários para cada módulo de handlers
-4. **Documentação**: Adicionar JSDoc para todas as funções públicas
+Este documento se refere a versao refatorada do sistema IPC.
+- **Versao**: 0.2.1
+- **Data**: Novembro de 2024
+- **Status**: Em desenvolvimento

@@ -1,47 +1,47 @@
-# Módulo Agent - DG Editor
+# Modulo Agent - DG Editor
 
-> **Agentes Autônomos com IA Local**
-> Versão: 0.2.0 | Status: 🟢 Ativo
+> **Agentes Autonomos com IA Local**
+> Versao: 0.2.0 | Status: Ativo
 
-## 🎯 Visão Geral
+## Visao Geral
 
-O módulo **Agent** implementa um sistema de **agentes autônomos** que executam tarefas no DG Editor usando **IA local (Ollama)**. Os agentes são projetados para:
+O modulo **Agent** implementa um sistema de **agentes autonomos** que executam tarefas no DG Editor usando **IA local (Ollama)**. Os agentes sao projetados para:
 
-- **Analisar código** e sugerir melhorias
-- **Gerar código** a partir de descrições
-- **Refatorar** código existente
+- **Analisar codigo** e sugerir melhorias
+- **Gerar codigo** a partir de descricoes
+- **Refatorar** codigo existente
 - **Corrigir erros** automaticamente
 - **Executar planos** multi-etapas
-- **Orquestrar** múltiplos agentes em sequência
+- **Orquestrar** multiplos agentes em sequencia
 
-## 📁 Estrutura
+## Estrutura
 
 ```
 agent/
 ├── ipc.ts              # Handlers IPC para o painel Agent
 ├── checkpoint.ts       # Sistema de checkpoint (undo/redo)
-├── contexto-implicito.ts # Contexto implícito (seleção, git, etc.)
+├── contexto-implicito.ts # Contexto implicito (selecao, git, etc.)
 ├── contexto-projeto.ts # Contexto do projeto para agentes
-├── diagnosticos.ts     # Diagnósticos de tipo (TypeScript)
-├── fila.ts             # Fila de execução de agentes
-├── mencoes.ts          # Processamento de menções (@projeto, @arquivo, etc.)
-├── orquestrador.ts     # Orquestrador de múltiplos agentes
-├── plano.ts            # Planejamento e execução de planos
+├── diagnosticos.ts     # Diagnosticos de tipo (TypeScript)
+├── fila.ts             # Fila de execucao de agentes
+├── mencoes.ts          # Processamento de mencoes (@projeto, @arquivo, etc.)
+├── orquestrador.ts     # Orquestrador de multiplos agentes
+├── plano.ts            # Planejamento e execucao de planos
 └── propostas.ts        # Sistema de propostas com diffs
 ```
 
-## 🎭 Agentes Disponíveis
+## Agentes Disponiveis
 
-| Agente | ID | Descrição | Modelo Padrão |
+| Agente | ID | Descricao | Modelo Padrao |
 |--------|-----|-------------|----------------|
-| **Free Coder** | `free-coder` | Gera código livremente | qwen2.5-coder:1.5b |
-| **Revisor** | `revisor` | Revisa e corrige código | qwen2.5-coder:3b |
-| **Engenheiro** | `engenheiro` | Projeta soluções complexas | qwen2.5-coder:3b |
-| **Orquestrador** | `orquestrador` | Coordena múltiplos agentes | - |
+| **Free Coder** | `free-coder` | Gera codigo livremente | qwen2.5-coder:1.5b |
+| **Revisor** | `revisor` | Revisa e corrige codigo | qwen2.5-coder:3b |
+| **Engenheiro** | `engenheiro` | Projeta solucoes complexas | qwen2.5-coder:3b |
+| **Orquestrador** | `orquestrador` | Coordena multiplos agentes | - |
 | **Arquiteto** | `arquiteto` | Projeta arquitetura | qwen2.5-coder:3b |
 | **Debugger** | `debugger` | Identifica e corrige bugs | qwen2.5-coder:3b |
 
-## 🚀 Uso
+## Uso
 
 ### 1. Executar um Agente
 
@@ -50,7 +50,7 @@ import { executarAgente } from './brain/agent';
 
 const resultado = await executarAgente(
   raizProjeto,          // Caminho do projeto
-  'Adicione validação ao formulário de login',
+  'Adicione validacao ao formulario de login',
   {
     agente: 'free-coder',
     modo: 'agent',        // 'agent' | 'plan'
@@ -61,7 +61,7 @@ const resultado = await executarAgente(
 
 console.log(resultado.texto); // Resposta do agente
 console.log(resultado.passos); // Passos executados (se em modo plan)
-console.log(resultado.duracaoMs); // Tempo de execução
+console.log(resultado.duracaoMs); // Tempo de execucao
 ```
 
 ### 2. Modo Plan (Apenas Planejamento)
@@ -69,14 +69,14 @@ console.log(resultado.duracaoMs); // Tempo de execução
 ```typescript
 const plano = await executarAgente(
   raizProjeto,
-  'Refatore todo o módulo de autenticação',
+  'Refatore todo o modulo de autenticacao',
   {
     agente: 'engenheiro',
-    modo: 'plan'  // Não executa, apenas planeja
+    modo: 'plan'  // Nao executa, apenas planeja
   }
 );
 
-// Salvar o plano para execução posterior
+// Salvar o plano para execucao posterior
 import { salvarPlano } from './agent/plano';
 await salvarPlano(raizProjeto, plano);
 ```
@@ -89,340 +89,328 @@ import { executarPlano } from './agent/plano';
 const resultado = await executarPlano(raizProjeto);
 ```
 
-### 4. Orquestrar Múltiplos Agentes
+## Arquiteto de Software
+
+O agente **Arquiteto** e especializado em projetar arquiteturas de software:
+
+```typescript
+// Solicitar arquitetura para um novo modulo
+const resultado = await executarAgente(
+  raizProjeto,
+  'Projete a arquitetura de um modulo de pagamentos com:
+  - Integracao com Stripe e MercadoPago
+  - Suporte a pagamentos recorentes
+  - Webhooks para notificacoes
+  - Persistencia de transacoes',
+  {
+    agente: 'arquiteto',
+    modeloForcado: 'qwen2.5-coder:3b'
+  }
+);
+
+// O agente ira gerar:
+// - Estrutura de diretorios
+// - Diagramas de arquitetura
+// - Interfaces TypeScript
+// - Esquema do banco de dados
+// - Documentacao
+```
+
+## Debugger
+
+O agente **Debugger** analisa e corrige bugs:
+
+```typescript
+// Descrever o problema
+const resultado = await executarAgente(
+  raizProjeto,
+  `Estou com um erro ao autenticar usuarios:
+  - O erro e: "Cannot read properties of undefined (reading 'email')"
+  - Ocorre em: src/services/auth.ts:45
+  - O usuario esta logado mas nao esta sendo reconhecido`,
+  {
+    agente: 'debugger'
+  }
+);
+
+// O agente pode:
+// - Analisar o codigo na linha 45
+// - Identificar a causa raiz
+// - Suggest fixes com trechos de codigo
+// - Gerar testes para prevenir regressao
+```
+
+## Orquestrador de Agentes
+
+Orquestra multiplos agentes para tarefas complexas:
 
 ```typescript
 import { orquestrarAgentes } from './agent/orquestrador';
 
 const resultado = await orquestrarAgentes(
   raizProjeto,
-  'Crie um novo módulo de usuário com CRUD completo',
+  'Crie um novo modulo de usuario com CRUD completo',
   {
-    rota: ['arquiteto', 'engenheiro', 'revisor'],
-    parallel: false  // Sequencial (padrão)
+    etapas: [
+      { agente: 'arquiteto', pedido: 'Projete a arquitetura do modulo de usuario' },
+      { agente: 'engenheiro', pedido: 'Implemente as interfaces e tipos TypeScript' },
+      { agente: 'free-coder', pedido: 'Crie os componentes React' },
+      { agente: 'revisor', pedido: 'Revise e aprimore o codigo gerado' }
+    ]
   }
 );
 ```
 
-## 📥 IPC Handlers
+## Recursos Avanados
 
-O módulo expõe os seguintes handlers IPC:
+### Contexto Implicito
 
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `agente:executar` | `{root, pergunta, opcoes}` | `{ok, texto, modelo, passos, duracaoMs, modo}` | Executa um agente |
-| `agente:modelo` | - | `{ok, modelo}` | Obtém modelo padrão |
-| `agente:historico` | `{root}` | `{ok, mensagens}` | Obtém histórico |
-| `agente:listar` | - | `{ok, agentes}` | Lista agentes disponíveis |
-| `agente:fila-status` | - | `{ok, fila, executando}` | Status da fila |
-| `agente:cancelar` | - | `{ok}` | Cancela execução atual |
+O sistema entende contexto implicitamente:
 
-### Handlers de Propostas
-
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `agente:propostas` | `{root}` | `{ok, propostas}` | Lista propostas pendentes |
-| `agente:aplicar-proposta` | `{propostaId, pastas}` | `{ok, aplicada, checkpoint}` | Aplica uma proposta |
-| `agente:rejeitar-proposta` | `{propostaId}` | `{ok}` | Rejeita uma proposta |
-
-### Handlers de Checkpoint
-
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `agente:checkpoint-criar` | - | `{ok, checkpointId}` | Cria um checkpoint |
-| `agente:checkpoint-listar` | - | `{ok, checkpoints}` | Lista checkpoints |
-| `agente:checkpoint-restaurar` | `{checkpointId}` | `{ok, restaurado}` | Restaura um checkpoint |
-| `agente:checkpoint-desfazer` | - | `{ok}` | Desfaz o último checkpoint |
-
-### Handlers de Plano
-
-| Canal | Payload | Resultado | Descrição |
-|-------|---------|-----------|-----------|
-| `agente:plano-salvar` | `{plano}` | `{ok, planoId}` | Salva um plano |
-| `agente:plano-ler` | `{planoId}` | `{ok, plano}` | Carrega um plano |
-| `agente:plano-limpar` | - | `{ok}` | Limpa plano atual |
-| `agente:executar-plano` | - | `{ok, resultado}` | Executa plano salvo |
-| `agente:plano-marcar-passo` | `{passoIndex, concluid` | `{ok}` | Marca passo como concluído |
-
-## 🎛️ Configurações
-
-### Agentes Padrão
-
-Os agentes são definidos em `src/main/brain/agentes.ts`:
+- **@projeto**: Referencia todo o projeto
+- **@src**: Referencia o diretorio src
+- **@arquivo:caminho**: Referencia arquivo especifico
+- **@git**: Status do git
+- **@selecao**: Conteudo selecionado no editor
 
 ```typescript
-const AGENTES = {
-  'free-coder': {
-    id: 'free-coder',
-    nome: 'Free Coder',
-    descricao: 'Gera código livremente',
-    modelo: 'qwen2.5-coder:1.5b',
-    prompt: 'Você é um gerador de código...'
-  },
-  // ...
+// O usuario pode pedir:
+'Refatore @arquivo:src/services/user.ts para usar a nova API'
+
+// E o agente entende que deve:
+// 1. Ler o arquivo src/services/user.ts
+// 2. Analisar o codigo atual
+// 3. Aplicar as mudancas da nova API
+```
+
+### Checkpoints
+
+Sistema de checkpoint permite undo/redo de operacoes:
+
+```typescript
+import { checkpoint } from './agent/checkpoint';
+
+// Antes de executar uma mudanca
+checkpoint.criar(raizProjeto, 'Adicionando validação de email');
+
+// Executar as mudancas...
+
+// Se algo der errado, reverter
+checkpoint.undo(raizProjeto);
+```
+
+### Fila de Execucao
+
+Agentes sao executados em fila para evitar conflitos:
+
+```typescript
+import { filaAgentes } from './agent/fila';
+
+// Adicionar tarefa a fila
+filaAgentes.adicionar({
+  raiz: raizProjeto,
+  pedido: 'Gerar documentacao do modulo',
+  agente: 'engenheiro'
+});
+
+// Processar fila
+filaAgentes.processar();
+```
+
+### Propostas
+
+Agentes podem gerar propostas com diffs:
+
+```typescript
+import { gerarPropostas } from './agent/propostas';
+
+const propostas = await gerarPropostas(
+  raizProjeto,
+  'Melhorar a performance do carrossel de produtos'
+);
+
+// Propostas contem:
+// - Descricao da mudanca
+// - Diff do codigo
+// - Impacto estimado
+// - Risco
+
+// O usuario pode:
+// - Aceitar todas
+// - Aceitar selecionadas
+// - Rejeitar todas
+// - Modificar manualmente
+```
+
+## Integracao com Outros Modulos
+
+### Com o Navegador
+
+```typescript
+// Abrir navegador para pesquisa
+ipcMain.handle('agente:abrir-navegador', async (_e, url) => {
+  // Abrir navegador com contexto do agente
+});
+```
+
+### Com o Terminal
+
+```typescript
+// Executar comandos no terminal
+import { writeTerminal } from './terminal';
+
+writeTerminal('terminal-1', 'npm install');
+```
+
+### Com o Chat
+
+```typescript
+// Enviar mensagens para o chat
+import { appendChat } from './chatstore';
+
+appendChat(raizProjeto, {
+  role: 'assistant',
+  content: resultado.texto,
+  at: Date.now(),
+  provider: 'agente'
+});
+```
+
+### Com o Brain
+
+```typescript
+// Usar o brain para analises complexas
+import { askOllama } from './brain/ollama';
+
+const resposta = await askOllama(prompt, contexto);
+```
+
+## Configuracao
+
+### Modelos Disponiveis
+
+```typescript
+// Configurar modelos para agentes
+export const AGENTE_MODELOS = {
+  'free-coder': 'qwen2.5-coder:1.5b',
+  'revisor': 'qwen2.5-coder:3b',
+  'engenheiro': 'qwen2.5-coder:3b',
+  'arquiteto': 'qwen2.5-coder:3b',
+  'debugger': 'qwen2.5-coder:3b'
 };
 ```
 
-### Personalização
+### Limites de Execucao
+
+```typescript
+export const AGENTE_LIMITES = {
+  maxTokens: 8192,
+  timeoutMs: 300000, // 5 minutos
+  maxIteracoes: 10
+};
+```
+
+## API IPC
+
+### Handlers IPC
+
+| Canal | Descricao | Retorno |
+|-------|-----------|---------|
+| `agente:executar` | Executa um agente | `{ ok, texto, modelo, passos, duracaoMs }` |
+| `agente:modelo` | Obtem modelo do agente | `{ ok, modelo }` |
+| `agente:historico` | Obtem historico | `{ ok, mensagens }` |
+| `agente:listar` | Lista agentes disponiveis | `{ ok, agentes }` |
+| `agente:status` | Status da execucao | `{ ok, executando, fila }` |
+
+### Eventos IPC
+
+| Evento | Descricao | Payload |
+|--------|-----------|---------|
+| `agente:progresso` | Progresso da execucao | `{ progresso, mensagem, passos }` |
+| `agente:completo` | Execucao concluida | `{ resultado }` |
+| `agente:erro` | Erro durante execucao | `{ erro }` |
+
+## Seguranca
+
+- Todos os caminhos sao validados para prevenir path traversal
+- Operacoes de escritao exigem confirmacao do usuario
+- Limites de tokens e timeout para prevenir uso excessivo
+- Log de todas as operacoes para auditoria
+
+## Depuracao
+
+### Logs
+
+```bash
+# Ver logs de agentes
+cat /c/Users/digo8/OneDrive/CURSOR/DG\)
+```
+
+### Debug Mode
+
+```typescript
+// Ativar modo debug
+process.env.AGENTE_DEBUG = '1';
+
+// Mais logs detalhados
+process.env.AGENTE_VERBOSE = '1';
+```
+
+## Testes
+
+### Teste Basico
+
+```typescript
+import { executarAgente } from './brain/agent';
+
+const resultado = await executarAgente(
+  '/path/to/project',
+  'Crie uma funcao que soma dois numeros',
+  { agente: 'free-coder' }
+);
+
+console.assert(resultado.ok, 'Execucao falhou');
+console.assert(resultado.texto.includes('function'), 'Nao gerou funcao');
+```
+
+### Teste de Planejamento
+
+```typescript
+const plano = await executarAgente(
+  '/path/to/project',
+  'Crie um modulo completo de autenticacao',
+  { agente: 'engenheiro', modo: 'plan' }
+);
+
+console.assert(plano.passos.length > 0, 'Nao gerou passos');
+```
+
+## Roadmap
+
+- [x] Agente Free Coder
+- [x] Agente Revisor
+- [x] Agente Engenheiro
+- [x] Agente Orquestrador
+- [x] Agente Arquiteto
+- [x] Agente Debugger
+- [ ] Agente Documentador
+- [ ] Agente Tester (geracao de testes)
+- [ ] Agente Refatorador (refatoracao automatica)
+- [ ] Integracao com GitHub Copilot
+
+## Contribuindo
 
 Para adicionar um novo agente:
 
-1. Adicione a configuração em `agentes.ts`
-2. Implemente o handler específico (opcional)
-3. Registre no orquestrador
+1. Crie um arquivo no diretorio `agent/` (ex: `novo-agente.ts`)
+2. Implemente a funcao de execucao
+3. Adicione a configuracao em `AGENTE_MODELOS`
+4. Registre o agente no `orquestrador.ts`
+5. Adicione testes
 
-## 📊 Fluxo de Execução
+## Versao
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      AGENT EXECUTION FLOW                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1. VALIDAÇÃO              2. CONTEXTO                        │
-│  ├── Safe Mode?           ├── Carregar .dgrules               │
-│  ├── Payload válido?      ├── Análise cached                  │
-│  └── Pastas permitidas?   ├── Git status                     │
-│                              └── Diagnósticos TypeScript      │
-│                                                               │
-│  3. ROTEAMENTO            4. EXECUÇÃO                         │
-│  ├── Escolher agente       ├── Enviar prompt para Ollama      │
-│  ├── Validar modelo        ├── Processar resposta              │
-│  └── Decidir modo          └── Gerar propostas (se agent)     │
-│                              (ou plano, se plan mode)          │
-│                                                               │
-│  5. PÓS-PROCESSAMENTO      6. RESULTADO                        │
-│  ├── Validar propostas     ├── Retornar texto                  │
-│  ├── Gerar diffs           ├── Retornar propostas              │
-│  ├── Criar checkpoint      └── Retornar checkpoint            │
-│  └── Indexar memória       (se aplicável)                      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🔍 Contexto Implícito
-
-Os agentes têm acesso ao seguinte **contexto implícito**:
-
-1. **Seleção Atual**: Texto selecionado no editor (`@selecao`)
-2. **Arquivo Atual**: Conteúdo do arquivo aberto (`@arquivo:path`)
-3. **Projeto**: Estrutura do projeto, .dgrules, package.json
-4. **Git**: Status do repositório, diffs
-5. **Diagnósticos**: Erros TypeScript, warnings
-6. **Memória**: Fatos aceitos em conversas anteriores
-
-### Menções
-
-| Menção | Exemplo | Descrição |
-|--------|---------|-----------|
-| `@projeto` | `@projeto` | Informações sobre o projeto |
-| `@arquivo` | `@arquivo:src/main/index.ts` | Conteúdo de um arquivo específico |
-| `@nota` | `@nota:Requisitos` | Conteúdo de uma nota do vault |
-| `@selecao` | `@selecao` | Texto selecionado no editor |
-
-## 🎯 Roteador de Agentes
-
-O **roteador** (`agent-router.ts`) determina qual agente usar com base no pedido:
-
-```typescript
-import { resolverRotaChat } from './agent-router';
-
-const rota = resolverRotaChat('auto', 'Crie um componente React');
-// { kind: 'agente', agente: 'free-coder', tarefa: 'codigo' }
-
-const rota2 = resolverRotaChat('auto', 'Explique como funciona o React');
-// { kind: 'chat', agente: null, tarefa: 'chat' }
-```
-
-### Rotas Padrão
-
-| Tipo de Pedido | Agente | Modo |
-|----------------|--------|------|
-| Criar código | `free-coder` | `agent` |
-| Refatorar | `engenheiro` | `agent` |
-| Corrigir bug | `debugger` | `agent` |
-| Explicar | `chat` | `chat` |
-| Analisar | `arquiteto` | `agent` |
-
-## 💡 Propostas e Diffs
-
-Quando um agente sugere mudanças no código:
-
-1. **Gera diffs** entre o código atual e a sugestão
-2. **Exibe propostas** no painel de diff
-3. **Permite revisão** por hunk (parte do diff)
-4. **Aplica automaticamente** ou com aprovação humana
-
-### Fluxo de Propostas
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PROPOSTAS FLOW                               │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  1. AGENTE GERA PROPOSTA                                      │
-│     ├── Analisa código atual                                  │
-│     ├── Gera nova versão                                       │
-│     └── Cria diff entre versões                                │
-│                                                               │
-│  2. SISTEMA PROCESSA                                           │
-│     ├── Valida diff                                            │
-│     ├── Separa em hunks                                        │
-│     └── Salva na fila de propostas                             │
-│                                                               │
-│  3. UI EXIBE PROPOSTAS                                         │
-│     ├── Mostra diff side-by-side                               │
-│     ├── Permite aceitar/rejeitar por hunk                      │
-│     └── Mostra preview no editor                               │
-│                                                               │
-│  4. USUÁRIO DECIDE                                             │
-│     ├── Aceitar tudo                                           │
-│     ├── Aceitar hunks específicos                              │
-│     ├── Rejeitar tudo                                          │
-│     └── Modificar manualmente                                  │
-│                                                               │
-│  5. APLICAÇÃO                                                  │
-│     ├── Cria checkpoint                                        │
-│     ├── Aplica mudanças                                        │
-│     ├── Verifica se compila                                    │
-│     └── Salva arquivo                                          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🔄 Checkpoint System
-
-O sistema de **checkpoints** permite:
-
-- **Desfazer** aplicações de propostas
-- **Restaurar** estado anterior
-- **Gerenciar** histórico de mudanças
-
-### Como Funciona
-
-1. Antes de aplicar propostas, um **checkpoint** é criado
-2. O checkpoint armazena:
-   - Hash dos arquivos modificados
-   - Estado do Git
-   - Lista de propostas aplicadas
-3. Se algo der errado, o checkpoint pode ser restaurado
-
-```typescript
-import { criarCheckpoint, restaurarCheckpoint, listarCheckpoints } from './agent/checkpoint';
-
-// Criar checkpoint
-await criarCheckpoint('Antes de aplicar propostas do agente');
-
-// Aplicar propostas...
-
-// Se der errado, restaurar
-await restaurarCheckpoint(checkpointId);
-```
-
-## 🎯 Fila de Execução
-
-Os agentes executam em uma **fila serial** para evitar:
-
-- Conflitos de escrita em arquivos
-- Sobrecarga do Ollama
-- Race conditions
-
-```typescript
-import { enfileirarAgente } from './agent/fila';
-
-// Adiciona à fila
-await enfileirarAgente(async () => {
-  // Execução do agente
-});
-```
-
-## 🛡️ Segurança
-
-### Safe Mode
-
-Em **safe mode**, os agentes são desativados:
-
-```typescript
-import { emSafeMode } from '../safe-mode';
-
-if (emSafeMode()) {
-  return { ok: false, erro: 'safe-mode' };
-}
-```
-
-### Validação de Caminhos
-
-Todos os caminhos são validados para prevenir:
-
-- **Path traversal** (acesso a arquivos fora da raiz)
-- **Acesso não autorizado** (arquivos do sistema)
-- **Operações perigosas** (delete, move)
-
-```typescript
-import { caminhoSeguro } from '../ipc-seguro';
-
-const seg = caminhoSeguro(caminho, raizProjeto);
-if (!seg.ok) {
-  return { ok: false, erro: seg.erro };
-}
-```
-
-### Auto-verify
-
-Quando ativado, o sistema:
-
-1. Executa o agente
-2. Aplica propostas
-3. **Executa typecheck** automaticamente
-4. Se falhar, **corrige automaticamente** ou pede intervenção
-
-```typescript
-// No frontend
-ipcRenderer.invoke('agente:executar', raiz, pedido, {
-  autoVerify: true
-});
-```
-
-## 📊 Métricas
-
-| Métrica | Valor |
-|---------|-------|
-| Agentes disponíveis | 7 |
-| Handlers IPC | 15+ |
-| Propostas por execução | 1-N |
-| Tempo médio de execução | 5-30 segundos |
-| Tamanho do módulo | ~2.500 linhas |
-
-## 🎯 Roadmap
-
-### 🟢 Concluído
-- [x] Sistema de agentes autônomos
-- [x] Roteador de agentes
-- [x] Orquestrador de múltiplos agentes
-- [x] Sistema de propostas com diffs
-- [x] Checkpoint system
-- [x] Fila de execução
-- [x] Contexto implícito
-- [x] Modo plan (apenas planejamento)
-
-### 🟡 Em Desenvolvimento
-- [ ] Auto-verify com correção automática
-- [ ] Integração com OpenClaw
-- [ ] Skills específicas por agente
-- [ ] Memória por agente
-
-### 🔴 Planejado
-- [ ] Agentes customizáveis pelo usuário
-- [ ] Marketplace de agentes
-- [ ] Agentes remotos (via API)
-- [ ] Treinamento de agentes específicos
-
-## 📚 Documentação Relacionada
-
-- [Brain Module](../brain/README.md) - Módulo de IA
-- [MCP Client](../mcp/client.ts) - Integração MCP
-- [IPC Handlers](../ipc/README.md) - Handlers IPC
-- [ DESIGN.md](../../../DESIGN.md) - Design System
-
-## 🔗 Links Úteis
-
-- [Ollama](https://ollama.ai) - IA local
-- [Model Context Protocol](https://modelcontextprotocol.io/) - MCP
-- [TypeScript](https://www.typescriptlang.org/) - Tipagem estática
+- **Versao**: 0.2.0
+- **Data**: Novembro de 2024
+- **Autor**: Rodrigo Soares
+- **Licenca**: MIT
