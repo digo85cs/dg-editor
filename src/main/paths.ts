@@ -1,4 +1,4 @@
-﻿// paths.ts - resolucao centralizada de paths do DG Editor
+// paths.ts - resolucao centralizada de paths do DG Editor
 // Estado do app (log, dossie, continuidade) -> userData
 // Estado por projeto (cache, chat) -> pasta do projeto
 
@@ -107,7 +107,7 @@ function fixarEnvEDgRoot(abs: string): void {
 export function resolverRaizProjeto(forcar = false): string {
   if (_raizCache && !forcar) return _raizCache.raiz
 
-  // 0. Windows — pasta oficial permanente (ganha de tudo)
+  // 0. Windows - pasta oficial permanente (ganha de tudo)
   if (process.platform === 'win32' && existsSync(join(RAIZ_WINDOWS_CANONICA, 'package.json'))) {
     const abs = resolve(RAIZ_WINDOWS_CANONICA)
     _raizCache = { raiz: abs, fonte: 'fix:windows-canonica' }
@@ -216,6 +216,6 @@ export function pareceCaminhoArquivo(s: string): boolean {
   const t = (s || '').trim()
   if (!t) return false
   if (/[\\/]/.test(t)) return true
-  if (/\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(t)) return true
+  if(/\.(tsx?|jsx?|mjs|cjs|json|md)$/i.test(t)) return true
   return false
 }
