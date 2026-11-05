@@ -239,13 +239,13 @@ export async function handleArquivoLer(
   if (isErroPayload(p)) return { ok: false, erro: p.erro };
 
   // 2. Validar caminho
-  const seg = caminhoSeguro(c.valor, p.valores);
+  const seg = caminhoSeguro(c, p);
   if (!seg.ok) return { ok: false, erro: seg.erro };
 
   // 3. Executar operacao
   try {
     const { lerArquivo } = await import('../arquivos');
-    const result = await lerArquivo(seg.abs, p.valores);
+    const result = await lerArquivo(seg.abs, p);
     return { ok: true, conteudo: result.conteudo };
   } catch (e) {
     dglog(`[arquivo:ler] erro: ${String(e)}`);
