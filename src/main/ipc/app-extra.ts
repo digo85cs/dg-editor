@@ -5,7 +5,6 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import { SAFE_MODE } from '../safe-mode';
 import { emSafeMode } from '../safe-mode';
 import type { IpcResult } from './types';
 
@@ -19,7 +18,7 @@ import type { IpcResult } from './types';
 export function handleAppIsSafeMode(
   _event: Electron.IpcMainInvokeEvent
 ): IpcResult & { ok: boolean; safeMode?: boolean } {
-  return { ok: true, safeMode: emSafeMode() || SAFE_MODE };
+  return { ok: true, safeMode: emSafeMode() };
 }
 
 // ============================================================================
