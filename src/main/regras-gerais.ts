@@ -21,9 +21,9 @@ export function listarRegrasGerais(): Regra[] {
     const p = regrasPath()
     if (!existsSync(p)) {
       const def: Regra[] = [
-        { id: 'direto', titulo: 'Resposta direta', descricao: 'Sempre responder direto ao ponto, sem enrolação.', ativo: true, criadoEm: new Date().toISOString() },
-        { id: 'acao', titulo: 'Ação direta', descricao: 'Executar o que foi pedido sem pedir confirmação desnecessária.', ativo: true, criadoEm: new Date().toISOString() },
-        { id: 'pratico', titulo: 'Foco prático', descricao: 'Priorizar solução funcional e objetiva.', ativo: true, criadoEm: new Date().toISOString() }
+        { id: 'direto', titulo: 'Resposta direta', descricao: 'Sempre responder direto ao ponto, sem enrolao.', ativo: true, criadoEm: new Date().toISOString() },
+        { id: 'acao', titulo: 'Ao direta', descricao: 'Executar o que foi pedido sem pedir confirmao desnecessria.', ativo: true, criadoEm: new Date().toISOString() },
+        { id: 'pratico', titulo: 'Foco prtico', descricao: 'Priorizar soluo funcional e objetiva.', ativo: true, criadoEm: new Date().toISOString() }
       ]
       writeFileSync(p, JSON.stringify(def, null, 2), 'utf8')
       return def

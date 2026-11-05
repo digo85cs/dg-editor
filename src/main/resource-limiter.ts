@@ -5,7 +5,7 @@ export function configurarLimites() {
   const totalGB = os.totalmem() / (1024 * 1024 * 1024)
   const cpus = os.cpus().length
   
-  // Limitar memória baseado na máquina - nunca mais que 25% ou 2GB
+  // Limitar memria baseado na mquina - nunca mais que 25% ou 2GB
   let maxRam = Math.min(2048, Math.floor((totalGB * 1024) * 0.25))
   if (maxRam < 512) maxRam = 512
   if (maxRam > 1536 && totalGB <= 8) maxRam = 1024

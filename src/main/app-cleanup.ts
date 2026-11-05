@@ -3,7 +3,7 @@ import { app } from 'electron'
 export function configurarFechamentoLimpo() {
   app.on('before-quit', () => {
     try {
-      // Forçar limpeza rápida
+      // Forar limpeza rpida
       process.removeAllListeners('uncaughtException')
       process.removeAllListeners('unhandledRejection')
     } catch {}

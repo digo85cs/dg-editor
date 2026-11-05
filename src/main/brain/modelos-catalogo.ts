@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Catálogo de modelos (.dg-editor/modelos.default.json + modelos.json runtime)
  * + detecção Ollama + health + fallback leve.
  */

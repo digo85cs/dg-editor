@@ -1,4 +1,4 @@
-﻿import { readdirSync, lstatSync } from 'fs'
+import { readdirSync, lstatSync } from 'fs'
 import { join, extname, basename } from 'path'
 import type { FolderScanResult } from '@shared/types'
 

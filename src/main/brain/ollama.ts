@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Unico ponto de contato com o Ollama local.
  * URL, escolha de modelo e chat simples vivem aqui.
  */

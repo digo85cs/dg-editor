@@ -34,7 +34,7 @@ export function guardianSnapshot(): GuardianSnapshot {
   const ramOk = free >= RAM_MINIMA_BYTES && cpuPercent < CPU_MAX_LIMITE
   if (!ramOk && !bloqueado) {
     bloqueado = true
-    dglog('[guardian] recursos limitados - modo econômico')
+    dglog('[guardian] recursos limitados - modo econmico')
   } else if (ramOk && bloqueado) {
     bloqueado = false
     dglog('[guardian] recursos liberados')

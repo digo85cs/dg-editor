@@ -48,7 +48,7 @@ export async function conectarGithub(): Promise<{ ok: boolean; erro?: string; em
         if (url.pathname !== '/callback') { res.writeHead(404); res.end(); return }
         const code = url.searchParams.get('code')
         const returned = url.searchParams.get('state')
-        if (returned !== state || !code) { res.writeHead(400); res.end('Erro'); server.close(); return resolve({ ok: false, erro: 'OAuth inválido' }) }
+        if (returned !== state || !code) { res.writeHead(400); res.end('Erro'); server.close(); return resolve({ ok: false, erro: 'OAuth invlido' }) }
         const addr: any = server.address()
         const port = addr.port
         const redirectUri = 'http://127.0.0.1:' + port + '/callback'

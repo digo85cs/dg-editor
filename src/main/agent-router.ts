@@ -75,10 +75,10 @@ export function decidirAutoAprovacao(
 }
 
 export function sugerirRota(intencao: Intencao): { modo?: string; mcp?: string[]; dica: string } {
-  if (intencao === 'video') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI/Wan para gerar vídeo local' }
+  if (intencao === 'video') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI/Wan para gerar vdeo local' }
   if (intencao === 'imagem') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI para gerar imagem' }
   if (intencao === 'planilha') return { modo: 'analise', mcp: ['duckdb'], dica: 'Usar DuckDB para consultar planilhas localmente' }
-  if (intencao === 'pdf') return { modo: 'analise', mcp: ['markitdown', 'docling'], dica: 'Converter com MarkItDown/Docling para melhor análise' }
-  if (intencao === 'codigo') return { modo: 'dg', dica: 'Modo código padrão com ferramentas de edição' }
+  if (intencao === 'pdf') return { modo: 'analise', mcp: ['markitdown', 'docling'], dica: 'Converter com MarkItDown/Docling para melhor anlise' }
+  if (intencao === 'codigo') return { modo: 'dg', dica: 'Modo cdigo padro com ferramentas de edio' }
   return { dica: 'Rota geral' }
 }

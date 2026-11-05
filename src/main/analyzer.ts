@@ -1,4 +1,4 @@
-﻿import { createHash } from 'crypto'
+import { createHash } from 'crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { scanFolder } from './scanner'
