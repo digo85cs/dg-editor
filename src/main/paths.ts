@@ -31,11 +31,8 @@ export function resolverRaizDGEditor(): string {
   }
 
   // 2. Padrao Windows
-  if (process.platform === 'win32') {
-    const windowsPath = 'D:\\CURSOR\\DG Editor';
-    if (existsSync(windowsPath)) {
-      return resolve(windowsPath);
-    }
+  if (process.platform === 'win32' && existsSync(RAIZ_WINDOWS_CANONICA)) {
+    return resolve(RAIZ_WINDOWS_CANONICA);
   }
 
   // 3. Padrao Linux/macOS

@@ -298,7 +298,8 @@ export async function handleChatSend(
       const { streamOllamaChat, streamOpenAIChat } = await import('../brain/stream-chat');
       const { primeiroProvider, limitesPorTarefa } = await import('../brain/registry');
       const modeloChat = modeloParaTarefa(rootOk, 'chat');
-      const modeloLocal = guardianPodeOperar() ? modeloChat : 'qwen2.5-coder:1.5b';
+      const tarefaLocal = guardianPodeOperar() ? 'chat' : 'chat-rapido';
+      const modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat;
       const provider = primeiroProvider('chat');
       const system = 'Voce e o DG Editor, assistente de analise de sistemas. Responda sempre em portugues brasileiro correto.';
       const user = (context ? 'Contexto:\n' + context + '\n\n' : '') + 'Pedido: ' + textoPedido;
@@ -323,19 +324,19 @@ export async function handleChatSend(
           }
         }
       }
-      if (!modeloChat) throw new Error('Nenhum modelo de chat instalado');
+      if (!modeloLocal) throw new Error('Nenhum modelo de chat instalado');
       await ensureOllama();
       try {
         const limites = limitesPorTarefa('chat');
         const resposta = (await streamOllamaChat({
-          model: modeloLocal || 'qwen2.5-coder:1.5b',
+          model: modeloLocal,
           system,
           user,
           numPredict: limites.num_predict,
           timeoutMs: limites.timeoutMs,
           onDelta: (delta) => publicarDelta({ delta })
         })).trim();
-        if (resposta) return publicar(resposta, 'ollama:' + (modeloLocal || modeloChat));
+        if (resposta) return publicar(resposta, 'ollama:' + modeloLocal);
       } catch (error) {
         publicarDelta({ reset: true });
         dglog('[chat] stream local falhou: ' + String(error));
