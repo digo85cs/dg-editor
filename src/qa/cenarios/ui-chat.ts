@@ -60,6 +60,37 @@ export async function cenariosUiChat(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
+      const r = await page.evaluate(async () => {
+        const api = (window as any).api
+        return await api.invoke('auditoria:rodar', { bootLeve: true })
+      })
+      const resumo = r?.resumo
+      const ok = typeof resumo?.ok === 'number' && resumo.erro === 0
+      out.push({
+        id: 'ui.auditoria.boot-leve',
+        area: 'ui',
+        titulo: 'auditoria leve responde pelo preload e IPC',
+        severidade: ok ? (resumo.warn === 0 ? 'ok' : 'warn') : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: resumo
+          ? 'ok=' + resumo.ok + ' warn=' + resumo.warn + ' erro=' + resumo.erro + ' corrigidos=' + resumo.corrigidos
+          : String(r?.erro || 'resposta sem resumo')
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.auditoria.boot-leve',
+        area: 'ui',
+        titulo: 'auditoria leve responde pelo preload e IPC',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
       await page.locator('.center-tab[data-center-pane="chat"]').click()
       const agent = page.locator('#chat-agent-select')
       const mode = page.locator('#chat-mode-select')

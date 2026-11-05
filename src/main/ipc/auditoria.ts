@@ -25,7 +25,8 @@ export async function handleAuditoriaRodar(
     return await mod.rodarAuditoria({
       ...mod.OPCOES_AUDITORIA_PADRAO,
       autoAtualizar: opts?.autoAtualizar === true,
-      reiniciarAoFim: opts?.reiniciarAoFim === true
+      reiniciarAoFim: opts?.reiniciarAoFim === true,
+      bootLeve: opts?.bootLeve === true
     });
   } catch (e: unknown) {
     return { ok: false, erro: String((e as Error)?.message || e) };
