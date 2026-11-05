@@ -3192,6 +3192,52 @@ const agentesGratisPadrao = [
   { id: 'free-debugger', nome: 'Debugger Free', tipo: 'free' },
   { id: 'free-reviewer', nome: 'Reviewer Free', tipo: 'free' }
 ]
+let chatAgentRequestId = 0
+
+async function carregarOpcoesAgenteChat(raiz = pastaAtual) {
+  const agentSel = document.getElementById('chat-agent-select')
+  if (!agentSel) return
+  const requestId = ++chatAgentRequestId
+  let list = []
+  if (raiz) {
+    try {
+      const r = await window.api.invoke('agente:listar', raiz)
+      list = r?.agentes || []
+    } catch {}
+  }
+  if (requestId !== chatAgentRequestId || !agentSel.isConnected) return
+
+  const preferido = (() => {
+    try { return localStorage.getItem('dg-chat-agent') || agentSel.value || 'auto' } catch { return agentSel.value || 'auto' }
+  })()
+  agentSel.replaceChildren()
+  const autoOpt = document.createElement('option')
+  autoOpt.value = 'auto'
+  autoOpt.textContent = 'Automático'
+  agentSel.appendChild(autoOpt)
+
+  const grpFree = document.createElement('optgroup')
+  grpFree.label = 'Agentes gratuitos'
+  for (const a of agentesGratisPadrao) {
+    const o = document.createElement('option')
+    o.value = a.id
+    o.textContent = a.nome
+    grpFree.appendChild(o)
+  }
+  agentSel.appendChild(grpFree)
+
+  const grpLocal = document.createElement('optgroup')
+  grpLocal.label = 'Agentes locais'
+  for (const a of list) {
+    const o = document.createElement('option')
+    o.value = a.id
+    o.textContent = a.nome || a.id
+    grpLocal.appendChild(o)
+  }
+  if (grpLocal.children.length) agentSel.appendChild(grpLocal)
+  agentSel.value = Array.from(agentSel.options).some((o) => o.value === preferido) ? preferido : 'auto'
+}
+
 function initChatAgentSelector() {
   const bar = document.getElementById('chat-header-actions')
   if (!bar) return
@@ -3294,44 +3340,11 @@ function initChatAgentSelector() {
   maisWrap.appendChild(menu)
   wrap.appendChild(maisWrap)
   bar.insertBefore(wrap, bar.firstChild)
-  ;(async () => {
-    try {
-      const r = await window.api.invoke('agente:listar', pastaAtual)
-      const list = r?.agentes || []
-      agentSel.innerHTML = ''
-      const autoOpt = document.createElement('option')
-      autoOpt.value = 'auto'
-      autoOpt.textContent = 'Auto'
-      agentSel.appendChild(autoOpt)
-      // adicionar agentes gratuitos/free
-      const grpFree = document.createElement('optgroup')
-      grpFree.label = 'Gratuitos / Free'
-      for (const a of agentesGratisPadrao) {
-        const o = document.createElement('option')
-        o.value = a.id
-        o.textContent = a.nome
-        grpFree.appendChild(o)
-      }
-      agentSel.appendChild(grpFree)
-      const grpLocal = document.createElement('optgroup')
-      grpLocal.label = 'Agentes locais'
-      for (const a of list) {
-        const o = document.createElement('option')
-        o.value = a.id
-        o.textContent = a.nome || a.id
-        grpLocal.appendChild(o)
-      }
-      if (grpLocal.children.length) agentSel.appendChild(grpLocal)
-      try {
-        const va = localStorage.getItem('dg-chat-agent')
-        if (va) agentSel.value = va
-      } catch {}
-      try {
-        const vm = localStorage.getItem('dg-chat-mode')
-        if (vm) modeSel.value = vm
-      } catch {}
-    } catch {}
-  })()
+  void carregarOpcoesAgenteChat()
+  try {
+    const vm = localStorage.getItem('dg-chat-mode')
+    if (vm) modeSel.value = vm
+  } catch {}
   agentSel.addEventListener('change', () => {
     try {
       localStorage.setItem('dg-chat-agent', agentSel.value)
