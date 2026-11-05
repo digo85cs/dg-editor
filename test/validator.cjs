@@ -1473,6 +1473,28 @@ async function main() {
     assert('preload agente:plano-marcar-passo', /agente:plano-marcar-passo/.test(pre))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
     assert('registerAgentExtrasIpc', /registerAgentExtrasIpc/.test(idxMain))
+    assert('Vault registrado no boot', /registerVaultIpc\(\)/.test(idxMain))
+    assert('OpenClaw registrado no boot', /registerOpenClawIpc\(\)/.test(idxMain))
+    assert('extras Agent registrados no boot', /registerAgentExtrasIpc\(\)/.test(idxMain))
+    const agentIpc = fs.readFileSync(path.join(SRC, 'main/agent/ipc.ts'), 'utf8')
+    const preloadIpc = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
+    for (const canal of [
+      'agente:pedir',
+      'agente:executar-plano',
+      'agente:plano-marcar-passo',
+      'agente:plano-salvar',
+      'agente:plano-limpar',
+      'agente:plano-atualizar-passos',
+      'agente:verificar',
+      'agente:diagnosticos',
+      'agente:diagnostico-manual'
+    ]) {
+      assert('Agent handler ' + canal, agentIpc.includes("ipcMain.handle('" + canal + "'"))
+      assert('preload libera ' + canal, preloadIpc.includes("'" + canal + "'"))
+    }
+    for (const canal of ['dg:modes:listar', 'dg:modes:salvar', 'dg:permissoes:obter', 'dg:permissoes:salvar', 'simbolos:indexar', 'simbolos:buscar']) {
+      assert('preload libera ' + canal, preloadIpc.includes("'" + canal + "'"))
+    }
     assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
     assert('smoke embed injeta BrowserWindow pai', /DG_NAV_SMOKE_EMBED/.test(idxMain))
     const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
