@@ -8,6 +8,43 @@ export async function cenariosUiChat(page: Page): Promise<ResultadoCenario[]> {
     const t0 = Date.now()
     try {
       await page.locator('.center-tab[data-center-pane="chat"]').click()
+      const agent = page.locator('#chat-agent-select')
+      const mode = page.locator('#chat-mode-select')
+      const mais = page.locator('#btn-chat-mais')
+      const menu = page.locator('#chat-mais-menu')
+      await agent.waitFor({ state: 'visible', timeout: 5000 })
+      const options = await agent.locator('option').allTextContents()
+      const setting = await page.evaluate(() => localStorage.getItem('dg-chat-autoapprove') === '1')
+      await mais.click({ timeout: 3000 })
+      const aberto = (await menu.isVisible()) && (await mais.getAttribute('aria-expanded')) === 'true'
+      const marcado = (await menu.locator('[role="menuitemcheckbox"]').getAttribute('aria-checked')) === String(setting)
+      await page.keyboard.press('Escape')
+      const fechado = (await menu.isHidden()) && (await mais.getAttribute('aria-expanded')) === 'false'
+      const ok = (await mode.count()) === 1 && options.includes('Automático') && options.some((x) => /Auto Free|Coder Free/.test(x)) && aberto && marcado && fechado
+      out.push({
+        id: 'ui.chat.controles',
+        area: 'ui',
+        titulo: 'seletores de agente/modo e menu de opções respondem',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'opcoes=' + options.length + ' aberto=' + aberto + ' pref=' + marcado + ' fechado=' + fechado
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.chat.controles',
+        area: 'ui',
+        titulo: 'controles do cabeçalho do chat',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
+      await page.locator('.center-tab[data-center-pane="chat"]').click()
       await page.waitForSelector('#chat-input', { timeout: 5000 })
       const input = page.locator('#chat-input')
       await input.fill('')
