@@ -3,10 +3,23 @@
  * Extraido de src/main/ipc/index.ts
  */
 
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { IpcResult } from './types';
+
+// ============================================================================
+// ESTADO
+// ============================================================================
+
+let mainWindowRef: BrowserWindow | null = null;
+
+/**
+ * Define a janela principal para dialogos de pasta
+ */
+export function setFolderMainWindow(window: BrowserWindow | null): void {
+  mainWindowRef = window;
+}
 
 // ============================================================================
 // HANDLERS DE PASTA
@@ -53,14 +66,6 @@ export function handleFolderFormatSummary(
 export async function handleFolderSelect(
   _event: Electron.IpcMainInvokeEvent
 ): Promise<{ canceled: boolean; path?: string }> {
-  let mainWindowRef: Electron.BrowserWindow | null = null;
-  try {
-    const { getMainWindow } = await import('./index');
-    mainWindowRef = getMainWindow();
-  } catch {
-    // ignore
-  }
-
   const window = mainWindowRef || null;
   const result = await dialog.showOpenDialog(window!, {
     title: 'Selecionar pasta de trabalho',
@@ -89,3 +94,6 @@ export function registrarHandlersFolder(): void {
 
   dglog('[ipc:folder] handlers registrados!');
 }
+
+// Exportar função para definir janela
+export { setFolderMainWindow };

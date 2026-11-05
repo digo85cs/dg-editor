@@ -3,7 +3,7 @@
  * Centraliza o registro de todos os handlers do DG Editor
  */
 
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
 
 // Importar todos os registradores

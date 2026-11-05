@@ -3,12 +3,9 @@
  * Extraido de src/main/ipc/index.ts
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, app as electronApp } from 'electron';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
-
-// Importar app do Electron para quit
-import { app as electronApp } from 'electron';
 
 // ============================================================================
 // HANDLERS DE APLICACAO
