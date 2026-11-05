@@ -39,7 +39,6 @@ import { registrarHandlersQa } from './qa';
 import { registrarHandlersModelos } from './modelos';
 import { registrarHandlersIndice } from './indice';
 import { registrarHandlersRegrasGerais } from './regras-gerais';
-import { registrarHandlersChatExtra } from './chat-extra';
 
 // ============================================================================
 // ESTADO
@@ -110,7 +109,6 @@ export function registrarTodosHandlers(): void {
     registrarHandlersModelos();
     registrarHandlersIndice();
     registrarHandlersRegrasGerais();
-    registrarHandlersChatExtra();
 
     dglog('[ipc:registry] <<< Todos os handlers IPC registrados com sucesso!');
   } catch (e) {
