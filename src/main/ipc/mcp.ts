@@ -5,6 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
+import { mcpAtivo } from '../mcp/client';
 import type { IpcResult } from './types';
 
 // ============================================================================
@@ -33,7 +34,6 @@ export function handleMcpStatus(
   _event: Electron.IpcMainInvokeEvent
 ): IpcResult & { ok: boolean; erro?: string; ativo?: boolean } {
   try {
-    const { mcpAtivo } = require('../mcp/client');
     return { ok: true, ativo: mcpAtivo() };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };

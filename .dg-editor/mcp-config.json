@@ -2,8 +2,8 @@
   "mcpServers": {
     "dg-editor": {
       "command": "node",
-      "args": ["D:\\CURSOR\\DG Editor\\.dg-editor\\bin\\main\\mcp\\server.js"],
-      "env": { "DG_ROOT": "D:\\CURSOR\\DG Editor" }
+      "args": ["C:\\Users\\digo8\\OneDrive\\CURSOR\\DG Editor\\.dg-editor\\bin\\main\\mcp\\server.js"],
+      "env": { "DG_ROOT": "C:\\Users\\digo8\\OneDrive\\CURSOR\\DG Editor" }
     }
   }
 }
