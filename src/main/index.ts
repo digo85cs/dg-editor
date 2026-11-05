@@ -349,6 +349,9 @@ app.whenReady().then(() => {
   // Registrar handlers IPC
   setMainWindow(mainWindow);
   registrarTodosHandlers();
+  registerVaultIpc();
+  registerOpenClawIpc();
+  registerAgentExtrasIpc();
 
   if (!SAFE_MODE && !qaE2e) {
     // Detectacao de modelos NAO no boot - libera o event loop para terminal:create.
