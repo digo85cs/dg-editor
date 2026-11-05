@@ -20,6 +20,7 @@ import {
   profundidadeExecucaoAgente
 } from '../brain/agent'
 import { chamarControle } from './navegador-client'
+import { executeOllamaTool, OLLAMA_TOOL_DEFINITIONS } from './ollama-tools'
 
 const RAIZ = resolverRaizProjeto()
 const VAULT = projectStateDir(RAIZ)
@@ -33,6 +34,7 @@ function dentroDoVault(p: string): boolean {
 }
 
 const TOOLS = [
+  ...OLLAMA_TOOL_DEFINITIONS,
   {
     name: 'dossie_read',
     description: 'Le o dossie atual do DG Editor (.dg-editor/dossie.txt)',
@@ -279,10 +281,15 @@ const server = new Server(
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 
-server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: string; arguments?: unknown } }) => {
+server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: string; arguments?: unknown } }, extra) => {
   const { name, arguments: args = {} } = req.params
 
   try {
+    if (name === 'ollama_ask' || name === 'ollama_script') {
+      const result = await executeOllamaTool(name, args, RAIZ, { signal: extra.signal })
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+    }
+
     if (name === 'dossie_read') {
       const txt = await lerDossie()
       return { content: [{ type: 'text', text: txt || '(dossie vazio)' }] }

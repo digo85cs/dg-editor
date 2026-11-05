@@ -22,6 +22,7 @@
     "server.ts",
     "client.ts",
     "navegador-client.ts",
+    "ollama-tools.ts",
     "../dossie.ts",
     "../paths.ts",
     "../chatstore.ts",
