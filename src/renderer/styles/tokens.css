@@ -1,0 +1,109 @@
+/**
+ * Tokens DG Editor — hexes legados preservados; --dg-* espelha + tokens de IDE.
+ * Contraste AA: --texto-fraco #aaaaaa no claro falha em 4.5:1 → só --dg-text-faint
+ * aponta para --texto-secundario; hex de --texto-fraco permanece intacto.
+ */
+:root,
+body.tema-claro {
+  /* === LEGADO (hexes light — INTACTOS) === */
+  --bg-principal: #f7f7f7;
+  --bg-sidebar: #f2f2f2;
+  --bg-painel: #ffffff;
+  --bg-ativo: #a8e0d0;
+  --bg-hover: #e8e8e8;
+  --texto-primario: #222222;
+  --texto-secundario: #6b6b6b;
+  --texto-fraco: #aaaaaa;
+  --verde-status: #00a884;
+  --vermelho-erro: #d9534f;
+  --borda: #d8d8d8;
+  --borda-tenue: #e4e4e4;
+  --raio: 8px;
+  --raio-pequeno: 6px;
+  --fonte: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fonte-mono: 'Cascadia Code', Consolas, monospace;
+
+  /* === ESPELHOS --dg-* === */
+  --dg-bg: var(--bg-principal);
+  --dg-surface: var(--bg-painel);
+  --dg-surface-raised: var(--bg-hover);
+  --dg-sidebar: var(--bg-sidebar);
+  --dg-active: var(--bg-ativo);
+  --dg-border: var(--borda);
+  --dg-border-subtle: var(--borda-tenue);
+  --dg-text: var(--texto-primario);
+  --dg-text-muted: var(--texto-secundario);
+  --dg-text-faint: var(--texto-secundario);
+  --dg-accent: var(--verde-status);
+  --dg-accent-brand: #00b894;
+  --dg-danger: var(--vermelho-erro);
+  --dg-danger-close: #d13438;
+  --dg-code-bg: var(--bg-painel);
+  --dg-selection: rgba(0, 168, 132, 0.28);
+  --dg-placeholder: #9e9e9e;
+  --dg-ink-on-accent: #0b0b0b;
+
+  /* === IDE === */
+  --dg-space-1: 4px;
+  --dg-space-2: 8px;
+  --dg-space-3: 12px;
+  --dg-space-4: 16px;
+  --dg-space-5: 20px;
+  --dg-space-6: 24px;
+  --dg-space-7: 32px;
+  --dg-space-8: 40px;
+  --dg-radius-sm: 4px;
+  --dg-radius-md: 6px;
+  --dg-radius-lg: 8px;
+  --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.16);
+  --dg-fs-xs: 11px;
+  --dg-fs-sm: 12px;
+  --dg-fs-md: 13px;
+  --dg-fs-lg: 15px;
+  --dg-fs-xl: 18px;
+  --dg-lh-tight: 1.35;
+  --dg-lh-normal: 1.5;
+  --dg-lh-relaxed: 1.7;
+  --dg-editor-line-height: 1.6;
+  --dg-titlebar-height: 38px;
+
+  /* === ESTRUTURA (Prompt F / Etapa 1+3) === */
+  --dg-gap: 8px;
+  --dg-gap-sm: 6px;
+  --dg-iconbar-w: 48px;
+  --dg-sidebar-w: 260px;
+  --dg-panel-w: 320px;
+  --dg-statusbar-h: 24px;
+  --dg-tabbar-h: 34px;
+  /* Alias legado: 36 → 34 (tabbar Cursor). Manter nome para CSS antigo. */
+  --dg-tab-height: var(--dg-tabbar-h);
+
+  /* Aliases legados → estrutura (drag/layout e CSS antigo) */
+  --dg-activitybar-width: var(--dg-iconbar-w);
+  --dg-sidebar-width: var(--dg-sidebar-w);
+  --dg-right-panel-width: var(--dg-panel-w);
+}
+
+body.tema-escuro {
+  /* === LEGADO (hexes dark — INTACTOS) === */
+  --bg-principal: #1a1a1a;
+  --bg-sidebar: #151515;
+  --bg-painel: #1f1f1f;
+  --bg-ativo: #2d5a4d;
+  --bg-hover: #2a2a2a;
+  --texto-primario: #f2f2f2;
+  --texto-secundario: #bdbdbd;
+  --texto-fraco: #a0a0a0;
+  --verde-status: #2dd4a0;
+  --vermelho-erro: #d9534f;
+  --borda: #333333;
+  --borda-tenue: #2a2a2a;
+
+  --dg-text-faint: var(--texto-fraco);
+  --dg-selection: rgba(45, 212, 160, 0.28);
+  --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+}

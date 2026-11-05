@@ -1,0 +1,58 @@
+# Regras do sistema (DG Editor)
+# Instrucoes permanentes. Chat, analise e Agent respeitam este arquivo.
+# Uma regra por linha, com hifen. Secoes com titulo # === ... ===.
+
+# === 1. EXECUCAO ===
+- Preferir EXECUTAR via automacao. Quando o pedido for criar, alterar ou executar, fazer direto.
+- Nao devolver so um bloco para copiar e colar quando a acao puder ser feita no projeto.
+- Nao pedir para "rodar este comando" se a automacao local puder executar.
+- Se faltar credencial ou segredo que nao esta no projeto, parar e pedir so isso. No resto, executar.
+
+# === 2. CONTEXTO ===
+- Nunca inventar stack, arquitetura ou estrutura. Consultar arquivos reais: .dgrules, package.json, src/, README.md.
+- Se a tecnologia nao foi lida, dizer "nao verifiquei a stack deste projeto".
+- Falar do projeto so com o que foi lido. Se nao houver dado, dizer que nao sabe.
+
+# === 3. IDIOMA ===
+- Idioma padrao: portugues do Brasil (pt-BR) em chat, relatorios, commits e PRs.
+- Comentarios, logs, UI, erros e docs em pt-BR.
+- Identificadores e APIs que ja existem em ingles podem ficar em ingles.
+- Nao misturar idiomas na mesma resposta.
+
+# === 4. PASTA DE TRABALHO ===
+- Pasta oficial: D:\CURSOR\DG Editor. App local (Electron neste PC).
+- Nao usar nuvem, espelho remoto nem sync no boot.
+- Nao abrir node_modules\electron\dist. Atalho diario: abrir-dg-editor.vbs (wscript).
+
+# === 5. CHAT ===
+- Respostas diretas e acionaveis, em bloco unico.
+
+# === 6. MELHORIA CONTINUA ===
+- Buscar e aplicar melhorias em layout/UI (estilo Kilo), agentes locais e gratuitos, skills, modelos locais e gratuitos, fila, aprovacao automatica, prompt e anexos.
+- Integrar sem quebrar Agent, OpenClaw, fila serial, propostas e checkpoints.
+- Rotear agentes free/locais no chat e respeitar a fila.
+- Nao remover funcionalidade. So integrar ou melhorar.
+- Vasculhar codigo e dependencias antes de mudar.
+- Validar as combinacoes tocadas: agente, modo, aprovacao automatica e fila.
+- No fim, informar o caminho de cada arquivo modificado e o executavel ou atalho em uso.
+- Autocomplete do editor usa so o modelo 1.5b. Memoria so entra no prompt depois de aceita. Diff aceito vira commit local no repositorio aberto. O guardiao segura tarefa pesada com RAM livre abaixo de 256 MB ou CPU a partir de 75%.
+
+# === 7. ENGENHARIA REVERSA (SEGURO) ===
+- So analise estatica de arquivo proprio, open-source ou com autorizacao explicita do dono.
+- Nao automatizar quebra de licenca, DRM, ofuscacao maliciosa, exploracao ou bypass.
+- Padrao read-only. Nao gerar payload, exploit, crack ou instrucao de invasao.
+- Respeitar a lei e os termos de uso do software analisado.
+- Conclusao exige evidence_id: caminho do arquivo e trecho lido, ou comando e saida que sustentam a frase.
+
+# === 8. CLEAN-ROOM ===
+- Antes de reimplementar, escrever o comportamento observavel (spec). Nao partir do codigo de terceiro.
+- Nao copiar codigo-fonte de terceiros. Vale usar API publica, formato publico e comportamento observado.
+- Paridade se prova com oraculo ou teste, nao com colagem.
+- Rastrear spec, oraculo e commit da reimplementacao.
+
+# === 9. REGRA FIXA ===
+- O que foi pedido e executado, ou fica explicito o que falta autorizar.
+- Dizer o motivo de cada validacao.
+- Validar, corrigir se falhar e validar de novo antes de concluir.
+- Fechar com a lista de arquivos alterados e com o atalho ou executavel atual.
+- A auditoria confere, linha a linha, se cada ferramenta da interface tem canal no preload e handler no processo principal.

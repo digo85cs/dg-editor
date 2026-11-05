@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160" role="img" aria-label="DG Editor">
+  <rect x="24" y="24" width="112" height="112" rx="24" fill="#141414" stroke="#2a2a2a" stroke-width="2"/>
+  <rect x="56" y="38" width="48" height="5" rx="2.5" fill="#00b894"/>
+  <path fill="#00b894" fill-rule="evenodd" d="M54 56h19c21 0 31 9 31 24s-10 24-31 24H54V56zm12 10h7c14 0 17 5 17 14s-3 14-17 14h-7V66z"/>
+  <rect x="112" y="70" width="9" height="24" rx="2.5" fill="#2dd4a0"/>
+  <text x="164" y="102" font-family="Segoe UI, system-ui, sans-serif" font-size="64" font-weight="700" fill="#f2f2f2">DG</text>
+  <text x="268" y="102" font-family="Segoe UI, system-ui, sans-serif" font-size="64" font-weight="500" fill="#00b894">Editor</text>
+</svg>

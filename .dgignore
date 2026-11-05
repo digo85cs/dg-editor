@@ -1,0 +1,16 @@
+node_modules
+.git
+out
+dist
+build
+coverage
+.next
+vendor
+__pycache__
+.dg-editor
+qa-artifacts
+*.log
+*.bak
+tmp
+backups
+dist-app

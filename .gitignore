@@ -1,0 +1,92 @@
+node_modules/
+out/
+dist-app/
+dg-config.json
+.vs/
+# Marca visual do DG Editor fica em resources/ (versionada)
+*.local
+.env
+dist/
+fase0-snapshot.txt
+tmp-*.cjs
+package.json.bak
+repair-mojibake.cjs
+check-acentos.cjs
+gen-css.cjs
+fix64.cjs
+logs/
+
+# Fase 3: dossie local do projeto
+.dg-editor/dossie.txt
+.dg-editor/backup/
+
+src/**/*.js
+!src/renderer/**/*.js
+
+# Testes e diagnosticos soltos na raiz
+teste-*.cjs
+teste-*.log
+diag-*.cjs
+*_teste_*.mjs
+_test-*.mjs
+
+# Dossies gerados
+dossie-tecnico.cjs
+dossie-tecnico.json
+dossie-tecnico.md
+
+# Estado local do DG Editor
+.dg-editor/chat.json
+.dg-editor/indice-codigo.json
+.dg-editor/memoria/
+.dg-editor/logs/
+
+.dg-root
+.dg-editor/cursor-cli-status.json
+.dg-editor/nav-token
+.dg-editor/nav-ultima-url
+.dg-editor/nav-ultima-url.smoke
+.dg-editor/downloads/
+
+# Build do servidor MCP (gerado por build:mcp)
+.dg-editor/bin/
+
+# telemetria de runtime (nao versionar)
+.dg-editor/modelos-stats.json
+
+# Agente QA (versionar so baseline e keep)
+qa-artifacts/*
+!qa-artifacts/baseline.json
+!qa-artifacts/.gitkeep
+
+# Logs de smoke / dumps soltos na raiz
+smoke-*.log
+dg-*.log
+
+# Relatorios / A-B / auditorias gerados (runtime)
+.dg-editor/ab-*.json
+.dg-editor/ab2-*.json
+.dg-editor/ab-relatorio.md
+.dg-editor/auditoria-*.md
+.dg-editor/navegador-relatorio.md
+.dg-editor/dossie-estado-pronto.txt
+
+# Catalogo de modelos e estado de runtime (o default versionado fica em modelos.default.json)
+.dg-editor/modelos.json
+
+# Provas isoladas de QA IA (scripts/qa-ia-teste.cjs)
+tmp/
+
+# Historico de chats (runtime)
+.dg-editor/chats/
+
+# Avaliacoes de modelo (runtime)
+.dg-editor/avaliacoes/
+.dg-editor/analise.json
+.dg-editor/*.flag
+
+*.bak
+*.ps1.bak
+
+.dg-editor/_backups/
+.dg-editor/modelos.json.bak-*
