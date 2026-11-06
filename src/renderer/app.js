@@ -768,7 +768,7 @@ async function renderizarArvoreEm(lista) {
     header.dataset.tipo = 'dir'
     header.innerHTML =
       CHEV +
-      '<span class="file-icon">ðŸ“</span><span class="tab-name" style="overflow:hidden;text-overflow:ellipsis">' +
+      '<span class="file-icon">📁</span><span class="tab-name" style="overflow:hidden;text-overflow:ellipsis">' +
       escapar(nomeArquivo(p)) +
       '</span>'
     header.title = p
@@ -3011,17 +3011,22 @@ function destacarPaleta(itens) {
 async function atualizarGuardiao() {
   try {
     const s = await window.api.invoke('guardian:snapshot')
-    const mb = Math.round(s.freeMemory / 1048576)
+    if (!s || typeof s !== 'object') return
+    const freeMem = typeof s.freeMemory === 'number' ? s.freeMemory : (typeof s.dados?.freeMemory === 'number' ? s.dados.freeMemory : NaN)
+    const freePct = typeof s.freePct === 'number' ? s.freePct : (typeof s.dados?.freePct === 'number' ? s.dados.freePct : NaN)
+    const cpuPercent = typeof s.cpuPercent === 'number' ? s.cpuPercent : (typeof s.dados?.cpuPercent === 'number' ? s.dados.cpuPercent : NaN)
+    const ramOk = typeof s.ramOk === 'boolean' ? s.ramOk : (typeof s.dados?.ramOk === 'boolean' ? s.dados.ramOk : true)
+    const mb = Number.isFinite(freeMem) ? Math.round(freeMem / 1048576) : null
+    const pct = Number.isFinite(freePct) ? freePct : null
+    const cpu = Number.isFinite(cpuPercent) ? cpuPercent : null
     $('guardian-text').textContent =
-      'Guardiao: RAM ' +
-      mb +
-      ' MB (' +
-      s.freePct +
-      '%) - CPU ' +
-      s.cpuPercent +
-      '%' +
-      (s.ramOk ? '' : ' - PAUSADO')
-    $('guardian-bar').classList.toggle('guardian-alerta', !s.ramOk)
+      'Guardião: RAM ' +
+      (mb === null ? '—' : mb + ' MB') +
+      (pct === null ? '' : ' (' + pct + '%)') +
+      ' - CPU ' +
+      (cpu === null ? '—' : cpu + '%') +
+      (ramOk ? '' : ' - PAUSADO')
+    $('guardian-bar').classList.toggle('guardian-alerta', !ramOk)
   } catch { /* ignora */ }
 }
 
