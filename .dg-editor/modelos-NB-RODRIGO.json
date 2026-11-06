@@ -1,0 +1,133 @@
+{
+  "versao": 1,
+  "atualizadoEm": "2026-11-05T22:41:03.008Z",
+  "ativo": "llama3.2:latest",
+  "secundario": "qwen2.5-coder:7b",
+  "roteamento": {
+    "completar": "pequeno",
+    "explicar": "grande",
+    "analise": "pequeno",
+    "analisar": "pequeno",
+    "chat": "pequeno",
+    "chat-rapido": "pequeno",
+    "codigo": "padrao"
+  },
+  "modelosPorTarefa": {
+    "analise": "qwen2.5-coder:3b",
+    "analisar": "qwen2.5-coder:3b",
+    "chat": "qwen2.5-coder:3b",
+    "chat-rapido": "qwen2.5-coder:1.5b",
+    "codigo": "qwen2.5-coder:7b"
+  },
+  "modelos": [
+    {
+      "id": "llama3.2:latest",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "chat",
+      "contexto": 8192,
+      "capacidades": [
+        "chat",
+        "analise"
+      ],
+      "porte": "pequeno",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    },
+    {
+      "id": "qwen2.5-coder:1.5b",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "codigo",
+      "contexto": 8192,
+      "capacidades": [
+        "codigo",
+        "chat"
+      ],
+      "porte": "pequeno",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    },
+    {
+      "id": "qwen2.5-coder:3b",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "codigo",
+      "contexto": 8192,
+      "capacidades": [
+        "codigo",
+        "chat"
+      ],
+      "porte": "pequeno",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    },
+    {
+      "id": "qwen2.5-coder:7b",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "codigo",
+      "contexto": 8192,
+      "capacidades": [
+        "codigo",
+        "chat",
+        "analise"
+      ],
+      "porte": "padrao",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    },
+    {
+      "id": "qwen2.5-coder:14b",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "codigo",
+      "contexto": 8192,
+      "capacidades": [
+        "codigo",
+        "chat",
+        "analise"
+      ],
+      "porte": "grande",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    },
+    {
+      "id": "nomic-embed-text:latest",
+      "provider": "ollama",
+      "endpoint": "http://127.0.0.1:11434",
+      "tipo": "embedding",
+      "contexto": 8192,
+      "capacidades": [
+        "embedding"
+      ],
+      "porte": "pequeno",
+      "ativo": true,
+      "instalado": false,
+      "latenciaMs": null,
+      "latenciaMedidaEm": null,
+      "atualizadoDisponivel": false,
+      "status": "down"
+    }
+  ]
+}
