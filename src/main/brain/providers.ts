@@ -573,15 +573,16 @@ export async function chamarProvider(
           total_tokens: (result.usage.input_tokens || 0) + (result.usage.output_tokens || 0)
         } : undefined
       }
-    } catch (error) {
-      if (error instanceof CodexCliError) {
+    } catch (e: unknown) {
+      if (e instanceof CodexCliError) {
         const kinds: Record<string, ErroProviderKind> = {
           auth: 'auth', timeout: 'timeout', cancelled: 'cancelled',
           unavailable: 'rede', server: 'server', protocol: 'outro'
         }
-        throw new ErroProvider(kinds[error.kind] || 'outro', error.message, cfg.id)
+        throw new ErroProvider(kinds[e.kind] || 'outro', e.message, cfg.id)
       }
-      throw error
+      if (e instanceof Error) throw e
+      throw new Error(String(e))
     }
   }
   const ac = new AbortController()
