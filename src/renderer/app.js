@@ -1,4 +1,4 @@
-﻿// DG Editor - renderer (IDE OpÃ§Ã£o B)
+﻿// DG Editor - renderer (IDE Opção B)
 import { mostrarRegrasUI } from './regras-ui.js'
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
@@ -30,7 +30,7 @@ let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
 /** #files-list precisa re-render quando a aba Files for ativada. */
 let filesListaSuja = false
-/** HistÃ³rico de navegaÃ§Ã£o de abas (tb-voltar / tb-avancar). */
+/** Histórico de navegação de abas (tb-voltar / tb-avancar). */
 let histAbas = []
 let histIdx = -1
 /** Raiz do vault Markdown aberto (null = fechado). */
@@ -409,7 +409,7 @@ async function abrirVault() {
   const r = await window.api.invoke('vault:abrir')
   if (r?.canceled) return
   if (!r?.ok) {
-    alert('NÃ£o foi possÃ­vel abrir o vault: ' + (r?.erro || 'erro'))
+    alert('Não foi possível abrir o vault: ' + (r?.erro || 'erro'))
     return
   }
   vaultRaiz = r.raiz
@@ -490,7 +490,7 @@ async function abrirWikiLink(alvo) {
   }
   const r = await window.api.invoke('vault:resolver-link', alvo, abaAtiva || undefined)
   if (!r?.path) {
-    alert('Nota nÃ£o encontrada: [[' + alvo + ']]')
+    alert('Nota não encontrada: [[' + alvo + ']]')
     return
   }
   await abrirArquivoNaAba(r.path)
@@ -538,7 +538,7 @@ function garantirEmptyStateChat() {
     empty.id = 'empty-state'
     empty.innerHTML =
       '<h2>Bem-vindo ao DG Editor</h2>' +
-      '<p>Abra uma pasta no Explorer. Chat e anÃ¡lise ficam neste painel; o cÃ³digo edita na aba Editor.</p>' +
+      '<p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>' +
       '<button id="btn-empty-open" class="btn-primary">Abrir pasta</button>'
     area.innerHTML = ''
     area.appendChild(empty)
@@ -553,7 +553,7 @@ async function removerPasta(path) {
   const nome = nomeArquivo(path)
   if (
     !window.confirm(
-      "Remover '" + nome + "' da lista?\n\nA pasta nÃ£o serÃ¡ apagada do disco."
+      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
     )
   ) {
     return
@@ -677,7 +677,7 @@ async function selecionarPasta(path) {
   const raizEl = document.querySelector('.tree-root[data-path="' + CSS.escape(path) + '"]')
   if (raizEl) raizEl.classList.add('selected')
 
-  // se a raiz clicada ainda nÃ£o tem filhos no DOM, carregar SÃ“ ela
+  // se a raiz clicada ainda não tem filhos no DOM, carregar SÓ ela
   if (raizEl) {
     const children = raizEl.querySelector(':scope > .tree-children')
     const chev = raizEl.querySelector('.chevron')
@@ -708,21 +708,21 @@ async function selecionarPasta(path) {
     renderizarAnalise(cached, true)
   } else {
     $('analysis-content').innerHTML =
-      '<p class="muted">Pasta aberta. Escolha AnÃ¡lise rÃ¡pida ou AnÃ¡lise completa quando quiser analisar.</p>'
+      '<p class="muted">Pasta aberta. Escolha Análise rápida ou Análise completa quando quiser analisar.</p>'
   }
 
   if (!temRegras) {
-    // fire-and-forget: nÃ£o bloqueia o clique
+    // fire-and-forget: não bloqueia o clique
     window.api.invoke('rules:create-template', path).catch(() => {})
   }
   console.timeEnd('selecionarPasta')
 }
 
-// ---------- Ãrvore ----------
+// ---------- Árvore ----------
 /**
  * Contexto do chat (pastaAtual / chat-title):
- * muda sÃ³ aqui â€” ao selecionar pasta raiz jÃ¡ expandida (clique no nome, nÃ£o no chevron)
- * ou ao abrir um arquivo. Expandir/retrair Ã¡rvore NÃƒO chama isto.
+ * muda só aqui â€” ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
+ * ou ao abrir um arquivo. Expandir/retrair árvore NÃO chama isto.
  */
 function definirContextoPasta(p) {
   if (!p) return
@@ -783,12 +783,12 @@ async function renderizarArvoreEm(lista) {
       if (e.target.closest('.pasta-remover')) return
       if (carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
-      // Pasta jÃ¡ expandida + clique no nome/Ã­cone â†’ selecionarPasta (sem re-render).
+      // Pasta já expandida + clique no nome/ícone â†’ selecionarPasta (sem re-render).
       if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
         selecionarPasta(p)
         return
       }
-      // Expandir / retrair: sÃ³ classe 'open'. NÃƒO limpar DOM. NÃƒO mudar chat.
+      // Expandir / retrair: só classe 'open'. NÃO limpar DOM. NÃO mudar chat.
       st.expandida = !st.expandida
       chev.classList.toggle('open', st.expandida)
       children.classList.toggle('open', st.expandida)
@@ -1327,7 +1327,7 @@ function criarNoFile(ent, nivel) {
       return
     }
     if (!ent.editavel) {
-      alert('ExtensÃ£o nÃ£o editÃ¡vel: ' + ent.nome)
+      alert('Extensão não editável: ' + ent.nome)
       return
     }
     document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'))
@@ -1447,7 +1447,7 @@ async function renderizarProjects(force) {
   lista.innerHTML = ''
   if (unicos.length === 0) {
     lista.innerHTML =
-      '<p class="projects-empty">Nenhum repositÃ³rio git nas pastas abertas.</p>'
+      '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
     console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + pastasRecentes.length)
     void atualizarStatusBar(pastaAtual)
     return
@@ -1469,7 +1469,7 @@ async function renderizarProjects(force) {
     if (it.dirty) {
       const dot = document.createElement('span')
       dot.className = 'project-dirty'
-      dot.title = 'AlteraÃ§Ãµes nÃ£o commitadas'
+      dot.title = 'Alterações não commitadas'
       btn.appendChild(dot)
     }
     const tempo = tempoRelativoCommit(it.ultimoCommitTs)
@@ -1528,7 +1528,7 @@ async function restaurarAbas() {
         const r = await window.api.invoke('arquivo:ler', c, pastasPermitidas())
         if (r.ok) {
           abas.push({ caminho: c, nome: nomeArquivo(c), dirty: false })
-          // conteÃºdo fica no editor sÃ³ para a ativa; dirty false
+          // conteúdo fica no editor só para a ativa; dirty false
         }
       }
     }
@@ -1567,7 +1567,7 @@ function renderizarAbas() {
     })
     bar.appendChild(btn)
   }
-  // #tabbar fora de #app: esconde quando nÃ£o hÃ¡ abas (Cursor)
+  // #tabbar fora de #app: esconde quando não há abas (Cursor)
   const tabbar = $('tabbar')
   if (tabbar) tabbar.style.display = abas.length ? 'flex' : 'none'
   atualizarEmpty()
@@ -1601,7 +1601,7 @@ function ehImagemExt(caminho) {
   return /^(png|jpe?g|gif|webp)$/.test(extDe(caminho))
 }
 
-/** Renderer markdown mÃ­nimo + sanitizaÃ§Ã£o (sem HTML arbitrÃ¡rio). */
+/** Renderer markdown mínimo + sanitização (sem HTML arbitrário). */
 function sanitizarERenderMarkdown(src) {
   let t = String(src || '')
   t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1702,7 +1702,7 @@ async function mostrarImagem(caminho) {
   if (!box || !img) return
   const r = await window.api.invoke('arquivo:ler-base64', caminho, pastasPermitidas())
   if (!r?.ok || !r.dataUrl) {
-    alert('NÃ£o foi possÃ­vel abrir imagem: ' + (r?.erro || 'erro'))
+    alert('Não foi possível abrir imagem: ' + (r?.erro || 'erro'))
     return
   }
   img.src = r.dataUrl
@@ -1742,7 +1742,7 @@ function atualizarBotoesHist() {
   }
 }
 
-/** Empurra no histÃ³rico sÃ³ se o caminho for diferente da posiÃ§Ã£o atual (evita loop com irHistAbas). */
+/** Empurra no histórico só se o caminho for diferente da posição atual (evita loop com irHistAbas). */
 function registrarHistAba(caminho) {
   if (!caminho) return
   if (histAbas[histIdx] === caminho) {
@@ -1766,7 +1766,7 @@ async function irHistAbas(delta) {
   histIdx = novo
   try {
     await abrirArquivoNaAba(alvo)
-    // arquivo apagado / falha de IPC: nÃ£o ficou em abas
+    // arquivo apagado / falha de IPC: não ficou em abas
     if (!abas.some((a) => a.caminho === alvo)) {
       histAbas.splice(novo, 1)
       histIdx = Math.min(novo, histAbas.length - 1)
@@ -1805,7 +1805,7 @@ async function abrirArquivoNaAba(caminho) {
   }
   const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
   if (!r.ok) {
-    alert('NÃ£o foi possÃ­vel abrir: ' + (r.erro || 'erro'))
+    alert('Não foi possível abrir: ' + (r.erro || 'erro'))
     return
   }
   // sincronizar dirty da aba atual antes de trocar
@@ -1871,7 +1871,7 @@ function perguntarDirty(caminho) {
   return new Promise((resolve) => {
     dirtyResolver = resolve
     $('dirty-msg').textContent =
-      'O arquivo "' + nomeArquivo(caminho) + '" tem alteraÃ§Ãµes nÃ£o salvas. Deseja salvar?'
+      'O arquivo "' + nomeArquivo(caminho) + '" tem alterações não salvas. Deseja salvar?'
     $('modal-dirty').classList.remove('hidden')
   })
 }
@@ -1901,8 +1901,8 @@ async function fecharAba(caminho) {
         const ok = await salvarArquivoAtivo()
         if (!ok) return
       } else {
-        // precisa ativar para salvar conteÃºdo atual no editor â€” se nÃ£o Ã© ativa e dirty, conteÃºdo perdido
-        // abas dirty sÃ³ se estavam ativas e editadas; ao trocar syncamos. OK.
+        // precisa ativar para salvar conteúdo atual no editor â€” se não é ativa e dirty, conteúdo perdido
+        // abas dirty só se estavam ativas e editadas; ao trocar syncamos. OK.
         await ativarAba(caminho)
         const ok = await salvarArquivoAtivo()
         if (!ok) return
@@ -1977,7 +1977,7 @@ function ciclarAbas() {
   ativarAba(next.caminho)
 }
 
-// ---------- AnÃ¡lise ----------
+// ---------- Análise ----------
 function habilitarBotoesAnalise(habilitar) {
   const rapida = $('btn-analise-rapida')
   const completa = $('btn-analise-completa')
@@ -1988,7 +1988,7 @@ function habilitarBotoesAnalise(habilitar) {
 async function solicitarDialogoEscopoAnalise(modo) {
   const resposta = await window.api.invoke('analysis:choose-scope', modo)
   if (resposta?.ok !== true || !Number.isInteger(resposta.response)) {
-    throw new Error(resposta?.erro || 'NÃ£o foi possÃ­vel abrir a escolha de escopo.')
+    throw new Error(resposta?.erro || 'Não foi possível abrir a escolha de escopo.')
   }
   return resposta.response
 }
@@ -1998,7 +1998,7 @@ async function analisarCompleta(root, force = false) {
     const resposta = await solicitarDialogoEscopoAnalise('confirm-complete')
     if (resposta === 0) await rodarAnalise(root, 'completa', force)
   } catch (err) {
-    mostrarToast('NÃ£o foi possÃ­vel confirmar a anÃ¡lise completa: ' + String(err), 'erro')
+    mostrarToast('Não foi possível confirmar a análise completa: ' + String(err), 'erro')
   }
 }
 
@@ -2008,7 +2008,7 @@ async function escolherEscopoAnalise(root, force = false) {
     if (resposta === 0) await rodarAnalise(root, 'rapida', force)
     else if (resposta === 1) await analisarCompleta(root, force)
   } catch (err) {
-    mostrarToast('NÃ£o foi possÃ­vel escolher o escopo da anÃ¡lise: ' + String(err), 'erro')
+    mostrarToast('Não foi possível escolher o escopo da análise: ' + String(err), 'erro')
   }
 }
 
@@ -2021,7 +2021,7 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
   try {
     const r = await window.api.analysisRun(root, force, escopo)
     if (r?.ok === false) {
-      throw new Error(r.erro || 'falha na anÃ¡lise')
+      throw new Error(r.erro || 'falha na análise')
     }
     renderizarAnalise(r.report, r.fromCache)
     $('analysis-content').dataset.escopo = escopo
@@ -2039,11 +2039,11 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
 function renderizarAnalise(report, fromCache) {
   const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
   let html = ''
-  html += secao('O que Ã©', report.oQueE || 'â€”')
+  html += secao('O que é', report.oQueE || 'â€”')
   html += secao('Stack', report.stack || 'â€”')
   html += secao('Estrutura', report.estrutura || 'â€”')
-  html += secaoLista('Pontos de atenÃ§Ã£o', report.pontosAtencao)
-  html += secaoLista('SugestÃµes', report.sugestoes)
+  html += secaoLista('Pontos de atenção', report.pontosAtencao)
+  html += secaoLista('Sugestões', report.sugestoes)
   if (report.provider) {
     html +=
       '<p class="muted">Analisado por: ' +
@@ -2160,7 +2160,7 @@ async function enviarMensagem() {
     const ok = r && r.ok !== false && r.message && r.message.content
     const conteudo = ok
       ? r.message.content
-      : r?.message?.content || 'NÃ£o consegui responder.'
+      : r?.message?.content || 'Não consegui responder.'
     falhou = !ok || (r.message && r.message.provider === 'erro')
     if (!streamBolha) await removerLoadingChat({ erro: falhou })
     else await removerLoadingChat({ imediato: true })
@@ -2184,8 +2184,8 @@ async function enviarMensagem() {
   } catch (err) {
     falhou = true
     await removerLoadingChat({ erro: !streamBolha, imediato: !!streamBolha })
-    if (!streamBolha) adicionarBolha('assistant', 'NÃ£o consegui responder.')
-    else if (streamSpan && !streamTexto) streamSpan.textContent = 'NÃ£o consegui responder.'
+    if (!streamBolha) adicionarBolha('assistant', 'Não consegui responder.')
+    else if (streamSpan && !streamTexto) streamSpan.textContent = 'Não consegui responder.'
     console.info('[chat] erro invoke:', err)
   } finally {
     if (typeof offDelta === 'function') offDelta()
@@ -2209,7 +2209,7 @@ async function ligarHistoricoChat(raiz) {
   })
 }
 
-/** Nova conversa: limpa UI e reseta estado do histÃ³rico (chat.js). */
+/** Nova conversa: limpa UI e reseta estado do histórico (chat.js). */
 function novaConversaUi() {
   if (histChat && typeof histChat.nova === 'function') {
     histChat.nova()
@@ -2259,13 +2259,13 @@ async function melhorarPromptLocal() {
       })
     ])
     if (!r || r.ok !== true || typeof r.resultado !== 'string' || !r.resultado.trim()) {
-      const erro = r?.erro === 'timeout' ? 'Tempo limite excedido nas duas tentativas.' : (r?.erro || 'NÃ£o foi possÃ­vel melhorar o prompt.')
+      const erro = r?.erro === 'timeout' ? 'Tempo limite excedido nas duas tentativas.' : (r?.erro || 'Não foi possível melhorar o prompt.')
       output.value = erro
       mostrarToast(erro, 'erro')
       return
     }
     output.value = r.resultado
-    const tokens = Number.isFinite(r.tokensGenerated) ? r.tokensGenerated + ' tokens' : 'tokens nÃ£o informados'
+    const tokens = Number.isFinite(r.tokensGenerated) ? r.tokensGenerated + ' tokens' : 'tokens não informados'
     mostrarToast('Prompt refinado por ' + r.modelo + ' em ' + r.elapsedMs + ' ms (' + tokens + ').', 'ok')
   } catch (err) {
     const mensagem = err instanceof Error ? err.message : String(err)
@@ -2308,7 +2308,7 @@ async function copiarPromptOrientador() {
     copiado = document.execCommand('copy')
     campo.remove()
   }
-  mostrarToast(copiado ? 'Prompt copiado.' : 'NÃ£o foi possÃ­vel copiar o prompt.', copiado ? 'ok' : 'erro')
+  mostrarToast(copiado ? 'Prompt copiado.' : 'Não foi possível copiar o prompt.', copiado ? 'ok' : 'erro')
 }
 
 $('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
@@ -2385,7 +2385,7 @@ function ligarJanelaFlutuante(modalEl) {
     if (e.target.closest('button, a, input, select, textarea')) return
     trazerJanelaFrente(modalEl)
     const rect = box.getBoundingClientRect()
-    // fixa posiÃ§Ã£o absoluta a partir do layout atual    box.style.left = rect.left + 'px'
+    // fixa posição absoluta a partir do layout atual    box.style.left = rect.left + 'px'
     box.style.top = rect.top + 'px'
     ox = e.clientX - rect.left
     oy = e.clientY - rect.top
@@ -2448,7 +2448,7 @@ async function atualizarPainelAdapta(elId) {
     adaptaStatusCache = st
     el.innerHTML =
       'Conta: <strong>digo85cs@gmail.com</strong><br>' +
-      'DossiÃª: ' +
+      'Dossiê: ' +
       (st.dossieExiste ? 'ok' : 'ausente') +
       ' Â· Continuidade: ' +
       (st.continuidadeExiste ? 'ok' : 'ausente') +
@@ -2468,19 +2468,19 @@ async function copiarContinuidadeAdapta(regenerar) {
     if (!regenerar) {
       const g = await window.api.invoke('adapta:gerar')
       if (!g?.ok) {
-        alert('Continuidade indisponÃ­vel: ' + (g?.erro || r?.erro || 'sem dossiÃª â€” use o chat primeiro'))
+        alert('Continuidade indisponível: ' + (g?.erro || r?.erro || 'sem dossiê â€” use o chat primeiro'))
         return
       }
       return copiarContinuidadeAdapta(false)
     }
-    alert('Continuidade indisponÃ­vel: ' + (r?.erro || 'erro'))
+    alert('Continuidade indisponível: ' + (r?.erro || 'erro'))
     return
   }
   try {
     await navigator.clipboard.writeText(r.texto)
     alert('Continuidade copiada. No Adapta ONE: + â†’ Contextos â†’ cole.')
   } catch (e) {
-    alert('NÃ£o foi possÃ­vel copiar: ' + String(e))
+    alert('Não foi possível copiar: ' + String(e))
   }
   await atualizarPainelAdapta('adapta-status')
   await atualizarPainelAdapta('adapta-status-cfg')
@@ -2491,17 +2491,17 @@ async function copiarMcpAdapta() {
     adaptaStatusCache || (await window.api.invoke('adapta:status', pastaAtual || undefined))
   adaptaStatusCache = st
   if (!st?.mcpComando) {
-    alert('Comando MCP indisponÃ­vel')
+    alert('Comando MCP indisponível')
     return
   }
   if (!st.mcpExiste) {
-    alert('MCP ainda nÃ£o compilado. Rode: npm run build:mcp\n\nO JSON serÃ¡ copiado mesmo assim.')
+    alert('MCP ainda não compilado. Rode: npm run build:mcp\n\nO JSON será copiado mesmo assim.')
   }
   try {
     await navigator.clipboard.writeText(st.mcpComando)
     alert('JSON MCP copiado. Cole no conector MCP do Maestro (ver docs/adapta.md).')
   } catch (e) {
-    alert('NÃ£o foi possÃ­vel copiar: ' + String(e))
+    alert('Não foi possível copiar: ' + String(e))
   }
 }
 
@@ -2614,7 +2614,7 @@ async function alternarTema() {
   aplicarTema(novo)
 }
 
-/** CodeMirror: escuro â†’ oneDark; claro â†’ tema padrÃ£o (themeCompartment). Body jÃ¡ deve ter a classe. */
+/** CodeMirror: escuro â†’ oneDark; claro â†’ tema padrão (themeCompartment). Body já deve ter a classe. */
 function trocarTemaEditor(_tema) {
   editor?.aplicarTema()
 }
@@ -2673,7 +2673,7 @@ function bootstrapComandos() {
     },
     {
       id: 'agent-undo',
-      titulo: 'Desfazer Ãºltimo apply (checkpoint)',
+      titulo: 'Desfazer último apply (checkpoint)',
       fn: async () => {
         const r = await window.api.invoke('agente:checkpoint-desfazer')
         alert(r?.ok ? 'Restaurado.' : r?.erro || 'falha')
@@ -2720,7 +2720,7 @@ function bootstrapComandos() {
     },
     {
       id: 'forcar-recarregar',
-      titulo: 'ForÃ§ar recarregamento',
+      titulo: 'Forçar recarregamento',
       atalho: 'Ctrl+Shift+R',
       fn: () => void window.api.invoke('janela:recarregar', true)
     },
@@ -2738,7 +2738,7 @@ function bootstrapComandos() {
     },
     {
       id: 'zoom-reset',
-      titulo: 'Zoom: padrÃ£o',
+      titulo: 'Zoom: padrão',
       atalho: 'Ctrl+0',
       fn: () => void window.api.invoke('janela:zoom', 'reset')
     },
@@ -3007,7 +3007,7 @@ function destacarPaleta(itens) {
   itens[paletaSel]?.scrollIntoView({ block: 'nearest' })
 }
 
-// ---------- GuardiÃ£o ----------
+// ---------- Guardião ----------
 async function atualizarGuardiao() {
   try {
     const s = await window.api.invoke('guardian:snapshot')
@@ -3091,7 +3091,7 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
       }
     }
     let texto = modelo ? 'IA: ' + nomeProv + ' â€” ' + modelo : 'IA: ' + nomeProv
-    if (flagUpdate) texto += ' âš  atualizaÃ§Ã£o disponÃ­vel'
+    if (flagUpdate) texto += ' âš  atualização disponível'
     const alvo = document.getElementById('chat-provider')
     if (alvo) alvo.textContent = texto
   } catch {
@@ -3099,7 +3099,7 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
   }
 }
 
-// Checagem ocasional de versÃµes remotas (nÃ£o bloqueia UI)
+// Checagem ocasional de versões remotas (não bloqueia UI)
 setTimeout(() => {
   void window.api
     .invoke('modelos:versoes-remotas')
@@ -3132,7 +3132,7 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
   try {
     const r = await window.api.invoke('brain:avaliar')
     if (!r?.ok) {
-      mostrarToast('AvaliaÃ§Ã£o falhou: ' + (r?.erro || 'erro'), 'erro')
+      mostrarToast('Avaliação falhou: ' + (r?.erro || 'erro'), 'erro')
       return
     }
     const a = r.avaliacao
@@ -3141,7 +3141,7 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
       a.nota < 6 ? 'aviso' : 'ok'
     )
   } catch (e) {
-    mostrarToast('AvaliaÃ§Ã£o falhou: ' + String(e), 'erro')
+    mostrarToast('Avaliação falhou: ' + String(e), 'erro')
   }
 })
 
@@ -3459,7 +3459,7 @@ function mostrarPropostasAgent(propostas) {
       )
     })
     .join('')
-  box.setAttribute('aria-label', n + ' proposta(s) de ediÃ§Ã£o pendentes')
+  box.setAttribute('aria-label', n + ' proposta(s) de edição pendentes')
   box.innerHTML =
     '<div class="agent-propostas-titulo"><strong>' +
     n +
@@ -3499,7 +3499,7 @@ function abrirFilaPropostasAgent() {
 
 async function aplicarTodasPropostasAgent() {
   if (!agentPropostas.length) return
-  if (!window.confirm('Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint serÃ¡ criado por arquivo.'))
+  if (!window.confirm('Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.'))
     return
   for (const p of [...agentPropostas]) {
     const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
@@ -3510,7 +3510,7 @@ async function aplicarTodasPropostasAgent() {
   }
   const rest = await window.api.invoke('agente:propostas')
   mostrarPropostasAgent(rest?.pendentes || [])
-  alert('Apply concluÃ­do.')
+  alert('Apply concluído.')
 }
 
 function ligarProgressoAgent() {
@@ -3724,7 +3724,7 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
   if (!pastaAtual) return
   ligarProgressoAgent()
   const out = $('agent-output')
-  if (out) out.textContent = 'Executando prÃ³ximo passoâ€¦'
+  if (out) out.textContent = 'Executando próximo passoâ€¦'
   const r = await window.api.invoke('agente:executar-plano', {
     raiz: pastaAtual,
     pastas: pastasPermitidas(),
@@ -3938,7 +3938,7 @@ document.addEventListener('keydown', (e) => {
     return
   }
   if (mod && key === 'f') {
-    // deixa o CM6 abrir busca se o foco estiver no editor; senÃ£o abre explicitamente
+    // deixa o CM6 abrir busca se o foco estiver no editor; senão abre explicitamente
     if (editor && abaAtiva) {
       e.preventDefault()
       editor.buscar()
@@ -3973,7 +3973,7 @@ $('busca-input')?.addEventListener('keydown', (e) => {
   }
 })
 $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
-// Config/Contas flutuantes: nÃ£o fecham ao clicar no fundo (sÃ³ no Ã—)
+// Config/Contas flutuantes: não fecham ao clicar no fundo (só no Ã—)
 function alternarPainel() {
   toggleRight()
 }
@@ -4125,7 +4125,7 @@ function perguntarEscolha(titulo, opcoes, config) {
 }
 window.perguntarEscolha = perguntarEscolha
 
-/** DiretÃ³rio pai de um caminho (arquivo â†’ pasta). */
+/** Diretório pai de um caminho (arquivo â†’ pasta). */
 function dirPaiDe(caminho) {
   const n = String(caminho || '').replace(/[/\\]+$/, '')
   const i = Math.max(n.lastIndexOf('\\'), n.lastIndexOf('/'))
@@ -4233,11 +4233,11 @@ const MENUS_BARRA = {
   ],
   ver: [
     { id: 'recarregar', label: 'Recarregar', accel: 'Ctrl+R' },
-    { id: 'forcar-recarregar', label: 'ForÃ§ar recarregamento', accel: 'Ctrl+Shift+R' },
+    { id: 'forcar-recarregar', label: 'Forçar recarregamento', accel: 'Ctrl+Shift+R' },
     { sep: true },
     { id: 'zoom-in', label: 'Zoom: aumentar', accel: 'Ctrl+=' },
     { id: 'zoom-out', label: 'Zoom: diminuir', accel: 'Ctrl+-' },
-    { id: 'zoom-reset', label: 'Zoom: padrÃ£o', accel: 'Ctrl+0' },
+    { id: 'zoom-reset', label: 'Zoom: padrão', accel: 'Ctrl+0' },
     { sep: true },
     { id: 'toggle-sidebar', label: 'Alternar Explorer', accel: 'Ctrl+B' },
     { id: 'toggle-right', label: 'Alternar painel direito', accel: 'Ctrl+Alt+B' },
@@ -4250,9 +4250,9 @@ const MENUS_BARRA = {
     { id: 'paleta-comandos', label: 'Paleta de comandos', accel: 'Ctrl+Shift+P' },
     { id: 'quick-open', label: 'Quick Open', accel: 'Ctrl+P' },
     { sep: true },
-    { id: 'contas', label: 'Contas e saÃºde' },
-    { id: 'config', label: 'ConfiguraÃ§Ãµes' },
-    { id: 'analisar', label: 'AnÃ¡lise do sistema' },
+    { id: 'contas', label: 'Contas e saúde' },
+    { id: 'config', label: 'Configurações' },
+    { id: 'analisar', label: 'Análise do sistema' },
     { id: 'auditar', label: 'Auto auditoria' },
     { id: 'regras-projeto', label: 'Regras do projeto (.dgrules)' },
     { sep: true },
@@ -4388,7 +4388,7 @@ initActivityBar()
 bootstrapComandos()
 initMenubar()
 carregarTema()
-// Lazy: terminal sÃ³ no primeiro uso (botÃ£o / atalho / abrirEm)
+// Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
 let terminalIniciado = false
 function garantirTerminal() {
   if (terminalIniciado) return
@@ -4407,14 +4407,14 @@ document.addEventListener(
   },
   true
 )
-// placeholder atÃ© primeiro uso
+// placeholder até primeiro uso
 const termPanel = document.getElementById('terminal-panel')
 if (termPanel && !termPanel.dataset.lazyReady) {
   termPanel.dataset.lazyReady = '0'
 }
 initMenuCtxArvore()
 setSidebarMode('explorer')
-// Centro: Chat se jÃ¡ houver mensagens; senÃ£o Editor
+// Centro: Chat se já houver mensagens; senão Editor
 {
   const temConversa = !!document.querySelector(
     '#chat-messages .msg, #chat-messages .chat-msg, #chat-messages .bolha, #chat-messages .message'
