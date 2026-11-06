@@ -1555,7 +1555,7 @@ function renderizarAbas() {
       '<span class="tab-name">' +
       escapar(a.nome) +
       '</span>' +
-      '<span class="tab-close" title="Fechar">Ã—</span>'
+      '<span class="tab-close" title="Fechar">×</span>'
     btn.title = a.caminho
     btn.addEventListener('click', (e) => {
       if (e.target.classList.contains('tab-close')) {
@@ -2016,7 +2016,7 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
   $('analysis-progress').classList.remove('hidden')
   $('progress-text').textContent = force ? 'Analisando novamente...' : (escopo === 'completa' ? 'Analisando projeto inteiro...' : 'Analisando arquivos-chave...')
   $('analysis-content').innerHTML =
-    '<p class="muted">' + (escopo === 'completa' ? 'Lendo o projeto inteiro' : 'Lendo os arquivos-chave') + ' e perguntando Ã  IA...</p>'
+    '<p class="muted">' + (escopo === 'completa' ? 'Lendo o projeto inteiro' : 'Lendo os arquivos-chave') + ' e perguntando à IA...</p>'
   ativarAbaDireita('analise')
   try {
     const r = await window.api.analysisRun(root, force, escopo)
@@ -2325,7 +2325,7 @@ $('btn-prompt-melhorar')?.addEventListener('click', () => void melhorarPromptLoc
 $('btn-prompt-usar')?.addEventListener('click', () => usarPromptNoChat())
 $('btn-prompt-copiar')?.addEventListener('click', () => void copiarPromptOrientador())
 
-// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre Ã  frente ----------let dgFloatZ = 20000
+// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------let dgFloatZ = 20000
 
 function trazerJanelaFrente(modalEl) {
   if (!modalEl) return
@@ -3973,7 +3973,7 @@ $('busca-input')?.addEventListener('keydown', (e) => {
   }
 })
 $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
-// Config/Contas flutuantes: não fecham ao clicar no fundo (só no Ã—)
+// Config/Contas flutuantes: não fecham ao clicar no fundo (só no ×)
 function alternarPainel() {
   toggleRight()
 }
