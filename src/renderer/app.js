@@ -3095,8 +3095,8 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
         /* */
       }
     }
-    let texto = modelo ? 'IA: ' + nomeProv + ' â€” ' + modelo : 'IA: ' + nomeProv
-    if (flagUpdate) texto += ' âš  atualização disponível'
+    let texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
+    if (flagUpdate) texto += ' ⚠ atualização disponível'
     const alvo = document.getElementById('chat-provider')
     if (alvo) alvo.textContent = texto
   } catch {
