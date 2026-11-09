@@ -18,6 +18,7 @@ import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivo
 import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
+import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -1787,8 +1788,7 @@ function mostrarErroTipado(erro, alvoId) {
   const e = dgNormalizarErro(erro)
   const alvo = $(alvoId || 'analysis-content')
   if (!alvo) { mostrarToast(e.mensagem, 'erro'); return }
-  const acao = e.acao ? '<p class="muted"><strong>Ação:</strong> ' + escapar(e.acao) + '</p>' : ''
-  alvo.innerHTML = '<p class="muted"><strong>[' + escapar(e.codigo) + ']</strong> ' + escapar(e.mensagem) + '</p>' + acao
+  alvo.innerHTML = renderizarErroHtml(e)
 }
 
 // ---------- Análise ----------
@@ -1860,44 +1860,7 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
 }
 
 function renderizarAnalise(report, fromCache) {
-  if (!report || typeof report !== 'object') {
-    $('analysis-content').innerHTML = '<p class="muted">Análise indisponível (dados ausentes).</p>'
-    return
-  }
-  const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
-  let html = ''
-  html += secao('O que é', report.oQueE || '—')
-  html += secao('Stack', report.stack || '—')
-  html += secao('Estrutura', report.estrutura || '—')
-  html += secaoLista('Pontos de atenção', Array.isArray(report.pontosAtencao) ? report.pontosAtencao : [])
-  html += secaoLista('Sugestões', Array.isArray(report.sugestoes) ? report.sugestoes : [])
-  if (report.provider) {
-    html +=
-      '<p class="muted">Analisado por: ' +
-      escapar(report.provider) +
-      (report.model ? ' (' + escapar(report.model) + ')' : '') +
-      (report.analyzedAt ? ' — ' + new Date(report.analyzedAt).toLocaleString('pt-BR') : '') +
-      badge +
-      '</p>'
-  }
-  $('analysis-content').innerHTML = html
-}
-
-function secao(titulo, texto) {
-  return (
-    '<div class="analysis-section"><h4>' + titulo + '</h4><p>' + escapar(texto) + '</p></div>'
-  )
-}
-
-function secaoLista(titulo, itens) {
-  if (!itens || itens.length === 0) return secao(titulo, '—')
-  return (
-    '<div class="analysis-section"><h4>' +
-    titulo +
-    '</h4><ul>' +
-    itens.map((i) => '<li>' + escapar(i) + '</li>').join('') +
-    '</ul></div>'
-  )
+  $('analysis-content').innerHTML = renderizarAnaliseHtml(report, fromCache)
 }
 
 // ---------- Onde está (whereis) ----------
