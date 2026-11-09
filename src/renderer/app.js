@@ -1,4 +1,4 @@
-﻿// DG Editor - renderer (IDE Opção B)
+// DG Editor - renderer (IDE Opção B)
 import { mostrarRegrasUI } from './regras-ui.js'
 import { criarEditor } from './editor-cm.js'
 import { initTerminalPanel } from './terminal.js'
