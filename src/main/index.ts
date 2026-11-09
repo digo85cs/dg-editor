@@ -77,6 +77,13 @@ function limparInstanciaAberta(): void {
 // INICIALIZACAO DO ELECTRON
 // ============================================================================
 
+process.on('uncaughtException', (e) => {
+  console.error('[main] UNCAUGHT:', (e as Error)?.message || e, (e as Error)?.stack || '')
+})
+process.on('unhandledRejection', (r) => {
+  console.error('[main] UNHANDLED:', r)
+})
+
 // GPU: desabilitada por padrão (driver/Chromium incompatível em alguns Windows).
 // Override: DG_ENABLE_GPU=1 (máquinas com GPU estável). Debug: DG_GPU_DEBUG=1.
 if (!process.env.DG_ENABLE_GPU) {
@@ -249,8 +256,17 @@ function createWindow(): void {
     mainWindow.loadURL(rendererUrl);
   } else {
     mainWindow.loadFile(join(__dirname, '..', 'renderer', 'index.html'));
-    mainWindow.once('ready-to-show', () => { mainWindow?.show(); });
   }
+  mainWindow.once('ready-to-show', () => {
+    console.log('[main] ready-to-show: window.show()')
+    try { mainWindow?.show(); mainWindow?.focus(); } catch { /* ignore */ }
+  })
+  mainWindow.webContents.on('did-fail-load', (_e, errCode, errDesc, validatedURL) => {
+    console.error('[main] did-fail-load:', errCode, errDesc, validatedURL || '')
+  })
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    console.error('[main] render-process-gone:', details?.reason, details)
+  })
 
   definirJanelaPrincipalNavegador(mainWindow);
 

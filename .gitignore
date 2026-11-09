@@ -97,3 +97,5 @@ tmp/
 .dg-editor/*.lock
 .dg-editor/*.pid
 *.log
+.dg-editor/analise-completa.json
+boot.log
