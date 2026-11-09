@@ -72,7 +72,7 @@ function caminhoRelativo(abs) {
 function extIcon(nome) {
   const m = String(nome).toLowerCase().match(/\.([a-z0-9]+)$/)
   const ext = m ? m[1] : ''
-  const label = (ext || 'Â·').slice(0, 3).toUpperCase()
+  const label = (ext || '·').slice(0, 3).toUpperCase()
   return `<span class="file-icon ext-${ext || 'txt'}">${label}</span>`
 }
 
@@ -290,7 +290,7 @@ async function abrirNavegadorUi() {
 }
 
 function ativarAbaDireita(pane) {
-  // Chat saiu do painel direito (Etapa 5) â€” redirecionar
+  // Chat saiu do painel direito (Etapa 5) — redirecionar
   if (pane === 'chat') {
     ativarAbaCentro('chat')
     return
@@ -721,7 +721,7 @@ async function selecionarPasta(path) {
 // ---------- Árvore ----------
 /**
  * Contexto do chat (pastaAtual / chat-title):
- * muda só aqui â€” ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
+ * muda só aqui — ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
  * ou ao abrir um arquivo. Expandir/retrair árvore NÃO chama isto.
  */
 function definirContextoPasta(p) {
@@ -873,7 +873,7 @@ function criarNoDir(ent, nivel) {
   const row = document.createElement('div')
   row.className = 'tree-item'
   row.style.paddingLeft = 8 + nivel * 16 + 'px'
-  row.innerHTML = CHEV + '<span class="file-icon">ðŸ“</span><span>' + escapar(ent.nome) + '</span>'
+  row.innerHTML = CHEV + '<span class="file-icon">📁</span><span>' + escapar(ent.nome) + '</span>'
   row.title = ent.caminho
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'dir'
@@ -1407,8 +1407,8 @@ async function atualizarStatusBar(pasta) {
   const elPasta = $('sb-pasta')
   if (!elBranch || !elPasta) return
   if (!pasta) {
-    elBranch.textContent = 'â€”'
-    elPasta.textContent = 'â€”'
+    elBranch.textContent = '—'
+    elPasta.textContent = '—'
     return
   }
   const itens = await obterReposGit(false)
@@ -1426,7 +1426,7 @@ async function atualizarStatusBar(pasta) {
     elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' â—' : '')
     elPasta.textContent = hit.repo
   } else {
-    elBranch.textContent = 'â€”'
+    elBranch.textContent = '—'
     elPasta.textContent = nomeArquivo(pasta)
   }
 }
@@ -1901,7 +1901,7 @@ async function fecharAba(caminho) {
         const ok = await salvarArquivoAtivo()
         if (!ok) return
       } else {
-        // precisa ativar para salvar conteúdo atual no editor â€” se não é ativa e dirty, conteúdo perdido
+        // precisa ativar para salvar conteúdo atual no editor — se não é ativa e dirty, conteúdo perdido
         // abas dirty só se estavam ativas e editadas; ao trocar syncamos. OK.
         await ativarAba(caminho)
         const ok = await salvarArquivoAtivo()
@@ -2039,9 +2039,9 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
 function renderizarAnalise(report, fromCache) {
   const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
   let html = ''
-  html += secao('O que é', report.oQueE || 'â€”')
-  html += secao('Stack', report.stack || 'â€”')
-  html += secao('Estrutura', report.estrutura || 'â€”')
+  html += secao('O que é', report.oQueE || '—')
+  html += secao('Stack', report.stack || '—')
+  html += secao('Estrutura', report.estrutura || '—')
   html += secaoLista('Pontos de atenção', report.pontosAtencao)
   html += secaoLista('Sugestões', report.sugestoes)
   if (report.provider) {
@@ -2049,7 +2049,7 @@ function renderizarAnalise(report, fromCache) {
       '<p class="muted">Analisado por: ' +
       escapar(report.provider) +
       (report.model ? ' (' + escapar(report.model) + ')' : '') +
-      ' â€” ' +
+      ' — ' +
       new Date(report.analyzedAt).toLocaleString('pt-BR') +
       badge +
       '</p>'
@@ -2064,7 +2064,7 @@ function secao(titulo, texto) {
 }
 
 function secaoLista(titulo, itens) {
-  if (!itens || itens.length === 0) return secao(titulo, 'â€”')
+  if (!itens || itens.length === 0) return secao(titulo, '—')
   return (
     '<div class="analysis-section"><h4>' +
     titulo +
@@ -2410,13 +2410,13 @@ async function abrirConfig() {
   $('config-profile').innerHTML =
     '<h4>Maquina</h4>' +
     escapar(p.hostname) +
-    ' â€” ' +
+    ' — ' +
     escapar(p.platform) +
     ' ' +
     escapar(p.arch) +
     '<br>' +
     (p.cpus ? p.cpus.length : '?') +
-    ' nucleos â€” ' +
+    ' nucleos — ' +
     gb(p.totalMemory) +
     ' RAM<br>' +
     'Forca: <strong>' +
@@ -2427,10 +2427,10 @@ async function abrirConfig() {
     '<h4>Ollama (IA local)</h4>' +
     (o.installed
       ? o.reachable
-        ? 'Instalado e rodando â€” ' +
+        ? 'Instalado e rodando — ' +
           o.models.length +
           ' modelo(s): ' +
-          escapar(o.models.map((m) => m.name).join(', ') || 'â€”')
+          escapar(o.models.map((m) => m.name).join(', ') || '—')
         : 'Instalado, mas parado. Rode: ollama serve'
       : 'Nao instalado. Baixe em ollama.com')
   await carregarConfigOpenClawUi()
@@ -2468,7 +2468,7 @@ async function copiarContinuidadeAdapta(regenerar) {
     if (!regenerar) {
       const g = await window.api.invoke('adapta:gerar')
       if (!g?.ok) {
-        alert('Continuidade indisponível: ' + (g?.erro || r?.erro || 'sem dossiê â€” use o chat primeiro'))
+        alert('Continuidade indisponível: ' + (g?.erro || r?.erro || 'sem dossiê — use o chat primeiro'))
         return
       }
       return copiarContinuidadeAdapta(false)
@@ -2526,15 +2526,15 @@ async function abrirContas() {
       escapar(s.identidade.tokenPrefix) +
       '...</code><br>' +
       'Desde: ' +
-      (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : 'â€”')
+      (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : '—')
     $('contas-maquina').innerHTML =
       '<h4>Maquina</h4>' +
       escapar(s.maquina.hostname) +
-      ' â€” ' +
+      ' — ' +
       escapar(s.maquina.plataforma) +
       '<br>' +
       s.maquina.cpus +
-      ' nucleos â€” ' +
+      ' nucleos — ' +
       escapar(s.maquina.ramGB) +
       ' GB RAM<br>' +
       'Forca: <strong>' +
@@ -2806,7 +2806,7 @@ function abrirPaletaArquivos() {
   fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Quick Open â€” nome do arquivo...'
+  $('palette-input').placeholder = 'Quick Open — nome do arquivo...'
   renderizarPaleta('')
   $('palette-input').focus()
 }
@@ -3074,7 +3074,7 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
       ? ativo.name === 'ollama'
         ? 'Ollama'
         : String(ativo.name || 'IA')
-      : 'â€”'
+      : '—'
     let modelo = modeloForcado || ''
     let flagUpdate = false
     if (!modelo) {
@@ -3124,7 +3124,7 @@ if (typeof window.api?.on === 'function') {
       const nota = r?.avaliacao?.nota
       if (typeof nota === 'number' && nota < 6) {
         mostrarToast(
-          'Modelo ' + para + ' respondeu abaixo do esperado (nota ' + nota + '/10) â€” verifique',
+          'Modelo ' + para + ' respondeu abaixo do esperado (nota ' + nota + '/10) — verifique',
           'aviso'
         )
       }
@@ -3142,7 +3142,7 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
     }
     const a = r.avaliacao
     mostrarToast(
-      'Nota ' + a.nota + '/10 (' + a.acertos + '/' + a.total + ') â€” ' + a.modelo,
+      'Nota ' + a.nota + '/10 (' + a.acertos + '/' + a.total + ') — ' + a.modelo,
       a.nota < 6 ? 'aviso' : 'ok'
     )
   } catch (e) {
@@ -3374,7 +3374,7 @@ function atualizarStatusAgent(modelo, ms, fila) {
     if (fila.ocupado) partes.push('filaâ—')
     else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
   }
-  el.textContent = partes.length ? 'Agent: ' + partes.join(' Â· ') : 'Agent: â€”'
+  el.textContent = partes.length ? 'Agent: ' + partes.join(' Â· ') : 'Agent: —'
 }
 
 async function carregarAgentesUi() {
@@ -3682,7 +3682,7 @@ async function executarAgentUi(orquestrar) {
         out.textContent =
           (plan ? '[PLAN]\n\n' : '') +
           (r.texto || '') +
-          (r.duracaoMs ? '\n\nâ€” ' + r.duracaoMs + ' ms Â· ' + (r.modelo || '') : '')
+          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms Â· ' + (r.modelo || '') : '')
       }
       renderAgentTrace(r.passos || [])
       mostrarPropostasAgent(r.propostas || [])
@@ -3991,7 +3991,7 @@ async function rodarAutoAuditoria() {
     btn.textContent = 'Auditando...'
   }
   try {
-    // Mesma regua do boot (autoAtualizar=false) â€” numeros OK/warn/erro identicos
+    // Mesma regua do boot (autoAtualizar=false) — numeros OK/warn/erro identicos
     const r = await window.api.invoke('auditoria:rodar', {
       autoAtualizar: false,
       reiniciarAoFim: false
@@ -4021,7 +4021,7 @@ async function rodarAutoAuditoria() {
           '\n\nPendencias:\n' +
           pend
             .map(function (p) {
-              return '- [' + p.severidade + '] ' + p.id + ' â€” ' + p.titulo
+              return '- [' + p.severidade + '] ' + p.id + ' — ' + p.titulo
             })
             .join('\n')
       }
