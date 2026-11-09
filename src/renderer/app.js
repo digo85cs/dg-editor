@@ -513,6 +513,31 @@ function caminhoSobPasta(caminho, raiz) {
   return c === root || c.startsWith(root + '\\')
 }
 
+async function escolherNovoCaminhoPasta(antigo) {
+  try {
+    const r = await window.api.invoke('folder:select')
+    if (!r || r.canceled || !r.path) return
+    const novo = r.path
+    if (novo === antigo) return
+    if (pastasRecentes.includes(novo)) {
+      await removerPasta(antigo, { skipConfirm: true })
+      await selecionarPasta(novo)
+      return
+    }
+    const idx = pastasRecentes.indexOf(antigo)
+    if (idx >= 0) pastasRecentes[idx] = novo
+    else pastasRecentes.push(novo)
+    estadoArvore.delete(antigo)
+    if (pastaAtual === antigo) pastaAtual = novo
+    salvarPastas()
+    await renderizarPastas()
+    void renderizarProjects(true)
+    await selecionarPasta(novo)
+  } catch (e) {
+    mostrarToast('Não foi possível alterar o caminho: ' + String(e), 'erro')
+  }
+}
+
 function criarBotaoRemoverPasta(path) {
   const btn = document.createElement('button')
   btn.type = 'button'
@@ -548,10 +573,12 @@ function garantirEmptyStateChat() {
   }
 }
 
-async function removerPasta(path) {
+async function removerPasta(path, opts) {
   if (!path || !pastasRecentes.includes(path)) return
   const nome = nomeArquivo(path)
+  const confirmar = !(opts && opts.skipConfirm)
   if (
+    confirmar &&
     !window.confirm(
       "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
     )
@@ -845,8 +872,26 @@ async function carregarFilhos(dir, container, nivel) {
     const r = await window.api.invoke('arquivo:listar', dir, pastasPermitidas())
     container.innerHTML = ''
     if (!r.ok) {
+      const msg = escapar(r.erro || 'erro')
+      const naoEncontrado = /diret[óo]rio n[ãa]o encontrado|ENOENT|not found/i.test(String(r.erro || ''))
+      let acoes = ''
+      if (naoEncontrado && pastasRecentes.includes(dir)) {
+        acoes =
+          ' <button type="button" class="btn-small pasta-acao-remover" data-path="' + escapar(dir) + '">Remover da lista</button>' +
+          ' <button type="button" class="btn-small pasta-acao-reapontar" data-path="' + escapar(dir) + '">Escolher novo caminho</button>'
+      }
       container.innerHTML =
-        '<div class="muted" style="padding:4px 12px;font-size:11px">' + escapar(r.erro || 'erro') + '</div>'
+        '<div class="muted" style="padding:4px 12px;font-size:11px">' + msg + acoes + '</div>'
+      if (acoes) {
+        container.querySelector('.pasta-acao-remover')?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          void removerPasta(dir, { skipConfirm: true })
+        })
+        container.querySelector('.pasta-acao-reapontar')?.addEventListener('click', (e) => {
+          e.stopPropagation()
+          void escolherNovoCaminhoPasta(dir)
+        })
+      }
       return false
     }
     const st = estadoArvore.get(dir)
