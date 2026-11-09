@@ -2028,8 +2028,13 @@ function ciclarAbas() {
 function habilitarBotoesAnalise(habilitar) {
   const rapida = $('btn-analise-rapida')
   const completa = $('btn-analise-completa')
-  if (rapida) rapida.disabled = !habilitar
-  if (completa) completa.disabled = !habilitar
+  const disabled = !habilitar
+  if (rapida) rapida.disabled = disabled
+  if (completa) completa.disabled = disabled
+  const whereisQ = $('whereis-query')
+  const whereisBtn = $('btn-whereis')
+  if (whereisQ) whereisQ.disabled = disabled
+  if (whereisBtn) whereisBtn.disabled = disabled
 }
 
 async function solicitarDialogoEscopoAnalise(modo) {
@@ -2133,6 +2138,44 @@ function secaoLista(titulo, itens) {
     itens.map((i) => '<li>' + escapar(i) + '</li>').join('') +
     '</ul></div>'
   )
+}
+
+// ---------- Onde está (whereis) ----------
+async function buscarOndeEsta() {
+  if (!pastaAtual) { mostrarToast('Abra uma pasta para buscar.', 'aviso'); return }
+  const input = $('whereis-query')
+  const q = (input?.value || '').trim()
+  if (q.length < 2) { mostrarToast('Digite ao menos 2 caracteres.', 'aviso'); input?.focus(); return }
+  const alvo = $('whereis-result')
+  if (alvo) alvo.innerHTML = '<p class="muted">Buscando…</p>'
+  try {
+    const r = await window.api.invoke('whereis:ask', pastaAtual, q)
+    if (!r || r.ok === false) throw new Error(String((r && (r.erro || r.error)) || 'falha na busca'))
+    const result = r.result || {}
+    const matches = Array.isArray(result.matches) ? result.matches : []
+    if (!alvo) return
+    if (matches.length === 0) {
+      alvo.innerHTML = '<p class="muted">Nada encontrado para “' + escapar(q) + '”.</p>'
+      return
+    }
+    const lis = matches.slice(0, 30).map((m) => {
+      const file = String(m.file || '')
+      const line = Number(m.line || 1)
+      const snippet = String(m.snippet || '').slice(0, 200)
+      return '<li><button type="button" class="btn-ghost whereis-hit-file" data-file="' + escapar(file) + '" data-line="' + line + '">' +
+        escapar(file) + ':' + line + '</button><div><code>' + escapar(snippet) + '</code></div></li>'
+    }).join('')
+    alvo.innerHTML = '<ul>' + lis + '</ul><div class="whereis-meta">' + matches.length + ' ocorrência(s) · ' +
+      Number(result.scannedFiles || 0) + ' arquivo(s) · ' + Number(result.durationMs || 0) + ' ms</div>'
+    alvo.querySelectorAll('.whereis-hit-file').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const file = btn.getAttribute('data-file')
+        if (file) void abrirArquivoNoEditor(file)
+      })
+    })
+  } catch (err) {
+    if (alvo) alvo.innerHTML = '<p class="muted">Busca falhou: ' + escapar(String(err && err.message ? err.message : err)) + '</p>'
+  }
 }
 
 // ---------- Chat ----------
@@ -3267,6 +3310,10 @@ $('btn-analise-rapida')?.addEventListener('click', () => {
 $('btn-analise-completa')?.addEventListener('click', () => {
   if (pastaAtual) void analisarCompleta(pastaAtual)
 })
+$('btn-whereis')?.addEventListener('click', () => { void buscarOndeEsta() })
+$('whereis-query')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); void buscarOndeEsta() }
+})
 $('btn-config').addEventListener('click', abrirConfig)
 $('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
 $('btn-oc-salvar')?.addEventListener('click', () => void salvarConfigOpenClawUi())
@@ -3557,7 +3604,7 @@ function mostrarPropostasAgent(propostas) {
         String(p.path || '').replace(/</g, '&lt;') +
         '</code> <span class="muted">+' +
         Math.max(0, add - 1) +
-        '/âˆ’' +
+        '/-' +
         Math.max(0, del - 1) +
         '</span></li>'
       )
@@ -3624,7 +3671,7 @@ function ligarProgressoAgent() {
     if (ev.tipo === 'status') appendAgentTraceLive('… ' + ev.texto)
     else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('⚙️ ' + ev.nome + '…')
     else if (ev.tipo === 'tool' && ev.fase === 'fim')
-      appendAgentTraceLive('âœ“ ' + ev.nome + (ev.detalhe ? ' → ' + String(ev.detalhe).slice(0, 80) : ''))
+      appendAgentTraceLive('ok ' + ev.nome + (ev.detalhe ? ' -> ' + String(ev.detalhe).slice(0, 80) : ''))
     else if (ev.tipo === 'proposta') { appendAgentTraceLive('proposta ' + ev.path); if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path }) }
     else if (ev.tipo === 'texto-delta') {
       const out = $('agent-output')

@@ -294,16 +294,22 @@
       </div>
 
       <div id="pane-analise" class="right-pane">
-        <header class="exec-header">
-          <span>Análise do sistema</span>
-          <div class="reinicio-acoes">
-            <button type="button" id="btn-analise-rapida" class="btn-primary" title="Analisa os arquivos-chave do projeto. Rápido." aria-label="Análise rápida" disabled>Análise rápida</button>
-            <button type="button" id="btn-analise-completa" class="btn-secondary" title="Analisa o projeto inteiro. Pode levar vários minutos." aria-label="Análise completa" disabled>Análise completa</button>
+          <header class="exec-header">
+            <span>Análise do sistema</span>
+            <div class="reinicio-acoes">
+              <button type="button" id="btn-analise-rapida" class="btn-primary" title="Analisa os arquivos-chave do projeto. Rápido." aria-label="Análise rápida" disabled>Análise rápida</button>
+              <button type="button" id="btn-analise-completa" class="btn-secondary" title="Analisa o projeto inteiro. Pode levar vários minutos." aria-label="Análise completa" disabled>Análise completa</button>
+            </div>
+          </header>
+          <div class="whereis-bar" id="whereis-bar">
+            <label class="sr-only" for="whereis-query">Onde está</label>
+            <input type="text" id="whereis-query" class="whereis-input" placeholder="Onde está… (função, variável, texto)" aria-label="Buscar onde está no projeto" disabled />
+            <button type="button" id="btn-whereis" class="btn-secondary" aria-label="Buscar onde está" disabled>Buscar</button>
           </div>
-        </header>
-        <div id="analysis-content" class="analysis-content">
-          <p class="muted">A análise aparece aqui quando você abrir uma pasta.</p>
-        </div>
+          <div id="whereis-result" class="whereis-result" aria-live="polite"></div>
+          <div id="analysis-content" class="analysis-content">
+            <p class="muted">A análise aparece aqui quando você abrir uma pasta.</p>
+          </div>
         <div id="analysis-progress" class="analysis-progress hidden">
           <span class="spinner"></span> <span id="progress-text">Analisando...</span>
         </div>

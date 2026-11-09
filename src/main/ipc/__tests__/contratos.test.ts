@@ -166,6 +166,19 @@ describe('IPC contratos (shapes)', () => {
     hasBool(out, 'ativo')
   })
 
+  it('whereis:ask retorna shape {ok,result,formatted} com matches', async () => {
+    whereIs.mockReturnValue({ query: 'foo', matches: [{ file: 'C:/proj/a.ts', line: 3, snippet: 'foo()' }], scannedFiles: 2, durationMs: 5 })
+    formatWhereIs.mockReturnValue('ok')
+    const { handleWhereisAsk } = await import('../analise')
+    const out = await handleWhereisAsk({} as never, 'C:/proj', 'foo')
+    expect(out.ok).toBe(true)
+    const r = out as { result?: { query?: string; matches?: unknown[] }; formatted?: string }
+    expect(typeof r.formatted).toBe('string')
+    expect(isObj(r.result)).toBe(true)
+    expect(r.result?.query).toBe('foo')
+    expect(Array.isArray(r.result?.matches)).toBe(true)
+  })
+
   it('dg:regrasgerais listar/salvar/ativas/reordenar preservam shape', async () => {
     const regras: Regra[] = [
       { id: 'a', titulo: 'A', descricao: 'da', ativo: true, criadoEm: 't' },
