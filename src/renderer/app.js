@@ -19,6 +19,7 @@ import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNo
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
+import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -1874,26 +1875,12 @@ async function buscarOndeEsta() {
   try {
     const r = await window.api.invoke('whereis:ask', state.pastaAtual, q)
     if (!r || r.ok === false) {
-      const e = dgNormalizarErro(r, 'Falha na busca.')
-      if (alvo) alvo.innerHTML = '<p class="muted"><strong>[' + escapar(e.codigo) + ']</strong> ' + escapar(e.mensagem) + '</p>' + (e.acao ? '<p class="muted">' + escapar(e.acao) + '</p>' : '')
+      if (alvo) alvo.innerHTML = renderizarWhereisErroHtml(dgNormalizarErro(r, 'Falha na busca.'))
       return
     }
     const result = r.result || {}
-    const matches = Array.isArray(result.matches) ? result.matches : []
     if (!alvo) return
-    if (matches.length === 0) {
-      alvo.innerHTML = '<p class="muted">Nada encontrado para “' + escapar(q) + '”.</p>'
-      return
-    }
-    const lis = matches.slice(0, 30).map((m) => {
-      const file = String(m.file || '')
-      const line = Number(m.line || 1)
-      const snippet = String(m.snippet || '').slice(0, 200)
-      return '<li><button type="button" class="btn-ghost whereis-hit-file" data-file="' + escapar(file) + '" data-line="' + line + '">' +
-        escapar(file) + ':' + line + '</button><div><code>' + escapar(snippet) + '</code></div></li>'
-    }).join('')
-    alvo.innerHTML = '<ul>' + lis + '</ul><div class="whereis-meta">' + matches.length + ' ocorrência(s) · ' +
-      Number(result.scannedFiles || 0) + ' arquivo(s) · ' + Number(result.durationMs || 0) + ' ms</div>'
+    alvo.innerHTML = renderizarWhereisMatchesHtml(result, q)
     alvo.querySelectorAll('.whereis-hit-file').forEach((btn) => {
       btn.addEventListener('click', () => {
         const file = btn.getAttribute('data-file')
@@ -1901,7 +1888,7 @@ async function buscarOndeEsta() {
       })
     })
   } catch (err) {
-    if (alvo) alvo.innerHTML = '<p class="muted">Busca falhou: ' + escapar(String(err && err.message ? err.message : err)) + '</p>'
+    if (alvo) alvo.innerHTML = renderizarWhereisErroHtml(dgNormalizarErro(err, 'Busca falhou.'))
   }
 }
 
