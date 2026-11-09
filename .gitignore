@@ -93,3 +93,6 @@ tmp/
 
 # DG Editor runtime
 .dg-editor/boot-silent.flag
+.dg-editor/instance.lock
+.dg-editor/*.lock
+.dg-editor/*.pid
