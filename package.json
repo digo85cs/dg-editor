@@ -40,7 +40,8 @@
     "deploy": "npm run dist:win:installer",
     "verificar:encoding": "node scripts/verificar-encoding.mjs",
     "test:validator": "node test/validator.cjs",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rebuild:pty": "node scripts/rebuild-node-pty.cjs"
   },
   "build": {
     "appId": "com.dgeditor.app",
@@ -123,6 +124,9 @@
     "vitest": "^2.1.9"
   },
   "allowScripts": {
-    "node-pty@1.1.0": true
+    "node-pty@1.1.0": true,
+    "electron@33.2.1": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.20.2": true
   }
 }
