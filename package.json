@@ -1,125 +1,128 @@
 {
-    "name": "dg-editor",
+  "name": "dg-editor",
+  "productName": "DG Editor",
+  "version": "0.2.0",
+  "description": "DG Editor — editor de sistemas com IA local",
+  "author": {
+    "name": "Rodrigo Soares",
+    "email": "digo85cs@gmail.com"
+  },
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite preview",
+    "build": "npm run verificar:encoding && electron-vite build",
+    "preview": "electron-vite preview",
+    "prestart": "node scripts/garantir-launchers.cjs",
+    "start": "node scripts/iniciar-app.cjs",
+    "test": "vitest run",
+    "test:mcp-ollama": "npm run build:mcp && node test/ollama-mcp.cjs && node test/mcp-ollama-stdio.cjs && node test/mcp-ollama-stdio.cjs --external-config",
+    "typecheck": "tsc --noEmit",
+    "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
+    "mcp": "npm run build:mcp && node .dg-editor/bin/main/mcp/server.js",
+    "indice": "node scripts/gerar-indice.cjs",
+    "prebuild": "npm run build:mcp",
+    "postinstall": "node scripts/patch-node-pty-spectre.cjs && node scripts/rebuild-node-pty.cjs && node scripts/garantir-launchers.cjs",
+    "qa": "node scripts/run-qa.cjs",
+    "qa:ipc": "node scripts/run-qa.cjs --suite=ipc",
+    "qa:e2e": "node scripts/run-qa.cjs --suite=e2e",
+    "qa:perf": "node scripts/run-qa.cjs --suite=perf",
+    "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
+    "qa:report": "node scripts/run-qa.cjs --report-only",
+    "qa:ia": "node scripts/qa-autocorrigir.cjs",
+    "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run",
+    "limpeza": "node scripts/limpeza-workspace.cjs",
+    "limpeza:dry": "node scripts/limpeza-workspace.cjs --dry-run",
+    "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
+    "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
+    "certificar": "node scripts/certificar.cjs",
+    "dist:win": "npm run build && electron-builder --win --dir",
+    "dist:win:installer": "npm run build && electron-builder --win nsis",
+    "deploy": "npm run dist:win:installer",
+    "verificar:encoding": "node scripts/verificar-encoding.mjs",
+    "test:validator": "node test/validator.cjs",
+    "test:watch": "vitest"
+  },
+  "build": {
+    "appId": "com.dgeditor.app",
     "productName": "DG Editor",
-    "version": "0.2.0",
-    "description": "DG Editor — editor de sistemas com IA local",
-    "author": {
-        "name": "Rodrigo Soares",
-        "email": "digo85cs@gmail.com"
+    "copyright": "Copyright © Rodrigo Soares",
+    "directories": {
+      "output": "dist-app",
+      "buildResources": "resources"
     },
-    "main": "out/main/index.js",
-    "scripts": {
-        "dev": "electron-vite preview",
-        "build": "npm run verificar:encoding && electron-vite build",
-        "preview": "electron-vite preview",
-        "prestart": "node scripts/garantir-launchers.cjs",
-        "start": "node scripts/iniciar-app.cjs",
-        "test": "node test/validator.cjs",
-        "test:mcp-ollama": "npm run build:mcp && node test/ollama-mcp.cjs && node test/mcp-ollama-stdio.cjs && node test/mcp-ollama-stdio.cjs --external-config",
-        "typecheck": "tsc --noEmit",
-        "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json",
-        "mcp": "npm run build:mcp && node .dg-editor/bin/main/mcp/server.js",
-        "indice": "node scripts/gerar-indice.cjs",
-        "prebuild": "npm run build:mcp",
-        "postinstall": "node scripts/patch-node-pty-spectre.cjs && node scripts/rebuild-node-pty.cjs && node scripts/garantir-launchers.cjs",
-        "qa": "node scripts/run-qa.cjs",
-        "qa:ipc": "node scripts/run-qa.cjs --suite=ipc",
-        "qa:e2e": "node scripts/run-qa.cjs --suite=e2e",
-        "qa:perf": "node scripts/run-qa.cjs --suite=perf",
-        "qa:baseline": "node scripts/run-qa.cjs --suite=perf --atualizar-baseline",
-        "qa:report": "node scripts/run-qa.cjs --report-only",
-        "qa:ia": "node scripts/qa-autocorrigir.cjs",
-        "qa:ia:dry": "node scripts/qa-autocorrigir.cjs --dry-run",
-        "limpeza": "node scripts/limpeza-workspace.cjs",
-        "limpeza:dry": "node scripts/limpeza-workspace.cjs --dry-run",
-        "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
-        "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
-        "certificar": "node scripts/certificar.cjs",
-        "dist:win": "npm run build && electron-builder --win --dir",
-        "dist:win:installer": "npm run build && electron-builder --win nsis",
-        "deploy": "npm run dist:win:installer",
-        "verificar:encoding": "node scripts/verificar-encoding.mjs"
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "name": "dg-editor",
+      "main": "out/main/index.js"
     },
-    "build": {
-        "appId": "com.dgeditor.app",
-        "productName": "DG Editor",
-        "copyright": "Copyright © Rodrigo Soares",
-        "directories": {
-            "output": "dist-app",
-            "buildResources": "resources"
+    "win": {
+      "executableName": "DG Editor",
+      "icon": "resources/dg-editor.ico",
+      "artifactName": "DG-Editor-${version}-${arch}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
         },
-        "files": [
-            "out/**/*",
-            "resources/**/*",
-            "package.json"
-        ],
-        "extraMetadata": {
-            "name": "dg-editor",
-            "main": "out/main/index.js"
-        },
-        "win": {
-            "executableName": "DG Editor",
-            "icon": "resources/dg-editor.ico",
-            "artifactName": "DG-Editor-${version}-${arch}.${ext}",
-            "target": [
-                {
-                    "target": "nsis",
-                    "arch": [
-                        "x64"
-                    ]
-                },
-                {
-                    "target": "portable",
-                    "arch": [
-                        "x64"
-                    ]
-                }
-            ]
-        },
-        "nsis": {
-            "oneClick": false,
-            "allowToChangeInstallationDirectory": true,
-            "shortcutName": "DG Editor",
-            "uninstallDisplayName": "DG Editor",
-            "createDesktopShortcut": false,
-            "createStartMenuShortcut": true,
-            "installerIcon": "resources/dg-editor.ico",
-            "uninstallerIcon": "resources/dg-editor.ico"
-        },
-        "portable": {
-            "artifactName": "DG-Editor-Portable-${version}.exe"
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
+      ]
     },
-    "dependencies": {
-        "@codemirror/lang-css": "^6.3.1",
-        "@codemirror/lang-html": "^6.4.12",
-        "@codemirror/lang-javascript": "^6.2.5",
-        "@codemirror/lang-json": "^6.0.2",
-        "@codemirror/lang-markdown": "^6.5.2",
-        "@codemirror/lang-python": "^6.2.1",
-        "@codemirror/lang-xml": "^6.1.0",
-        "@codemirror/search": "^6.7.2",
-        "@codemirror/theme-one-dark": "^6.1.3",
-        "@modelcontextprotocol/sdk": "^1.32.2",
-        "@xterm/addon-fit": "^0.11.0",
-        "@xterm/addon-web-links": "^0.12.0",
-        "@xterm/xterm": "^6.0.0",
-        "chokidar": "^4.0.3",
-        "codemirror": "^6.0.2",
-        "node-pty": "^1.1.0",
-        "zod": "^4.6.7"
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "DG Editor",
+      "uninstallDisplayName": "DG Editor",
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "installerIcon": "resources/dg-editor.ico",
+      "uninstallerIcon": "resources/dg-editor.ico"
     },
-    "devDependencies": {
-        "@electron/rebuild": "^4.2.1",
-        "@types/node": "^20.11.0",
-        "electron": "^33.2.1",
-        "electron-builder": "^25.1.8",
-        "electron-vite": "^2.3.0",
-        "esbuild": "^0.20.0",
-        "playwright-core": "^1.49.1",
-        "typescript": "^5.3.3"
-    },
-    "allowScripts": {
-        "node-pty@1.1.0": true
+    "portable": {
+      "artifactName": "DG-Editor-Portable-${version}.exe"
     }
+  },
+  "dependencies": {
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "chokidar": "^4.0.3",
+    "codemirror": "^6.0.2",
+    "node-pty": "^1.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.1",
+    "@types/node": "^20.11.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "esbuild": "^0.20.0",
+    "playwright-core": "^1.49.1",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
+  }
 }
