@@ -20,6 +20,7 @@ import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, rem
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
+import { normalizarMensagensChat, bolhaHtml } from './features/chat/render.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -1896,29 +1897,16 @@ async function buscarOndeEsta() {
 function renderizarChat(msgs) {
   const area = $('chat-messages')
   area.innerHTML = ''
-  const mensagens = Array.isArray(msgs)
-    ? msgs
-    : Array.isArray(msgs?.mensagens)
-      ? msgs.mensagens
-      : []
-  for (const m of mensagens) adicionarBolha(m.role, m.content, m.provider)
+  for (const m of normalizarMensagensChat(msgs)) adicionarBolha(m.role, m.content, m.provider)
   area.scrollTop = area.scrollHeight
 }
 
 function adicionarBolha(role, content, provider) {
   const area = $('chat-messages')
   const div = document.createElement('div')
-  div.className = 'msg ' + role
-  const span = document.createElement('span')
-  span.className = 'msg-text'
-  span.textContent = content
-  div.appendChild(span)
-  if (provider) {
-    const tag = document.createElement('span')
-    tag.className = 'msg-provider'
-    tag.textContent = provider
-    div.appendChild(tag)
-  }
+  const b = bolhaHtml(role, content, provider)
+  div.className = b.cls
+  div.innerHTML = b.html
   area.appendChild(div)
   animarEntradaMsg(div, role)
   area.scrollTop = area.scrollHeight
