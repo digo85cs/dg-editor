@@ -10,9 +10,9 @@ Contrato de decomposição do renderer (`src/renderer/app.js`). Módulos em `fea
 - **Extraído**: `render.js` (secao/secaoLista, `renderizarAnaliseHtml`, `renderizarErroHtml` com `@shared/erros`), `whereis.js` (`renderizarWhereisMatchesHtml/VazioHtml/ErroHtml`). IPC e wiring de DOM/eventos permanecem em `app.js`.
 - **Residual em `app.js`**: `habilitarBotoesAnalise` (depende de `state.pastaAtual` + botões DOM), `rodarAnalise`/`analisarCompleta`/`escolherEscopoAnalise`/`solicitarDialogoEscopoAnalise` (orquestram IPC `analysis:*`, progresso, ativação de aba, cache flag, erros tipados), `buscarOndeEsta` (valida input, IPC `whereis:ask`, injeta HTML, liga cliques `.whereis-hit-file` → `abrirArquivoNoEditor`).
 
-## Chat
-- **Extraído**: (Fatia 7a/7b) render de mensagem e composer/atalhos, quando aplicável sem mover streaming/scroll vivo.
-- **Residual em `app.js`**: `enviarMensagem`, streaming/estado de envio, histórico vivo, scroll/focus DOM, upload/anexos, orquestração IPC+render+estado.
+## Chat (features/chat)
+- **Extraído**: `render.js` (`normalizarMensagensChat`, `bolhaHtml` — HTML escapado; inserção DOM/scroll/animação `animarEntradaMsg` permanecem em `app.js`), `composer.js` (`deveEnviarPorEnter`, `iniciarComposer` com `onEnviar` injetado).
+- **Residual em `app.js`**: `enviarMensagem` (orquestra IPC `chat:send`, streaming `chat:delta`, loading, anexos, seleção agente/modo, histórico, render/scroll, erros), `ligarHistoricoChat`/`novaConversaUi`, estado `histChat`/anexos, scroll/focus DOM vivo.
 
 ## Terminal
 - **Extraído**: (Fatia 8) init xterm, atalhos e ciclo de vida (`iniciarTerminal`/`destroy`) com deps de PTY injetadas.
