@@ -23,9 +23,9 @@ const $ = (id) => document.getElementById(id)
 
 import { state, setPastaAtual } from './state/app-state.js'
 ligarFerramentas(() => state.pastaAtual)
-/** @type {{ caminho: string, nome: string, dirty: boolean }[]} */
-state.state.abas = state.state.abas || []
-state.state.abaAtiva = state.state.abaAtiva ?? null
+/** @type {{ caminho: string, nome: string, dirty: boolean }[]} initialized in state */
+state.abas = state.abas || []
+state.abaAtiva = state.abaAtiva ?? null
 /** @type {ReturnType<typeof criarEditor> | null} */
 let editor = null
 let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
@@ -35,7 +35,7 @@ let filesListaSuja = false
 /** Histórico de navegação de state.abas (tb-voltar / tb-avancar). */
 let histAbas = []
 let histIdx = -1
-// state.vaultRaiz: state.state.vaultRaiz
+// state.vaultRaiz migrado para state/app-state.js
 
 
 function caminhoNoVault(caminho) {
