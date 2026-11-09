@@ -1,4 +1,4 @@
-﻿/* DG Editor â€” layout IDE (OpÃ§Ã£o B) */
+/* DG Editor — layout IDE (Opção B) */
 @import './styles/tokens.css';
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,7 +24,7 @@ body {
   justify-content: space-between;
   background: var(--dg-sidebar);
   border-bottom: 1px solid var(--dg-border-subtle);
-  /* drag sÃ³ em .tb-drag-fill â€” senÃ£o o menubar nÃ£o recebe clique */
+  /* drag só em .tb-drag-fill — senão o menubar não recebe clique */
   -webkit-app-region: no-drag;
   user-select: none;
   position: relative;
@@ -1225,7 +1225,7 @@ body {
 .terminal-tab-pane .xterm { height: 100%; }
 .terminal-tab-pane .xterm-viewport { background: var(--dg-bg) !important; }
 
-/* Chat panel â€” agora no centro (max 720px via #pane-chat.center-pane-inner) */
+/* Chat panel — agora no centro (max 720px via #pane-chat.center-pane-inner) */
 #chat-panel {
   display: flex;
   flex-direction: column;
@@ -1645,7 +1645,7 @@ body.tema-claro .msg.user { color: #333333; }
     background: var(--dg-accent, #5b8def);
   }
   .dg-chat-progress::after {
-    content: 'processandoâ€¦';
+    content: 'processando…';
     position: absolute;
     right: 8px;
     top: 4px;

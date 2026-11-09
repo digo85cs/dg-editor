@@ -1,4 +1,4 @@
-﻿import { ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { ollamaAlive, ollamaInstalado, startOllama } from '../ollama-keeper';
 import { OLLAMA_URL } from '../brain/ollama';
 

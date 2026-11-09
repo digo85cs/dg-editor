@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Guard de automação (Etapa 1). Ponto ÚNICO de execução.
  * Fluxo: allow-list -> valida args -> sanitiza -> aprovação -> audit inicio -> exec -> audit fim.
  */

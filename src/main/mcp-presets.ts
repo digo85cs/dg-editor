@@ -25,7 +25,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'docling',
     nome: 'Docling',
-    descricao: 'Extra��o avan�ada de PDFs com tabelas, OCR e layout complexo',
+    descricao: 'Extração avançada de PDFs com tabelas, OCR e layout complexo',
     comando: 'uvx',
     args: ['docling-mcp'],
     tags: ['documentos', 'pdf', 'ocr', 'tabelas']
@@ -41,7 +41,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'sequential-thinking',
     nome: 'Sequential Thinking',
-    descricao: 'Racioc�nio passo a passo para tarefas complexas',
+    descricao: 'Racioc?nio passo a passo para tarefas complexas',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
     tags: ['raciocinio', 'planejamento']
@@ -49,7 +49,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'memory',
     nome: 'Memory',
-    descricao: 'Mem�ria persistente entre sess�es',
+    descricao: 'Mem?ria persistente entre sess?es',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-memory'],
     tags: ['memoria']
@@ -65,7 +65,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'git',
     nome: 'Git',
-    descricao: 'Opera��es git padronizadas para o agente',
+    descricao: 'Opera??es git padronizadas para o agente',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-git'],
     tags: ['git']

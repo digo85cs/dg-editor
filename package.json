@@ -10,7 +10,7 @@
     "main": "out/main/index.js",
     "scripts": {
         "dev": "electron-vite preview",
-        "build": "electron-vite build && node scripts/emit-shell-detect.cjs",
+        "build": "npm run verificar:encoding && electron-vite build",
         "preview": "electron-vite preview",
         "prestart": "node scripts/garantir-launchers.cjs",
         "start": "node scripts/iniciar-app.cjs",
@@ -35,9 +35,10 @@
         "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
         "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
         "certificar": "node scripts/certificar.cjs",
-"dist:win": "npm run build && electron-builder --win --dir",
-          "dist:win:installer": "npm run build && electron-builder --win nsis",
-          "deploy": "npm run dist:win:installer"
+        "dist:win": "npm run build && electron-builder --win --dir",
+        "dist:win:installer": "npm run build && electron-builder --win nsis",
+        "deploy": "npm run dist:win:installer",
+        "verificar:encoding": "node scripts/verificar-encoding.mjs"
     },
     "build": {
         "appId": "com.dgeditor.app",

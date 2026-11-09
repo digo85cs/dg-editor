@@ -118,7 +118,7 @@ import {
 } from './ipc-seguro'
 import { ativarSafeMode, emSafeMode, detectarSafeModeArgv } from './safe-mode'
 
-/** Flag de processo � safe-mode desliga watcher, health, agentes e MCP. */
+/** Flag de processo — safe-mode desliga watcher, health, agentes e MCP. */
 const SAFE_MODE = detectarSafeModeArgv(process.argv)
 if (SAFE_MODE) ativarSafeMode()
 import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from './busca'
@@ -232,7 +232,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   if (SAFE_MODE) {
-    dglog('[boot] SAFE MODE � sem agentes/MCP/watcher/health')
+    dglog('[boot] SAFE MODE — sem agentes/MCP/watcher/health')
   }
   void import('./logs-estruturados').then(({ logEstruturado }) => {
     logEstruturado('info', 'boot', emSafeMode() || SAFE_MODE ? 'inicio safe-mode' : 'inicio normal')
@@ -247,7 +247,7 @@ app.whenReady().then(() => {
         dglog('[boot] win-self-heal: ' + String(e))
       })
   }
-  // Token de sess�o ANTES do servidor de controle (sempre novo)
+  // Token de sess—o ANTES do servidor de controle (sempre novo)
   garantirTokenSessao()
   installPtBrMenu({
     onAbrirNavegador: () => {
@@ -274,7 +274,7 @@ app.whenReady().then(() => {
   })
   const qaE2e = process.env.DG_QA_E2E === '1'
   if (!SAFE_MODE) {
-    // Nao competir com terminal:create no boot � Ollama sobe depois
+    // Nao competir com terminal:create no boot — Ollama sobe depois
     if (!qaE2e) {
       setTimeout(() => {
         void bootSaudeIAs()
@@ -289,7 +289,7 @@ app.whenReady().then(() => {
   dglog('[boot] DG Editor pronto (token ' + session.token.slice(0, 8) + '...)')
   createWindow()
   if (!SAFE_MODE && !qaE2e) {
-    // Detec��o de modelos N�O no boot � libera o event loop para terminal:create.
+    // Detec——o de modelos N—O no boot — libera o event loop para terminal:create.
     void import('./paths').then(({ resolverRaizProjeto }) => {
       const raiz = resolverRaizProjeto()
       setTimeout(() => {
@@ -312,10 +312,10 @@ app.whenReady().then(() => {
   })
 
   // Smoke headless do navegador embutido (DG_NAV_SMOKE=1)
-  // Com DG_NAV_SMOKE_EMBED=1: injeta BrowserWindow pai e usa host View (produ��o).
+  // Com DG_NAV_SMOKE_EMBED=1: injeta BrowserWindow pai e usa host View (produ——o).
   if (process.env.DG_NAV_SMOKE === '1') {
     if (process.env.DG_NAV_SMOKE_EMBED === '1') {
-      // Pai oculto (n�o offscreen) � WebContentsView precisa de paint real p/ screenshot.
+      // Pai oculto (n—o offscreen) — WebContentsView precisa de paint real p/ screenshot.
       const smokeParent = new BrowserWindow({
         width: 1280,
         height: 800,
@@ -436,7 +436,7 @@ ipcMain.handle('terminal:setShellPadrao', (_e, id: string | null) => {
   }
 })
 
-// ---------- Arquivos (IDE) � path sanitizado + payload tipado ----------
+// ---------- Arquivos (IDE) — path sanitizado + payload tipado ----------
 ipcMain.handle('arquivo:ler', async (_e, caminho: unknown, pastas: unknown) => {
   const c = exigirString(caminho, 'caminho')
   if (isErroPayload(c)) return c
@@ -541,7 +541,7 @@ ipcMain.handle('folder:select', async () => {
   return { canceled: false, path: result.filePaths[0] }
 })
 
-/** Raiz can�nica do DG Editor (ex.: D:\CURSOR\DG Editor) � para autoabrir no Explorer. */
+/** Raiz can—nica do DG Editor (ex.: D:\CURSOR\DG Editor) — para autoabrir no Explorer. */
 ipcMain.handle('app:raiz-projeto', async () => {
   try {
     const { resolverRaizProjeto, fonteRaizResolvida } = await import('./paths')
@@ -640,7 +640,7 @@ ipcMain.handle('analysis:run', async (_e, root: unknown, forceOrOptions: unknown
   let escopoValue: unknown
   if (optionsValue && 'escopo' in optionsValue) escopoValue = optionsValue.escopo
   if (escopoValue !== undefined && escopoValue !== 'rapida' && escopoValue !== 'completa') {
-    return { ok: false, erro: 'escopo de an�lise inv�lido' }
+    return { ok: false, erro: 'escopo de an—lise inv—lido' }
   }
   const escopo: EscopoAnalise = escopoValue === 'completa' ? 'completa' : 'rapida'
   const seg = caminhoSeguro(r, r)
@@ -1012,7 +1012,7 @@ ipcMain.handle('chat:clear', (_e, root: string) => {
   return { ok: true }
 })
 
-const PROMPT_ORIENTADOR_SYSTEM = 'Voc� � um engenheiro de prompt. Receba a ideia do usu�rio e devolva um prompt mais claro, espec�fico e acion�vel, mantendo a inten��o original. Devolva APENAS o prompt refinado, sem pre�mbulo, sem explica��es. Preserve o idioma do usu�rio.'
+const PROMPT_ORIENTADOR_SYSTEM = 'Voc— — um engenheiro de prompt. Receba a ideia do usu—rio e devolva um prompt mais claro, espec—fico e acion—vel, mantendo a inten——o original. Devolva APENAS o prompt refinado, sem pre—mbulo, sem explica——es. Preserve o idioma do usu—rio.'
 
 ipcMain.handle('orientar:prompt', async (_e, root: unknown, prompt: unknown) => {
   const r = exigirString(root, 'root')

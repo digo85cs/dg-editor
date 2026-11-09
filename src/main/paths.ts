@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Modulo de Caminhos do DG Editor
  * Refatorado para usar path.resolve() e evitar caminhos hardcoded
  */

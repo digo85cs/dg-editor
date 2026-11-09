@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Allow-list declarativa (Etapa 1) — LISTA FECHADA.
  * Nenhum comando fora daqui é executável pelo guard.
  */

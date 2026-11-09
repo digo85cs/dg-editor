@@ -1,4 +1,4 @@
-﻿/** Stub Etapa 1 — substituído na Etapa 2 pelos módulos de domínio. */
+/** Stub Etapa 1 — substituído na Etapa 2 pelos módulos de domínio. */
 import type { ComandoAutomacao } from './allowlist'
 import type { ContextoExecucao } from './guard'
 export async function executarComandoDominio(

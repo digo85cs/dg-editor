@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Stub (BLOCO 3) — módulo codex-cli ausente no repositório.
  * Mantém compilação de providers/registry; indisponível em runtime.
  */

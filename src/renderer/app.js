@@ -812,7 +812,7 @@ async function renderizarArvoreEm(lista) {
       if (e.target.closest('.pasta-remover')) return
       if (carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
-      // Pasta já expandida + clique no nome/ícone â†’ selecionarPasta (sem re-render).
+      // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
       if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
         selecionarPasta(p)
         return
@@ -1000,7 +1000,7 @@ async function abrirPainelDiff(absPath) {
   const title = $('diff-panel-title')
   if (!panel || !body) return
   title.textContent = 'Diff: ' + rel
-  body.textContent = 'Carregandoâ€¦'
+  body.textContent = 'Carregando…'
   panel.classList.remove('hidden')
   panel.setAttribute('aria-hidden', 'false')
   try {
@@ -2539,7 +2539,7 @@ async function copiarContinuidadeAdapta(regenerar) {
   }
   try {
     await navigator.clipboard.writeText(r.texto)
-    alert('Continuidade copiada. No Adapta ONE: + â†’ Contextos â†’ cole.')
+    alert('Continuidade copiada. No Adapta ONE: + → Contextos → cole.')
   } catch (e) {
     alert('Não foi possível copiar: ' + String(e))
   }
@@ -2681,7 +2681,7 @@ async function alternarTema() {
   aplicarTema(novo)
 }
 
-/** CodeMirror: escuro â†’ oneDark; claro â†’ tema padrão (themeCompartment). Body já deve ter a classe. */
+/** CodeMirror: escuro → oneDark; claro → tema padrão (themeCompartment). Body já deve ter a classe. */
 function trocarTemaEditor(_tema) {
   editor?.aplicarTema()
 }
@@ -3216,7 +3216,7 @@ if (typeof window.api?.on === 'function') {
     const p = payload || {}
     const de = p.de || '?'
     const para = p.para || '?'
-    mostrarToast('IA trocou de modelo: ' + de + ' â†’ ' + para, 'aviso')
+    mostrarToast('IA trocou de modelo: ' + de + ' → ' + para, 'aviso')
     marcarProviderFallback()
     void atualizarBadgeProvedorReal(para)
     void window.api.invoke('brain:avaliar', para).then((r) => {
@@ -3232,7 +3232,7 @@ if (typeof window.api?.on === 'function') {
 }
 
 $('btn-brain-avaliar')?.addEventListener('click', async () => {
-  mostrarToast('Avaliando modelo ativoâ€¦', 'aviso')
+  mostrarToast('Avaliando modelo ativo…', 'aviso')
   try {
     const r = await window.api.invoke('brain:avaliar')
     if (!r?.ok) {
@@ -3514,11 +3514,11 @@ function renderAgentTrace(passos) {
     div.className = 'step'
     if (p.tipo === 'tool') {
       div.textContent =
-        'âš™ ' +
+        '⚙️ ' +
         (p.nome || 'tool') +
-        (p.resultado ? ' â†’ ' + String(p.resultado).slice(0, 160) : '')
+        (p.resultado ? ' → ' + String(p.resultado).slice(0, 160) : '')
     } else {
-      div.textContent = 'ðŸ’¬ ' + String(p.texto || '').slice(0, 200)
+      div.textContent = '💬 ' + String(p.texto || '').slice(0, 200)
     }
     box.appendChild(div)
   }
@@ -3621,10 +3621,10 @@ function ligarProgressoAgent() {
   if (agentProgressUnsub) agentProgressUnsub()
   agentProgressUnsub = window.api.on('agente:progresso', (_e, ev) => {
     if (!ev || typeof ev !== 'object') return
-    if (ev.tipo === 'status') appendAgentTraceLive('â€¦ ' + ev.texto)
-    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('âš™ ' + ev.nome + 'â€¦')
+    if (ev.tipo === 'status') appendAgentTraceLive('… ' + ev.texto)
+    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('⚙️ ' + ev.nome + '…')
     else if (ev.tipo === 'tool' && ev.fase === 'fim')
-      appendAgentTraceLive('âœ“ ' + ev.nome + (ev.detalhe ? ' â†’ ' + String(ev.detalhe).slice(0, 80) : ''))
+      appendAgentTraceLive('âœ“ ' + ev.nome + (ev.detalhe ? ' → ' + String(ev.detalhe).slice(0, 80) : ''))
     else if (ev.tipo === 'proposta') { appendAgentTraceLive('proposta ' + ev.path); if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path }) }
     else if (ev.tipo === 'texto-delta') {
       const out = $('agent-output')
@@ -3733,7 +3733,7 @@ async function executarAgentUi(orquestrar) {
   const out = $('agent-output')
   const send = $('agent-send')
   if (send) send.disabled = true
-  if (out) out.textContent = plan ? 'Gerando planoâ€¦' : 'Executandoâ€¦'
+  if (out) out.textContent = plan ? 'Gerando plano…' : 'Executando…'
   renderAgentTrace([])
   mostrarPropostasAgent([])
   ligarProgressoAgent()
@@ -3808,7 +3808,7 @@ $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   if (!pastaAtual) return
   ligarProgressoAgent()
   const out = $('agent-output')
-  if (out) out.textContent = 'Executando plano salvoâ€¦'
+  if (out) out.textContent = 'Executando plano salvo…'
   const r = await window.api.invoke('agente:executar-plano', {
     raiz: pastaAtual,
     pastas: pastasPermitidas(),
@@ -3828,7 +3828,7 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
   if (!pastaAtual) return
   ligarProgressoAgent()
   const out = $('agent-output')
-  if (out) out.textContent = 'Executando próximo passoâ€¦'
+  if (out) out.textContent = 'Executando próximo passo…'
   const r = await window.api.invoke('agente:executar-plano', {
     raiz: pastaAtual,
     pastas: pastasPermitidas(),
@@ -3848,7 +3848,7 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
 })
 $('btn-agent-verificar')?.addEventListener('click', async () => {
   if (!pastaAtual) return
-  appendAgentTraceLive('â€¦ typecheck')
+  appendAgentTraceLive('… typecheck')
   const r = await window.api.invoke('agente:verificar', {
     raiz: pastaAtual,
     pastas: pastasPermitidas(),
@@ -4229,7 +4229,7 @@ function perguntarEscolha(titulo, opcoes, config) {
 }
 window.perguntarEscolha = perguntarEscolha
 
-/** Diretório pai de um caminho (arquivo â†’ pasta). */
+/** Diretório pai de um caminho (arquivo → pasta). */
 function dirPaiDe(caminho) {
   const n = String(caminho || '').replace(/[/\\]+$/, '')
   const i = Math.max(n.lastIndexOf('\\'), n.lastIndexOf('/'))
@@ -4316,13 +4316,13 @@ async function atualizarIconeMax() {
 // ---------- Menubar (titlebar frameless) ----------
 const MENUS_BARRA = {
   arquivo: [
-    { id: 'abrir-pasta', label: 'Abrir pasta de trabalhoâ€¦', accel: 'Ctrl+O' },
-    { id: 'abrir-vault', label: 'Abrir vault Markdownâ€¦' },
+    { id: 'abrir-pasta', label: 'Abrir pasta de trabalho…', accel: 'Ctrl+O' },
+    { id: 'abrir-vault', label: 'Abrir vault Markdown…' },
     { sep: true },
     { id: 'salvar', label: 'Salvar', accel: 'Ctrl+S' },
     { id: 'fechar-aba', label: 'Fechar aba', accel: 'Ctrl+W' },
     { sep: true },
-    { id: 'navegador', label: 'Navegadorâ€¦', accel: 'Ctrl+Shift+N' },
+    { id: 'navegador', label: 'Navegador…', accel: 'Ctrl+Shift+N' },
     { sep: true },
     { id: 'sair', label: 'Sair', accel: 'Alt+F4' }
   ],

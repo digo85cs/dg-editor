@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Audit log append-only para automação (Etapa 1).
  * Arquivo: %APPDATA%\DG Editor\logs\automation-audit.jsonl
  * Hash encadeado: SHA-256(timestamp + comando + JSON(args) + hash_anterior)
