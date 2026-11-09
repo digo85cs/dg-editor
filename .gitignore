@@ -99,3 +99,6 @@ tmp/
 *.log
 .dg-editor/analise-completa.json
 boot.log
+.dgrules.truncado.bak
+.dgrules*.bak
+_ed*.js

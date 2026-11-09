@@ -1,11 +1,11 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
 const FIX_BOM = process.argv.includes('--fix-nobom');
 const exts = new Set(['.ts', '.js', '.mjs', '.cjs', '.css', '.html', '.json', '.md', '.ps1']);
 const skipDirNames = new Set(['node_modules', '.git', 'dist', 'dist-app']);
-const roots = [path.join(ROOT, 'src'), path.join(ROOT, 'out', 'renderer')];
+const roots = [path.join(ROOT, 'src'), path.join(ROOT, 'scripts'), path.join(ROOT, 'out', 'renderer')];
 const findings = [];
 let scanned = 0;
 

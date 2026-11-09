@@ -56,3 +56,5 @@
 - Validar, corrigir se falhar e validar de novo antes de concluir.
 - Fechar com a lista de arquivos alterados e com o atalho ou executavel atual.
 - A auditoria confere, linha a linha, se cada ferramenta da interface tem canal no preload e handler no processo principal.
+# === REGRA ADICIONADA 2026-11-09 (Rodrigo) ===
+- Sempre resolver todos os problemas automaticamente e entregar o resultado ao usuario.
