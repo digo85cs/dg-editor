@@ -96,3 +96,4 @@ tmp/
 .dg-editor/instance.lock
 .dg-editor/*.lock
 .dg-editor/*.pid
+*.log
