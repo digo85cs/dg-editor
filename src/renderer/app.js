@@ -4483,6 +4483,19 @@ void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
 atualizarGuardiao()
 setInterval(atualizarGuardiao, 5000)
 void atualizarBadgeProvedorReal()
+void (async () => {
+  try {
+    const st = await window.api.invoke('deps:status')
+    if (st) {
+      atualizarIndicadorDeps(st)
+      if (st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
+        mostrarToast('Ollama instalado, mas offline. Use as Configurações/terminal para iniciar (ollama serve) quando quiser.', 'aviso')
+      } else if (st.ollama === 'nao-instalado' && !st.llmApiKey) {
+        mostrarToast('IA local: Ollama não instalado. Instale em ollama.com ou configure LLM_API_KEY.', 'aviso')
+      }
+    }
+  } catch { /* ignora */ }
+})()
 
 document.addEventListener('DOMContentLoaded', function () {
   var btn = document.getElementById('btn-auditar')

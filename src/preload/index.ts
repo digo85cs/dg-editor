@@ -38,6 +38,7 @@ const invokeChannels = [
   'indice:iniciar', 'indice:listar', 'indice:status', 'analysis:invalidar',
   'vault:abrir', 'vault:fechar', 'vault:estado', 'vault:listar',
   'vault:resolver-link', 'vault:backlinks', 'vault:tags', 'vault:nota', 'vault:salvar',
+  'deps:status',
   'openclaw:config-get', 'openclaw:config-set',
   'openclaw:token-set', 'openclaw:token-clear', 'openclaw:token-status',
   'openclaw:pedir', 'openclaw:pendentes', 'openclaw:aplicar', 'openclaw:rejeitar',

@@ -40,6 +40,7 @@ import { registrarHandlersModelos } from './modelos';
 import { registrarHandlersIndice } from './indice';
 import { registrarHandlersRegrasGerais } from './regras-gerais';
 import { registrarHandlersFerramentas } from './ferramentas';
+import { registrarHandlersDeps } from './deps';
 
 // ============================================================================
 // ESTADO
@@ -111,6 +112,7 @@ export function registrarTodosHandlers(): void {
     registrarHandlersIndice();
     registrarHandlersRegrasGerais();
     registrarHandlersFerramentas();
+    registrarHandlersDeps();
 
     dglog('[ipc:registry] <<< Todos os handlers IPC registrados com sucesso!');
   } catch (e) {
