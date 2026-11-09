@@ -21,6 +21,20 @@ describe('analise render', () => {
     expect(h).toContain('—')
   })
 
+  it('renderizarAnaliseHtml não quebra com payload vazio', () => {
+    expect(() => renderizarAnaliseHtml({}, false)).not.toThrow()
+  })
+
+  it('renderizarAnaliseHtml não quebra com payload null', () => {
+    expect(() => renderizarAnaliseHtml(null, false)).not.toThrow()
+  })
+
+  it('renderizarAnaliseHtml usa fallback quando oQueE ausente', () => {
+    const h = renderizarAnaliseHtml({}, false)
+    expect(h).toContain('—')
+    expect(h).not.toContain('undefined')
+  })
+
   it('renderizarErroHtml com ErroApp', () => {
     const h = renderizarErroHtml({ codigo: 'ERR_LLM_TIMEOUT', mensagem: 'Timeout', acao: 'Tente' })
     expect(h).toContain('[ERR_LLM_TIMEOUT]')

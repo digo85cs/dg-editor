@@ -8,34 +8,53 @@ export function secao(titulo, texto) {
 }
 
 export function secaoLista(titulo, itens) {
-  if (!itens || itens.length === 0) return secao(titulo, '—')
+  const arr = Array.isArray(itens) ? itens.filter((i) => i != null && String(i).trim()) : []
+  if (!arr.length) return secao(titulo, '—')
   return (
     '<div class="analysis-section"><h4>' +
     escapar(titulo) +
     '</h4><ul>' +
-    itens.map((i) => '<li>' + escapar(i) + '</li>').join('') +
+    arr.map((i) => '<li>' + escapar(i) + '</li>').join('') +
     '</ul></div>'
   )
+}
+
+function normReport(report) {
+  const r = report && typeof report === 'object' ? report : {}
+  const txt = (v) => (v == null ? '' : typeof v === 'string' ? v : String(v)).trim()
+  const list = (v) => (Array.isArray(v) ? v.map((x) => txt(x)).filter(Boolean) : [])
+  return {
+    oQueE: txt(r.oQueE ?? r.oqueE ?? r['o_que_e']),
+    stack: txt(r.stack),
+    estrutura: txt(r.estrutura),
+    pontosAtencao: list(r.pontosAtencao ?? r.pontos_atencao),
+    sugestoes: list(r.sugestoes),
+    provider: txt(r.provider),
+    model: txt(r.model),
+    analyzedAt: typeof r.analyzedAt === 'number' ? r.analyzedAt : undefined,
+  }
 }
 
 /** @param {any} report @param {boolean} [fromCache] */
 export function renderizarAnaliseHtml(report, fromCache) {
   if (!report || typeof report !== 'object') {
-    return '<p class="muted">Análise indisponível (dados ausentes).</p>'
+    return '<p class="muted">Análise indisponível (dados ausentes). ' +
+      '<button type="button" class="btn-small" data-action="retry-analise">Tentar novamente</button></p>'
   }
+  const r = normReport(report)
   const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
   let html = ''
-  html += secao('O que é', report.oQueE || '—')
-  html += secao('Stack', report.stack || '—')
-  html += secao('Estrutura', report.estrutura || '—')
-  html += secaoLista('Pontos de atenção', Array.isArray(report.pontosAtencao) ? report.pontosAtencao : [])
-  html += secaoLista('Sugestões', Array.isArray(report.sugestoes) ? report.sugestoes : [])
-  if (report.provider) {
+  html += secao('O que é', r.oQueE || '—')
+  html += secao('Stack', r.stack || '—')
+  html += secao('Estrutura', r.estrutura || '—')
+  html += secaoLista('Pontos de atenção', r.pontosAtencao)
+  html += secaoLista('Sugestões', r.sugestoes)
+  if (r.provider) {
     html +=
       '<p class="muted">Analisado por: ' +
-      escapar(report.provider) +
-      (report.model ? ' (' + escapar(report.model) + ')' : '') +
-      (report.analyzedAt ? ' — ' + escapar(new Date(report.analyzedAt).toLocaleString('pt-BR')) : '') +
+      escapar(r.provider) +
+      (r.model ? ' (' + escapar(r.model) + ')' : '') +
+      (r.analyzedAt ? ' — ' + escapar(new Date(r.analyzedAt).toLocaleString('pt-BR')) : '') +
       badge +
       '</p>'
   }

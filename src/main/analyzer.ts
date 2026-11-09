@@ -4,6 +4,7 @@ import { join } from 'path'
 import { scanFolder } from './scanner'
 import { readRules } from './dgrules'
 import { dglog } from './dglog'
+import { normalizarRelatorio } from '@shared/schemas/relatorio'
 import { getBrain } from './brain/module'
 import type { AnalysisReport, AnalysisCache, AnalysisRunResult, EscopoAnalise, FolderScanResult } from '@shared/types'
 
@@ -135,25 +136,26 @@ SUGESTOES: (3-5 melhorias praticas; uma por linha comecando com "- ")`
 }
 
 export function parseReport(raw: string, root: string, provider: string, model?: string): AnalysisReport {
-  const report: AnalysisReport = {
+  const base: AnalysisReport = {
     root, analyzedAt: Date.now(), provider, model,
-    oQueE: '', stack: '', estrutura: '', pontosAtencao: [], sugestoes: [], raw
+    oQueE: '', stack: '', estrutura: '', pontosAtencao: [], sugestoes: [], raw: String(raw ?? '')
   }
-  const sections = raw.split(/\n(?=[A-Z\u00C0-\u00DA]{2,}[A-Z\u00C0-\u00DA\s]+:)/m)
+  const text = String(raw ?? '')
+  const sections = text.split(/\n(?=[A-Z\u00C0-\u00DA]{2,}[A-Z\u00C0-\u00DA\s]+:)/m)
   for (const s of sections) {
     const t = s.trim()
     const separator = t.indexOf(':')
     const label = separator < 0 ? '' : t.slice(0, separator).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
-    if (label === 'O QUE E') report.oQueE = t.slice(separator + 1).trim()
-    else if (label === 'STACK') report.stack = t.slice(separator + 1).trim()
-    else if (label === 'ESTRUTURA') report.estrutura = t.slice(separator + 1).trim()
+    if (label === 'O QUE E') base.oQueE = t.slice(separator + 1).trim()
+    else if (label === 'STACK') base.stack = t.slice(separator + 1).trim()
+    else if (label === 'ESTRUTURA') base.estrutura = t.slice(separator + 1).trim()
     else if (label === 'PONTOS DE ATENCAO') {
-      report.pontosAtencao = t.split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().slice(1).trim())
+      base.pontosAtencao = t.split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().slice(1).trim())
     } else if (label === 'SUGESTOES') {
-      report.sugestoes = t.split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().slice(1).trim())
+      base.sugestoes = t.split('\n').filter((l) => l.trim().startsWith('-')).map((l) => l.trim().slice(1).trim())
     }
   }
-  return report
+  return normalizarRelatorio(base) as AnalysisReport
 }
 
 function loadCache(root: string, escopo: EscopoAnalise): AnalysisCache | null {

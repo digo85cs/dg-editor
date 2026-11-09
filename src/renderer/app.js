@@ -665,12 +665,11 @@ async function selecionarPasta(path) {
   void ligarHistoricoChat(path)
   void atualizarGitStatusArvore()
 
-  // Trocar pasta: 1Âº clique volta a "Analisando..." (mesmo com cache)
+  // Trocar pasta: 1º clique volta a "Analisando..." (mesmo com cache)
   delete $('analysis-content').dataset.jaAnalisou
-  if (cached && cached.oQueE !== undefined) {
-    renderizarAnalise(cached, true)
-  } else if (cached && cached.report) {
-    renderizarAnalise(cached.report, !!cached.fromCache)
+  if (cached && typeof cached === 'object') {
+    const rep = cached.report && typeof cached.report === 'object' ? cached.report : cached
+    renderizarAnalise(rep, !!cached.fromCache)
   } else {
     $('analysis-content').innerHTML =
       '<p class="muted">Pasta aberta. Escolha Análise rápida ou Análise completa quando quiser analisar.</p>'
@@ -1847,7 +1846,9 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
       return
     }
     const payload = (r.result && typeof r.result === 'object') ? r.result : r
-    const report = payload && payload.report ? payload.report : (payload && typeof payload.oQueE === 'string' ? payload : null)
+    const report = payload && payload.report && typeof payload.report === 'object'
+      ? payload.report
+      : (payload && typeof payload === 'object' ? payload : null)
     if (!report || typeof report !== 'object') {
       mostrarErroTipado({ codigo: 'ERR_ANALYSIS_EMPTY', mensagem: 'A análise não retornou dados suficientes para exibir.', acao: 'Tente novamente com análise rápida.' })
       return
@@ -2989,7 +2990,11 @@ $('whereis-query')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); void buscarOndeEsta() }
 })
 $('btn-config').addEventListener('click', abrirConfig)
-$('btn-config-close').addEventListener('click', () => $('modal-config').classList.add('hidden'))
+const fecharConfig = () => $('modal-config').classList.add('hidden')
+$('btn-config-close').addEventListener('click', fecharConfig)
+$('btn-config-fechar')?.addEventListener('click', fecharConfig)
+$('modal-config').addEventListener('click', (e) => { if (e.target === $('modal-config')) fecharConfig() })
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('modal-config').classList.contains('hidden')) fecharConfig() })
 $('btn-oc-salvar')?.addEventListener('click', () => void salvarConfigOpenClawUi())
 $('btn-oc-limpar-token')?.addEventListener('click', async () => {
   await window.api.invoke('openclaw:token-clear')

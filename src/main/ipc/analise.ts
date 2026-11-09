@@ -13,6 +13,7 @@ import { dglog } from '../dglog';
 import type { EscopoAnalise } from '@shared/types';
 import { CodigoErro, criarErro, type ErroApp } from '@shared/erros';
 import type { IpcResult } from './types';
+import { normalizarRelatorio } from '@shared/schemas/relatorio';
 
 // ============================================================================
 // ESTADO
@@ -98,7 +99,11 @@ export async function handleAnaliseRun(
       }
     }
     const result = await runAnalysis(seg.abs, escopo, f);
-    return { ok: true, result };
+    const safe = { ...result, report: normalizarRelatorio((result as any)?.report) };
+    if (!String((safe.report as any).oQueE || (safe.report as any).stack || (safe.report as any).estrutura || '').trim() && !String((safe.report as any).raw || '').trim()) {
+      return falha(CodigoErro.ERR_ANALYSIS_SHAPE, 'A análise retornou formato inválido/vazio.', 'Tente novamente.', 'report sem campos');
+    }
+    return { ok: true, result: safe };
   } catch (e) {
     return mapearErroAnalise(e);
   }
