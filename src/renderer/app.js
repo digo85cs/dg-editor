@@ -13,6 +13,7 @@ import {
 import { ligarFerramentas } from './ferramentas-ui.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
+import { iniciarGuardian } from './features/guardian/index.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -3122,32 +3123,7 @@ function destacarPaleta(itens) {
 }
 
 // ---------- Guardião ----------
-async function atualizarGuardiao() {
-  try {
-    const s = await window.api.invoke('guardian:snapshot')
-    if (!s || typeof s !== 'object') return
-    const freeMem = typeof s.freeMemory === 'number' ? s.freeMemory : NaN
-    const totalMem = typeof s.totalMemory === 'number' ? s.totalMemory : NaN
-    const cpuPercent = typeof s.cpuPercent === 'number' ? s.cpuPercent : NaN
-    const ramOk = typeof s.ramOk === 'boolean' ? s.ramOk : true
-    const usedMem = totalMem - freeMem
-    const usedMB = Number.isFinite(usedMem) ? Math.round(usedMem / 1048576) : null
-    const totalMB = Number.isFinite(totalMem) ? Math.round(totalMem / 1048576) : null
-    const usedPct = Number.isFinite(usedMem) && Number.isFinite(totalMem) && totalMem > 0
-      ? Math.round((usedMem / totalMem) * 100)
-      : null
-    const cpu = Number.isFinite(cpuPercent) ? Math.round(cpuPercent) : null
-    $('guardian-text').textContent =
-      'Guardião: RAM ' +
-      (usedMB === null ? '—' : usedMB + ' MB') +
-      (usedPct === null ? '' : ' (' + usedPct + '%)') +
-      (totalMB === null ? '' : ' de ' + totalMB + ' MB') +
-      ' - CPU ' +
-      (cpu === null ? '—' : cpu + '%') +
-      (ramOk ? '' : ' - PAUSADO')
-    $('guardian-bar').classList.toggle('guardian-alerta', !ramOk)
-  } catch { /* ignora */ }
-}
+window.__dgAtualizarAba = window.__dgAtualizarAba || function () {}
 
 let depStatusCache = null
 function atualizarIndicadorDeps(st) {
@@ -4581,8 +4557,7 @@ renderizarPastas()
   .then(() => restaurarAbas())
 void renderizarProjects().then(() => atualizarStatusBar(pastaAtual || pastasRecentes[0] || null))
 void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
-atualizarGuardiao()
-setInterval(atualizarGuardiao, 5000)
+iniciarGuardian()
 void atualizarBadgeProvedorReal()
 void (async () => {
   try {
