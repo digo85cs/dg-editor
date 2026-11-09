@@ -90,3 +90,6 @@ tmp/
 
 .dg-editor/_backups/
 .dg-editor/modelos.json.bak-*
+
+# DG Editor runtime
+.dg-editor/boot-silent.flag

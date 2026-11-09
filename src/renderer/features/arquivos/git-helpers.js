@@ -1,5 +1,8 @@
 import { escapar } from '../../utils/dom.js'
 
+/** @type {Map<string, string>} caminho relativo (posix) -> status git */
+export const gitStatusMap = new Map()
+
 /** @param {string} abs @param {string} raiz */
 export function relPosix(abs, raiz) {
   const a = String(abs || '').replace(/\\/g, '/')
