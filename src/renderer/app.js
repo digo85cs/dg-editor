@@ -3062,6 +3062,11 @@ function atualizarIndicadorDeps(st) {
   depStatusCache = st || depStatusCache
   const d = depStatusCache
   const alvo = document.getElementById('chat-provider')
+  const btn = document.getElementById('btn-ollama-start')
+  if (d && btn) {
+    const mostrar = d.ollama === 'offline' && d.instalado && !d.llmApiKey
+    btn.style.display = mostrar ? '' : 'none'
+  }
   if (!alvo || !d) return
   const base = alvo.dataset.iaBase || alvo.textContent || 'IA: —'
   alvo.dataset.iaBase = base
@@ -4489,13 +4494,32 @@ void (async () => {
     if (st) {
       atualizarIndicadorDeps(st)
       if (st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
-        mostrarToast('Ollama instalado, mas offline. Use as Configurações/terminal para iniciar (ollama serve) quando quiser.', 'aviso')
+        mostrarToast('Ollama instalado, mas offline. Use "Iniciar Ollama" na barra de status ou rode "ollama serve".', 'aviso')
       } else if (st.ollama === 'nao-instalado' && !st.llmApiKey) {
         mostrarToast('IA local: Ollama não instalado. Instale em ollama.com ou configure LLM_API_KEY.', 'aviso')
       }
     }
   } catch { /* ignora */ }
 })()
+document.getElementById('btn-ollama-start')?.addEventListener('click', async (e) => {
+  const btn = e.currentTarget
+  if (btn) { btn.disabled = true; btn.textContent = 'Iniciando…' }
+  try {
+    const r = await window.api.invoke('deps:ollama:start')
+    if (r && r.ativo) {
+      mostrarToast('Ollama iniciado.', 'ok')
+    } else if (r && !r.instalado) {
+      mostrarToast('Ollama não está instalado. Instale em ollama.com.', 'aviso')
+    } else {
+      mostrarToast('Não foi possível iniciar o Ollama. Tente "ollama serve" no terminal.', 'erro')
+    }
+  } catch (err) {
+    mostrarToast('Falha ao iniciar Ollama: ' + String(err), 'erro')
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Iniciar Ollama' }
+    try { atualizarIndicadorDeps(await window.api.invoke('deps:status')) } catch { /* */ }
+  }
+})
 
 document.addEventListener('DOMContentLoaded', function () {
   var btn = document.getElementById('btn-auditar')

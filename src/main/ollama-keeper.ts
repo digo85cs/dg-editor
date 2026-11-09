@@ -1,4 +1,4 @@
-import { spawn } from 'child_process'
+import { spawn, execSync } from 'child_process'
 import { request } from 'http'
 import { dglog } from './dglog'
 import { OLLAMA_URL } from './brain/ollama'
@@ -14,12 +14,36 @@ export function ollamaAlive(): Promise<boolean> {
   })
 }
 
+export function ollamaBin(): string {
+  return process.platform === 'win32' ? 'ollama.exe' : 'ollama'
+}
+
+export function ollamaInstalado(): boolean {
+  try {
+    if (process.platform === 'win32') execSync('where ollama', { stdio: 'ignore' })
+    else execSync('which ollama', { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export type OllamaCheck = { ativo: boolean; instalado: boolean }
+
 let keeperProc: ReturnType<typeof spawn> | null = null
 
-export async function ensureOllama(): Promise<boolean> {
-  if (await ollamaAlive()) return true
-  dglog('[keeper] Ollama morto - subindo oculto e persistente...')
-  const exe = process.platform === 'win32' ? 'ollama.exe' : 'ollama'
+export async function checkOllama(): Promise<OllamaCheck> {
+  const ativo = await ollamaAlive()
+  return { ativo, instalado: ativo ? true : ollamaInstalado() }
+}
+
+export async function startOllama(): Promise<OllamaCheck> {
+  const ativo = await ollamaAlive()
+  if (ativo) return { ativo: true, instalado: true }
+  const instalado = ollamaInstalado()
+  if (!instalado) return { ativo: false, instalado: false }
+  dglog('[keeper] startOllama solicitado pelo usuário...')
+  const exe = ollamaBin()
   try {
     keeperProc = spawn(exe, ['serve'], {
       env: Object.assign({}, process.env, {
@@ -31,7 +55,6 @@ export async function ensureOllama(): Promise<boolean> {
       stdio: 'ignore',
       windowsHide: true
     })
-    // Sem isto, spawn ENOENT vira dialog modal e trava a UI.
     keeperProc.on('error', (err) => {
       dglog('[keeper] spawn ollama falhou: ' + String((err as NodeJS.ErrnoException)?.message || err))
       keeperProc = null
@@ -39,16 +62,22 @@ export async function ensureOllama(): Promise<boolean> {
     keeperProc.unref()
   } catch (e) {
     dglog('[keeper] nao foi possivel iniciar ollama: ' + String(e))
-    return false
+    return { ativo: false, instalado: true }
   }
-  // espera subir (ate 10s)
   for (let i = 0; i < 10; i++) {
     await new Promise((r) => setTimeout(r, 1000))
     if (await ollamaAlive()) {
       dglog('[keeper] Ollama no ar')
-      return true
+      return { ativo: true, instalado: true }
     }
   }
   dglog('[keeper] Ollama nao subiu')
-  return false
+  return { ativo: false, instalado: true }
+}
+
+/** Apenas verifica (sem auto-start). Mantido por compatibilidade de chamada; não inicia processo. */
+export async function ensureOllama(): Promise<boolean> {
+  const st = await checkOllama()
+  if (!st.ativo) dglog('[keeper] Ollama indisponível (verificação passiva; sem auto-start)')
+  return st.ativo
 }

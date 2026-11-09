@@ -1,15 +1,6 @@
 ﻿import { ipcMain } from 'electron';
-import { execSync } from 'child_process';
-import { ollamaAlive } from '../ollama-keeper';
+import { ollamaAlive, ollamaInstalado, startOllama } from '../ollama-keeper';
 import { OLLAMA_URL } from '../brain/ollama';
-
-function ollamaInstalado(): boolean {
-  try {
-    if (process.platform === 'win32') execSync('where ollama', { stdio: 'ignore' });
-    else execSync('which ollama', { stdio: 'ignore' });
-    return true;
-  } catch { return false; }
-}
 
 export function registrarHandlersDeps(): void {
   ipcMain.handle('deps:status', async () => {
@@ -28,5 +19,10 @@ export function registrarHandlersDeps(): void {
       } catch { /* ignora */ }
     }
     return { ok: true, ollama: vivo ? 'ativo' : (instalado ? 'offline' : 'nao-instalado'), instalado, vivo, llmApiKey, modelo, ollamaUrl: OLLAMA_URL };
+  });
+
+  ipcMain.handle('deps:ollama:start', async () => {
+    const st = await startOllama().catch(() => ({ ativo: false, instalado: ollamaInstalado() }));
+    return { ok: true, ...st };
   });
 }

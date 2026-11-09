@@ -6,7 +6,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { runAnalysis, getCachedAnalysis, invalidarCacheAnalise } from '../analyzer';
 import { whereIs, formatWhereIs } from '../whereis';
-import { ensureOllama } from '../ollama-keeper';
+import { checkOllama } from '../ollama-keeper';
 import { readRules, rulesExist, createRulesTemplate, writeRules } from '../dgrules';
 import { caminhoSeguro, exigirString, exigirBoolean, isErroPayload } from '../ipc-seguro';
 import { dglog } from '../dglog';
@@ -62,7 +62,16 @@ export async function handleAnaliseRun(
   dglog('[analysis] handler acionado escopo=' + escopo);
 
   try {
-    await ensureOllama();
+    const ollama = await checkOllama();
+    if (!ollama.ativo) {
+      const temKey = !!(process.env.LLM_API_KEY || process.env.OPENAI_API_KEY);
+      if (!temKey) {
+        return {
+          ok: false,
+          erro: 'Ollama não está rodando. Inicie "ollama serve" ou clique em "Iniciar Ollama" na barra de status.'
+        };
+      }
+    }
     const result = await runAnalysis(seg.abs, escopo, f);
     return { ok: true, result };
   } catch (e) {
