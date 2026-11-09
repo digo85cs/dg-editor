@@ -418,7 +418,7 @@ async function abrirVault() {
   const sec = $('vault-section')
   if (sec) sec.hidden = false
   const st = $('vault-status')
-  if (st) st.textContent = nomeArquivo(r.raiz) + ' Â· ' + (r.total || 0) + ' notas'
+  if (st) st.textContent = nomeArquivo(r.raiz) + ' · ' + (r.total || 0) + ' notas'
   await atualizarPainelVault(abaAtiva)
 }
 
@@ -2450,9 +2450,9 @@ async function atualizarPainelAdapta(elId) {
       'Conta: <strong>digo85cs@gmail.com</strong><br>' +
       'Dossiê: ' +
       (st.dossieExiste ? 'ok' : 'ausente') +
-      ' Â· Continuidade: ' +
+      ' · Continuidade: ' +
       (st.continuidadeExiste ? 'ok' : 'ausente') +
-      ' Â· MCP: ' +
+      ' · MCP: ' +
       (st.mcpExiste ? 'compilado' : 'rode npm run build:mcp') +
       '<br><code style="font-size:11px">' +
       escapar(st.caminhoContinuidade || '') +
@@ -2553,18 +2553,24 @@ async function abrirContas() {
       '<br>' +
       'Provedores: <br>' +
       provs
+    const g = s.guardian || {}
+    const usedMem = (g.totalMemory || 0) - (g.freeMemory || 0)
+    const usedMB = Math.round(usedMem / 1048576)
+    const usedPct = g.totalMemory > 0 ? Math.round((usedMem / g.totalMemory) * 100) : 0
     $('contas-guardian').innerHTML =
       '<h4>Guardiao de recursos</h4>' +
-      'RAM livre: ' +
-      Math.round(s.guardian.freeMemory / 1048576) +
-      ' MB (' +
-      s.guardian.freePct +
-      '%)<br>' +
+      'RAM: ' +
+      usedMB +
+      ' MB usados (' +
+      usedPct +
+      '% de ' +
+      Math.round((g.totalMemory || 0) / 1048576) +
+      ' MB)<br>' +
       'CPU: ' +
-      s.guardian.cpuPercent +
+      (Number.isFinite(g.cpuPercent) ? g.cpuPercent : 0) +
       '%<br>' +
       'Operacoes pesadas: ' +
-      (s.guardian.ramOk ? 'LIBERADAS' : 'PAUSADAS (RAM baixa)')
+      (g.ramOk ? 'LIBERADAS' : 'PAUSADAS (RAM baixa)')
   } catch (err) {
     $('contas-ia').innerHTML = '<h4>Erro</h4>' + escapar(String(err))
   }
@@ -3012,17 +3018,22 @@ async function atualizarGuardiao() {
   try {
     const s = await window.api.invoke('guardian:snapshot')
     if (!s || typeof s !== 'object') return
-    const freeMem = typeof s.freeMemory === 'number' ? s.freeMemory : (typeof s.dados?.freeMemory === 'number' ? s.dados.freeMemory : NaN)
-    const freePct = typeof s.freePct === 'number' ? s.freePct : (typeof s.dados?.freePct === 'number' ? s.dados.freePct : NaN)
-    const cpuPercent = typeof s.cpuPercent === 'number' ? s.cpuPercent : (typeof s.dados?.cpuPercent === 'number' ? s.dados.cpuPercent : NaN)
-    const ramOk = typeof s.ramOk === 'boolean' ? s.ramOk : (typeof s.dados?.ramOk === 'boolean' ? s.dados.ramOk : true)
-    const mb = Number.isFinite(freeMem) ? Math.round(freeMem / 1048576) : null
-    const pct = Number.isFinite(freePct) ? freePct : null
-    const cpu = Number.isFinite(cpuPercent) ? cpuPercent : null
+    const freeMem = typeof s.freeMemory === 'number' ? s.freeMemory : NaN
+    const totalMem = typeof s.totalMemory === 'number' ? s.totalMemory : NaN
+    const cpuPercent = typeof s.cpuPercent === 'number' ? s.cpuPercent : NaN
+    const ramOk = typeof s.ramOk === 'boolean' ? s.ramOk : true
+    const usedMem = totalMem - freeMem
+    const usedMB = Number.isFinite(usedMem) ? Math.round(usedMem / 1048576) : null
+    const totalMB = Number.isFinite(totalMem) ? Math.round(totalMem / 1048576) : null
+    const usedPct = Number.isFinite(usedMem) && Number.isFinite(totalMem) && totalMem > 0
+      ? Math.round((usedMem / totalMem) * 100)
+      : null
+    const cpu = Number.isFinite(cpuPercent) ? Math.round(cpuPercent) : null
     $('guardian-text').textContent =
       'Guardião: RAM ' +
-      (mb === null ? '—' : mb + ' MB') +
-      (pct === null ? '' : ' (' + pct + '%)') +
+      (usedMB === null ? '—' : usedMB + ' MB') +
+      (usedPct === null ? '' : ' (' + usedPct + '%)') +
+      (totalMB === null ? '' : ' de ' + totalMB + ' MB') +
       ' - CPU ' +
       (cpu === null ? '—' : cpu + '%') +
       (ramOk ? '' : ' - PAUSADO')
@@ -3374,7 +3385,7 @@ function atualizarStatusAgent(modelo, ms, fila) {
     if (fila.ocupado) partes.push('filaâ—')
     else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
   }
-  el.textContent = partes.length ? 'Agent: ' + partes.join(' Â· ') : 'Agent: —'
+  el.textContent = partes.length ? 'Agent: ' + partes.join(' · ') : 'Agent: —'
 }
 
 async function carregarAgentesUi() {
@@ -3682,7 +3693,7 @@ async function executarAgentUi(orquestrar) {
         out.textContent =
           (plan ? '[PLAN]\n\n' : '') +
           (r.texto || '') +
-          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms Â· ' + (r.modelo || '') : '')
+          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
       }
       renderAgentTrace(r.passos || [])
       mostrarPropostasAgent(r.propostas || [])
