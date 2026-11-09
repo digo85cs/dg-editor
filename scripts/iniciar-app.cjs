@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Inicia o Electron sem vite/preview e sem prender console.
+ * Inicia o Electron sem prender console. Em checkout limpo (sem out/),
+ * roda build inicial automaticamente.
  * Uso: node scripts/iniciar-app.cjs
- * (npm start aponta para caqui — nao use electron-vite preview no dia a dia)
  */
 'use strict'
 
@@ -12,6 +12,7 @@ const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')
 const RAIZ_WIN = 'D:\\CURSOR\\DG Editor'
+const isWin = process.platform === 'win32'
 
 try {
   spawnSync(process.execPath, [path.join(__dirname, 'garantir-launchers.cjs')], {
@@ -32,6 +33,32 @@ function resolverRaiz() {
   return ROOT
 }
 
+function garantirBuild(raiz) {
+  const outMain = path.join(raiz, 'out', 'main', 'index.js')
+  if (fs.existsSync(outMain)) {
+    console.log('[iniciar-app] out/ OK — iniciando')
+    return true
+  }
+  console.log('[iniciar-app] out/ ausente — rodando build inicial...')
+  const r = spawnSync('npx', ['--no-install', 'electron-vite', 'build'], {
+    cwd: raiz,
+    stdio: 'inherit',
+    env: process.env,
+    windowsHide: true,
+    shell: isWin,
+  })
+  if (r.error || r.status !== 0) {
+    console.error('[iniciar-app] Build falhou (exit ' + String(r && r.status) + '). Rode: npm run build')
+    return false
+  }
+  if (!fs.existsSync(outMain)) {
+    console.error('[iniciar-app] Build concluiu mas out/main/index.js não existe. Rode: npm run build')
+    return false
+  }
+  console.log('[iniciar-app] build OK')
+  return true
+}
+
 const raiz = resolverRaiz()
 process.env.DG_ROOT = raiz
 
@@ -45,11 +72,7 @@ if (!fs.existsSync(electronExe)) {
   process.exit(1)
 }
 
-const outMain = path.join(raiz, 'out', 'main', 'index.js')
-if (!fs.existsSync(outMain)) {
-  console.error('[iniciar-app] falta out/main/index.js — rode o build antes')
-  process.exit(1)
-}
+if (!garantirBuild(raiz)) process.exit(1)
 
 const child = spawn(electronExe, [raiz, '--no-sandbox'], {
   cwd: raiz,

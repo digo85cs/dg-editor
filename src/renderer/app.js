@@ -1310,7 +1310,7 @@ setInterval(() => {
 function persistirAbas() {
   localStorage.setItem(
     'dg-state.abas',
-    JSON.stringify({ state.abas: state.abas.map((a) => a.caminho), ativa: state.abaAtiva })
+    JSON.stringify({ abas: state.abas.map((a) => a.caminho), ativa: state.abaAtiva })
   )
 }
 
@@ -3490,7 +3490,7 @@ async function executarAgentUi(orquestrar) {
         arquivoAtivo: state.abaAtiva || undefined,
         proposeWrites: true,
         verificarApos: !!verify && !plan,
-        state.abas: coletarAbasCtx(),
+        abas: coletarAbasCtx(),
         incluirGit: true,
         errosEditor: errosEditor || undefined
       })

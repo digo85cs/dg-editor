@@ -9,7 +9,7 @@
   },
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite preview",
+    "dev": "electron-vite dev",
     "build": "npm run verificar:encoding && electron-vite build",
     "preview": "electron-vite preview",
     "prestart": "node scripts/garantir-launchers.cjs",
@@ -41,7 +41,9 @@
     "verificar:encoding": "node scripts/verificar-encoding.mjs",
     "test:validator": "node test/validator.cjs",
     "test:watch": "vitest",
-    "rebuild:pty": "node scripts/rebuild-node-pty.cjs"
+    "rebuild:pty": "node scripts/rebuild-node-pty.cjs",
+    "predev": "node scripts/garantir-build.cjs",
+    "limpar": "node -e \"require('fs').rmSync('out',{recursive:true,force:true});require('fs').rmSync('node_modules/.vite',{recursive:true,force:true});console.log('ok')\""
   },
   "build": {
     "appId": "com.dgeditor.app",
