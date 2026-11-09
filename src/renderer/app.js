@@ -17,13 +17,8 @@ import { iniciarGuardian } from './features/guardian/index.js'
 
 const $ = (id) => document.getElementById(id)
 
-let pastaAtual = null
-ligarFerramentas(() => pastaAtual)
-const pastasRecentes = []
-/** @type {Map<string, { expandida: boolean, filhosCarregados: boolean }>} */
-const estadoArvore = new Map()
-/** Containers .tree-children com listagem IPC em andamento (anti duplo clique). */
-const carregandoNos = new WeakSet()
+import { state, setPastaAtual } from './state/app-state.js'
+ligarFerramentas(() => state.pastaAtual)
 /** @type {{ caminho: string, nome: string, dirty: boolean }[]} */
 let abas = []
 let abaAtiva = null
@@ -36,21 +31,20 @@ let filesListaSuja = false
 /** Histórico de navegação de abas (tb-voltar / tb-avancar). */
 let histAbas = []
 let histIdx = -1
-/** Raiz do vault Markdown aberto (null = fechado). */
-let vaultRaiz = null
+// state.vaultRaiz: state.state.vaultRaiz
 
 const CHEV =
   '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
 
 function pastasPermitidas() {
-  const s = new Set(pastasRecentes)
-  if (vaultRaiz) s.add(vaultRaiz)
+  const s = new Set(state.pastasRecentes)
+  if (state.vaultRaiz) s.add(state.vaultRaiz)
   return [...s]
 }
 
 function caminhoNoVault(caminho) {
-  if (!vaultRaiz || !caminho) return false
-  return caminhoSobPasta(caminho, vaultRaiz)
+  if (!state.vaultRaiz || !caminho) return false
+  return caminhoSobPasta(caminho, state.vaultRaiz)
 }
 
 function nomeArquivo(p) {
@@ -61,7 +55,7 @@ function nomeArquivo(p) {
 
 function caminhoRelativo(abs) {
   const a = String(abs || '')
-  for (const raiz of pastasRecentes) {
+  for (const raiz of state.pastasRecentes) {
     const r = String(raiz)
     if (a === r) return nomeArquivo(r)
     const sep = r.endsWith('\\') || r.endsWith('/') ? '' : '\\'
@@ -409,7 +403,7 @@ async function abrirVault() {
     alert('Não foi possível abrir o vault: ' + (r?.erro || 'erro'))
     return
   }
-  vaultRaiz = r.raiz
+  state.vaultRaiz = r.raiz
   adicionarPasta(r.raiz)
   await selecionarPasta(r.raiz)
   const sec = $('vault-section')
@@ -421,7 +415,7 @@ async function abrirVault() {
 
 async function fecharVault() {
   await window.api.invoke('vault:fechar')
-  vaultRaiz = null
+  state.vaultRaiz = null
   const sec = $('vault-section')
   if (sec) sec.hidden = true
   const st = $('vault-status')
@@ -433,7 +427,7 @@ async function fecharVault() {
 }
 
 async function atualizarPainelVault(caminho) {
-  if (!vaultRaiz) return
+  if (!state.vaultRaiz) return
   const bl = $('vault-backlinks')
   const tg = $('vault-tags')
   if (bl) {
@@ -481,7 +475,7 @@ async function atualizarPainelVault(caminho) {
 }
 
 async function abrirWikiLink(alvo) {
-  if (!vaultRaiz) {
+  if (!state.vaultRaiz) {
     alert('Abra um vault para resolver [[links]].')
     return
   }
@@ -495,7 +489,7 @@ async function abrirWikiLink(alvo) {
 }
 
 function adicionarPasta(path) {
-  if (!pastasRecentes.includes(path)) pastasRecentes.push(path)
+  if (!state.pastasRecentes.includes(path)) state.pastasRecentes.push(path)
   renderizarPastas()
   salvarPastas()
   void renderizarProjects(true)
@@ -516,16 +510,16 @@ async function escolherNovoCaminhoPasta(antigo) {
     if (!r || r.canceled || !r.path) return
     const novo = r.path
     if (novo === antigo) return
-    if (pastasRecentes.includes(novo)) {
+    if (state.pastasRecentes.includes(novo)) {
       await removerPasta(antigo, { skipConfirm: true })
       await selecionarPasta(novo)
       return
     }
-    const idx = pastasRecentes.indexOf(antigo)
-    if (idx >= 0) pastasRecentes[idx] = novo
-    else pastasRecentes.push(novo)
-    estadoArvore.delete(antigo)
-    if (pastaAtual === antigo) pastaAtual = novo
+    const idx = state.pastasRecentes.indexOf(antigo)
+    if (idx >= 0) state.pastasRecentes[idx] = novo
+    else state.pastasRecentes.push(novo)
+    state.estadoArvore.delete(antigo)
+    if (state.pastaAtual === antigo) state.pastaAtual = novo
     salvarPastas()
     await renderizarPastas()
     void renderizarProjects(true)
@@ -571,7 +565,7 @@ function garantirEmptyStateChat() {
 }
 
 async function removerPasta(path, opts) {
-  if (!path || !pastasRecentes.includes(path)) return
+  if (!path || !state.pastasRecentes.includes(path)) return
   const nome = nomeArquivo(path)
   const confirmar = !(opts && opts.skipConfirm)
   if (
@@ -582,9 +576,9 @@ async function removerPasta(path, opts) {
   ) {
     return
   }
-  const idx = pastasRecentes.indexOf(path)
+  const idx = state.pastasRecentes.indexOf(path)
   if (idx === -1) return
-  pastasRecentes.splice(idx, 1)
+  state.pastasRecentes.splice(idx, 1)
   salvarPastas()
 
   // Fechar abas cujos arquivos estavam sob a pasta removida
@@ -607,8 +601,8 @@ async function removerPasta(path, opts) {
     persistirAbas()
   }
 
-  if (pastaAtual === path) {
-    pastaAtual = null
+  if (state.pastaAtual === path) {
+    state.pastaAtual = null
     const titulo = $('chat-title')
     if (titulo) titulo.textContent = 'Nenhuma pasta aberta'
     $('chat-send') && ($('chat-send').disabled = true)
@@ -620,13 +614,13 @@ async function removerPasta(path, opts) {
   await renderizarPastas()
   void renderizarProjects(true)
   if (typeof atualizarStatusBar === 'function') {
-    void atualizarStatusBar(pastaAtual)
+    void atualizarStatusBar(state.pastaAtual)
   }
 }
 
 function salvarPastas() {
   try {
-    localStorage.setItem('dg-pastas', JSON.stringify(pastasRecentes))
+    localStorage.setItem('dg-pastas', JSON.stringify(state.pastasRecentes))
   } catch (e) {
     console.warn('[pastas] falha ao salvar localStorage:', e)
   }
@@ -639,8 +633,8 @@ function carregarPastas() {
       const lista = JSON.parse(salvas)
       if (Array.isArray(lista)) {
         for (const p of lista) {
-          if (typeof p === 'string' && p && !pastasRecentes.includes(p)) {
-            pastasRecentes.push(p)
+          if (typeof p === 'string' && p && !state.pastasRecentes.includes(p)) {
+            state.pastasRecentes.push(p)
           }
         }
       }
@@ -655,22 +649,22 @@ async function garantirPastaRaizProjeto() {
     if (!r?.ok || !r.raiz) return
     const raiz = String(r.raiz)
     // Remove caminhos truncados por bug de espaco (ex.: "D:\\CURSOR\\DG Edi")
-    for (let i = pastasRecentes.length - 1; i >= 0; i--) {
-      const p = String(pastasRecentes[i] || '')
+    for (let i = state.pastasRecentes.length - 1; i >= 0; i--) {
+      const p = String(state.pastasRecentes[i] || '')
       if (!p) {
-        pastasRecentes.splice(i, 1)
+        state.pastasRecentes.splice(i, 1)
         continue
       }
       if (p !== raiz && raiz.toLowerCase().startsWith(p.toLowerCase())) {
-        pastasRecentes.splice(i, 1)
+        state.pastasRecentes.splice(i, 1)
       }
     }
-    if (!pastasRecentes.includes(raiz)) {
-      pastasRecentes.unshift(raiz)
+    if (!state.pastasRecentes.includes(raiz)) {
+      state.pastasRecentes.unshift(raiz)
     }
     salvarPastas()
     await renderizarPastas()
-    if (!pastaAtual) {
+    if (!state.pastaAtual) {
       await selecionarPasta(raiz)
     }
   } catch (e) {
@@ -680,7 +674,7 @@ async function garantirPastaRaizProjeto() {
 
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
-  pastaAtual = path
+  state.pastaAtual = path
   void carregarOpcoesAgenteChat(path)
   ativarAbaCentro('chat')
   void atualizarStatusBar(path)
@@ -690,10 +684,10 @@ async function selecionarPasta(path) {
   habilitarBotoesAnalise(true)
 
   // garantir estado no Map SEM re-renderizar
-  if (!estadoArvore.has(path)) {
-    estadoArvore.set(path, { expandida: true, filhosCarregados: false })
+  if (!state.estadoArvore.has(path)) {
+    state.estadoArvore.set(path, { expandida: true, filhosCarregados: false })
   } else {
-    estadoArvore.get(path).expandida = true
+    state.estadoArvore.get(path).expandida = true
   }
 
   // realce visual do item selecionado (SEM recriar DOM)
@@ -746,16 +740,16 @@ async function selecionarPasta(path) {
 
 // ---------- Árvore ----------
 /**
- * Contexto do chat (pastaAtual / chat-title):
+ * Contexto do chat (state.pastaAtual / chat-title):
  * muda só aqui — ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
  * ou ao abrir um arquivo. Expandir/retrair árvore NÃO chama isto.
  */
 function definirContextoPasta(p) {
   if (!p) return
-  if (pastaAtual && pastaAtual !== p) {
+  if (state.pastaAtual && state.pastaAtual !== p) {
     delete $('analysis-content')?.dataset.jaAnalisou
   }
-  pastaAtual = p
+  state.pastaAtual = p
   void carregarOpcoesAgenteChat(p)
   $('chat-title').textContent = nomeArquivo(p)
   $('chat-send').disabled = false
@@ -764,29 +758,29 @@ function definirContextoPasta(p) {
 
 function raizWorkspaceDe(caminho) {
   const a = String(caminho || '')
-  for (const r of pastasRecentes) {
+  for (const r of state.pastasRecentes) {
     if (!r) continue
     if (a === r) return r
     const sep = r.endsWith('\\') || r.endsWith('/') ? '' : '\\'
     if (a.toLowerCase().startsWith((r + sep).toLowerCase())) return r
   }
-  return pastaAtual
+  return state.pastaAtual
 }
 
 async function renderizarArvoreEm(lista) {
   if (!lista) return
   lista.innerHTML = ''
-  if (pastasRecentes.length === 0) {
+  if (state.pastasRecentes.length === 0) {
     lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
     return
   }
   const promessasFilhos = []
-  for (const p of pastasRecentes) {
+  for (const p of state.pastasRecentes) {
     const root = document.createElement('div')
-    root.className = 'tree-root' + (p === pastaAtual ? ' selected' : '')
+    root.className = 'tree-root' + (p === state.pastaAtual ? ' selected' : '')
     root.dataset.path = p
-    const st = estadoArvore.get(p) || { expandida: false, filhosCarregados: false }
-    estadoArvore.set(p, st)
+    const st = state.estadoArvore.get(p) || { expandida: false, filhosCarregados: false }
+    state.estadoArvore.set(p, st)
 
     const header = document.createElement('div')
     header.className = 'tree-root-header'
@@ -807,7 +801,7 @@ async function renderizarArvoreEm(lista) {
 
     header.addEventListener('click', async (e) => {
       if (e.target.closest('.pasta-remover')) return
-      if (carregandoNos.has(children)) return
+      if (state.carregandoNos.has(children)) return
       const noChevron = !e.target.closest('.chevron')
       // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
       if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
@@ -820,11 +814,11 @@ async function renderizarArvoreEm(lista) {
       children.classList.toggle('open', st.expandida)
       if (!st.expandida) return
       if (children.childElementCount > 0) return
-      carregandoNos.add(children)
+      state.carregandoNos.add(children)
       try {
         await carregarFilhos(p, children, 1)
       } finally {
-        carregandoNos.delete(children)
+        state.carregandoNos.delete(children)
       }
     })
     root.appendChild(header)
@@ -833,11 +827,11 @@ async function renderizarArvoreEm(lista) {
 
     // Re-render: leituras em paralelo (sem await no loop).
     if (st.expandida && children.childElementCount === 0) {
-      carregandoNos.add(children)
+      state.carregandoNos.add(children)
       promessasFilhos.push(
         carregarFilhos(p, children, 1)
           .catch(() => false)
-          .finally(() => carregandoNos.delete(children))
+          .finally(() => state.carregandoNos.delete(children))
       )
     }
   }
@@ -872,7 +866,7 @@ async function carregarFilhos(dir, container, nivel) {
       const msg = escapar(r.erro || 'erro')
       const naoEncontrado = /diret[óo]rio n[ãa]o encontrado|ENOENT|not found/i.test(String(r.erro || ''))
       let acoes = ''
-      if (naoEncontrado && pastasRecentes.includes(dir)) {
+      if (naoEncontrado && state.pastasRecentes.includes(dir)) {
         acoes =
           ' <button type="button" class="btn-small pasta-acao-remover" data-path="' + escapar(dir) + '">Remover da lista</button>' +
           ' <button type="button" class="btn-small pasta-acao-reapontar" data-path="' + escapar(dir) + '">Escolher novo caminho</button>'
@@ -891,7 +885,7 @@ async function carregarFilhos(dir, container, nivel) {
       }
       return false
     }
-    const st = estadoArvore.get(dir)
+    const st = state.estadoArvore.get(dir)
     if (st) st.filhosCarregados = true
     for (const ent of r.entradas || []) {
       if (ent.tipo === 'dir') {
@@ -927,7 +921,7 @@ function criarNoDir(ent, nivel) {
   let carregado = false
   row.addEventListener('click', async (e) => {
     e.stopPropagation()
-    if (carregandoNos.has(kids)) return
+    if (state.carregandoNos.has(kids)) return
     aberto = !aberto
     row.querySelector('.chevron').classList.toggle('open', aberto)
     kids.classList.toggle('open', aberto)
@@ -936,11 +930,11 @@ function criarNoDir(ent, nivel) {
       carregado = kids.childElementCount > 0
       return
     }
-    carregandoNos.add(kids)
+    state.carregandoNos.add(kids)
     try {
       carregado = await carregarFilhos(ent.caminho, kids, nivel + 1)
     } finally {
-      carregandoNos.delete(kids)
+      state.carregandoNos.delete(kids)
     }
   })
   wrap.appendChild(row)
@@ -989,7 +983,7 @@ function renderDiffHtml(diffText) {
 }
 
 async function abrirPainelDiff(absPath) {
-  const raiz = raizWorkspaceDe(absPath) || pastaAtual
+  const raiz = raizWorkspaceDe(absPath) || state.pastaAtual
   if (!raiz) return
   const rel = relPosix(absPath, raiz)
   const panel = $('diff-panel')
@@ -1317,7 +1311,7 @@ async function salvarConfigOpenClawUi() {
 }
 
 async function atualizarGitStatusArvore() {
-  const raiz = pastaAtual
+  const raiz = state.pastaAtual
   if (!raiz) return
   try {
     const r = await window.api.invoke('git:status', raiz)
@@ -1356,7 +1350,7 @@ function criarNoFile(ent, nivel) {
   const row = document.createElement('div')
   row.className = 'tree-item'
   row.style.paddingLeft = 8 + nivel * 16 + 16 + 'px'
-  const raiz = raizWorkspaceDe(ent.caminho) || pastaAtual
+  const raiz = raizWorkspaceDe(ent.caminho) || state.pastaAtual
   const rel = raiz ? relPosix(ent.caminho, raiz) : ''
   const st = rel ? gitStatusMap.get(rel) : null
   row.innerHTML =
@@ -1385,15 +1379,15 @@ function criarNoFile(ent, nivel) {
 }
 
 $('btn-refresh-tree')?.addEventListener('click', () => {
-  for (const [, st] of estadoArvore) st.filhosCarregados = false
+  for (const [, st] of state.estadoArvore) st.filhosCarregados = false
   renderizarPastas().then(() => atualizarGitStatusArvore())
   void renderizarProjects(true)
-  void atualizarStatusBar(pastaAtual)
+  void atualizarStatusBar(state.pastaAtual)
 })
 $('btn-git-refresh')?.addEventListener('click', () => {
   void atualizarGitStatusArvore()
   void renderizarProjects(true)
-  void atualizarStatusBar(pastaAtual)
+  void atualizarStatusBar(state.pastaAtual)
 })
 
 // ---------- Sidebar modos: Projects / Explorer ----------
@@ -1428,7 +1422,7 @@ async function obterReposGit(force) {
     return reposCacheLocal.itens
   }
   try {
-    const r = await window.api.invoke('git:repos', { pastas: [...pastasRecentes] })
+    const r = await window.api.invoke('git:repos', { pastas: [...state.pastasRecentes] })
     reposCacheLocal = { ts: Date.now(), itens: Array.isArray(r) ? r : [] }
   } catch (e) {
     console.warn('[projects] git:repos', e)
@@ -1483,14 +1477,14 @@ async function renderizarProjects(force) {
   if (unicos.length === 0) {
     lista.innerHTML =
       '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
-    console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + pastasRecentes.length)
-    void atualizarStatusBar(pastaAtual)
+    console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + state.pastasRecentes.length)
+    void atualizarStatusBar(state.pastaAtual)
     return
   }
   for (const it of unicos) {
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = 'project-item' + (it.pasta === pastaAtual ? ' selected' : '')
+    btn.className = 'project-item' + (it.pasta === state.pastaAtual ? ' selected' : '')
     btn.dataset.path = it.pasta
     btn.title = it.pasta
     const nome = document.createElement('span')
@@ -1528,18 +1522,18 @@ async function renderizarProjects(force) {
       'ms repos=' +
       unicos.length +
       ' pastas=' +
-      pastasRecentes.length +
+      state.pastasRecentes.length +
       ' dedup=' +
       (itens.filter((i) => i && i.repo).length - unicos.length)
   )
-  void atualizarStatusBar(pastaAtual)
+  void atualizarStatusBar(state.pastaAtual)
 }
 
 $('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
 $('sidebar-mode-explorer')?.addEventListener('click', () => setSidebarMode('explorer'))
 $('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
 setInterval(() => {
-  if (document.hidden || !pastaAtual) return
+  if (document.hidden || !state.pastaAtual) return
   void atualizarGitStatusArvore()
 }, 5000)
 
@@ -1970,7 +1964,7 @@ async function salvarArquivoAtivo() {
   if (!abaAtiva || !editor) return false
   const conteudo = editor.getConteudo()
   let r
-  if (vaultRaiz && caminhoNoVault(abaAtiva) && ehMarkdown(abaAtiva)) {
+  if (state.vaultRaiz && caminhoNoVault(abaAtiva) && ehMarkdown(abaAtiva)) {
     r = await window.api.invoke('vault:salvar', abaAtiva, conteudo, pastasPermitidas())
     if (r?.ok) void atualizarPainelVault(abaAtiva)
   } else {
@@ -2143,14 +2137,14 @@ function secaoLista(titulo, itens) {
 
 // ---------- Onde está (whereis) ----------
 async function buscarOndeEsta() {
-  if (!pastaAtual) { mostrarToast('Abra uma pasta para buscar.', 'aviso'); return }
+  if (!state.pastaAtual) { mostrarToast('Abra uma pasta para buscar.', 'aviso'); return }
   const input = $('whereis-query')
   const q = (input?.value || '').trim()
   if (q.length < 2) { mostrarToast('Digite ao menos 2 caracteres.', 'aviso'); input?.focus(); return }
   const alvo = $('whereis-result')
   if (alvo) alvo.innerHTML = '<p class="muted">Buscando…</p>'
   try {
-    const r = await window.api.invoke('whereis:ask', pastaAtual, q)
+    const r = await window.api.invoke('whereis:ask', state.pastaAtual, q)
     if (!r || r.ok === false) {
       const e = dgNormalizarErro(r, 'Falha na busca.')
       if (alvo) alvo.innerHTML = '<p class="muted"><strong>[' + escapar(e.codigo) + ']</strong> ' + escapar(e.mensagem) + '</p>' + (e.acao ? '<p class="muted">' + escapar(e.acao) + '</p>' : '')
@@ -2220,7 +2214,7 @@ function adicionarBolha(role, content, provider) {
 let histChat = null
 
 async function enviarMensagem() {
-  if (!pastaAtual) return
+  if (!state.pastaAtual) return
   const input = $('chat-input')
   const texto = input.value.trim()
   if (!texto) return
@@ -2263,7 +2257,7 @@ async function enviarMensagem() {
         return false
       }
     })()
-    const r = await window.api.invoke('chat:send', pastaAtual, texto, { agente, modo, autoAprovar, anexos: chatAnexos, arquivo: abaAtiva || '' })
+    const r = await window.api.invoke('chat:send', state.pastaAtual, texto, { agente, modo, autoAprovar, anexos: chatAnexos, arquivo: abaAtiva || '' })
     chatAnexos = []
     renderizarAnexosChat()
     const ok = r && r.ok !== false && r.message && r.message.content
@@ -2359,7 +2353,7 @@ async function melhorarPromptLocal() {
   btn.textContent = 'Melhorando...'
   let timeoutId
   try {
-    const raiz = pastaAtual || pastasRecentes[0] || '.'
+    const raiz = state.pastaAtual || state.pastasRecentes[0] || '.'
     const resposta = window.api.invoke('orientar:prompt', raiz, valor)
     const r = await Promise.race([
       resposta,
@@ -2553,7 +2547,7 @@ async function atualizarPainelAdapta(elId) {
   const el = $(elId)
   if (!el) return
   try {
-    const st = await window.api.invoke('adapta:status', pastaAtual || undefined)
+    const st = await window.api.invoke('adapta:status', state.pastaAtual || undefined)
     adaptaStatusCache = st
     el.innerHTML =
       'Conta: <strong>digo85cs@gmail.com</strong><br>' +
@@ -2597,7 +2591,7 @@ async function copiarContinuidadeAdapta(regenerar) {
 
 async function copiarMcpAdapta() {
   const st =
-    adaptaStatusCache || (await window.api.invoke('adapta:status', pastaAtual || undefined))
+    adaptaStatusCache || (await window.api.invoke('adapta:status', state.pastaAtual || undefined))
   adaptaStatusCache = st
   if (!st?.mcpComando) {
     alert('Comando MCP indisponível')
@@ -2690,7 +2684,7 @@ async function rodarDiagnostico() {
   alvo.innerHTML = '<h4>Diagnostico ao vivo</h4>Rodando 8 testes...'
   const t0 = Date.now()
   try {
-    const r = await window.api.invoke('diagnostico:rodar', pastaAtual || null)
+    const r = await window.api.invoke('diagnostico:rodar', state.pastaAtual || null)
     const total = Date.now() - t0
     let html = '<h4>Diagnostico ao vivo - ' + r.ok + '/' + r.total + ' OK (' + total + ' ms)</h4>'
     for (const m of r.modulos) {
@@ -2765,13 +2759,13 @@ function bootstrapComandos() {
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
     { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
     { id: 'paleta-comandos', titulo: 'Paleta de comandos', atalho: 'Ctrl+Shift+P', fn: () => abrirPaletaComandos() },
-    { id: 'analisar', titulo: 'Analisar sistema aberto', fn: () => pastaAtual && escolherEscopoAnalise(pastaAtual) },
-    { id: 'analisar-completa', titulo: 'Analise completa do projeto', fn: () => pastaAtual && analisarCompleta(pastaAtual) },
-    { id: 'reanalisar', titulo: 'Analisar novamente', fn: () => pastaAtual && escolherEscopoAnalise(pastaAtual, true) },
+    { id: 'analisar', titulo: 'Analisar sistema aberto', fn: () => state.pastaAtual && escolherEscopoAnalise(state.pastaAtual) },
+    { id: 'analisar-completa', titulo: 'Analise completa do projeto', fn: () => state.pastaAtual && analisarCompleta(state.pastaAtual) },
+    { id: 'reanalisar', titulo: 'Analisar novamente', fn: () => state.pastaAtual && escolherEscopoAnalise(state.pastaAtual, true) },
     {
       id: 'limpar-chat',
       titulo: 'Limpar chat',
-      fn: () => pastaAtual && window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([]))
+      fn: () => state.pastaAtual && window.api.invoke('chat:clear', state.pastaAtual).then(() => renderizarChat([]))
     },
     { id: 'contas', titulo: 'Contas e saude', fn: () => abrirContas() },
     { id: 'config', titulo: 'Configuracoes', fn: () => abrirConfig() },
@@ -2980,7 +2974,7 @@ async function renderizarPaleta(filtro) {
         paletaItens.push({ tipo: 'cmd', id: c.id, label: c.titulo, hint: c.hint || c.atalho || '' })
       }
   } else {
-    const raiz = pastaAtual || pastasRecentes[0]
+    const raiz = state.pastaAtual || state.pastasRecentes[0]
     if (raiz) {
       try {
         const r = await window.api.invoke('busca:arquivos', raiz, f, 80)
@@ -3030,13 +3024,13 @@ function executarComando(id) {
   if (executarComandoLocal(id)) return
   if (id === 'abrir-pasta') abrirPasta()
   else if (id === 'analisar') {
-    if (pastaAtual) void escolherEscopoAnalise(pastaAtual)
+    if (state.pastaAtual) void escolherEscopoAnalise(state.pastaAtual)
   } else if (id === 'analisar-completa') {
-    if (pastaAtual) void analisarCompleta(pastaAtual)
+    if (state.pastaAtual) void analisarCompleta(state.pastaAtual)
   } else if (id === 'reanalisar') {
-    if (pastaAtual) void escolherEscopoAnalise(pastaAtual, true)
+    if (state.pastaAtual) void escolherEscopoAnalise(state.pastaAtual, true)
   } else if (id === 'limpar-chat') {
-    if (pastaAtual) window.api.invoke('chat:clear', pastaAtual).then(() => renderizarChat([]))
+    if (state.pastaAtual) window.api.invoke('chat:clear', state.pastaAtual).then(() => renderizarChat([]))
   } else if (id === 'contas') abrirContas()
   else if (id === 'config') abrirConfig()
   else if (id === 'tema') alternarTema()
@@ -3052,11 +3046,11 @@ function executarComando(id) {
     ativarAbaDireita('browser')
     void abrirNavegadorUi()
   } else if (id === 'regras-projeto') {
-    if (pastaAtual) void mostrarRegrasUI(pastaAtual)
+    if (state.pastaAtual) void mostrarRegrasUI(state.pastaAtual)
   }
 }
 async function rodarBuscaGlobal() {
-  const raiz = pastaAtual || pastasRecentes[0]
+  const raiz = state.pastaAtual || state.pastasRecentes[0]
   const q = ($('busca-input')?.value || '').trim()
   const box = $('busca-resultados')
   if (!box) return
@@ -3285,10 +3279,10 @@ $('md-preview')?.addEventListener('click', (ev) => {
 })
 $('btn-empty-open')?.addEventListener('click', abrirPasta)
 $('btn-analise-rapida')?.addEventListener('click', () => {
-  if (pastaAtual) void rodarAnalise(pastaAtual, 'rapida')
+  if (state.pastaAtual) void rodarAnalise(state.pastaAtual, 'rapida')
 })
 $('btn-analise-completa')?.addEventListener('click', () => {
-  if (pastaAtual) void analisarCompleta(pastaAtual)
+  if (state.pastaAtual) void analisarCompleta(state.pastaAtual)
 })
 $('btn-whereis')?.addEventListener('click', () => { void buscarOndeEsta() })
 $('whereis-query')?.addEventListener('keydown', (e) => {
@@ -3328,7 +3322,7 @@ const agentesGratisPadrao = [
 ]
 let chatAgentRequestId = 0
 
-async function carregarOpcoesAgenteChat(raiz = pastaAtual) {
+async function carregarOpcoesAgenteChat(raiz = state.pastaAtual) {
   const agentSel = document.getElementById('chat-agent-select')
   if (!agentSel) return
   const requestId = ++chatAgentRequestId
@@ -3505,8 +3499,8 @@ function atualizarStatusAgent(modelo, ms, fila) {
 
 async function carregarAgentesUi() {
   const sel = $('agent-select')
-  if (!sel || !pastaAtual) return
-  const r = await window.api.invoke('agente:listar', pastaAtual)
+  if (!sel || !state.pastaAtual) return
+  const r = await window.api.invoke('agente:listar', state.pastaAtual)
   const cur = sel.value
   sel.innerHTML = ''
   for (const a of r?.agentes || []) {
@@ -3747,7 +3741,7 @@ async function refrescarPlanoUi() {
 }
 
 async function executarAgentUi(orquestrar) {
-  if (!pastaAtual) {
+  if (!state.pastaAtual) {
     alert('Abra uma pasta primeiro.')
     return
   }
@@ -3773,7 +3767,7 @@ async function executarAgentUi(orquestrar) {
   try {
     let r
     if (orquestrar) {
-      r = await window.api.invoke('agente:orquestrar', pastaAtual, texto)
+      r = await window.api.invoke('agente:orquestrar', state.pastaAtual, texto)
       if (out) {
         out.textContent = (r?.passos || [])
           .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
@@ -3787,7 +3781,7 @@ async function executarAgentUi(orquestrar) {
     } else {
       const errosEditor = await coletarErrosEditor()
       r = await window.api.invoke('agente:pedir', {
-        raiz: pastaAtual,
+        raiz: state.pastaAtual,
         pergunta: texto,
         modo: plan ? 'plan' : 'agent',
         agente,
@@ -3832,12 +3826,12 @@ $('btn-agent-stop')?.addEventListener('click', async () => {
   await carregarAgentesUi()
 })
 $('btn-agent-exec-plano')?.addEventListener('click', async () => {
-  if (!pastaAtual) return
+  if (!state.pastaAtual) return
   ligarProgressoAgent()
   const out = $('agent-output')
   if (out) out.textContent = 'Executando plano salvo…'
   const r = await window.api.invoke('agente:executar-plano', {
-    raiz: pastaAtual,
+    raiz: state.pastaAtual,
     pastas: pastasPermitidas(),
     soProximo: false
   })
@@ -3852,12 +3846,12 @@ $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   renderPlanoChecklist(r.plano)
 })
 $('btn-agent-exec-passo')?.addEventListener('click', async () => {
-  if (!pastaAtual) return
+  if (!state.pastaAtual) return
   ligarProgressoAgent()
   const out = $('agent-output')
   if (out) out.textContent = 'Executando próximo passo…'
   const r = await window.api.invoke('agente:executar-plano', {
-    raiz: pastaAtual,
+    raiz: state.pastaAtual,
     pastas: pastasPermitidas(),
     soProximo: true
   })
@@ -3874,10 +3868,10 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
   renderPlanoChecklist(r.plano)
 })
 $('btn-agent-verificar')?.addEventListener('click', async () => {
-  if (!pastaAtual) return
+  if (!state.pastaAtual) return
   appendAgentTraceLive('… typecheck')
   const r = await window.api.invoke('agente:verificar', {
-    raiz: pastaAtual,
+    raiz: state.pastaAtual,
     pastas: pastasPermitidas(),
     modo: 'typecheck'
   })
@@ -4555,8 +4549,8 @@ setSidebarMode('explorer')
 renderizarPastas()
   .then(() => garantirPastaRaizProjeto())
   .then(() => restaurarAbas())
-void renderizarProjects().then(() => atualizarStatusBar(pastaAtual || pastasRecentes[0] || null))
-void atualizarStatusBar(pastaAtual || pastasRecentes[0] || null)
+void renderizarProjects().then(() => atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null))
+void atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null)
 iniciarGuardian()
 void atualizarBadgeProvedorReal()
 void (async () => {
