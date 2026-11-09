@@ -69,7 +69,11 @@ export async function handleAnaliseRun(
     const mensagem = String(e instanceof Error ? e.message : e);
     if (/timeout|abort/i.test(mensagem)) {
       dglog('[analysis] timeout retornado ao renderer');
-      return { ok: false, erro: 'timeout' };
+      return { ok: false, erro: 'A análise demorou demais (timeout). Verifique se o Ollama/modelo está respondendo e tente novamente.' };
+    }
+    if (/fetch failed|ECONNREFUSED|ENOTFOUND|ollama|LLM/i.test(mensagem)) {
+      dglog('[analysis] dependencia LLM/Ollama: ' + mensagem);
+      return { ok: false, erro: 'Não foi possível falar com a IA (Ollama/LLM). Confirme que o Ollama está ativo e com modelo instalado, ou configure LLM_API_KEY.' };
     }
     dglog(`[analysis] erro: ${mensagem}`);
     return { ok: false, erro: mensagem };

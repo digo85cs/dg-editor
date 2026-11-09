@@ -704,8 +704,10 @@ async function selecionarPasta(path) {
 
   // Trocar pasta: 1Âº clique volta a "Analisando..." (mesmo com cache)
   delete $('analysis-content').dataset.jaAnalisou
-  if (cached) {
+  if (cached && cached.oQueE !== undefined) {
     renderizarAnalise(cached, true)
+  } else if (cached && cached.report) {
+    renderizarAnalise(cached.report, !!cached.fromCache)
   } else {
     $('analysis-content').innerHTML =
       '<p class="muted">Pasta aberta. Escolha Análise rápida ou Análise completa quando quiser analisar.</p>'
@@ -2020,37 +2022,51 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
   ativarAbaDireita('analise')
   try {
     const r = await window.api.analysisRun(root, force, escopo)
-    if (r?.ok === false) {
-      throw new Error(r.erro || 'falha na análise')
+    if (!r || r.ok === false) {
+      const msg = (r && (r.erro || r.error)) || 'falha na análise'
+      throw new Error(String(msg))
     }
-    renderizarAnalise(r.report, r.fromCache)
+    const payload = (r.result && typeof r.result === 'object') ? r.result : r
+    const report = payload && payload.report ? payload.report : (payload && typeof payload.oQueE === 'string' ? payload : null)
+    if (!report || typeof report !== 'object') {
+      $('analysis-content').innerHTML =
+        '<p class="muted">Análise concluída, mas sem dados para exibir (resposta incompleta).</p>' +
+        '<p class="muted">Tente novamente ou use Análise rápida. Se persistir, verifique o modelo/LLM ativo.</p>'
+      return
+    }
+    renderizarAnalise(report, !!payload.fromCache)
     $('analysis-content').dataset.escopo = escopo
     $('analysis-content').dataset.jaAnalisou = '1'
   } catch (err) {
+    const msg = String(err && err.message ? err.message : err)
+    const dicaOllama = /timeout|ollama|ECONNREFUSED|fetch failed|LLM_API_KEY|modelo/i.test(msg)
+      ? '<p class="muted">Dica: verifique se o Ollama está ativo (ollama.com, ex.: ollama pull llama3.2) ou configure LLM_API_KEY.</p>'
+      : '<p class="muted">Tente novamente. Se for análise completa, teste a análise rápida para isolar o problema.</p>'
     $('analysis-content').innerHTML =
-      '<p class="muted">Nao consegui analisar agora: ' +
-      escapar(String(err)) +
-      '</p><p class="muted">Dica: instale o Ollama (ollama.com) e baixe um modelo (ex.: ollama pull llama3.2), ou configure LLM_API_KEY no ambiente.</p>'
+      '<p class="muted">Nao consegui analisar agora: ' + escapar(msg) + '</p>' + dicaOllama
   } finally {
     $('analysis-progress').classList.add('hidden')
   }
 }
 
 function renderizarAnalise(report, fromCache) {
+  if (!report || typeof report !== 'object') {
+    $('analysis-content').innerHTML = '<p class="muted">Análise indisponível (dados ausentes).</p>'
+    return
+  }
   const badge = fromCache ? ' <span class="muted">(do cache)</span>' : ''
   let html = ''
   html += secao('O que é', report.oQueE || '—')
   html += secao('Stack', report.stack || '—')
   html += secao('Estrutura', report.estrutura || '—')
-  html += secaoLista('Pontos de atenção', report.pontosAtencao)
-  html += secaoLista('Sugestões', report.sugestoes)
+  html += secaoLista('Pontos de atenção', Array.isArray(report.pontosAtencao) ? report.pontosAtencao : [])
+  html += secaoLista('Sugestões', Array.isArray(report.sugestoes) ? report.sugestoes : [])
   if (report.provider) {
     html +=
       '<p class="muted">Analisado por: ' +
       escapar(report.provider) +
       (report.model ? ' (' + escapar(report.model) + ')' : '') +
-      ' — ' +
-      new Date(report.analyzedAt).toLocaleString('pt-BR') +
+      (report.analyzedAt ? ' — ' + new Date(report.analyzedAt).toLocaleString('pt-BR') : '') +
       badge +
       '</p>'
   }
@@ -3041,9 +3057,31 @@ async function atualizarGuardiao() {
   } catch { /* ignora */ }
 }
 
+let depStatusCache = null
+function atualizarIndicadorDeps(st) {
+  depStatusCache = st || depStatusCache
+  const d = depStatusCache
+  const alvo = document.getElementById('chat-provider')
+  if (!alvo || !d) return
+  const base = alvo.dataset.iaBase || alvo.textContent || 'IA: —'
+  alvo.dataset.iaBase = base
+  let dep = 'LLM: ?'
+  if (d.llmApiKey) dep = 'LLM: API key'
+  else if (d.ollama === 'ativo') dep = 'Ollama: ativo'
+  else if (d.ollama === 'offline') dep = 'Ollama: offline'
+  else dep = 'Ollama: não instalado'
+  alvo.textContent = base + ' · ' + dep
+  alvo.title = dep + (d.modelo && d.modelo !== 'desconhecido' ? ' · modelo: ' + d.modelo : '')
+}
+
 function atualizarBadgeProvedor(nome) {
   const alvo = document.getElementById('chat-provider')
-  if (alvo) alvo.textContent = 'IA: ' + nome
+  if (alvo) {
+    const txt = 'IA: ' + nome
+    alvo.dataset.iaBase = txt
+    alvo.textContent = txt
+    if (depStatusCache) atualizarIndicadorDeps(depStatusCache)
+  }
 }
 
 /** Toast DOM simples (canto inferior direito, auto-dismiss 5s). */
