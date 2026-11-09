@@ -23,6 +23,7 @@ import {
 import { streamOllamaChat, streamOpenAIChat } from './stream-chat'
 import { garantirSkillsPadrao, skillsRelevantes } from './skills'
 import { garantirAgentesPadrao, lerAgente } from './agentes'
+import { normalizarArgs, validarChamadaTool } from './tool-call-validation'
 
 /**
  * Agente do DG Editor: fila hibrida (OpenRouter → Ollama) com failover.
@@ -94,71 +95,6 @@ Regras:
 - NUNCA anunciar acao sem executar no mesmo turno.
 - NUNCA incluir o nome do modelo (ollama:/qwen/llama) no corpo da resposta.`
 
-/**
- * Modelos pequenos em CPU confundem o schema da tool com os argumentos,
- * achatando "type: object / properties / required" dentro do valor.
- * Esta funcao remove esses artefatos e mantem so os valores reais.
- */
-/** Ollama as vezes devolve arguments como STRING JSON. Normaliza para objeto. */
-function normalizarArgs(bruto: unknown): Record<string, unknown> {
-  if (!bruto) return {}
-  if (typeof bruto === 'string') {
-    const s = bruto.trim()
-    if (!s) return {}
-    try {
-      const p = JSON.parse(s)
-      if (p && typeof p === 'object' && !Array.isArray(p)) return p as Record<string, unknown>
-    } catch { /* nao e JSON valido */ }
-    return {}
-  }
-  if (typeof bruto === 'object' && !Array.isArray(bruto)) return bruto as Record<string, unknown>
-  return {}
-}
-function sanitizarArgs(
-  brutos: Record<string, unknown>,
-  schema: unknown
-): Record<string, unknown> {
-  const saida: Record<string, unknown> = {}
-  const props = (schema as { properties?: Record<string, { type?: string }> })?.properties || {}
-
-  // chaves que sao metadados de schema, jamais argumentos reais
-  const lixo = new Set(['type', 'description', 'properties', 'required', 'object', 'nil', '[]', 'Lista', 'lista'])
-
-  for (const [k, v] of Object.entries(brutos)) {
-    if (lixo.has(k)) continue
-    const def = props[k]
-
-    // se nao esta no schema, mas e um valor escalar valido, aceita
-    if (!def) {
-      if (v === null || v === undefined) continue
-      if (typeof v === 'object') {
-        // objeto aninhado de schema: descarta
-        const pareceSchema = typeof v === 'object' && v !== null &&
-          ('type' in (v as object) || 'properties' in (v as object))
-        if (pareceSchema) continue
-      }
-      saida[k] = v
-      continue
-    }
-
-    // coage ao tipo declarado
-    if (def.type === 'integer' || def.type === 'number') {
-      const n = typeof v === 'number' ? v : parseInt(String(v), 10)
-      if (!Number.isNaN(n)) saida[k] = n
-    } else if (def.type === 'string') {
-      if (typeof v === 'string') saida[k] = v
-      else if (v !== null && v !== undefined) saida[k] = String(v)
-    } else if (def.type === 'boolean') {
-      saida[k] = v === true || v === 'true'
-    } else if (def.type === 'array' && Array.isArray(v)) {
-      saida[k] = v
-    } else if (def.type === 'object' && typeof v === 'object' && v !== null) {
-      const pareceSchema = 'type' in (v as object) || 'properties' in (v as object)
-      if (!pareceSchema) saida[k] = v
-    }
-  }
-  return saida
-}
 /**
  * Modelos pequenos (3b) as vezes escrevem o tool_call como TEXTO em vez de
  * emitir tool_calls estruturado. Esta funcao detecta esse caso e devolve
@@ -445,12 +381,12 @@ async function rodarLoopComProvider(
     const r = await responderRodada(cfg, mensagens, toolsAgora, emit, opts?.signal)
     if (r.content) emit({ tipo: 'texto', texto: r.content.slice(0, 2000) })
 
-    let chamadas = r.tool_calls.map((c) => ({
-      function: {
-        name: c.function.name,
-        arguments: normalizarArgs(c.function.arguments)
-      }
-    }))
+    let chamadas = r.tool_calls
+      .map((c) => {
+        const name = typeof c.function?.name === 'string' ? c.function.name.trim() : ''
+        return { function: { name, arguments: normalizarArgs(c.function.arguments) } }
+      })
+      .filter((c) => c.function.name.length > 0 && c.function.name.length <= 128)
 
     dglog(
       '[agente] iter=' + i + ' provider=' + cfg.id +
@@ -517,9 +453,24 @@ async function rodarLoopComProvider(
         }
       }
       const ch = chamadas[ti]
-      const nome = ch.function?.name || ''
-      const schemaDaTool = tools.find((t) => t.name === nome)?.inputSchema
-      const args = sanitizarArgs(normalizarArgs(ch.function?.arguments), schemaDaTool)
+      const nomeBruto = ch.function?.name || ''
+      const argsBrutos = normalizarArgs(ch.function?.arguments)
+      const validado = validarChamadaTool(nomeBruto, argsBrutos, tools)
+      if (!validado.ok) {
+        dglog('[agente] tool_call inválida: ' + validado.erro)
+        emit({ tipo: 'tool', nome: nomeBruto || 'invalida', fase: 'fim', detalhe: validado.erro.slice(0, 180) })
+        passos.push({ tipo: 'tool', nome: nomeBruto || 'invalida', args: argsBrutos, resultado: validado.erro })
+        mensagens.push({
+          role: 'tool',
+          tool_name: nomeBruto || 'invalida',
+          tool_call_id: 'call_' + ti,
+          name: nomeBruto || 'invalida',
+          content: JSON.stringify({ ok: false, erro: validado.erro }).slice(0, 2000)
+        })
+        continue
+      }
+      const { tool, args } = validado
+      const nome = tool.name
       const sig = nome + '|' + JSON.stringify(args)
       if (assinaturasFeitas.has(sig)) {
         dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
