@@ -1,4 +1,4 @@
-/* DG Editor — layout IDE (Opção B) */
+﻿/* DG Editor â€” layout IDE (OpÃ§Ã£o B) */
 @import './styles/tokens.css';
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,7 +24,7 @@ body {
   justify-content: space-between;
   background: var(--dg-sidebar);
   border-bottom: 1px solid var(--dg-border-subtle);
-  /* drag só em .tb-drag-fill — senão o menubar não recebe clique */
+  /* drag sÃ³ em .tb-drag-fill â€” senÃ£o o menubar nÃ£o recebe clique */
   -webkit-app-region: no-drag;
   user-select: none;
   position: relative;
@@ -897,7 +897,7 @@ body {
   font-size: 12px;
   color: var(--dg-text);
 }
-.editor-tab.dirty:hover .tab-close::after { content: '×'; font-size: 12px; }
+.editor-tab.dirty:hover .tab-close::after { content: 'Ã—'; font-size: 12px; }
 
 #editor-breadcrumb {
   height: 24px;
@@ -1225,7 +1225,7 @@ body {
 .terminal-tab-pane .xterm { height: 100%; }
 .terminal-tab-pane .xterm-viewport { background: var(--dg-bg) !important; }
 
-/* Chat panel — agora no centro (max 720px via #pane-chat.center-pane-inner) */
+/* Chat panel â€” agora no centro (max 720px via #pane-chat.center-pane-inner) */
 #chat-panel {
   display: flex;
   flex-direction: column;
@@ -1530,7 +1530,7 @@ body.tema-claro .msg.user { color: #333333; }
   letter-spacing: 0.5px;
 }
 
-/* ---------- PRE-A: animações de estado do chat ---------- */
+/* ---------- PRE-A: animaÃ§Ãµes de estado do chat ---------- */
 #chat-panel, #pane-chat { position: relative; }
 .dg-chat-progress {
   position: absolute;
@@ -1645,7 +1645,7 @@ body.tema-claro .msg.user { color: #333333; }
     background: var(--dg-accent, #5b8def);
   }
   .dg-chat-progress::after {
-    content: 'processando…';
+    content: 'processandoâ€¦';
     position: absolute;
     right: 8px;
     top: 4px;
@@ -1823,17 +1823,8 @@ body.tema-claro .msg.user { color: #333333; }
 }
 .btn-primary:hover:not(:disabled) { opacity: 0.9; }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-secondary {
-  background: var(--dg-surface-raised);
-  color: var(--dg-text);
-  border: 1px solid var(--dg-border);
-  padding: 0 12px;
-  height: 28px;
-  border-radius: var(--dg-radius-sm);
-  font-size: var(--dg-fs-sm);
-  font-family: var(--fonte);
-  cursor: pointer;
-}
+
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-ghost {
   background: transparent;
   color: var(--dg-text-muted);
@@ -1959,7 +1950,7 @@ button:focus-visible { outline: 2px solid var(--dg-accent-brand); outline-offset
 
 .modal-box h3 { font-size: var(--dg-fs-lg); font-weight: 600; margin-bottom: 18px; }
 
-/* Janelas flutuantes (Config / Contas): arrastáveis e sempre à frente */
+/* Janelas flutuantes (Config / Contas): arrastÃ¡veis e sempre Ã  frente */
 .modal.modal-float {
   background: transparent;
   pointer-events: none;
@@ -2105,8 +2096,20 @@ button:focus-visible { outline: 2px solid var(--dg-accent-brand); outline-offset
 #modal-reinicio .modal-box { width: 440px; }
 #modal-reinicio h3 { margin: 0 0 10px; font-size: 15px; }
 #modal-reinicio p { margin: 0 0 18px; font-size: 13px; color: var(--dg-text-muted); line-height: 1.55; }
-.reinicio-acoes { display: flex; gap: 8px; justify-content: flex-end; }
+.reinicio-acoes { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.reinicio-acoes .btn-primary,
+.reinicio-acoes .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: max-content;
+  overflow: visible;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+}
 .reinicio-acoes .btn-primary { background: var(--dg-accent-brand); color: var(--dg-ink-on-accent); border: 0; font-weight: 600; height: auto; padding: 8px 16px; }
+.reinicio-acoes .btn-secondary { height: auto; padding: 8px 16px; }
 .reinicio-acoes .btn-ghost { border: 1px solid var(--dg-border); }
 
 .escolha-overlay {
