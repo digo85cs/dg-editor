@@ -394,11 +394,11 @@
       <div id="config-ollama" class="config-section"></div>
       <div id="config-adapta" class="config-section">
         <h4>Adapta ONE / Maestro</h4>
-        <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE + comando MCP para o Maestro. Detalhes: docs/adapta.md</p>
+        <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE + comando MCP para o Maestro. <span class="muted">Detalhes: docs/adapta.md</span></p>
         <p id="adapta-status-cfg" class="muted" style="margin:0 0 8px;font-size:12px"></p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" id="btn-adapta-copiar-cfg" class="btn-small">Copiar continuidade</button>
-          <button type="button" id="btn-adapta-gerar-cfg" class="btn-ghost">Gerar continuidade</button>
+        <div class="config-actions">
+          <button type="button" id="btn-adapta-gerar-cfg" class="btn-small">Gerar continuidade</button>
+          <button type="button" id="btn-adapta-copiar-cfg" class="btn-ghost">Copiar continuidade</button>
           <button type="button" id="btn-adapta-mcp-cfg" class="btn-ghost">Copiar comando MCP</button>
           <button type="button" id="btn-adapta-one-cfg" class="btn-ghost">Abrir ONE</button>
           <button type="button" id="btn-adapta-maestro-cfg" class="btn-ghost">Abrir Maestro</button>
@@ -407,19 +407,22 @@
       <div id="config-openclaw" class="config-section">
         <h4>OpenClaw</h4>
         <label class="config-field">Endpoint<br>
-          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" />
+          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" autocomplete="off" />
         </label>
         <label class="config-field">Model<br>
-          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" />
+          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" autocomplete="off" />
         </label>
-        <label class="config-field">Token (Gateway Bearer)<br>
-          <input type="password" id="oc-token" placeholder="colar token — nao fica em texto plano" style="width:100%" autocomplete="off" />
+        <label class="config-field">Gateway Bearer (token)<br>
+          <input type="password" id="oc-token" placeholder="Cole o token (não fica em texto plano)" style="width:100%" autocomplete="off" />
         </label>
         <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="config-actions">
           <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
           <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
         </div>
+      </div>
+      <div class="config-actions config-actions--footer">
+        <button type="button" id="btn-config-fechar" class="btn-ghost">Fechar</button>
       </div>    </div>
   </div>
 
