@@ -6,6 +6,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
+import { CodigoErro, criarErro } from '@shared/erros';
 import type { IpcResult } from './types';
 import type { FolderScanResult } from '@shared/types';
 
@@ -32,17 +33,25 @@ export function setFolderMainWindow(window: BrowserWindow | null): void {
 export async function handleFolderScan(
   _event: Electron.IpcMainInvokeEvent,
   root: unknown
-): Promise<FolderScanResult | { ok: false; erro: string }> {
+): Promise<FolderScanResult | IpcResult> {
   const r = exigirString(root, 'root');
-  if (isErroPayload(r)) return r;
+  if (isErroPayload(r)) return { ok: false, erro: criarErro(CodigoErro.ERR_FOLDER_NOT_FOUND, 'Caminho da pasta inválido.', 'Escolha outro caminho.', r.erro), erroTexto: r.erro };
   const seg = caminhoSeguro(r, r);
-  if (!seg.ok) return { ok: false, erro: seg.erro };
+  if (!seg.ok) return { ok: false, erro: criarErro(CodigoErro.ERR_FOLDER_NOT_FOUND, 'Pasta não encontrada.', 'Escolha outro caminho.', seg.erro), erroTexto: seg.erro };
 
   try {
     const { scanFolder } = await import('../scanner');
     return scanFolder(seg.abs);
   } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
+    const msg = String(e);
+    const notFound = /ENOENT|not found|nao encontrad|não encontrad/i.test(msg);
+    const perm = /EACCES|EPERM|permission|permiss/i.test(msg);
+    const erro = notFound
+      ? criarErro(CodigoErro.ERR_FOLDER_NOT_FOUND, 'Pasta não encontrada.', 'Escolha outro caminho.', msg)
+      : perm
+        ? criarErro(CodigoErro.ERR_FOLDER_PERMISSION, 'Sem permissão para acessar a pasta.', 'Verifique as permissões ou escolha outro caminho.', msg)
+        : criarErro(CodigoErro.ERR_FILE_READ, 'Não foi possível ler a pasta.', 'Tente novamente.', msg);
+    return { ok: false, erro, erroTexto: erro.mensagem };
   }
 }
 

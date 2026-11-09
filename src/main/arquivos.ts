@@ -189,17 +189,18 @@ export type EntradaDir = {
 export async function listarDiretorio(
   dir: string,
   pastas: string[]
-): Promise<{ ok: boolean; entradas?: EntradaDir[]; erro?: string }> {
+): Promise<{ ok: boolean; entradas?: EntradaDir[]; erro?: string; code?: string }> {
   if (!validarCaminho(dir, pastas)) {
     return { ok: false, erro: 'caminho fora das pastas permitidas' }
   }
   const abs = resolve(dir)
-  if (!(await pathExists(abs))) return { ok: false, erro: 'diretorio nao encontrado' }
+  if (!(await pathExists(abs))) return { ok: false, erro: 'diretorio nao encontrado', code: 'ENOENT' }
   let st
   try {
     st = await fsp.stat(abs)
   } catch (e) {
-    return { ok: false, erro: String((e as Error).message || e) }
+    const code = (e as NodeJS.ErrnoException).code || ''
+    return { ok: false, erro: String((e as Error).message || e), code }
   }
   if (!st.isDirectory()) return { ok: false, erro: 'nao e diretorio' }
 

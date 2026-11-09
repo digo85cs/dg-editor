@@ -9,10 +9,13 @@ import type { BrowserWindow, IpcMainEvent } from 'electron';
 // TIPOS BASE
 // ============================================================================
 
+import type { ErroApp } from '@shared/erros';
+
 /** Resultado base para todas as operacoes IPC */
 export interface IpcResult<T = unknown> {
   ok: boolean;
-  erro?: string;
+  erro?: string | ErroApp;
+  erroTexto?: string;
   dados?: T;
 }
 

@@ -112,11 +112,43 @@ describe('IPC contratos (shapes)', () => {
   it('analysis:run retorna {ok:false,erro} com Ollama offline sem API key', async () => {
     checkOllama.mockResolvedValue({ ativo: false })
     const { handleAnaliseRun } = await import('../analise')
+    const { isErroApp, CodigoErro } = await import('@shared/erros')
     const out = await handleAnaliseRun({} as never, 'C:/proj', false)
     expect(out.ok).toBe(false)
-    const err = out as { erro?: string }
-    expect(typeof err.erro).toBe('string')
-    expect(String(err.erro)).toMatch(/Ollama/)
+    const err = out as { erro?: unknown; erroTexto?: string }
+    expect(isErroApp(err.erro)).toBe(true)
+    if (isErroApp(err.erro)) {
+      expect(err.erro.codigo).toBe(CodigoErro.ERR_OLLAMA_OFFLINE)
+      expect(typeof err.erro.mensagem).toBe('string')
+      expect(err.erro.mensagem.length).toBeGreaterThan(0)
+    }
+    expect(typeof err.erroTexto).toBe('string')
+  })
+
+  it('analysis:run mapeia timeout para ErroApp (ERR_LLM_TIMEOUT)', async () => {
+    checkOllama.mockResolvedValue({ ativo: true })
+    runAnalysis.mockRejectedValue(new Error('timeout after 60s'))
+    const { handleAnaliseRun } = await import('../analise')
+    const { isErroApp, CodigoErro } = await import('@shared/erros')
+    const out = await handleAnaliseRun({} as never, 'C:/proj', false)
+    expect(out.ok).toBe(false)
+    expect(isErroApp((out as { erro?: unknown }).erro)).toBe(true)
+    if (isErroApp((out as { erro?: unknown }).erro)) expect(((out as { erro: { codigo: string } }).erro.codigo)).toBe(CodigoErro.ERR_LLM_TIMEOUT)
+  })
+
+  it('analysis:run mapeia resposta vazia para ErroApp (ERR_LLM_EMPTY_RESPONSE) sem dica Ollama', async () => {
+    checkOllama.mockResolvedValue({ ativo: true })
+    runAnalysis.mockRejectedValue(new Error('modelo respondeu vazio ou invalido'))
+    const { handleAnaliseRun } = await import('../analise')
+    const { isErroApp, CodigoErro } = await import('@shared/erros')
+    const out = await handleAnaliseRun({} as never, 'C:/proj', false)
+    expect(out.ok).toBe(false)
+    expect(isErroApp((out as { erro?: unknown }).erro)).toBe(true)
+    if (isErroApp((out as { erro?: unknown }).erro)) {
+      const e = (out as { erro: { codigo: string; mensagem: string } }).erro
+      expect(e.codigo).toBe(CodigoErro.ERR_LLM_EMPTY_RESPONSE)
+      expect(/ollama/i.test(e.mensagem)).toBe(false)
+    }
   })
 
   it('guardian:snapshot retorna GuardianSnapshot com números finitos', async () => {

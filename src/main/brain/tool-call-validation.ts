@@ -1,4 +1,5 @@
 import type { McpTool } from '../mcp/client'
+import { CodigoErro, criarErro, type ErroApp } from '@shared/erros'
 
 export interface ToolCallNorm {
   name: string
@@ -63,21 +64,36 @@ function schemaRequired(schema: unknown): string[] {
   return Array.isArray(r) ? r.filter((x): x is string => typeof x === 'string') : []
 }
 
+export function criarErroTool(codigo: CodigoErro, mensagem: string, detalhe?: string): ErroApp {
+  return criarErro(codigo, mensagem, 'Revise a chamada da ferramenta ou tente novamente.', detalhe)
+}
+
 export function validarChamadaTool(
   nome: string,
   args: Record<string, unknown>,
   toolsDisponiveis: McpTool[]
-): { ok: true; tool: McpTool; args: Record<string, unknown> } | { ok: false; erro: string } {
+): { ok: true; tool: McpTool; args: Record<string, unknown> } | { ok: false; erro: string; erroApp: ErroApp } {
   const n = (nome || '').trim()
-  if (!n) return { ok: false, erro: 'tool_call sem nome' }
-  if (n === 'agente_executar') return { ok: false, erro: 'tool agente_executar bloqueada no loop interno' }
+  if (!n) {
+    const e = criarErroTool(CodigoErro.ERR_TOOL_CALL_INVALID, 'Chamada de ferramenta sem nome.')
+    return { ok: false, erro: e.mensagem, erroApp: e }
+  }
+  if (n === 'agente_executar') {
+    const e = criarErroTool(CodigoErro.ERR_TOOL_CALL_INVALID, 'A ferramenta agente_executar está bloqueada no loop interno.')
+    return { ok: false, erro: e.mensagem, erroApp: e }
+  }
   const tool = toolsDisponiveis.find((t) => t.name === n)
   if (!tool) {
     const sugs = toolsDisponiveis.map((t) => t.name).slice(0, 12).join(', ')
-    return { ok: false, erro: 'tool desconhecida: ' + n + (sugs ? '. Disponíveis (amostra): ' + sugs : '') }
+    const e = criarErroTool(CodigoErro.ERR_TOOL_UNKNOWN, 'Ferramenta desconhecida: ' + n + '.', sugs ? 'Disponíveis (amostra): ' + sugs : undefined)
+    return { ok: false, erro: e.mensagem, erroApp: e }
   }
   const sane = sanitizarArgs(args, tool.inputSchema)
   const missing = schemaRequired(tool.inputSchema).filter((k) => sane[k] === undefined || sane[k] === null || sane[k] === '')
-  if (missing.length) return { ok: false, erro: 'argumentos obrigatórios ausentes para ' + n + ': ' + missing.join(', ') }
+  if (missing.length) {
+    const e = criarErroTool(CodigoErro.ERR_TOOL_CALL_INVALID, 'Faltam argumentos obrigatórios para ' + n + ': ' + missing.join(', ') + '.')
+    return { ok: false, erro: e.mensagem, erroApp: e }
+  }
   return { ok: true, tool, args: sane }
 }
+

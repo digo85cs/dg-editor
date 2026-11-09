@@ -13,7 +13,22 @@ import {
 } from '../arquivos';
 import { caminhoSeguro, isErroPayload, exigirString, exigirArrayStrings } from '../ipc-seguro';
 import { dglog } from '../dglog';
+import { CodigoErro, criarErro, type ErroApp } from '@shared/erros';
 import type { IpcResult } from './types';
+
+function falhaFs(msg: string, code?: string): { ok: false; erro: ErroApp; erroTexto: string } {
+  const c = (code || '') + ' ' + msg;
+  if (/ENOENT|nao encontrad|não encontrad/i.test(c)) {
+    const e = criarErro(CodigoErro.ERR_FOLDER_NOT_FOUND, 'Pasta ou arquivo não encontrado.', 'Escolha outro caminho.', msg);
+    return { ok: false, erro: e, erroTexto: e.mensagem };
+  }
+  if (/EACCES|EPERM|permiss|permission/i.test(c)) {
+    const e = criarErro(CodigoErro.ERR_FOLDER_PERMISSION, 'Sem permissão para acessar este local.', 'Verifique as permissões ou escolha outro caminho.', msg);
+    return { ok: false, erro: e, erroTexto: e.mensagem };
+  }
+  const e = criarErro(CodigoErro.ERR_FILE_READ, 'Não foi possível acessar o arquivo/pasta.', 'Tente novamente ou escolha outro caminho.', msg);
+  return { ok: false, erro: e, erroTexto: e.mensagem };
+}
 
 // ============================================================================
 // HANDLERS DE ARQUIVO
@@ -116,26 +131,26 @@ export async function handleArquivoListar(
   _event: Electron.IpcMainInvokeEvent,
   dir: unknown,
   pastas: unknown
-): Promise<IpcResult & { entradas?: unknown; erro?: string }> {
+): Promise<IpcResult & { entradas?: unknown }> {
   const d = exigirString(dir, 'dir');
-  if (isErroPayload(d)) return { ok: false, erro: d.erro };
+  if (isErroPayload(d)) return falhaFs(d.erro);
 
   const p = exigirArrayStrings(pastas, 'pastas');
-  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+  if (isErroPayload(p)) return falhaFs(p.erro);
 
   const seg = caminhoSeguro(d, p);
-  if (!seg.ok) return { ok: false, erro: seg.erro };
+  if (!seg.ok) return falhaFs(seg.erro);
 
   try {
     const result = await listarDiretorio(seg.abs, p);
     if (result.ok) {
       return { ok: true, entradas: result.entradas };
     }
-    return { ok: false, erro: result.erro || 'Erro ao listar diretorio' };
+    return falhaFs(result.erro || 'Erro ao listar diretorio', result.code);
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
     dglog(`[arquivo:listar] erro: ${msg}`);
-    return { ok: false, erro: msg };
+    return falhaFs(msg, (e as NodeJS.ErrnoException).code);
   }
 }
 

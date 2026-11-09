@@ -65,6 +65,7 @@ export interface RespostaAgente {
   tentativas?: TentativaProvider[]
   duracaoMs?: number
   ok?: boolean
+  erro?: { codigo: string; mensagem: string; acao?: string; detalhe?: string }
   propostas?: Array<{ id: string; path: string; absPath: string; unifiedDiff: string }>
 }
 
@@ -465,7 +466,7 @@ async function rodarLoopComProvider(
           tool_name: nomeBruto || 'invalida',
           tool_call_id: 'call_' + ti,
           name: nomeBruto || 'invalida',
-          content: JSON.stringify({ ok: false, erro: validado.erro }).slice(0, 2000)
+          content: JSON.stringify({ ok: false, erro: validado.erro, erroApp: validado.erroApp }).slice(0, 2400)
         })
         continue
       }
@@ -475,7 +476,7 @@ async function rodarLoopComProvider(
       if (assinaturasFeitas.has(sig)) {
         dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
         const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
-        return { ...fin, propostas: propostasAcc }
+        return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente repetiu a mesma ação e foi interrompido.', acao: 'Refine o pedido ou tente novamente.' } as any }
       }
       assinaturasFeitas.add(sig)
       dglog('[agente] tool ' + nome + ' ' + JSON.stringify(args).slice(0, 120))
@@ -554,7 +555,7 @@ async function rodarLoopComProvider(
 
   dglog('[agente] limite de iteracoes; sintetizando')
   const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
-  return { ...fin, propostas: propostasAcc }
+  return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente atingiu o limite de etapas.', acao: 'Divida o pedido em partes menores e tente novamente.' } as any }
 }
 
 export async function executarAgente(

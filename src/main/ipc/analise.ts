@@ -11,6 +11,7 @@ import { readRules, rulesExist, createRulesTemplate, writeRules } from '../dgrul
 import { caminhoSeguro, exigirString, exigirBoolean, isErroPayload } from '../ipc-seguro';
 import { dglog } from '../dglog';
 import type { EscopoAnalise } from '@shared/types';
+import { CodigoErro, criarErro, type ErroApp } from '@shared/erros';
 import type { IpcResult } from './types';
 
 // ============================================================================
@@ -27,6 +28,33 @@ export function setAnaliseMainWindow(window: BrowserWindow | null): void {
 // HANDLERS DE ANALIS
 // ============================================================================
 
+function falha(codigo: CodigoErro, mensagem: string, acao?: string, detalhe?: string): { ok: false; erro: ErroApp; erroTexto: string } {
+  const erro = criarErro(codigo, mensagem, acao, detalhe);
+  return { ok: false, erro, erroTexto: erro.mensagem };
+}
+
+function mapearErroAnalise(e: unknown): { ok: false; erro: ErroApp; erroTexto: string } {
+  const mensagem = String(e instanceof Error ? e.message : e);
+  if (/timeout|abort/i.test(mensagem)) {
+    dglog('[analysis] timeout retornado ao renderer');
+    return falha(CodigoErro.ERR_LLM_TIMEOUT, 'A análise demorou demais.', 'Verifique se o Ollama/modelo está respondendo e tente novamente.', mensagem);
+  }
+  if (/modelo respondeu vazio/i.test(mensagem)) {
+    return falha(CodigoErro.ERR_LLM_EMPTY_RESPONSE, 'A IA respondeu sem conteúdo útil.', 'Tente a análise rápida ou verifique o modelo ativo.', mensagem);
+  }
+  if (/resposta incompleta|report descartado|sem campos/i.test(mensagem)) {
+    return falha(CodigoErro.ERR_ANALYSIS_EMPTY, 'A análise não retornou dados suficientes para exibir.', 'Tente novamente com análise rápida.', mensagem);
+  }
+  if (/parse|json|invalido/i.test(mensagem) && !/modelo/i.test(mensagem)) {
+    return falha(CodigoErro.ERR_ANALYSIS_PARSE, 'Não foi possível interpretar a resposta da análise.', 'Tente novamente.', mensagem);
+  }
+  if (/model|modelo/i.test(mensagem) && /not found|missing|nao instalado|não instalado|pull/i.test(mensagem)) {
+    return falha(CodigoErro.ERR_OLLAMA_MODEL_MISSING, 'O modelo de IA necessário não está instalado.', 'Instale o modelo no Ollama (ex.: ollama pull llama3.2).', mensagem);
+  }
+  dglog(`[analysis] erro: ${mensagem}`);
+  return falha(CodigoErro.ERR_UNKNOWN, 'Não foi possível concluir a análise.', 'Tente novamente. Se persistir, confira o diagnóstico.', mensagem);
+}
+
 /**
  * Handler para executar analise
  */
@@ -35,9 +63,9 @@ export async function handleAnaliseRun(
   root: unknown,
   forceOrOptions: unknown,
   options?: unknown
-): Promise<IpcResult & { result?: unknown; erro?: string }> {
+): Promise<IpcResult & { result?: unknown }> {
   const r = exigirString(root, 'root');
-  if (isErroPayload(r)) return { ok: false, erro: r.erro };
+  if (isErroPayload(r)) return falha(CodigoErro.ERR_UNKNOWN, r.erro, undefined, r.erro);
 
   const optionsValue = options && typeof options === 'object'
     ? options
@@ -47,7 +75,7 @@ export async function handleAnaliseRun(
 
   const forceValue = typeof forceOrOptions === 'boolean' ? forceOrOptions : undefined;
   const f = exigirBoolean(forceValue, 'force', false);
-  if (isErroPayload(f)) return { ok: false, erro: f.erro };
+  if (isErroPayload(f)) return falha(CodigoErro.ERR_UNKNOWN, f.erro, undefined, f.erro);
 
   let escopoValue: unknown;
   if (optionsValue && 'escopo' in (optionsValue as object)) {
@@ -57,7 +85,7 @@ export async function handleAnaliseRun(
   const escopo: EscopoAnalise = escopoValue === 'completa' ? 'completa' : 'rapida';
 
   const seg = caminhoSeguro(r, r);
-  if (!seg.ok) return { ok: false, erro: seg.erro };
+  if (!seg.ok) return falha(CodigoErro.ERR_UNKNOWN, seg.erro, undefined, seg.erro);
 
   dglog('[analysis] handler acionado escopo=' + escopo);
 
@@ -66,26 +94,13 @@ export async function handleAnaliseRun(
     if (!ollama.ativo) {
       const temKey = !!(process.env.LLM_API_KEY || process.env.OPENAI_API_KEY);
       if (!temKey) {
-        return {
-          ok: false,
-          erro: 'Ollama não está rodando. Inicie "ollama serve" ou clique em "Iniciar Ollama" na barra de status.'
-        };
+        return falha(CodigoErro.ERR_OLLAMA_OFFLINE, 'O Ollama não está ativo.', 'Inicie "ollama serve" ou clique em Iniciar Ollama.');
       }
     }
     const result = await runAnalysis(seg.abs, escopo, f);
     return { ok: true, result };
   } catch (e) {
-    const mensagem = String(e instanceof Error ? e.message : e);
-    if (/timeout|abort/i.test(mensagem)) {
-      dglog('[analysis] timeout retornado ao renderer');
-      return { ok: false, erro: 'A análise demorou demais (timeout). Verifique se o Ollama/modelo está respondendo e tente novamente.' };
-    }
-    if (/fetch failed|ECONNREFUSED|ENOTFOUND|ollama|LLM/i.test(mensagem)) {
-      dglog('[analysis] dependencia LLM/Ollama: ' + mensagem);
-      return { ok: false, erro: 'Não foi possível falar com a IA (Ollama/LLM). Confirme que o Ollama está ativo e com modelo instalado, ou configure LLM_API_KEY.' };
-    }
-    dglog(`[analysis] erro: ${mensagem}`);
-    return { ok: false, erro: mensagem };
+    return mapearErroAnalise(e);
   }
 }
 
@@ -95,9 +110,9 @@ export async function handleAnaliseRun(
 export async function handleAnaliseChooseScope(
   _event: Electron.IpcMainInvokeEvent,
   mode: unknown
-): Promise<IpcResult & { response?: number; erro?: string }> {
+): Promise<IpcResult & { response?: number }> {
   if (mode !== 'choose-scope' && mode !== 'confirm-complete') {
-    return { ok: false, erro: 'modo de escolha de analise invalido' };
+    return falha(CodigoErro.ERR_UNKNOWN, 'Modo de escolha de análise inválido.', undefined, String(mode));
   }
 
   const options = mode === 'choose-scope'
@@ -133,7 +148,7 @@ export async function handleAnaliseChooseScope(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     dglog(`[analysis:choose-scope] erro: ${msg}`);
-    return { ok: false, erro: msg };
+    return falha(CodigoErro.ERR_UNKNOWN, 'Não foi possível abrir a escolha de escopo.', 'Tente novamente.', msg);
   }
 }
 

@@ -2024,6 +2024,26 @@ function ciclarAbas() {
   ativarAba(next.caminho)
 }
 
+// ---------- Erros tipados (Block 7) ----------
+const DG_CODIGOS_OLLAMA = new Set(['ERR_OLLAMA_OFFLINE', 'ERR_OLLAMA_MODEL_MISSING', 'ERR_LLM_TIMEOUT'])
+function dgIsErroApp(v) {
+  return !!v && typeof v === 'object' && typeof v.codigo === 'string' && typeof v.mensagem === 'string' && v.mensagem.trim().length > 0 && /^ERR_[A-Z0-9_]+$/.test(v.codigo)
+}
+function dgNormalizarErro(e, fallbackMsg) {
+  if (dgIsErroApp(e)) return e
+  if (e && typeof e === 'object' && dgIsErroApp(e.erro)) return e.erro
+  if (typeof e === 'string' && e.trim()) return { codigo: 'ERR_UNKNOWN', mensagem: e.trim() }
+  if (e && typeof e.erro === 'string' && e.erro.trim()) return { codigo: 'ERR_UNKNOWN', mensagem: e.erro.trim() }
+  return { codigo: 'ERR_UNKNOWN', mensagem: String(fallbackMsg || 'Ocorreu um erro.'), detalhe: String(e && e.message ? e.message : e || '') }
+}
+function mostrarErroTipado(erro, alvoId) {
+  const e = dgNormalizarErro(erro)
+  const alvo = $(alvoId || 'analysis-content')
+  if (!alvo) { mostrarToast(e.mensagem, 'erro'); return }
+  const acao = e.acao ? '<p class="muted"><strong>Ação:</strong> ' + escapar(e.acao) + '</p>' : ''
+  alvo.innerHTML = '<p class="muted"><strong>[' + escapar(e.codigo) + ']</strong> ' + escapar(e.mensagem) + '</p>' + acao
+}
+
 // ---------- Análise ----------
 function habilitarBotoesAnalise(habilitar) {
   const rapida = $('btn-analise-rapida')
@@ -2073,27 +2093,20 @@ async function rodarAnalise(root, escopo = 'rapida', force = false) {
   try {
     const r = await window.api.analysisRun(root, force, escopo)
     if (!r || r.ok === false) {
-      const msg = (r && (r.erro || r.error)) || 'falha na análise'
-      throw new Error(String(msg))
+      mostrarErroTipado(r || { codigo: 'ERR_UNKNOWN', mensagem: 'Falha na análise.' })
+      return
     }
     const payload = (r.result && typeof r.result === 'object') ? r.result : r
     const report = payload && payload.report ? payload.report : (payload && typeof payload.oQueE === 'string' ? payload : null)
     if (!report || typeof report !== 'object') {
-      $('analysis-content').innerHTML =
-        '<p class="muted">Análise concluída, mas sem dados para exibir (resposta incompleta).</p>' +
-        '<p class="muted">Tente novamente ou use Análise rápida. Se persistir, verifique o modelo/LLM ativo.</p>'
+      mostrarErroTipado({ codigo: 'ERR_ANALYSIS_EMPTY', mensagem: 'A análise não retornou dados suficientes para exibir.', acao: 'Tente novamente com análise rápida.' })
       return
     }
     renderizarAnalise(report, !!payload.fromCache)
     $('analysis-content').dataset.escopo = escopo
     $('analysis-content').dataset.jaAnalisou = '1'
   } catch (err) {
-    const msg = String(err && err.message ? err.message : err)
-    const dicaOllama = /timeout|ollama|ECONNREFUSED|fetch failed|LLM_API_KEY|modelo/i.test(msg)
-      ? '<p class="muted">Dica: verifique se o Ollama está ativo (ollama.com, ex.: ollama pull llama3.2) ou configure LLM_API_KEY.</p>'
-      : '<p class="muted">Tente novamente. Se for análise completa, teste a análise rápida para isolar o problema.</p>'
-    $('analysis-content').innerHTML =
-      '<p class="muted">Nao consegui analisar agora: ' + escapar(msg) + '</p>' + dicaOllama
+    mostrarErroTipado(err)
   } finally {
     $('analysis-progress').classList.add('hidden')
   }
@@ -2150,7 +2163,11 @@ async function buscarOndeEsta() {
   if (alvo) alvo.innerHTML = '<p class="muted">Buscando…</p>'
   try {
     const r = await window.api.invoke('whereis:ask', pastaAtual, q)
-    if (!r || r.ok === false) throw new Error(String((r && (r.erro || r.error)) || 'falha na busca'))
+    if (!r || r.ok === false) {
+      const e = dgNormalizarErro(r, 'Falha na busca.')
+      if (alvo) alvo.innerHTML = '<p class="muted"><strong>[' + escapar(e.codigo) + ']</strong> ' + escapar(e.mensagem) + '</p>' + (e.acao ? '<p class="muted">' + escapar(e.acao) + '</p>' : '')
+      return
+    }
     const result = r.result || {}
     const matches = Array.isArray(result.matches) ? result.matches : []
     if (!alvo) return
