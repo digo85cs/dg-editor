@@ -2181,3 +2181,88 @@ button {
     animation: none !important;
   }
 }
+
+/* -- REGRAS GERAIS (premium, drag+inline) -- */
+.regras-gerais {
+  --rg-bg: var(--bg-hover, #f3f3f6);
+  --rg-card-bg: var(--bg-painel, #ffffff);
+  --rg-card-border: var(--borda, #e4e4e8);
+  --rg-card-hover: var(--bg-hover, #f3f3f6);
+  --rg-text: var(--texto-primario, #1c1c1e);
+  --rg-muted: var(--texto-secundario, #6b6b75);
+  --rg-accent: var(--verde-status, #0A84FF);
+  --rg-danger: #e5484d;
+  --rg-radius: 10px;
+  --rg-gap: 10px;
+  padding: 16px 18px;
+  margin-top: 14px;
+  border-radius: 14px;
+  background: var(--rg-bg);
+  border: 1px solid var(--rg-card-border);
+}
+.regras-gerais__header { margin-bottom: 14px; }
+.regras-gerais__title-group { display: flex; align-items: baseline; gap: 10px; }
+.regras-gerais__title-group h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--rg-text); letter-spacing: -0.01em; }
+.regras-gerais__badge-count {
+  font-size: 11px; font-weight: 500; color: var(--rg-muted);
+  background: var(--rg-card-bg); border: 1px solid var(--rg-card-border);
+  padding: 2px 8px; border-radius: 999px;
+}
+.regras-gerais__subtitle { margin: 4px 0 0; font-size: 12.5px; color: var(--rg-muted); }
+.regras-gerais__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--rg-gap); }
+.regra-card {
+  display: grid; grid-template-columns: 20px 24px 1fr auto; align-items: center; gap: 12px;
+  padding: 12px 14px; background: var(--rg-card-bg);
+  border: 1px solid var(--rg-card-border); border-radius: var(--rg-radius);
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.regra-card:hover { background: var(--rg-card-hover); border-color: var(--borda-forte, #d4d4dc); }
+.regra-card.is-dragging { opacity: 0.4; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.regra-card.is-drag-over { border-color: var(--rg-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--rg-accent) 18%, transparent); }
+.regra-card.is-editing { border-color: var(--rg-accent); }
+.regra-card__handle { cursor: grab; color: var(--rg-muted); font-size: 16px; line-height: 1; user-select: none; opacity: 0.4; transition: opacity .15s; }
+.regra-card:hover .regra-card__handle, .regra-card__handle:focus-visible { opacity: 1; }
+.regra-card__handle:active { cursor: grabbing; }
+.regra-card__index {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; font-size: 11px; font-weight: 600;
+  color: var(--rg-muted); background: var(--rg-bg); border-radius: 6px;
+}
+.regra-card__content { min-width: 0; }
+.regra-card__title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--rg-text); margin-bottom: 3px; }
+.regra-card__badge { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: #0a7f43; background: #e6f6ec; padding: 1px 7px; border-radius: 4px; }
+.regra-card__desc { font-size: 12.5px; color: var(--rg-muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.regra-card__actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.regra-card:hover .regra-card__actions, .regra-card.is-editing .regra-card__actions, .regra-card:focus-within .regra-card__actions { opacity: 1; }
+@media (hover: none) { .regra-card__actions { opacity: 1; } }
+.rg-icon-btn {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent; border-radius: 7px;
+  cursor: pointer; color: var(--rg-muted); font-size: 14px;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.rg-icon-btn:hover, .rg-icon-btn:focus-visible { background: var(--rg-card-bg); border-color: var(--rg-card-border); color: var(--rg-text); outline: 2px solid color-mix(in srgb, var(--rg-accent) 35%, transparent); outline-offset: 1px; }
+.rg-icon-btn--danger:hover, .rg-icon-btn--danger:focus-visible { color: var(--rg-danger); border-color: color-mix(in srgb, var(--rg-danger) 35%, transparent); background: color-mix(in srgb, var(--rg-danger) 8%, transparent); }
+.regra-nova { margin-top: 14px; display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; align-items: start; }
+.regra-nova input, .regra-nova textarea, .regra-card__editor input, .regra-card__editor textarea {
+  font: inherit; font-size: 12.5px; padding: 8px 11px;
+  border: 1px solid var(--rg-card-border); border-radius: 8px;
+  background: var(--rg-card-bg); color: var(--rg-text); resize: vertical;
+}
+.regra-nova input:focus, .regra-nova textarea:focus, .regra-card__editor input:focus, .regra-card__editor textarea:focus {
+  outline: none; border-color: var(--rg-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent) 18%, transparent);
+}
+.regra-nova button[type="submit"] { font-size: 12.5px; font-weight: 600; padding: 8px 16px; border: 0; border-radius: 8px; background: var(--rg-accent); color: #fff; cursor: pointer; }
+.regra-card.is-editing .regra-card__title, .regra-card.is-editing .regra-card__desc { display: none; }
+.regra-card__editor { display: none; flex-direction: column; gap: 6px; grid-column: 3 / 4; }
+.regra-card.is-editing .regra-card__editor { display: flex; }
+.regra-card__editor-actions { display: flex; gap: 6px; margin-top: 4px; }
+.regra-card__editor-actions button { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+.regra-card__editor-actions .btn-save { background: var(--rg-accent); border: 0; color: #fff; }
+.regra-card__editor-actions .btn-cancel { background: transparent; border: 1px solid var(--rg-card-border); color: var(--rg-muted); }
+.regras-gerais__list:empty::before {
+  content: "Nenhuma regra cadastrada. Adicione a primeira abaixo.";
+  display: block; padding: 24px; text-align: center; font-size: 12.5px; color: var(--rg-muted);
+  border: 1px dashed var(--rg-card-border); border-radius: var(--rg-radius);
+}
+@media (max-width: 720px) { .regra-nova { grid-template-columns: 1fr; } .regra-card { grid-template-columns: 20px 1fr auto; } .regra-card__index { display: none; } }
