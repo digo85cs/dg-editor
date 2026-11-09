@@ -5,38 +5,18 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import type { IpcResult } from './types';
+import { guardianSnapshot, guardianResumo } from '../guardian';
 
 // ============================================================================
 // HANDLERS DE GUARDIAN
 // ============================================================================
 
-/**
- * Handler para obter snapshot do guardian
- */
-export function handleGuardianSnapshot(
-  _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string } {
-  try {
-    const { guardianSnapshot } = require('../guardian');
-    return guardianSnapshot();
-  } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
-  }
+export function handleGuardianSnapshot(_event: Electron.IpcMainInvokeEvent) {
+  return guardianSnapshot();
 }
 
-/**
- * Handler para obter resumo do guardian
- */
-export function handleGuardianResumo(
-  _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string } {
-  try {
-    const { guardianResumo } = require('../guardian');
-    return guardianResumo();
-  } catch (e: unknown) {
-    return { ok: false, erro: String(e) };
-  }
+export function handleGuardianResumo(_event: Electron.IpcMainInvokeEvent) {
+  return guardianResumo();
 }
 
 // ============================================================================
