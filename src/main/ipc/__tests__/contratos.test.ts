@@ -189,6 +189,22 @@ describe('IPC contratos (shapes)', () => {
     vi.unstubAllGlobals()
   })
 
+  it('deps:diagnostico retorna shape completo com chaves presentes', async () => {
+    ollamaAlive.mockResolvedValue(false)
+    ollamaInstalado.mockReturnValue(false)
+    const handlers = await handlersOf('../deps')
+    const fn = handlers.get('deps:diagnostico')
+    expect(typeof fn).toBe('function')
+    const out = (await Promise.race([fn!({} as never, null), new Promise((r) => setTimeout(() => r({ timeout: true }), 12000))])) as Record<string, unknown>
+    expect(out.timeout).not.toBe(true)
+    hasBool(out, 'llmApiKey')
+    for (const k of ['ollama', 'disco', 'permissaoPasta', 'encoding', 'build']) expect(isObj(out[k])).toBe(true)
+    expect(Array.isArray(((out.ollama as Record<string, unknown>).modelos))).toBe(true)
+    expect(typeof (out.ollama as Record<string, unknown>).modeloEscolhido).toBe('string')
+    expect(typeof (out.disco as Record<string, unknown>).espacoLivreMB).toBe('number')
+    expect(typeof (out.build as Record<string, unknown>).versao).toBe('string')
+  })
+
   it('deps:ollama:start retorna {ok,...st}', async () => {
     startOllama.mockResolvedValue({ ativo: true, instalado: true })
     const handlers = await handlersOf('../deps')
