@@ -12,6 +12,7 @@ import {
 } from './chat.js'
 import { ligarFerramentas } from './ferramentas-ui.js'
 import { tempoRelativoCommit } from './utils/format.js'
+import { escapar } from './utils/dom.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -75,12 +76,6 @@ function extIcon(nome) {
   const ext = m ? m[1] : ''
   const label = (ext || '·').slice(0, 3).toUpperCase()
   return `<span class="file-icon ext-${ext || 'txt'}">${label}</span>`
-}
-
-function escapar(s) {
-  const d = document.createElement('div')
-  d.textContent = s
-  return d.innerHTML
 }
 
 // ---------- Layout persistido ----------
