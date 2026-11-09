@@ -21,6 +21,7 @@ import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
 import { normalizarMensagensChat, bolhaHtml } from './features/chat/render.js'
+import { iniciarComposer } from './features/chat/composer.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -2118,13 +2119,9 @@ async function copiarPromptOrientador() {
 }
 
 $('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
-$('chat-send')?.addEventListener('click', () => void enviarMensagem())
-$('chat-input')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    void enviarMensagem()
-  }
-})
+function enviarMensagemUi() { void enviarMensagem() }
+$('chat-send')?.addEventListener('click', enviarMensagemUi)
+iniciarComposer($('chat-input'), { onEnviar: enviarMensagemUi })
 $('btn-prompt-orientador')?.addEventListener('click', () => abrirOrientadorPrompt())
 $('btn-prompt-fechar')?.addEventListener('click', () => fecharOrientadorPrompt())
 $('btn-prompt-melhorar')?.addEventListener('click', () => void melhorarPromptLocal())
