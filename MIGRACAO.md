@@ -89,3 +89,11 @@ Caminhos com espaço (ex.: `C:\dev\DG Editor`) podem quebrar `node-gyp`/toolchai
 - Dados de runtime do app (ex.: `%APPDATA%\DG Editor\config\regras-gerais.json`) **não** fazem parte do repositório.
 - `src/renderer/app.js.bak-block6` mantido como backup até validação visual do Block 6.
 - `package-lock.json` commitado para reprodutibilidade.
+
+## Boot: GPU desabilitada por padrão
+O Electron 33.2.1 pode não montar a janela com GPU habilitada em alguns drivers do Windows (sintoma: `npm run dev` inicia processos Electron, mas nenhum exibe `MainWindowTitle`; a janela não aparece). Com `--disable-gpu` a janela abre.
+
+Solução: `app.disableHardwareAcceleration()` em `src/main/index.ts`, **antes** de `aplicarIdentidadeDg()` / `app.whenReady()`.
+- Override: `DG_ENABLE_GPU=1 npm run dev`
+- Debug: `DG_GPU_DEBUG=1 npm run dev`
+- Testado historicamente com: Electron 33.2.1 / Chromium 130 (ambiente Windows do projeto).
