@@ -19,3 +19,9 @@ Contrato de decomposição do renderer (`src/renderer/app.js`). Módulos em `fea
 - **Residual / não movido em 8a-8c (decisão segura)**: refatorar `terminal.js` para `features/terminal/{xterm-init,keys,index}` exigiria reescrita com >10 dependências/coupling (DOM vivo xterm container/fit/ResizeObserver, PTY IPC, abas/grupos, layout, tema CSS vars, estado global do painel). Conforme regras, **não extrair**; manter `terminal.js` como módulo dedicado. `app.js` mantém wiring mínimo (`initTerminalPanel` lazy via `garantirTerminal`, botão/atalho Ctrl+`, integração menubar/layout). Teardown PTY: `kill` via IPC no main (`node-pty`); renderer faz dispose/unsub dos recursos xterm no módulo — sem duplicar processos; mudanças adicionais exigiriam verificação de `beforeunload` vs `apiTerm().kill` com cuidado.
 
 Atualizar este arquivo ao mover orquestração adicional.
+
+## Boot / GPU
+- GPU desabilitada por padrão (`app.disableHardwareAcceleration()` em `src/main/index.ts`, antes de `aplicarIdentidadeDg`/`app.whenReady`) por incompatibilidade observada com drivers Windows + Electron 33.2.1 (sintoma: processos iniciam, janela sem `MainWindowTitle`; `--disable-gpu` abre).
+- Override: `DG_ENABLE_GPU=1 npm run dev` (GPU estável).
+- Debug: `DG_GPU_DEBUG=1 npm run dev` (loga versões Electron/Chrome/Node).
+- `electron-vite dev`/HMR não injeta flag de GPU; o controle é no main.

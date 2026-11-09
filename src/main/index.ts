@@ -77,6 +77,16 @@ function limparInstanciaAberta(): void {
 // INICIALIZACAO DO ELECTRON
 // ============================================================================
 
+// GPU: desabilitada por padrão (driver/Chromium incompatível em alguns Windows).
+// Override: DG_ENABLE_GPU=1 (máquinas com GPU estável). Debug: DG_GPU_DEBUG=1.
+if (!process.env.DG_ENABLE_GPU) {
+  try { app.disableHardwareAcceleration(); } catch { /* ignore */ }
+}
+if (process.env.DG_GPU_DEBUG) {
+  console.log('[main] GPU desabilitada:', !process.env.DG_ENABLE_GPU);
+  console.log('[main] Electron:', process.versions.electron, 'Chrome:', process.versions.chrome, 'Node:', process.versions.node);
+}
+
 // Identidade DG Editor (sem marca Electron na UI / taskbar)
 aplicarIdentidadeDg();
 
