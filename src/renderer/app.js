@@ -16,6 +16,7 @@ import { escapar } from './utils/dom.js'
 import { iniciarGuardian } from './features/guardian/index.js'
 import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivos/git-helpers.js'
 import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
+import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -489,19 +490,10 @@ async function abrirWikiLink(alvo) {
 }
 
 function adicionarPasta(path) {
-  if (!state.pastasRecentes.includes(path)) state.pastasRecentes.push(path)
+  adicionarPastaState(path)
   renderizarPastas()
-  salvarPastas()
   void renderizarProjects(true)
   void atualizarStatusBar(path)
-}
-
-function caminhoSobPasta(caminho, raiz) {
-  const n = (s) => String(s || '').replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
-  const root = n(raiz)
-  const c = n(caminho)
-  if (!root || !c) return false
-  return c === root || c.startsWith(root + '\\')
 }
 
 async function escolherNovoCaminhoPasta(antigo) {
@@ -515,12 +507,7 @@ async function escolherNovoCaminhoPasta(antigo) {
       await selecionarPasta(novo)
       return
     }
-    const idx = state.pastasRecentes.indexOf(antigo)
-    if (idx >= 0) state.pastasRecentes[idx] = novo
-    else state.pastasRecentes.push(novo)
-    state.estadoArvore.delete(antigo)
-    if (state.pastaAtual === antigo) state.pastaAtual = novo
-    salvarPastas()
+    reapontarPastaState(antigo, novo)
     await renderizarPastas()
     void renderizarProjects(true)
     await selecionarPasta(novo)
@@ -573,36 +560,22 @@ async function removerPasta(path, opts) {
     !window.confirm(
       "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
     )
-  ) {
-    return
+  ) return
+  const res = removerPastaDoState(path)
+  if (!res) return
+  if (res.abaAtivaPerdida) {
+    editor?.limpar()
+    histAbas = []
+    histIdx = -1
+    atualizarBotoesHist()
   }
-  const idx = state.pastasRecentes.indexOf(path)
-  if (idx === -1) return
-  state.pastasRecentes.splice(idx, 1)
-  salvarPastas()
-
-  // Fechar state.abas cujos arquivos estavam sob a pasta removida
-  const paraFechar = state.abas.filter((a) => caminhoSobPasta(a.caminho, path)).map((a) => a.caminho)
-  for (const c of paraFechar) {
-    const i = state.abas.findIndex((x) => x.caminho === c)
-    if (i >= 0) state.abas.splice(i, 1)
-  }
-  if (paraFechar.length) {
-    if (!state.abaAtiva || !state.abas.some((a) => a.caminho === state.abaAtiva)) {
-      state.abaAtiva = null
-      editor?.limpar()
-      histAbas = []
-      histIdx = -1
-      atualizarBotoesHist()
-    }
+  if (res.abasFechadas.length) {
     renderizarAbas()
     atualizarBreadcrumb()
     atualizarEmpty()
     persistirAbas()
   }
-
-  if (state.pastaAtual === path) {
-    state.pastaAtual = null
+  if (res.eraPastaAtual) {
     const titulo = $('chat-title')
     if (titulo) titulo.textContent = 'Nenhuma pasta aberta'
     $('chat-send') && ($('chat-send').disabled = true)
@@ -610,36 +583,9 @@ async function removerPasta(path, opts) {
     garantirEmptyStateChat()
     histChat = null
   }
-
   await renderizarPastas()
   void renderizarProjects(true)
-  if (typeof atualizarStatusBar === 'function') {
-    void atualizarStatusBar(state.pastaAtual)
-  }
-}
-
-function salvarPastas() {
-  try {
-    localStorage.setItem('dg-pastas', JSON.stringify(state.pastasRecentes))
-  } catch (e) {
-    console.warn('[pastas] falha ao salvar localStorage:', e)
-  }
-}
-
-function carregarPastas() {
-  const salvas = localStorage.getItem('dg-pastas')
-  if (salvas) {
-    try {
-      const lista = JSON.parse(salvas)
-      if (Array.isArray(lista)) {
-        for (const p of lista) {
-          if (typeof p === 'string' && p && !state.pastasRecentes.includes(p)) {
-            state.pastasRecentes.push(p)
-          }
-        }
-      }
-    } catch { /* ignora */ }
-  }
+  if (typeof atualizarStatusBar === 'function') void atualizarStatusBar(state.pastaAtual)
 }
 
 /** Garante a raiz do projeto no Explorer (evita "Nenhuma pasta" no primeiro boot). */
