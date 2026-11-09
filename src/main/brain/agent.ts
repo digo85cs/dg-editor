@@ -458,15 +458,16 @@ async function rodarLoopComProvider(
       const argsBrutos = normalizarArgs(ch.function?.arguments)
       const validado = validarChamadaTool(nomeBruto, argsBrutos, tools)
       if (!validado.ok) {
-        dglog('[agente] tool_call inválida: ' + validado.erro)
-        emit({ tipo: 'tool', nome: nomeBruto || 'invalida', fase: 'fim', detalhe: validado.erro.slice(0, 180) })
-        passos.push({ tipo: 'tool', nome: nomeBruto || 'invalida', args: argsBrutos, resultado: validado.erro })
+        const vErr = validado as { ok: false; erro: string; erroApp?: unknown }
+        dglog('[agente] tool_call inválida: ' + vErr.erro)
+        emit({ tipo: 'tool', nome: nomeBruto || 'invalida', fase: 'fim', detalhe: vErr.erro.slice(0, 180) })
+        passos.push({ tipo: 'tool', nome: nomeBruto || 'invalida', args: argsBrutos, resultado: vErr.erro })
         mensagens.push({
           role: 'tool',
           tool_name: nomeBruto || 'invalida',
           tool_call_id: 'call_' + ti,
           name: nomeBruto || 'invalida',
-          content: JSON.stringify({ ok: false, erro: validado.erro, erroApp: validado.erroApp }).slice(0, 2400)
+          content: JSON.stringify({ ok: false, erro: vErr.erro, erroApp: vErr.erroApp }).slice(0, 2400)
         })
         continue
       }
