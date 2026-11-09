@@ -58,21 +58,6 @@
     ).join('')
   }
 
-  function cardsFrom(d) {
-    const oll = d.ollama || {}
-    const disc = d.disco || {}
-    const perm = d.permissaoPasta || {}
-    const enc = d.encoding || {}
-    const build = d.build || {}
-    return [
-      { id: 'ollama', titulo: 'Ollama', ok: !!oll.ativo || !!d.llmApiKey, status: oll.ativo ? 'Ativo' : (d.llmApiKey ? 'Offline (API key disponível)' : 'Offline'), detalhe: (oll.modelos && oll.modelos.length ? 'Modelos: ' + oll.modelos.slice(0, 3).join(', ') : (oll.modeloEscolhido ? 'Modelo: ' + oll.modeloEscolhido : '')), acao: (!oll.ativo && oll.instalado && !d.llmApiKey) ? 'Iniciar Ollama' : '', action: 'ollama-start' },
-      { id: 'licenca', titulo: 'Licença/API', ok: !!d.llmApiKey || !!oll.ativo, status: d.llmApiKey ? 'API key configurada' : (oll.ativo ? 'Ollama local ativo' : 'Sem LLM disponível'), detalhe: d.llmApiKey ? 'LLM_API_KEY/OPENAI_API_KEY presente.' : 'Configure uma API key ou inicie o Ollama.' },
-      { id: 'disco', titulo: 'Disco', ok: !!disc.ok, status: typeof disc.espacoLivreMB === 'number' ? Math.round(disc.espacoLivreMB / 1024 * 10) / 10 + ' GB livres' : 'Indisponível', detalhe: typeof disc.espacoMinimoMB === 'number' ? 'Mínimo recomendado: ' + disc.espacoMinimoMB + ' MB.' : '' },
-      { id: 'pasta', titulo: 'Pasta', ok: perm.pastaAtual ? !!perm.ok : null, status: perm.pastaAtual ? (perm.ok ? 'Acesso OK' : 'Sem permissão') : 'Nenhuma pasta atual', detalhe: perm.pastaAtual ? String(perm.pastaAtual) : 'Abra uma pasta no projeto.', acao: perm.pastaAtual && !perm.ok ? 'Escolher pasta' : '', action: 'folder-select' },
-      { id: 'encoding', titulo: 'Encoding', ok: typeof enc.achados === 'number' ? enc.achados === 0 : !!enc.ok, status: typeof enc.achados === 'number' ? (enc.achados === 0 ? '0 achados' : enc.achados + ' achado(s)') : 'Indisponível', detalhe: enc.ok ? 'UTF-8 sem BOM.' : 'Execute: npm run verificar:encoding', acao: enc.achados > 0 ? 'Rever encoding' : '', action: 'encoding-info' },
-      { id: 'build', titulo: 'Build', ok: !!build.ok, status: build.ok ? 'OK' : 'Não encontrado', detalhe: (build.versao ? 'v' + build.versao : '') + (build.timestamp ? ' · ' + new Date(build.timestamp).toLocaleString('pt-BR') : '') },
-    ]
-  }
 
   function render(d) {
     ultimo = d
@@ -85,18 +70,61 @@
     if (foot) foot.textContent = 'Última verificação: ' + new Date().toLocaleString('pt-BR') + (d.build && d.build.versao ? ' · build v' + d.build.versao : '')
   }
 
+  function comTimeout(promessa, ms, rotulo) {
+    return Promise.race([
+      promessa,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout ' + rotulo + ' após ' + ms + 'ms')), ms))
+    ])
+  }
+
+  function diagFallback(msg) {
+    return { llmApiKey: false, _erro: msg || '', ollama: { ok: false, ativo: false }, disco: { ok: false, espacoLivreMB: undefined }, permissaoPasta: { ok: false, pastaAtual }, encoding: { ok: false, achados: undefined }, build: { ok: false, versao: '' } }
+  }
+
+  function cardsFrom(d) {
+    const erroG = d && d._erro ? String(d._erro) : ''
+    const timed = (v, rot) => (erroG && /timeout/i.test(erroG) ? (rot || 'timeout') : v)
+    const oll = d.ollama || {}
+    const disc = d.disco || {}
+    const perm = d.permissaoPasta || {}
+    const enc = d.encoding || {}
+    const build = d.build || {}
+    const ollOk = !!oll.ativo || !!d.llmApiKey
+    const ollSt = erroG && /timeout/i.test(erroG) ? 'Timeout (4s)' : (oll.ativo ? 'Ativo' : (d.llmApiKey ? 'Offline (API key disponível)' : 'Offline'))
+    const discOk = typeof disc.espacoLivreMB === 'number' ? !!disc.ok : (erroG ? false : null)
+    const discSt = typeof disc.espacoLivreMB === 'number' ? Math.round(disc.espacoLivreMB / 1024 * 10) / 10 + ' GB livres' : (erroG ? timed('', 'Timeout (4s)') : 'Indisponível')
+    const pastaOk = perm.pastaAtual ? !!perm.ok : null
+    const pastaSt = perm.pastaAtual ? (perm.ok ? 'Acesso OK' : 'Sem permissão') : 'Nenhuma pasta atual'
+    const encN = typeof enc.achados === 'number' ? enc.achados : undefined
+    const encOk = encN !== undefined ? (encN === 0) : (erroG ? false : null)
+    const encSt = encN !== undefined ? (encN === 0 ? '0 achados' : encN + ' achado(s)') : (erroG ? 'Timeout/indisponível' : 'Indisponível')
+    const buildOk = !!build.ok
+    const buildSt = erroG && !build.versao ? 'Timeout/indisponível' : (build.ok ? 'OK' : 'Não encontrado')
+    return [
+      { id: 'ollama', titulo: 'Ollama', ok: ollOk, status: ollSt, detalhe: (oll.modelos && oll.modelos.length ? 'Modelos: ' + oll.modelos.slice(0, 3).join(', ') : (oll.modeloEscolhido ? 'Modelo: ' + oll.modeloEscolhido : (oll.instalado === false ? 'Não detectado' : ''))), acao: (!oll.ativo && oll.instalado && !d.llmApiKey) ? 'Iniciar Ollama' : (!ollOk && !erroG ? 'Rever' : ''), action: 'ollama-start' },
+      { id: 'licenca', titulo: 'Licença/API', ok: !!d.llmApiKey || !!oll.ativo, status: d.llmApiKey ? 'API key configurada' : (oll.ativo ? 'Ollama local ativo' : (erroG ? 'Indisponível' : 'Sem LLM disponível')), detalhe: d.llmApiKey ? 'LLM_API_KEY/OPENAI_API_KEY presente.' : 'Configure uma API key ou inicie o Ollama.' },
+      { id: 'disco', titulo: 'Disco', ok: discOk, status: discSt, detalhe: typeof disc.espacoMinimoMB === 'number' ? 'Mínimo recomendado: ' + disc.espacoMinimoMB + ' MB.' : (erroG ? erroG : '') },
+      { id: 'pasta', titulo: 'Pasta', ok: pastaOk, status: pastaSt, detalhe: perm.pastaAtual ? String(perm.pastaAtual) : 'Abra uma pasta no projeto.', acao: perm.pastaAtual && !perm.ok ? 'Escolher pasta' : '', action: 'folder-select' },
+      { id: 'encoding', titulo: 'Encoding', ok: encOk, status: encSt, detalhe: encOk ? 'UTF-8 sem BOM.' : (encN > 0 ? 'Execute: npm run verificar:encoding' : (erroG ? erroG : '')), acao: encN > 0 ? 'Rever encoding' : '', action: 'encoding-info' },
+      { id: 'build', titulo: 'Build', ok: buildOk, status: buildSt, detalhe: (build.versao ? 'v' + build.versao : '') + (build.timestamp ? ' · ' + new Date(build.timestamp).toLocaleString('pt-BR') : '') + (erroG && !build.versao ? ' · ' + erroG : '') },
+    ]
+  }
+
   async function verificar(force) {
     ensure()
     if (verificando) return
     verificando = true
+    const foot0 = $('dg-diag-foot')
+    if (foot0) foot0.textContent = 'Verificando…'
     if (force || !ultimo) renderSkeleton()
     try {
-      const d = await api.invoke('deps:diagnostico', pastaAtual)
-      render(d && typeof d === 'object' ? d : { llmApiKey: false, ollama: {}, disco: {}, permissaoPasta: {}, encoding: {}, build: {} })
+      const d = await comTimeout(api.invoke('deps:diagnostico', pastaAtual), 5000, 'diagnóstico')
+      render(d && typeof d === 'object' ? d : diagFallback('resposta inválida'))
     } catch (e) {
-      render({ llmApiKey: false, ollama: { ok: false }, disco: { ok: false }, permissaoPasta: { ok: false, pastaAtual }, encoding: { ok: false, achados: -1 }, build: { ok: false, versao: '' } })
+      const msg = String(e && e.message ? e.message : e)
+      render(diagFallback(msg))
       const foot = $('dg-diag-foot')
-      if (foot) foot.textContent = 'Falha ao verificar: ' + String(e && e.message ? e.message : e)
+      if (foot) foot.textContent = 'Falha: ' + msg + ' · ' + new Date().toLocaleString('pt-BR')
     } finally {
       verificando = false
     }
