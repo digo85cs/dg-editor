@@ -14,6 +14,7 @@ import { ligarFerramentas } from './ferramentas-ui.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
 import { iniciarGuardian } from './features/guardian/index.js'
+import { relPosix, badgeGitHtml, corGit } from './features/arquivos/git-helpers.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -945,29 +946,7 @@ function criarNoDir(ent, nivel) {
 /** @type {Map<string, string>} caminho relativo (posix) -> status git */
 const gitStatusMap = new Map()
 
-function relPosix(abs, raiz) {
-  const a = String(abs || '').replace(/\\/g, '/')
-  const r = String(raiz || '').replace(/\\/g, '/').replace(/\/$/, '')
-  if (a.toLowerCase().startsWith(r.toLowerCase() + '/')) return a.slice(r.length + 1)
-  return a.split('/').pop() || a
-}
 
-function badgeGitHtml(st) {
-  if (!st) return ''
-  const cor =
-    st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
-  return (
-    '<span class="git-badge" data-git="' +
-    escapar(st) +
-    '" style="color:' +
-    cor +
-    '" title="git ' +
-    escapar(st) +
-    '">' +
-    escapar(st) +
-    '</span>'
-  )
-}
 
 function renderDiffHtml(diffText) {
   const lines = String(diffText || '').split(/\r?\n/)
@@ -1338,8 +1317,7 @@ async function atualizarGitStatusArvore() {
       badge.dataset.git = st
       badge.textContent = st
       badge.title = 'git ' + st
-      badge.style.color =
-        st === 'M' ? '#c9a227' : st === 'A' ? '#2e7d4f' : st === 'D' ? '#b33a3a' : '#888'
+      badge.style.color = corGit(st)
     })
   } catch {
     /* */
