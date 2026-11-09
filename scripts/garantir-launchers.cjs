@@ -64,7 +64,6 @@ const SHIM_CMD = [
   'set "DG_ROOT=%~dp0..\\.."',
   'for %%I in ("%DG_ROOT%") do set "DG_ROOT=%%~fI"',
   'if /I "%~1"=="preview" goto :silent',
-  'if /I "%~1"=="dev" goto :silent',
   'node "%~dp0\\..\\electron-vite\\bin\\electron-vite.js" %*',
   'exit /b %ERRORLEVEL%',
   ':silent',
@@ -79,10 +78,10 @@ const { spawnSync } = require('child_process')
 const path = require('path')
 const root = path.resolve(__dirname, '..', '..')
 const arg = process.argv[2]
-if (arg === 'preview' || arg === 'dev') {
+if (arg === 'preview') {
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'iniciar-app.cjs')], {
     cwd: root,
-    stdio: 'ignore',
+    stdio: 'inherit',
     windowsHide: true,
     env: { ...process.env, DG_ROOT: process.env.DG_ROOT || root }
   })

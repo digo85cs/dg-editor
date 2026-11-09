@@ -77,9 +77,14 @@ if (!garantirBuild(raiz)) process.exit(1)
 const child = spawn(electronExe, [raiz, '--no-sandbox'], {
   cwd: raiz,
   env: { ...process.env, DG_ROOT: raiz },
-  detached: true,
-  stdio: 'ignore',
-  windowsHide: true
+  stdio: 'inherit',
+  windowsHide: false
 })
-child.unref()
-process.exit(0)
+child.on('error', (e) => {
+  console.error('[iniciar-app] falha ao iniciar Electron:', e && e.message ? e.message : e)
+  process.exit(1)
+})
+child.on('exit', (code, signal) => {
+  if (signal) process.exit(1)
+  process.exit(code == null ? 1 : code)
+})
