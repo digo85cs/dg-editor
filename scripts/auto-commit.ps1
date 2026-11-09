@@ -1,4 +1,4 @@
-Set-Location -LiteralPath 'C:\Users\digo8\OneDrive\CURSOR\DG Editor'
+Set-Location -LiteralPath 'C:\dev\DGEditor'
 $git = 'C:\Program Files\Git\bin\git.exe'
 & $git add -A
 $status = & $git status --porcelain
