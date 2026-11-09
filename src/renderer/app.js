@@ -14,7 +14,8 @@ import { ligarFerramentas } from './ferramentas-ui.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
 import { iniciarGuardian } from './features/guardian/index.js'
-import { relPosix, badgeGitHtml, corGit } from './features/arquivos/git-helpers.js'
+import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivos/git-helpers.js'
+import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -34,8 +35,6 @@ let histAbas = []
 let histIdx = -1
 // state.vaultRaiz: state.state.vaultRaiz
 
-const CHEV =
-  '<span class="chevron"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>'
 
 function pastasPermitidas() {
   const s = new Set(state.pastasRecentes)
@@ -768,75 +767,18 @@ function raizWorkspaceDe(caminho) {
   return state.pastaAtual
 }
 
+function treeDeps() {
+  return {
+    renderizarPastas,
+    carregarFilhos,
+    selecionarPasta,
+    criarBotaoRemoverPasta,
+    nomeArquivo,
+  }
+}
+
 async function renderizarArvoreEm(lista) {
-  if (!lista) return
-  lista.innerHTML = ''
-  if (state.pastasRecentes.length === 0) {
-    lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
-    return
-  }
-  const promessasFilhos = []
-  for (const p of state.pastasRecentes) {
-    const root = document.createElement('div')
-    root.className = 'tree-root' + (p === state.pastaAtual ? ' selected' : '')
-    root.dataset.path = p
-    const st = state.estadoArvore.get(p) || { expandida: false, filhosCarregados: false }
-    state.estadoArvore.set(p, st)
-
-    const header = document.createElement('div')
-    header.className = 'tree-root-header'
-    header.dataset.path = p
-    header.dataset.tipo = 'dir'
-    header.innerHTML =
-      CHEV +
-      '<span class="file-icon">📁</span><span class="tab-name" style="overflow:hidden;text-overflow:ellipsis">' +
-      escapar(nomeArquivo(p)) +
-      '</span>'
-    header.title = p
-    header.appendChild(criarBotaoRemoverPasta(p))
-    const chev = header.querySelector('.chevron')
-    if (st.expandida) chev.classList.add('open')
-
-    const children = document.createElement('div')
-    children.className = 'tree-children' + (st.expandida ? ' open' : '')
-
-    header.addEventListener('click', async (e) => {
-      if (e.target.closest('.pasta-remover')) return
-      if (state.carregandoNos.has(children)) return
-      const noChevron = !e.target.closest('.chevron')
-      // Pasta já expandida + clique no nome/ícone → selecionarPasta (sem re-render).
-      if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
-        selecionarPasta(p)
-        return
-      }
-      // Expandir / retrair: só classe 'open'. NÃO limpar DOM. NÃO mudar chat.
-      st.expandida = !st.expandida
-      chev.classList.toggle('open', st.expandida)
-      children.classList.toggle('open', st.expandida)
-      if (!st.expandida) return
-      if (children.childElementCount > 0) return
-      state.carregandoNos.add(children)
-      try {
-        await carregarFilhos(p, children, 1)
-      } finally {
-        state.carregandoNos.delete(children)
-      }
-    })
-    root.appendChild(header)
-    root.appendChild(children)
-    lista.appendChild(root)
-
-    // Re-render: leituras em paralelo (sem await no loop).
-    if (st.expandida && children.childElementCount === 0) {
-      state.carregandoNos.add(children)
-      promessasFilhos.push(
-        carregarFilhos(p, children, 1)
-          .catch(() => false)
-          .finally(() => state.carregandoNos.delete(children))
-      )
-    }
-  }
-  if (promessasFilhos.length) await Promise.all(promessasFilhos)
+  return _renderizarArvoreEm(lista, treeDeps())
 }
 
 function abaFilesVisivel() {
@@ -908,43 +850,9 @@ async function carregarFilhos(dir, container, nivel) {
 }
 
 function criarNoDir(ent, nivel) {
-  const wrap = document.createElement('div')
-  const row = document.createElement('div')
-  row.className = 'tree-item'
-  row.style.paddingLeft = 8 + nivel * 16 + 'px'
-  row.innerHTML = CHEV + '<span class="file-icon">📁</span><span>' + escapar(ent.nome) + '</span>'
-  row.title = ent.caminho
-  row.dataset.path = ent.caminho
-  row.dataset.tipo = 'dir'
-  const kids = document.createElement('div')
-  kids.className = 'tree-children'
-  let aberto = false
-  let carregado = false
-  row.addEventListener('click', async (e) => {
-    e.stopPropagation()
-    if (state.carregandoNos.has(kids)) return
-    aberto = !aberto
-    row.querySelector('.chevron').classList.toggle('open', aberto)
-    kids.classList.toggle('open', aberto)
-    if (!aberto) return
-    if (carregado || kids.childElementCount > 0) {
-      carregado = kids.childElementCount > 0
-      return
-    }
-    state.carregandoNos.add(kids)
-    try {
-      carregado = await carregarFilhos(ent.caminho, kids, nivel + 1)
-    } finally {
-      state.carregandoNos.delete(kids)
-    }
-  })
-  wrap.appendChild(row)
-  wrap.appendChild(kids)
-  return wrap
+  return _criarNoDir(ent, nivel, { carregarFilhos })
 }
 
-/** @type {Map<string, string>} caminho relativo (posix) -> status git */
-const gitStatusMap = new Map()
 
 
 
@@ -1325,35 +1233,13 @@ async function atualizarGitStatusArvore() {
 }
 
 function criarNoFile(ent, nivel) {
-  const row = document.createElement('div')
-  row.className = 'tree-item'
-  row.style.paddingLeft = 8 + nivel * 16 + 16 + 'px'
-  const raiz = raizWorkspaceDe(ent.caminho) || state.pastaAtual
-  const rel = raiz ? relPosix(ent.caminho, raiz) : ''
-  const st = rel ? gitStatusMap.get(rel) : null
-  row.innerHTML =
-    extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>' + badgeGitHtml(st)
-  row.title = ent.caminho
-  row.dataset.path = ent.caminho
-  row.dataset.tipo = 'file'
-  row.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (e.target?.closest?.('.git-badge')) {
-      void abrirPainelDiff(ent.caminho)
-      return
-    }
-    if (!ent.editavel) {
-      alert('Extensão não editável: ' + ent.nome)
-      return
-    }
-    document.querySelectorAll('.tree-item.active').forEach((el) => el.classList.remove('active'))
-    row.classList.add('active')
-    const rz = raizWorkspaceDe(ent.caminho)
-    if (rz) definirContextoPasta(rz)
-    abrirArquivoNaAba(ent.caminho)
-    if (st) void abrirPainelDiff(ent.caminho)
+  return _criarNoFile(ent, nivel, {
+    extIcon,
+    raizWorkspaceDe,
+    definirContextoPasta,
+    abrirArquivoNaAba,
+    abrirPainelDiff,
   })
-  return row
 }
 
 $('btn-refresh-tree')?.addEventListener('click', () => {
