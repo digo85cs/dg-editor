@@ -20,15 +20,15 @@ const $ = (id) => document.getElementById(id)
 import { state, setPastaAtual } from './state/app-state.js'
 ligarFerramentas(() => state.pastaAtual)
 /** @type {{ caminho: string, nome: string, dirty: boolean }[]} */
-let abas = []
-let abaAtiva = null
+state.state.abas = state.state.abas || []
+state.state.abaAtiva = state.state.abaAtiva ?? null
 /** @type {ReturnType<typeof criarEditor> | null} */
 let editor = null
 let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
 /** #files-list precisa re-render quando a aba Files for ativada. */
 let filesListaSuja = false
-/** Histórico de navegação de abas (tb-voltar / tb-avancar). */
+/** Histórico de navegação de state.abas (tb-voltar / tb-avancar). */
 let histAbas = []
 let histIdx = -1
 // state.vaultRaiz: state.state.vaultRaiz
@@ -410,7 +410,7 @@ async function abrirVault() {
   if (sec) sec.hidden = false
   const st = $('vault-status')
   if (st) st.textContent = nomeArquivo(r.raiz) + ' · ' + (r.total || 0) + ' notas'
-  await atualizarPainelVault(abaAtiva)
+  await atualizarPainelVault(state.abaAtiva)
 }
 
 async function fecharVault() {
@@ -479,7 +479,7 @@ async function abrirWikiLink(alvo) {
     alert('Abra um vault para resolver [[links]].')
     return
   }
-  const r = await window.api.invoke('vault:resolver-link', alvo, abaAtiva || undefined)
+  const r = await window.api.invoke('vault:resolver-link', alvo, state.abaAtiva || undefined)
   if (!r?.path) {
     alert('Nota não encontrada: [[' + alvo + ']]')
     return
@@ -581,15 +581,15 @@ async function removerPasta(path, opts) {
   state.pastasRecentes.splice(idx, 1)
   salvarPastas()
 
-  // Fechar abas cujos arquivos estavam sob a pasta removida
-  const paraFechar = abas.filter((a) => caminhoSobPasta(a.caminho, path)).map((a) => a.caminho)
+  // Fechar state.abas cujos arquivos estavam sob a pasta removida
+  const paraFechar = state.abas.filter((a) => caminhoSobPasta(a.caminho, path)).map((a) => a.caminho)
   for (const c of paraFechar) {
-    const i = abas.findIndex((x) => x.caminho === c)
-    if (i >= 0) abas.splice(i, 1)
+    const i = state.abas.findIndex((x) => x.caminho === c)
+    if (i >= 0) state.abas.splice(i, 1)
   }
   if (paraFechar.length) {
-    if (!abaAtiva || !abas.some((a) => a.caminho === abaAtiva)) {
-      abaAtiva = null
+    if (!state.abaAtiva || !state.abas.some((a) => a.caminho === state.abaAtiva)) {
+      state.abaAtiva = null
       editor?.limpar()
       histAbas = []
       histIdx = -1
@@ -1045,7 +1045,7 @@ async function previewDiffNoEditor(pendente) {
   }
   // abre o arquivo no editor (antes) se ainda nao estiver
   const abs = r.absPath || pendente.absPath || pendente.path
-  if (abs && abaAtiva !== abs) {
+  if (abs && state.abaAtiva !== abs) {
     try {
       await abrirArquivoNaAba(abs)
     } catch {
@@ -1150,9 +1150,9 @@ async function pedirOpenClawUi() {
   const prompt = window.prompt('Pedido para o OpenClaw (edicoes voltam como diff para aprovacao):')
   if (prompt == null || !String(prompt).trim()) return
   const arquivosAbertos = []
-  for (const a of abas) {
+  for (const a of state.abas) {
     const item = { path: a.caminho }
-    if (a.caminho === abaAtiva && editor) {
+    if (a.caminho === state.abaAtiva && editor) {
       item.conteudo = editor.getConteudo()
       if (editor.getSelecao) {
         const sel = editor.getSelecao()
@@ -1187,7 +1187,7 @@ async function finalizarApplyPendente(r, id) {
   ocPendentes = ocPendentes.filter((p) => p.id !== id)
   agentPropostas = agentPropostas.filter((p) => p.id !== id)
   mostrarPropostasAgent(agentPropostas)
-  if (r.absPath && abaAtiva === r.absPath && editor) {
+  if (r.absPath && state.abaAtiva === r.absPath && editor) {
     const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
     if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
   }
@@ -1540,45 +1540,45 @@ setInterval(() => {
 // ---------- Abas + editor ----------
 function persistirAbas() {
   localStorage.setItem(
-    'dg-abas',
-    JSON.stringify({ abas: abas.map((a) => a.caminho), ativa: abaAtiva })
+    'dg-state.abas',
+    JSON.stringify({ state.abas: state.abas.map((a) => a.caminho), ativa: state.abaAtiva })
   )
 }
 
 async function restaurarAbas() {
   try {
-    const raw = localStorage.getItem('dg-abas')
+    const raw = localStorage.getItem('dg-state.abas')
     if (!raw) return
     const data = JSON.parse(raw)
-    const lista = data.abas || []
+    const lista = data.state.abas || []
     for (const c of lista) {
       const existe = await window.api.invoke('arquivo:existe', c, pastasPermitidas())
       if (existe.ok && existe.existe) {
         const r = await window.api.invoke('arquivo:ler', c, pastasPermitidas())
         if (r.ok) {
-          abas.push({ caminho: c, nome: nomeArquivo(c), dirty: false })
+          state.abas.push({ caminho: c, nome: nomeArquivo(c), dirty: false })
           // conteúdo fica no editor só para a ativa; dirty false
         }
       }
     }
-    if (abas.length) {
-      const alvo = data.ativa && abas.find((a) => a.caminho === data.ativa) ? data.ativa : abas[0].caminho
+    if (state.abas.length) {
+      const alvo = data.ativa && state.abas.find((a) => a.caminho === data.ativa) ? data.ativa : state.abas[0].caminho
       await ativarAba(alvo)
     }
     renderizarAbas()
   } catch (e) {
-    console.warn('[abas] restaurar:', e)
+    console.warn('[state.abas] restaurar:', e)
   }
 }
 
 function renderizarAbas() {
   const bar = $('editor-tabs')
   bar.innerHTML = ''
-  for (const a of abas) {
+  for (const a of state.abas) {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className =
-      'editor-tab' + (a.caminho === abaAtiva ? ' active' : '') + (a.dirty ? ' dirty' : '')
+      'editor-tab' + (a.caminho === state.abaAtiva ? ' active' : '') + (a.dirty ? ' dirty' : '')
     btn.innerHTML =
       extIcon(a.nome) +
       '<span class="tab-name">' +
@@ -1596,22 +1596,22 @@ function renderizarAbas() {
     })
     bar.appendChild(btn)
   }
-  // #tabbar fora de #app: esconde quando não há abas (Cursor)
+  // #tabbar fora de #app: esconde quando não há state.abas (Cursor)
   const tabbar = $('tabbar')
-  if (tabbar) tabbar.style.display = abas.length ? 'flex' : 'none'
+  if (tabbar) tabbar.style.display = state.abas.length ? 'flex' : 'none'
   atualizarEmpty()
 }
 
 function atualizarEmpty() {
   const empty = $('editor-empty')
   if (!empty) return
-  empty.classList.toggle('hidden', !!abaAtiva)
+  empty.classList.toggle('hidden', !!state.abaAtiva)
 }
 
 function atualizarBreadcrumb() {
   const bc = $('editor-breadcrumb')
   if (!bc) return
-  bc.textContent = abaAtiva ? caminhoRelativo(abaAtiva) : ''
+  bc.textContent = state.abaAtiva ? caminhoRelativo(state.abaAtiva) : ''
 }
 
 function extDe(caminho) {
@@ -1705,7 +1705,7 @@ function atualizarToolbarPreview(caminho) {
 }
 
 function toggleMdPreview() {
-  const caminho = abaAtiva
+  const caminho = state.abaAtiva
   if (!ehMarkdown(caminho) || !editor) return
   mdPreviewOn = !mdPreviewOn
   const host = $('editor-host')
@@ -1795,14 +1795,14 @@ async function irHistAbas(delta) {
   histIdx = novo
   try {
     await abrirArquivoNaAba(alvo)
-    // arquivo apagado / falha de IPC: não ficou em abas
-    if (!abas.some((a) => a.caminho === alvo)) {
+    // arquivo apagado / falha de IPC: não ficou em state.abas
+    if (!state.abas.some((a) => a.caminho === alvo)) {
       histAbas.splice(novo, 1)
       histIdx = Math.min(novo, histAbas.length - 1)
       if (histAbas.length === 0) histIdx = -1
     }
   } catch (e) {
-    console.warn('[hist-abas]', e)
+    console.warn('[hist-state.abas]', e)
     histAbas.splice(novo, 1)
     histIdx = Math.min(novo, histAbas.length - 1)
     if (histAbas.length === 0) histIdx = -1
@@ -1812,15 +1812,15 @@ async function irHistAbas(delta) {
 
 async function abrirArquivoNaAba(caminho) {
   ativarAbaCentro('editor')
-  const existente = abas.find((a) => a.caminho === caminho)
+  const existente = state.abas.find((a) => a.caminho === caminho)
   if (existente) {
     await ativarAba(caminho)
     return
   }
   if (ehImagemExt(caminho)) {
     syncDirtyAtiva()
-    abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
-    abaAtiva = caminho
+    state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
+    state.abaAtiva = caminho
     registrarHistAba(caminho)
     if (!editor) initEditor()
     esconderImagem()
@@ -1839,20 +1839,20 @@ async function abrirArquivoNaAba(caminho) {
   }
   // sincronizar dirty da aba atual antes de trocar
   syncDirtyAtiva()
-  abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false })
+  state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false })
   await ativarAba(caminho, r.conteudo)
   persistirAbas()
 }
 
 function syncDirtyAtiva() {
-  if (!abaAtiva || !editor) return
-  const a = abas.find((x) => x.caminho === abaAtiva)
+  if (!state.abaAtiva || !editor) return
+  const a = state.abas.find((x) => x.caminho === state.abaAtiva)
   if (a) a.dirty = editor.isDirty()
 }
 
 async function ativarAba(caminho, conteudoPrevio) {
   syncDirtyAtiva()
-  abaAtiva = caminho
+  state.abaAtiva = caminho
   registrarHistAba(caminho)
   ativarAbaCentro('editor')
   if (ehImagemExt(caminho)) {
@@ -1877,7 +1877,7 @@ async function ativarAba(caminho, conteudoPrevio) {
   }
   if (!editor) initEditor()
   editor.abrir(caminho, conteudo)
-  const a = abas.find((x) => x.caminho === caminho)
+  const a = state.abas.find((x) => x.caminho === caminho)
   if (a) a.dirty = false
   renderizarAbas()
   atualizarBreadcrumb()
@@ -1919,31 +1919,31 @@ $('btn-dirty-discard')?.addEventListener('click', () => fecharDirtyModal('descar
 $('btn-dirty-save')?.addEventListener('click', () => fecharDirtyModal('salvar'))
 
 async function fecharAba(caminho) {
-  const a = abas.find((x) => x.caminho === caminho)
+  const a = state.abas.find((x) => x.caminho === caminho)
   if (!a) return
-  if (caminho === abaAtiva && editor) a.dirty = editor.isDirty()
+  if (caminho === state.abaAtiva && editor) a.dirty = editor.isDirty()
   if (a.dirty) {
     const resp = await perguntarDirty(caminho)
     if (resp === 'cancelar') return
     if (resp === 'salvar') {
-      if (caminho === abaAtiva) {
+      if (caminho === state.abaAtiva) {
         const ok = await salvarArquivoAtivo()
         if (!ok) return
       } else {
         // precisa ativar para salvar conteúdo atual no editor — se não é ativa e dirty, conteúdo perdido
-        // abas dirty só se estavam ativas e editadas; ao trocar syncamos. OK.
+        // state.abas dirty só se estavam ativas e editadas; ao trocar syncamos. OK.
         await ativarAba(caminho)
         const ok = await salvarArquivoAtivo()
         if (!ok) return
       }
     }
   }
-  const idx = abas.findIndex((x) => x.caminho === caminho)
-  abas.splice(idx, 1)
-  if (abaAtiva === caminho) {
-    abaAtiva = null
-    if (abas.length) {
-      const next = abas[Math.min(idx, abas.length - 1)]
+  const idx = state.abas.findIndex((x) => x.caminho === caminho)
+  state.abas.splice(idx, 1)
+  if (state.abaAtiva === caminho) {
+    state.abaAtiva = null
+    if (state.abas.length) {
+      const next = state.abas[Math.min(idx, state.abas.length - 1)]
       await ativarAba(next.caminho)
     } else {
       editor?.limpar()
@@ -1961,21 +1961,21 @@ async function fecharAba(caminho) {
 }
 
 async function salvarArquivoAtivo() {
-  if (!abaAtiva || !editor) return false
+  if (!state.abaAtiva || !editor) return false
   const conteudo = editor.getConteudo()
   let r
-  if (state.vaultRaiz && caminhoNoVault(abaAtiva) && ehMarkdown(abaAtiva)) {
-    r = await window.api.invoke('vault:salvar', abaAtiva, conteudo, pastasPermitidas())
-    if (r?.ok) void atualizarPainelVault(abaAtiva)
+  if (state.vaultRaiz && caminhoNoVault(state.abaAtiva) && ehMarkdown(state.abaAtiva)) {
+    r = await window.api.invoke('vault:salvar', state.abaAtiva, conteudo, pastasPermitidas())
+    if (r?.ok) void atualizarPainelVault(state.abaAtiva)
   } else {
-    r = await window.api.invoke('arquivo:salvar', abaAtiva, conteudo, pastasPermitidas())
+    r = await window.api.invoke('arquivo:salvar', state.abaAtiva, conteudo, pastasPermitidas())
   }
   if (!r.ok) {
     alert('Erro ao salvar: ' + (r.erro || 'erro'))
     return false
   }
   editor.marcarSalvo()
-  const a = abas.find((x) => x.caminho === abaAtiva)
+  const a = state.abas.find((x) => x.caminho === state.abaAtiva)
   if (a) a.dirty = false
   renderizarAbas()
   return true
@@ -1985,7 +1985,7 @@ function initEditor() {
   const mount = $('editor-mount')
   editor = criarEditor(mount, {
     onChange: () => {
-      const a = abas.find((x) => x.caminho === abaAtiva)
+      const a = state.abas.find((x) => x.caminho === state.abaAtiva)
       if (!a || !editor) return
       const dirty = editor.isDirty()
       if (a.dirty !== dirty) {
@@ -2000,9 +2000,9 @@ function initEditor() {
 }
 
 function ciclarAbas() {
-  if (abas.length < 2) return
-  const idx = abas.findIndex((a) => a.caminho === abaAtiva)
-  const next = abas[(idx + 1) % abas.length]
+  if (state.abas.length < 2) return
+  const idx = state.abas.findIndex((a) => a.caminho === state.abaAtiva)
+  const next = state.abas[(idx + 1) % state.abas.length]
   ativarAba(next.caminho)
 }
 
@@ -2257,7 +2257,7 @@ async function enviarMensagem() {
         return false
       }
     })()
-    const r = await window.api.invoke('chat:send', state.pastaAtual, texto, { agente, modo, autoAprovar, anexos: chatAnexos, arquivo: abaAtiva || '' })
+    const r = await window.api.invoke('chat:send', state.pastaAtual, texto, { agente, modo, autoAprovar, anexos: chatAnexos, arquivo: state.abaAtiva || '' })
     chatAnexos = []
     renderizarAnexosChat()
     const ok = r && r.ok !== false && r.message && r.message.content
@@ -2788,7 +2788,7 @@ function bootstrapComandos() {
         alert(r?.ok ? 'Restaurado.' : r?.erro || 'falha')
       }
     },
-    { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => abaAtiva && fecharAba(abaAtiva) },
+    { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => state.abaAtiva && fecharAba(state.abaAtiva) },
     { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
     { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
     {
@@ -3037,7 +3037,7 @@ function executarComando(id) {
   else if (id === 'guardian') abrirContas()
   else if (id === 'salvar') salvarArquivoAtivo()
   else if (id === 'fechar-aba') {
-    if (abaAtiva) fecharAba(abaAtiva)
+    if (state.abaAtiva) fecharAba(state.abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
   else if (id === 'orientar-prompt') abrirOrientadorPrompt()
@@ -3667,9 +3667,9 @@ function ligarProgressoAgent() {
 
 function coletarAbasCtx() {
   const out = []
-  for (const a of abas) {
-    const item = { path: a.caminho, ativa: a.caminho === abaAtiva }
-    if (a.caminho === abaAtiva && editor && editor.getConteudo) {
+  for (const a of state.abas) {
+    const item = { path: a.caminho, ativa: a.caminho === state.abaAtiva }
+    if (a.caminho === state.abaAtiva && editor && editor.getConteudo) {
       try {
         item.conteudo = editor.getConteudo()
       } catch {
@@ -3787,10 +3787,10 @@ async function executarAgentUi(orquestrar) {
         agente,
         pastas: pastasPermitidas(),
         selecao,
-        arquivoAtivo: abaAtiva || undefined,
+        arquivoAtivo: state.abaAtiva || undefined,
         proposeWrites: true,
         verificarApos: !!verify && !plan,
-        abas: coletarAbasCtx(),
+        state.abas: coletarAbasCtx(),
         incluirGit: true,
         errosEditor: errosEditor || undefined
       })
@@ -4044,7 +4044,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (mod && key === 'w') {
     e.preventDefault()
-    if (abaAtiva) fecharAba(abaAtiva)
+    if (state.abaAtiva) fecharAba(state.abaAtiva)
     return
   }
   if (e.altKey && !mod && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'Left')) {
@@ -4064,7 +4064,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (mod && key === 'f') {
     // deixa o CM6 abrir busca se o foco estiver no editor; senão abre explicitamente
-    if (editor && abaAtiva) {
+    if (editor && state.abaAtiva) {
       e.preventDefault()
       editor.buscar()
     }

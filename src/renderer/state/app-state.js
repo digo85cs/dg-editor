@@ -7,6 +7,9 @@ export const state = {
   /** Containers .tree-children com listagem IPC em andamento (anti duplo clique). */
   carregandoNos: new WeakSet(),
   vaultRaiz: null,
+  /** Editor tabs */
+  abas: [],
+  abaAtiva: null,
 }
 
 export function setPastaAtual(v) {
