@@ -20,6 +20,7 @@ import {
   definirTetoDiarioUSD,
   permitirPagoAtivo,
   gastoHoje,
+  precoConhecido,
 } from '../brain/roteador-cota';
 import { chamarProvider, type ProviderConfig, type Message } from '../brain/providers';
 
@@ -194,12 +195,12 @@ async function handleProvidersPermitirPago(
   }
 }
 
-async function handleProvidersGasto(): Promise<IpcResult & { usd: number; teto?: number; porProvider: Record<string, number> }> {
+async function handleProvidersGasto(): Promise<IpcResult & { usd: number; teto?: number; porProvider: Record<string, number>; naoRastreados: string[] }> {
   try {
     const g = gastoHoje();
-    return { ok: true, usd: g.usd, teto: g.teto, porProvider: g.porProvider };
+    return { ok: true, usd: g.usd, teto: g.teto, porProvider: g.porProvider, naoRastreados: g.naoRastreados };
   } catch (e: unknown) {
-    return { ok: false, erro: String(e), usd: 0, porProvider: {} };
+    return { ok: false, erro: String(e), usd: 0, porProvider: {}, naoRastreados: [] };
   }
 }
 

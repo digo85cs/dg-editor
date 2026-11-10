@@ -45,10 +45,11 @@
       '<span style="margin-left:auto;font-weight:normal;color:#666;font-size:12px">Desligado por default para evitar cobranca acidental</span>' +
       '</label>' +
       '<div style="margin-top:6px">' +
-      '<label style="display:flex;align-items:center;gap:8px">Teto diario (USD): ' +
-      '<input type="number" id="teto-diario" min="0" step="0.01" style="width:100px" placeholder="sem teto"> ' +
-      '<span style="font-size:11px;color:#666">0 = sem limite</span>' +
-      '</label>' +
+       '<label style="display:flex;align-items:center;gap:8px">Teto diario (USD): ' +
+       '<input type="number" id="teto-diario" min="0" step="0.01" style="width:100px" placeholder="sem teto"> ' +
+       '<span style="font-size:11px;color:#666">0 = sem limite</span>' +
+       '<span id="teto-aviso" style="font-size:11px;color:#b45309;margin-left:8px;display:none">O teto so protege os provedores com preco conhecido.</span>' +
+       '</label>' +
       '</div>' +
       '<div id="gasto-hoje" style="margin-top:8px;font-family:monospace,monospace;font-size:12px"></div>' +
       '</div>' +
@@ -263,6 +264,7 @@
     const el = document.getElementById('gasto-hoje');
     const toggle = document.getElementById('toggle-permitir-pago');
     const tetoInput = document.getElementById('teto-diario');
+    const tetoAviso = document.getElementById('teto-aviso');
     if (!el) return;
 
     // Atualiza toggle
@@ -274,6 +276,13 @@
       tetoInput.value = (gasto && typeof gasto.teto === 'number') ? gasto.teto : '';
     }
 
+    // Mostra/oculta aviso sobre teto nao cobrir providers sem preco
+    if (tetoAviso) {
+      const temTeto = gasto && typeof gasto.teto === 'number';
+      const naoRastreados = gasto && Array.isArray(gasto.naoRastreados) ? gasto.naoRastreados : [];
+      tetoAviso.style.display = (temTeto && naoRastreados.length > 0) ? '' : 'none';
+    }
+
     if (!gasto) {
       el.innerHTML = '<span style="color:#666">Hoje: sem dados</span>';
       return;
@@ -281,16 +290,30 @@
 
     const usd = typeof gasto.usd === 'number' ? gasto.usd : 0;
     const teto = typeof gasto.teto === 'number' ? gasto.teto : null;
-    const tetoStr = teto !== null ? '$' + teto.toFixed(2) : 'sem teto';
-    let html = '<strong>Hoje:</strong> $' + usd.toFixed(4) + ' / teto ' + tetoStr;
-    if (gasto.porProvider && typeof gasto.porProvider === 'object') {
-      const providers = Object.entries(gasto.porProvider)
-        .filter(([, v]) => v && v > 0)
-        .sort(([, a], [, b]) => b - a);
-      if (providers.length > 0) {
-        html += ' | por provider: ' + providers.map(([id, v]) => esc(id) + ' $' + Number(v).toFixed(4)).join(', ');
-      }
+    const naoRastreados = Array.isArray(gasto.naoRastreados) ? gasto.naoRastreados : [];
+    const temPorProvider = gasto.porProvider && typeof gasto.porProvider === 'object';
+    const trackedProviders = temPorProvider ? Object.entries(gasto.porProvider).filter(([, v]) => v && v > 0) : [];
+
+    const todosNaoRastreados = naoRastreados.length > 0 && trackedProviders.length === 0;
+    const haMistura = naoRastreados.length > 0 && trackedProviders.length > 0;
+
+    if (todosNaoRastreados) {
+      el.innerHTML = '<strong>Hoje:</strong> <span style="color:#b45309">Gasto não rastreado — ' + naoRastreados.length + ' provedor(es) sem preço configurado</span>';
+      return;
     }
+
+    let html = '<strong>Hoje:</strong> $' + usd.toFixed(4);
+    if (teto !== null) html += ' / teto $' + teto.toFixed(2);
+    else html += ' / teto sem teto';
+
+    if (haMistura) {
+      html += ' <span style="color:#b45309">+ ' + naoRastreados.length + ' provedor(es) sem preço</span>';
+    }
+
+    if (trackedProviders.length > 0) {
+      html += ' | por provider: ' + trackedProviders.map(([id, v]) => esc(id) + ' $' + Number(v).toFixed(4)).join(', ');
+    }
+
     el.innerHTML = html;
   }
 
@@ -310,7 +333,7 @@
     } catch {}
     try {
       const rGasto = await api.invoke('providers:gasto');
-      gasto = rGasto && rGasto.ok ? { usd: rGasto.usd, teto: rGasto.teto, porProvider: rGasto.porProvider } : null;
+      gasto = rGasto && rGasto.ok ? { usd: rGasto.usd, teto: rGasto.teto, porProvider: rGasto.porProvider, naoRastreados: rGasto.naoRastreados } : null;
     } catch {}
     renderFila(fila);
     renderConfig(providers);
