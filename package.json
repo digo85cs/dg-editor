@@ -39,6 +39,7 @@
     "dist:win:installer": "npm run build && electron-builder --win nsis",
     "deploy": "npm run dist:win:installer",
     "verificar:encoding": "node scripts/verificar-encoding.mjs",
+    "testar:fila": "node scripts/testar-fila.mjs",
     "test:validator": "node test/validator.cjs",
     "test:watch": "vitest",
     "rebuild:pty": "node scripts/rebuild-node-pty.cjs",
