@@ -16,6 +16,10 @@ import {
   statusCotas,
   estaEsgotado,
   resetarProvider,
+  definirPermitirPago,
+  definirTetoDiarioUSD,
+  permitirPagoAtivo,
+  gastoHoje,
 } from '../brain/roteador-cota';
 import { chamarProvider, type ProviderConfig, type Message } from '../brain/providers';
 
@@ -174,6 +178,47 @@ async function handleProvidersFila(): Promise<IpcResult & { fila?: FilaItem[] }>
   }
 }
 
+async function handleProvidersPermitirPago(
+  _event: Electron.IpcMainInvokeEvent,
+  payload: unknown
+): Promise<IpcResult> {
+  try {
+    const p = (payload || {}) as { v?: boolean };
+    if (typeof p.v !== 'boolean') {
+      return { ok: false, erro: 'campo v (boolean) nao informado' };
+    }
+    definirPermitirPago(p.v);
+    return { ok: true };
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) };
+  }
+}
+
+async function handleProvidersGasto(): Promise<IpcResult & { usd: number; teto?: number; porProvider: Record<string, number> }> {
+  try {
+    const g = gastoHoje();
+    return { ok: true, usd: g.usd, teto: g.teto, porProvider: g.porProvider };
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e), usd: 0, porProvider: {} };
+  }
+}
+
+async function handleProvidersTetoDiario(
+  _event: Electron.IpcMainInvokeEvent,
+  payload: unknown
+): Promise<IpcResult> {
+  try {
+    const p = (payload || {}) as { teto?: number };
+    if (p.teto !== undefined && (typeof p.teto !== 'number' || p.teto < 0)) {
+      return { ok: false, erro: 'teto deve ser um numero >= 0' };
+    }
+    definirTetoDiarioUSD(p.teto);
+    return { ok: true };
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) };
+  }
+}
+
 // ============================================================================
 // REGISTRO
 // ============================================================================
@@ -187,6 +232,9 @@ export function registrarHandlersProviders(): void {
   ipcMain.handle('providers:cotas', handleProvidersCotas);
   ipcMain.handle('providers:resetar', handleProvidersResetar);
   ipcMain.handle('providers:fila', handleProvidersFila);
+  ipcMain.handle('providers:permitir-pago', handleProvidersPermitirPago);
+  ipcMain.handle('providers:gasto', handleProvidersGasto);
+  ipcMain.handle('providers:teto-diario', handleProvidersTetoDiario);
 
   dglog('[ipc:providers] handlers registrados!');
 }

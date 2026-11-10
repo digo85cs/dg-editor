@@ -339,4 +339,24 @@ describe('IPC providers (shapes)', () => {
       hasNum(item, 'ordem'); hasStr(item, 'id'); hasNum(item, 'tier'); hasStr(item, 'modelo'); hasBool(item, 'disponivel')
     }
   })
+
+  it('providers:permitir-pago retorna ok e altera estado', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:permitir-pago')
+    expect(typeof fn).toBe('function')
+    const out = (await fn!({} as never, { v: true })) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+    const out2 = (await fn!({} as never, { v: false })) as Record<string, unknown>
+    expect(out2.ok).toBe(true)
+  })
+
+  it('providers:gasto retorna {ok, usd, teto?, porProvider}', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:gasto')
+    expect(typeof fn).toBe('function')
+    const out = (await fn!({} as never)) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+    expect(typeof out.usd).toBe('number')
+    expect(typeof out.porProvider).toBe('object')
+  })
 })

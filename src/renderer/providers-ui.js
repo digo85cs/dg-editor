@@ -39,6 +39,19 @@
       '</div>' +
       '<div class="config-section" style="margin-top:12px">' +
       '<h4>Cotas / esgotamentos</h4>' +
+      '<div style="margin-bottom:8px;padding:8px;background:#f4f4f4;border:1px solid #ddd;border-radius:6px">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:600">' +
+      '<input type="checkbox" id="toggle-permitir-pago"> Permitir provedores pagos (tier 2)' +
+      '<span style="margin-left:auto;font-weight:normal;color:#666;font-size:12px">Desligado por default para evitar cobranca acidental</span>' +
+      '</label>' +
+      '<div style="margin-top:6px">' +
+      '<label style="display:flex;align-items:center;gap:8px">Teto diario (USD): ' +
+      '<input type="number" id="teto-diario" min="0" step="0.01" style="width:100px" placeholder="sem teto"> ' +
+      '<span style="font-size:11px;color:#666">0 = sem limite</span>' +
+      '</label>' +
+      '</div>' +
+      '<div id="gasto-hoje" style="margin-top:8px;font-family:monospace,monospace;font-size:12px"></div>' +
+      '</div>' +
       '<div id="providers-cotas"></div>' +
       '<div style="margin-top:8px"><small class="muted">Atualizado ao vivo pelo canal brain:cota.</small></div>' +
       '</div>' +
@@ -51,6 +64,30 @@
     document.getElementById('btn-provedores-x').onclick = fechar;
     document.getElementById('btn-provedores-fechar').onclick = fechar;
     modal.onclick = (ev) => { if (ev.target === modal) fechar(); };
+
+    // Guardrail de custo: toggle permitir pago + teto diario
+    const togglePago = document.getElementById('toggle-permitir-pago');
+    const tetoInput = document.getElementById('teto-diario');
+    if (togglePago) {
+      togglePago.onchange = async () => {
+        try {
+          await api.invoke('providers:permitir-pago', { v: togglePago.checked });
+          render();
+        } catch (e) { mostrarToast('Erro ao alterar guardrail: ' + String(e), 'erro'); }
+      };
+    }
+    if (tetoInput) {
+      tetoInput.onchange = async () => {
+        const v = tetoInput.value.trim();
+        const teto = v === '' ? undefined : Number(v);
+        if (isNaN(teto)) return;
+        try {
+          await api.invoke('providers:teto-diario', { teto });
+          render();
+        } catch (e) { mostrarToast('Erro ao definir teto: ' + String(e), 'erro'); }
+      };
+    }
+
     return modal;
   }
 
@@ -222,8 +259,43 @@
     });
   }
 
+  async function renderGasto(gasto) {
+    const el = document.getElementById('gasto-hoje');
+    const toggle = document.getElementById('toggle-permitir-pago');
+    const tetoInput = document.getElementById('teto-diario');
+    if (!el) return;
+
+    // Atualiza toggle
+    if (toggle) {
+      // Ler estado atual via IPC nao e necessario aqui; o toggle reflete a ultima acao do usuario
+      // Mas para consistencia, nao forçamos o estado do toggle a partir do gasto
+    }
+    if (tetoInput) {
+      tetoInput.value = (gasto && typeof gasto.teto === 'number') ? gasto.teto : '';
+    }
+
+    if (!gasto) {
+      el.innerHTML = '<span style="color:#666">Hoje: sem dados</span>';
+      return;
+    }
+
+    const usd = typeof gasto.usd === 'number' ? gasto.usd : 0;
+    const teto = typeof gasto.teto === 'number' ? gasto.teto : null;
+    const tetoStr = teto !== null ? '$' + teto.toFixed(2) : 'sem teto';
+    let html = '<strong>Hoje:</strong> $' + usd.toFixed(4) + ' / teto ' + tetoStr;
+    if (gasto.porProvider && typeof gasto.porProvider === 'object') {
+      const providers = Object.entries(gasto.porProvider)
+        .filter(([, v]) => v && v > 0)
+        .sort(([, a], [, b]) => b - a);
+      if (providers.length > 0) {
+        html += ' | por provider: ' + providers.map(([id, v]) => esc(id) + ' $' + Number(v).toFixed(4)).join(', ');
+      }
+    }
+    el.innerHTML = html;
+  }
+
   async function render() {
-    let fila = [], providers = [], cotas = [];
+    let fila = [], providers = [], cotas = [], gasto = null;
     try {
       const rFila = await api.invoke('providers:fila');
       fila = rFila && rFila.fila ? rFila.fila : [];
@@ -236,9 +308,14 @@
       const rCotas = await api.invoke('providers:cotas');
       cotas = rCotas && rCotas.cotas ? rCotas.cotas : [];
     } catch {}
+    try {
+      const rGasto = await api.invoke('providers:gasto');
+      gasto = rGasto && rGasto.ok ? { usd: rGasto.usd, teto: rGasto.teto, porProvider: rGasto.porProvider } : null;
+    } catch {}
     renderFila(fila);
     renderConfig(providers);
     renderCotas(cotas);
+    renderGasto(gasto);
   }
 
   function mostrarToast(mensagem, tipo) {
@@ -249,6 +326,8 @@
     api.on('brain:cota', (_evt, payload) => {
       const st = payload && payload.status;
       if (Array.isArray(st)) renderCotas(st);
+      const g = payload && payload.gasto;
+      if (g) renderGasto(g);
     });
   }
 
