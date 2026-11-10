@@ -265,15 +265,16 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
   // ---------------- TIER 2 — pago barato ----------------
   desc('openai', 'OpenAI', 'openai', 'https://api.openai.com/v1', {
     apiKeyRef: 'openai', apiKeyEnv: 'OPENAI_API_KEY', tier: 2, ordem: 23,
-    modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
+    preco: { entradaPor1M: 0.10, saidaPor1M: 0.50 }, // openai gpt-6-luna — fonte: https://platform.openai.com/docs/pricing — consulta 2026-11-10
+    modelos: [{ id: 'gpt-6-luna', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
   }),
   desc('gemini-pago', 'Google Gemini (pago)', 'openai', 'https://generativelanguage.googleapis.com/v1beta/openai', {
-    apiKeyRef: 'gemini', apiKeyEnv: 'GEMINI_API_KEY', tier: 2, ordem: 24,
+    apiKeyRef: 'gemini', apiKeyEnv: 'GEMINI_API_KEY', tier: 2, ordem: 25,
     preco: { entradaPor1M: 0.75, saidaPor1M: 3.75 }, // Google Gemini 3.8-flash — fonte: https://aistudio.google.com/docs/pricing — consulta 2026-11-10 (pago até 31/12/2026; depois $1.50/$7.50)
     modelos: [{ id: 'gemini-3.8-flash', capacidades: ['chat', 'codigo', 'analise'] }],
   }),
   desc('deepseek', 'DeepSeek', 'openai', 'https://api.deepseek.com/v1', {
-    apiKeyRef: 'deepseek', tier: 2, ordem: 25,
+    apiKeyRef: 'deepseek', tier: 2, ordem: 24,
     preco: { entradaPor1M: 0.15, saidaPor1M: 0.60 }, // DeepSeek deepseek-flash cache miss — fonte: https://api-docs.deepseek.com/quick_start/pricing/ — consulta 2026-11-10 (valores off-peak; cache miss é o caso conservador)
     modelos: [{ id: 'deepseek-chat', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
   }),

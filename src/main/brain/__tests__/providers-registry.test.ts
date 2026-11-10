@@ -95,7 +95,6 @@ describe('providers-registry', () => {
       'chutes',
       'arli',
       'litellm',
-      'openai',
     ])
 
     for (const p of CATALOGO_PROVIDERS) {

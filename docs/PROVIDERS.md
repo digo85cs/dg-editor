@@ -39,9 +39,9 @@ A fila global e ordenada por `ordem` (menor = preferencia maior). O roteador des
 | 20 | chutes | 1 | https://llm.chutes.ai/v1 | 40 | UTC | sim | deepseek-ai/DeepSeek-V3 |
 | 21 | arli | 1 | https://api.arliai.com/v1 | 40 | UTC | sim | llama-3.3-70b |
 | 22 | litellm | 1 | http://127.0.0.1:4000/v1 | 0 | UTC | **nao** | gpt-3.5-turbo |
-| 23 | openai | 2 | https://api.openai.com/v1 | — | UTC | sim | gpt-5.3-mini |
-| 24 | gemini-pago | 2 | https://generativelanguage.googleapis.com/v1beta/openai | — | UTC | sim | gemini-3.8-flash |
-| 25 | deepseek | 2 | https://api.deepseek.com/v1 | — | UTC | sim | deepseek-chat |
+| 23 | openai | 2 | https://api.openai.com/v1 | — | UTC | sim | gpt-6-luna |
+| 24 | deepseek | 2 | https://api.deepseek.com/v1 | — | UTC | sim | deepseek-chat |
+| 25 | gemini-pago | 2 | https://generativelanguage.googleapis.com/v1beta/openai | — | UTC | sim | gemini-3.8-flash |
 | 26 | zai-pago | 2 | https://api.z.ai/api/paas/v4 | — | UTC | sim | glm-5.3 |
 | 28 | ollama-local | 3 | http://127.0.0.1:11434 | — | UTC | sim | qwen2.5-coder:7b, qwen2.5-coder:3b, llama3.2 |
 
@@ -189,8 +189,8 @@ desc('openai', 'OpenAI', 'openai', 'https://api.openai.com/v1', {
   apiKeyRef: 'openai',
   tier: 2,
   ordem: 23,
-  preco: { entradaPor1M: 1.25, saidaPor1M: 10.00 },
-  modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
+  preco: { entradaPor1M: 0.10, saidaPor1M: 0.50 },
+  modelos: [{ id: 'gpt-6-luna', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
 })
 ```
 
@@ -217,13 +217,14 @@ Quando um modelo tem mais de uma variante de preço (ex: entrada com cache / sem
 | gemini-flash-lite | gemini-3.5-flash-lite, gemini-3.1-flash-lite | 0 | 0 | https://ai.google.dev/pricing | oficial | gratuito (free tier) |
 | zai-direto | glm-4.7-flash, glm-4.5-flash | 0 | 0 | https://docs.z.ai/guides/overview/pricing | oficial | gratuito |
 | ollama-local | qwen2.5-coder:7b, qwen2.5-coder:3b, llama3.2 | 0 | 0 | https://ollama.com | oficial | local, custo de token zero |
+| openai | gpt-6-luna | 0.10 | 0.50 | https://platform.openai.com/docs/pricing | oficial | modelo de entrada economico |
 | gemini-pago | gemini-3.8-flash | 0.75 | 3.75 | https://aistudio.google.com/docs/pricing | oficial | pago até 31/12/2026; depois $1.50/$7.50 |
 | deepseek | deepseek-flash (cache miss) | 0.15 | 0.60 | https://api-docs.deepseek.com/quick_start/pricing/ | oficial | cache miss (conservador); valores off-peak |
 | zai-pago | glm-5.3 | 1.40 | 4.40 | https://docs.z.ai/guides/overview/pricing | oficial | |
 
-Providers com `preco: undefined` (sem fonte oficial confirmada): `groq`, `together`, `fireworks`, `mistral`, `deepinfra`, `novita`, `hyperbolic`, `sambanova`, `cerebras`, `nvidia-nim`, `perplexity`, `xai`, `moonshot-direto`, `chutes`, `arli`, `litellm`, `openai`.
+Providers com `preco: undefined` (sem fonte oficial confirmada): `groq`, `together`, `fireworks`, `mistral`, `deepinfra`, `novita`, `hyperbolic`, `sambanova`, `cerebras`, `nvidia-nim`, `perplexity`, `xai`, `moonshot-direto`, `chutes`, `arli`, `litellm`.
 
-**Nota sobre `openai`**: o modelo `gpt-5.3-mini` usado no catálogo não existe na página oficial de pricing da OpenAI (`https://developers.openai.com/api/docs/pricing`) nem no agregador LiteLLM. Mantido como `undefined` até que o preço seja confirmado.
+Os preços confirmados incluem `openai` com modelo `gpt-6-luna` (entrada $0.10/1M, saída $0.50/1M), consultado em `https://platform.openai.com/docs/pricing`.
 
 ---
 
@@ -241,4 +242,4 @@ Executa com: `npx vitest run`
 - Provedores online (ordens 1-27) nao foram validados por chamada real por falta de chave; permanecem cadastrados mas pulados sem chave.
 - Endpoints OpenAI-compatible de terceiros podem mudar de formato sem aviso.
 - `chamarProvider` continua usando `node:http` nativo (sem lib de retry externa); o retry de rede e controlado pelo roteador (max 2 falhas de rede, 4 de server).
-- O teto de gasto só protege providers com `preco` preenchido. Os seguintes providers têm preço conhecido e são protegidos pelo teto: `openrouter-inkling`, `openrouter-glm`, `openrouter-north`, `openrouter-kimi`, `gemini-flash-lite`, `zai-direto`, `ollama-local`, `gemini-pago`, `deepseek`, `zai-pago`. Todos os demais ficam em `naoRastreados` e não contam para o teto — verificar `providers:gasto` (campo `naoRastreados`) antes de confiar no teto.
+- O teto de gasto so protege providers com `preco` preenchido. Os seguintes providers têm preço conhecido e são protegidos pelo teto: `openrouter-inkling`, `openrouter-glm`, `openrouter-north`, `openrouter-kimi`, `gemini-flash-lite`, `zai-direto`, `ollama-local`, `openai`, `gemini-pago`, `deepseek`, `zai-pago`. Todos os demais ficam em `naoRastreados` e não contam para o teto — verificar `providers:gasto` (campo `naoRastreados`) antes de confiar no teto.

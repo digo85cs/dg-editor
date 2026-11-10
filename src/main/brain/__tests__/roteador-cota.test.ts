@@ -351,34 +351,34 @@ describe('roteador-cota', () => {
   // ---------------- FASE B - Regressão com preço real ----------------
 
   it('registrarCusto(openai) acumula exatamente preco.entradaPor1M em gastoHojeUSD', () => {
-    mObterProvider.mockReturnValue({ id: 'openai', preco: { entradaPor1M: 0.25, saidaPor1M: 2.00 }, modelos: [{ id: 'gpt-5.3-mini' }] } as unknown as ProviderDescriptor)
+    mObterProvider.mockReturnValue({ id: 'openai', preco: { entradaPor1M: 0.10, saidaPor1M: 0.50 }, modelos: [{ id: 'gpt-6-luna' }] } as unknown as ProviderDescriptor)
     const agora = new Date()
     registrarCusto('openai', 1_000_000, 0, agora)
     const g = gastoHoje()
-    expect(g.usd).toBe(0.25)
-    expect(g.porProvider['openai']).toBe(0.25)
+    expect(g.usd).toBe(0.10)
+    expect(g.porProvider['openai']).toBe(0.10)
     expect(g.naoRastreados).not.toContain('openai')
   })
 
   it('teto dispara com preço real e openai deixa de aparecer em proximoDisponivel', () => {
-    mObterProvider.mockReturnValue({ id: 'openai', preco: { entradaPor1M: 0.25, saidaPor1M: 2.00 }, modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }] } as unknown as ProviderDescriptor)
+    mObterProvider.mockReturnValue({ id: 'openai', preco: { entradaPor1M: 0.10, saidaPor1M: 0.50 }, modelos: [{ id: 'gpt-6-luna', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }] } as unknown as ProviderDescriptor)
     const agora = new Date()
     definirPermitirPago(true)
-    definirTetoDiarioUSD(0.50) // teto baixo para disparar rapidamente
+    definirTetoDiarioUSD(0.20) // teto baixo para disparar rapidamente
 
-    // Acumula $0.25 (1M entrada) -> abaixo do teto
+    // Acumula $0.10 (1M entrada) -> abaixo do teto
     registrarCusto('openai', 1_000_000, 0, agora)
-    expect(estaEsgotado('openai', 'gpt-5.3-mini', agora)).toBe(false)
+    expect(estaEsgotado('openai', 'gpt-6-luna', agora)).toBe(false)
 
-    // Acumula mais $0.25 -> total $0.50, bate o teto
+    // Acumula mais $0.10 -> total $0.20, bate o teto
     registrarCusto('openai', 1_000_000, 0, agora)
-    expect(estaEsgotado('openai', 'gpt-5.3-mini', agora)).toBe(true)
+    expect(estaEsgotado('openai', 'gpt-6-luna', agora)).toBe(true)
     const entrada = statusCotas().find((e) => e.providerId === 'openai')
     expect(entrada?.motivo).toBe('quota')
 
     // proximoDisponivel deve pular openai (esgotado por quota) quando permitirPago=true
     mFilaGlobal.mockReturnValue([
-      { id: 'openai', modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }], ordem: 23, ativo: true, tier: 2, formato: 'openai' } as unknown as ProviderDescriptor,
+      { id: 'openai', modelos: [{ id: 'gpt-6-luna', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }], ordem: 23, ativo: true, tier: 2, formato: 'openai' } as unknown as ProviderDescriptor,
       ollama,
     ])
     const cfg = proximoDisponivel('codigo')
