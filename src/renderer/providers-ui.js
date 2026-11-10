@@ -297,21 +297,42 @@
     const todosNaoRastreados = naoRastreados.length > 0 && trackedProviders.length === 0;
     const haMistura = naoRastreados.length > 0 && trackedProviders.length > 0;
 
+    // Formata valor rastreado: 2 casas se >= 0.01, 4 casas se > 0 e < 0.01 (evita $0,00 enganoso)
+    let usdStr;
+    if (usd > 0 && usd < 0.01) {
+      usdStr = '$' + usd.toFixed(4);
+    } else {
+      usdStr = '$' + usd.toFixed(2);
+    }
+
     if (todosNaoRastreados) {
       el.innerHTML = '<strong>Hoje:</strong> <span style="color:#b45309">Gasto não rastreado — ' + naoRastreados.length + ' provedor(es) sem preço configurado</span>';
       return;
     }
 
-    let html = '<strong>Hoje:</strong> $' + usd.toFixed(4);
-    if (teto !== null) html += ' / teto $' + teto.toFixed(2);
-    else html += ' / teto sem teto';
+    let html = '<strong>Hoje:</strong> ' + usdStr;
+    let tetoAviso80 = '';
+    if (teto !== null) {
+      html += ' / teto $' + teto.toFixed(2);
+      if (usd > 0 && teto > 0 && usd / teto >= 0.8) {
+        tetoAviso80 = ' <span style="color:#b45309">Teto a ' + Math.round((usd / teto) * 100) + '% — gasto $' + usd.toFixed(4) + ' de $' + teto.toFixed(2) + '</span>';
+      }
+    } else {
+      html += ' / teto sem teto';
+    }
 
     if (haMistura) {
       html += ' <span style="color:#b45309">+ ' + naoRastreados.length + ' provedor(es) sem preço</span>';
     }
 
+    if (tetoAviso80) html += tetoAviso80;
+
     if (trackedProviders.length > 0) {
-      html += ' | por provider: ' + trackedProviders.map(([id, v]) => esc(id) + ' $' + Number(v).toFixed(4)).join(', ');
+      html += ' | por provider: ' + trackedProviders.map(([id, v]) => {
+        const vv = Number(v);
+        const vStr = vv > 0 && vv < 0.01 ? vv.toFixed(4) : vv.toFixed(2);
+        return esc(id) + ' $' + vStr;
+      }).join(', ');
     }
 
     el.innerHTML = html;
