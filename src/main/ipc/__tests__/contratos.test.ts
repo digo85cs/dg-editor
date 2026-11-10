@@ -350,7 +350,7 @@ describe('IPC providers (shapes)', () => {
     expect(out2.ok).toBe(true)
   })
 
-  it('providers:gasto retorna {ok, usd, teto?, porProvider}', async () => {
+  it('providers:gasto retorna {ok, usd, teto?, porProvider, naoRastreados}', async () => {
     const handlers = await providersHandlers()
     const fn = handlers.get('providers:gasto')
     expect(typeof fn).toBe('function')
@@ -358,5 +358,6 @@ describe('IPC providers (shapes)', () => {
     expect(out.ok).toBe(true)
     expect(typeof out.usd).toBe('number')
     expect(typeof out.porProvider).toBe('object')
+    expect(Array.isArray(out.naoRastreados)).toBe(true)
   })
 })

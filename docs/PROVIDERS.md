@@ -120,7 +120,7 @@ desc('meu-provedor', 'Meu Provedor', 'openai', 'https://api.meuprovedor.com/v1',
 | `providers:resetar` | invoke | `{ id }` | `{ ok }` |
 | `providers:fila` | invoke | — | `{ ok, fila: [{ordem,id,tier,modelo,disponivel}] }` |
 | `providers:permitir-pago` | invoke | `{ v: boolean }` | `{ ok }` (liga/desliga uso de tier 2 pago) |
-| `providers:gasto` | invoke | — | `{ ok, usd, teto?, porProvider: {id: usd} }` |
+| `providers:gasto` | invoke | — | `{ ok, usd, teto?, porProvider: {id: usd}, naoRastreados: string[] }` |
 | `providers:cotas` | invoke | — | `{ ok, cotas: [...] }` |
 | `providers:resetar` | invoke | `{ id }` | `{ ok }` |
 | `brain:cota` | evento (webContents) | — | `{ status: [...] }` (atualizacao ao vivo na UI) |
@@ -161,6 +161,57 @@ O roteador emite o evento `brain:cota` apos cada `marcarEsgotado` e apos `limpar
 |-----|-------------------|-------------|
 | `anthropic-openai-shim` | `https://api.anthropic.com/v1` nao e um endpoint OpenAI-compatible. Forcar o formato `openai` criaria dívida, ja que a Anthropic possui SDK proprio e o `chamarProvider` ja suporta caminhos CLI (`cursor-cli`, `codex-cli`). | Usar o SDK oficial da Anthropic separadamente, ou acessar modelos Claude via OpenRouter (ex: `anthropic/claude-3-5-sonnet`) no provider `openrouter-*`. |
 
+## Rastreamento de custo
+
+O roteador de cota (`src/main/brain/roteador-cota.ts`) rastreia o gasto em USD por provider, calculado como:
+
+```
+custo = (tokensEntrada / 1_000_000) * preco.entradaPor1M + (tokensSaida / 1_000_000) * preco.saidaPor1M
+```
+
+### Como funciona
+
+- Cada provider em `CATALOGO_PROVIDERS` pode ter um campo opcional `preco: { entradaPor1M, saidaPor1M }` em USD por 1 milhão de tokens.
+- Quando `registrarCusto(providerId, tokensEntrada, tokensSaida)` é chamado, o custo é acumulado em `gastoHojeUSD` e `gastoPorProvider[providerId]`.
+- Se o provider não tem `preco` definido, **nada é acumulado**, o provider entra na lista `naoRastreados` e uma mensagem de log `'custo não rastreado: <providerId>'` é emitida (uma vez por sessão por provider).
+- O teto diário (`tetoDiarioUSD`) só dispara para provedores com preço conhecido. Providers sem preço nunca acionam o teto.
+
+### `naoRastreados`
+
+O campo `naoRastreados` no retorno de `gastoHoje()` e `providers:gasto` lista os providerIds que consumiram tokens mas não têm preço configurado. Quando todos os providers usados estão em `naoRastreados`, o valor exibido é `$0,00` mas com aviso de que o rastreamento está incompleto.
+
+### Como adicionar preço a um provider
+
+Edite `src/main/brain/providers-registry.ts` e inclua o campo `preco` na entrada do provider em `CATALOGO_PROVIDERS`:
+
+```ts
+desc('openai', 'OpenAI', 'openai', 'https://api.openai.com/v1', {
+  apiKeyRef: 'openai',
+  tier: 2,
+  ordem: 23,
+  preco: { entradaPor1M: 1.25, saidaPor1M: 10.00 },
+  modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
+})
+```
+
+**Regra rígida**: nunca chutar preço. Só inclua `preco` com valor confirmado em fonte oficial (página de pricing do provedor). Providers gratuitos (`:free` no OpenRouter, Gemini Flash-Lite free tier, Z.AI GLM-4.7-Flash/4.5-Flash, Ollama local) recebem `preco: { entradaPor1M: 0, saidaPor1M: 0 }`.
+
+### Preços confirmados (consultado em 10/11/2026)
+
+| id | entradaPor1M | saidaPor1M | fonte | confiança |
+|-----|-------------|------------|-------|-----------|
+| openrouter-inkling | 0 | 0 | https://openrouter.ai/collections/free-models | confirmado |
+| openrouter-glm | 0 | 0 | https://openrouter.ai/collections/free-models | confirmado |
+| openrouter-north | 0 | 0 | https://openrouter.ai/collections/free-models | confirmado |
+| openrouter-kimi | 0 | 0 | https://openrouter.ai/collections/free-models | confirmado |
+| gemini-flash-lite | 0 | 0 | https://ai.google.dev/pricing | confirmado |
+| zai-direto | 0 | 0 | https://docs.z.ai/guides/overview/pricing | confirmado |
+| ollama-local | 0 | 0 | https://ollama.com | confirmado |
+
+Providers com `preco: undefined` (sem fonte oficial confirmada): `groq`, `together`, `fireworks`, `mistral`, `deepinfra`, `novita`, `hyperbolic`, `sambanova`, `cerebras`, `nvidia-nim`, `perplexity`, `xai`, `moonshot-direto`, `chutes`, `arli`, `litellm`, `openai`, `gemini-pago`, `deepseek`, `zai-pago`.
+
+---
+
 ## Testes
 
 - `src/main/brain/__tests__/providers-registry.test.ts` — catálogo, ordem, configParaProvider, registrar/remover, sem duplicatas, cota tier 1.
@@ -175,4 +226,4 @@ Executa com: `npx vitest run`
 - Provedores online (ordens 1-27) nao foram validados por chamada real por falta de chave; permanecem cadastrados mas pulados sem chave.
 - Endpoints OpenAI-compatible de terceiros podem mudar de formato sem aviso.
 - `chamarProvider` continua usando `node:http` nativo (sem lib de retry externa); o retry de rede e controlado pelo roteador (max 2 falhas de rede, 4 de server).
-- `preco` nao e preenchido para nenhum provider (valores reais nao confirmados); `registrarCusto` ignora providers sem preco ate que precos reais sejam informados.
+- O teto de gasto só protege providers com `preco` preenchido. Os seguintes providers têm preço conhecido e são protegidos pelo teto: `openrouter-inkling`, `openrouter-glm`, `openrouter-north`, `openrouter-kimi`, `gemini-flash-lite`, `zai-direto`, `ollama-local`. Todos os demais ficam em `naoRastreados` e não contam para o teto — verificar `providers:gasto` (campo `naoRastreados`) antes de confiar no teto.

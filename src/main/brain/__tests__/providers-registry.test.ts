@@ -75,6 +75,41 @@ describe('providers-registry', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('todo provider ativo tem preco definido ou esta listado explicitamente como "sem preco confirmado"', () => {
+    // Lista explícita de providers ativos SEM preço confirmado (valores reais não disponíveis em fontes oficiais).
+    // Qualquer provider ativo novo adicionado ao catálogo deve estar aqui OU ter preco definido.
+    const semPrecoConfirmado = new Set([
+      'groq',
+      'together',
+      'fireworks',
+      'mistral',
+      'deepinfra',
+      'novita',
+      'hyperbolic',
+      'sambanova',
+      'cerebras',
+      'nvidia-nim',
+      'perplexity',
+      'xai',
+      'moonshot-direto',
+      'chutes',
+      'arli',
+      'litellm',
+      'openai',
+      'gemini-pago',
+      'deepseek',
+      'zai-pago',
+    ])
+
+    for (const p of CATALOGO_PROVIDERS) {
+      if (!p.ativo) continue
+      const temPreco = !!p.preco
+      const listadoSemPreco = semPrecoConfirmado.has(p.id)
+      expect(temPreco || listadoSemPreco).toBe(true,
+        'Provider ativo "' + p.id + '" deve ter preco definido ou estar na lista semPrecoConfirmado')
+    }
+  })
+
   it('todo provider tier 1 ativo tem cotaDiaria definida', () => {
     for (const p of CATALOGO_PROVIDERS) {
       if (p.tier === 1 && p.ativo) {

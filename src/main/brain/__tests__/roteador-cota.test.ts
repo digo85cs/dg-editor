@@ -10,6 +10,7 @@ import {
   limparExpirados,
   marcarEsgotado,
   permitirPagoAtivo,
+  precoConhecido,
   proximoDisponivel,
   registrarCusto,
   resetarProvider,
@@ -284,5 +285,66 @@ describe('roteador-cota', () => {
     expect(permitirPagoAtivo()).toBe(true)
     definirPermitirPago(false)
     expect(permitirPagoAtivo()).toBe(false)
+  })
+
+  // ---------------- FASE D - Rastreamento de custo honesto ----------------
+
+  it('provider com preco {0,0} acumula 0 (gratis contabilizado)', () => {
+    const agora = new Date()
+    mObterProvider.mockReturnValue({ ...pA, preco: { entradaPor1M: 0, saidaPor1M: 0 } } as unknown as ProviderDescriptor)
+    registrarCusto('prov-a', 1_000_000, 1_000_000, agora)
+    const g = gastoHoje()
+    expect(g.usd).toBe(0)
+    expect(g.porProvider['prov-a']).toBe(0)
+    expect(g.naoRastreados).not.toContain('prov-a')
+    expect(precoConhecido('prov-a')).toBe(true)
+  })
+
+  it('provider com preco undefined nao acumula e entra em naoRastreados', () => {
+    const agora = new Date()
+    mObterProvider.mockReturnValue(pA) // pA nao tem preco
+    registrarCusto('prov-a', 1_000_000, 1_000_000, agora)
+    const g = gastoHoje()
+    expect(g.usd).toBe(0)
+    expect(g.porProvider['prov-a']).toBeUndefined()
+    expect(g.naoRastreados).toContain('prov-a')
+    expect(precoConhecido('prov-a')).toBe(false)
+    expect(estaEsgotado('prov-a', 'model-a', agora)).toBe(false)
+  })
+
+  it('precoConhecido retorna true para provider com preco e false para sem', () => {
+    mObterProvider.mockReturnValue({ ...pA, preco: { entradaPor1M: 1.0, saidaPor1M: 2.0 } } as unknown as ProviderDescriptor)
+    expect(precoConhecido('prov-a')).toBe(true)
+    mObterProvider.mockReturnValue(pB) // pB nao tem preco
+    expect(precoConhecido('prov-b')).toBe(false)
+  })
+
+  it('gastoHoje().naoRastreados contem apenas ids sem preco', () => {
+    const agora = new Date()
+    mObterProvider.mockImplementation((id) => {
+      if (id === 'prov-a') return { ...pA, preco: { entradaPor1M: 1.0, saidaPor1M: 2.0 } } as unknown as ProviderDescriptor
+      if (id === 'prov-b') return pB // sem preco
+      if (id === 'prov-c') return pC // sem preco
+      return pD
+    })
+    registrarCusto('prov-a', 500_000, 500_000, agora) // tem preco, acumulado
+    registrarCusto('prov-b', 500_000, 500_000, agora) // sem preco, nao acumulado
+    registrarCusto('prov-c', 500_000, 500_000, agora) // sem preco, nao acumulado
+    const g = gastoHoje()
+    expect(g.usd).toBeCloseTo(1.5, 4) // 0.5M * 1.0 + 0.5M * 2.0 = 0.5 + 1.0 = 1.5
+    expect(g.naoRastreados).toContain('prov-b')
+    expect(g.naoRastreados).toContain('prov-c')
+    expect(g.naoRastreados).not.toContain('prov-a')
+  })
+
+  it('teto dispara corretamente quando ha preco (regressao guardrail)', () => {
+    mObterProvider.mockReturnValue({ ...pA, preco: { entradaPor1M: 1.0, saidaPor1M: 2.0 } } as unknown as ProviderDescriptor)
+    const agora = new Date()
+    definirTetoDiarioUSD(3.0)
+    registrarCusto('prov-a', 500_000, 500_000, agora) // $1.50
+    registrarCusto('prov-a', 500_000, 500_000, agora) // $1.50 -> total $3.00, bate teto
+    expect(estaEsgotado('prov-a', 'model-a', agora)).toBe(true)
+    const entrada = statusCotas().find((e) => e.providerId === 'prov-a')
+    expect(entrada?.motivo).toBe('quota')
   })
 })
