@@ -7,7 +7,6 @@ import { resolve, join, isAbsolute, relative, normalize } from 'path';
 import { homedir } from 'os';
 import { existsSync, mkdirSync } from 'fs';
 import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
-import { app } from 'electron';
 
 export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
 
@@ -351,6 +350,7 @@ export function getUserDataPath(): string {
  */
 export function userDataDir(): string {
   try {
+    const { app } = require('electron');
     if (app && typeof app.getPath === 'function') {
       return app.getPath('userData');
     }
