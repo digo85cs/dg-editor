@@ -30,6 +30,7 @@ export interface ProviderDescriptor {
   fusoReset?: string
   ordem: number
   modelos: ModeloCatalogo[]
+  preco?: { entradaPor1M: number; saidaPor1M: number }
   ativo: boolean
 }
 
@@ -258,23 +259,16 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
     apiKeyRef: 'openai', apiKeyEnv: 'OPENAI_API_KEY', tier: 2, ordem: 23,
     modelos: [{ id: 'gpt-5.3-mini', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
   }),
-  desc(
-    'anthropic-openai-shim',
-    'Anthropic (OpenAI shim — endpoint ainda não confirmado)',
-    'openai',
-    'https://api.anthropic.com/v1',
-    { apiKeyRef: 'anthropic', tier: 2, ordem: 24, ativo: false, modelos: [] }
-  ),
   desc('gemini-pago', 'Google Gemini (pago)', 'openai', 'https://generativelanguage.googleapis.com/v1beta/openai', {
-    apiKeyRef: 'gemini', apiKeyEnv: 'GEMINI_API_KEY', tier: 2, ordem: 25,
+    apiKeyRef: 'gemini', apiKeyEnv: 'GEMINI_API_KEY', tier: 2, ordem: 24,
     modelos: [{ id: 'gemini-3.8-flash', capacidades: ['chat', 'codigo', 'analise'] }],
   }),
   desc('deepseek', 'DeepSeek', 'openai', 'https://api.deepseek.com/v1', {
-    apiKeyRef: 'deepseek', tier: 2, ordem: 26,
+    apiKeyRef: 'deepseek', tier: 2, ordem: 25,
     modelos: [{ id: 'deepseek-chat', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
   }),
   desc('zai-pago', 'Z.AI (pago)', 'openai', 'https://api.z.ai/api/paas/v4', {
-    apiKeyRef: 'zai', tier: 2, ordem: 27,
+    apiKeyRef: 'zai', tier: 2, ordem: 26,
     modelos: [{ id: 'glm-5.3', capacidades: ['chat', 'codigo', 'analise'] }],
   }),
 

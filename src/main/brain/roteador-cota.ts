@@ -18,7 +18,7 @@ import { filaGlobal, configParaProvider, type ProviderDescriptor, obterProvider 
 import { chaveConfigurada } from './segredos-providers'
 
 const ARQUIVO = join(app.getPath('userData'), 'cota-modelos.json')
-const VERSAO = 1
+const VERSAO = 2
 const DIA_MS = 24 * 60 * 60 * 1000
 const RAIZ = process.env.DG_ROOT || process.cwd()
 
@@ -32,8 +32,17 @@ export interface EntradaCota {
   ocorrencias: number
 }
 
-interface EstadoCota {
+export interface GastoPorProvider {
+  providerId: string
+  usd: number
+}
+
+export interface EstadoCota {
   versao: number
+  permitirPago: boolean
+  tetoDiarioUSD?: number
+  gastoHojeUSD: number
+  gastoPorProvider: Record<string, number>
   entradas: EntradaCota[]
 }
 
@@ -42,17 +51,37 @@ let estadoCache: EstadoCota | null = null
 function lerEstado(): EstadoCota {
   if (estadoCache) return estadoCache
   if (!existsSync(ARQUIVO)) {
-    estadoCache = { versao: VERSAO, entradas: [] }
+    estadoCache = { versao: VERSAO, permitirPago: false, tetoDiarioUSD: undefined, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] }
     return estadoCache
   }
   try {
     const j = JSON.parse(readFileSync(ARQUIVO, 'utf-8')) as EstadoCota
     if (!j || typeof j !== 'object' || !Array.isArray(j.entradas)) throw new Error('estado invalido')
-    estadoCache = { versao: j.versao ?? VERSAO, entradas: j.entradas }
+    // Migracao v1 -> v2
+    if (j.versao === 1) {
+      estadoCache = {
+        versao: VERSAO,
+        permitirPago: false,
+        tetoDiarioUSD: undefined,
+        gastoHojeUSD: 0,
+        gastoPorProvider: {},
+        entradas: j.entradas,
+      }
+      salvarEstado(estadoCache)
+      return estadoCache
+    }
+    estadoCache = {
+      versao: j.versao ?? VERSAO,
+      permitirPago: j.permitirPago ?? false,
+      tetoDiarioUSD: j.tetoDiarioUSD,
+      gastoHojeUSD: j.gastoHojeUSD ?? 0,
+      gastoPorProvider: j.gastoPorProvider || {},
+      entradas: j.entradas,
+    }
     return estadoCache
   } catch (e) {
     dglog('[roteador-cota] arquivo corrompido, regenerando vazio: ' + String((e as Error)?.message || e))
-    estadoCache = { versao: VERSAO, entradas: [] }
+    estadoCache = { versao: VERSAO, permitirPago: false, tetoDiarioUSD: undefined, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] }
     return estadoCache
   }
 }
@@ -173,6 +202,68 @@ export function resetarProvider(providerId: string): void {
   emitirEventoCota()
 }
 
+export function permitirPagoAtivo(): boolean {
+  return lerEstado().permitirPago === true
+}
+
+export function definirPermitirPago(v: boolean): void {
+  const estado = lerEstado()
+  estado.permitirPago = v === true
+  invalidaCache()
+  salvarEstado(estado)
+  emitirEventoCota()
+  dglog('[roteador-cota] permitirPago=' + estado.permitirPago)
+}
+
+export function definirTetoDiarioUSD(teto: number | undefined): void {
+  const estado = lerEstado()
+  estado.tetoDiarioUSD = teto
+  invalidaCache()
+  salvarEstado(estado)
+  emitirEventoCota()
+  dglog('[roteador-cota] tetoDiarioUSD=' + String(teto))
+}
+
+export function registrarCusto(
+  providerId: string,
+  tokensEntrada: number,
+  tokensSaida: number,
+  agora: Date = new Date()
+): void {
+  const p = obterProvider(providerId)
+  if (!p?.preco) return
+  const preco = p.preco
+  const custo = (tokensEntrada / 1_000_000) * preco.entradaPor1M + (tokensSaida / 1_000_000) * preco.saidaPor1M
+  if (!custo || custo <= 0) return
+
+  const estado = lerEstado()
+  estado.gastoHojeUSD += custo
+  const jaTinha = estado.gastoPorProvider ? estado.gastoPorProvider[providerId] : undefined
+  if (!estado.gastoPorProvider) estado.gastoPorProvider = {}
+  estado.gastoPorProvider[providerId] = (jaTinha || 0) + custo
+
+  // Se bateu o teto, marca esgotado ate o reset com motivo quota
+  const teto = estado.tetoDiarioUSD
+  if (typeof teto === 'number' && estado.gastoHojeUSD >= teto) {
+    const modelo = p.modelos[0]?.id || ''
+    marcarEsgotado(providerId, modelo, 'quota', undefined, agora)
+  }
+
+  invalidaCache()
+  salvarEstado(estado)
+  emitirEventoCota()
+  dglog('[roteador-cota] custo provider=' + providerId + ' usd=' + custo.toFixed(6) + ' hoje=' + estado.gastoHojeUSD.toFixed(6))
+}
+
+export function gastoHoje(): { usd: number; teto?: number; porProvider: Record<string, number> } {
+  const estado = lerEstado()
+  return {
+    usd: estado.gastoHojeUSD,
+    teto: estado.tetoDiarioUSD,
+    porProvider: estado.gastoPorProvider || {},
+  }
+}
+
 export function proximoDisponivel(
   tarefa: string,
   opts: { ignorarIds?: string[] } = {}
@@ -186,6 +277,8 @@ export function proximoDisponivel(
     if (ignorar.has(p.id)) continue
     const modelo = p.modelos[0]?.id || ''
     if (!modelo) continue
+    // Guardrail de custo: tier 2 (pago) so e usado se permitirPago estiver ligado
+    if (p.tier === 2 && !permitirPagoAtivo()) continue
     // compatibilidade de tarefa por capacidades
     const caps = new Set<string>()
     for (const m of p.modelos) for (const c of m.capacidades) caps.add(c)
@@ -200,12 +293,16 @@ export function proximoDisponivel(
   const ollama = obterProvider('ollama-local')
   if (ollama) {
     try {
+      const semPago = !permitirPagoAtivo()
       appendFailoverLog(RAIZ, {
         tarefa,
-        tentou: 'todos-providers-esgotados',
-        motivo: 'piso-ollama-local',
+        tentou: semPago ? 'todos-tier-1-esgotados-guardrail' : 'todos-providers-esgotados',
+        motivo: semPago ? 'tier-2-bloqueado-por-guardrail' : 'piso-ollama-local',
         resultado: 'pulado',
       })
+      if (semPago) {
+        dglog('[roteador-cota] tier 2 bloqueado por guardrail; usando piso ollama-local')
+      }
     } catch { /* */ }
     return configParaProvider(ollama, ollama.modelos[0]?.id || 'qwen2.5-coder:7b')
   }
@@ -230,10 +327,10 @@ function compatComTarefa(tarefa: string, caps: string[]): boolean {
 /** Emite observabilidade de cotas para janelas renderer (canal brain:cota). */
 export function emitirEventoCota(): void {
   try {
-    const status = statusCotas()
+    const payload = { status: statusCotas(), gasto: gastoHoje() }
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) {
-        w.webContents.send('brain:cota', { status })
+        w.webContents.send('brain:cota', payload)
       }
     }
   } catch { /* renderer indisponível ou sem janelas */ }

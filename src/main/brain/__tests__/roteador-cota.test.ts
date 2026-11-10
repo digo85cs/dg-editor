@@ -3,10 +3,15 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
   __resetarEstadoParaTestes,
+  definirPermitirPago,
+  definirTetoDiarioUSD,
   estaEsgotado,
+  gastoHoje,
   limparExpirados,
   marcarEsgotado,
+  permitirPagoAtivo,
   proximoDisponivel,
+  registrarCusto,
   resetarProvider,
   statusCotas,
 } from '../roteador-cota'
@@ -32,6 +37,12 @@ const pC: ProviderDescriptor = {
   timeoutMs: 120_000, numPredict: 4096, tier: 1, cotaDiaria: 50, ordem: 3,
   modelos: [{ id: 'model-c', capacidades: ['codigo', 'chat'] }], ativo: true,
 }
+// pD e' tier 2 (pago) para testar o guardrail
+const pD: ProviderDescriptor = {
+  id: 'prov-d', label: 'D (pago)', formato: 'openai', baseUrl: 'https://d/v1', apiKeyRef: 'd',
+  timeoutMs: 120_000, numPredict: 4096, tier: 2, cotaDiaria: 50, ordem: 4,
+  modelos: [{ id: 'model-d', capacidades: ['codigo', 'chat'] }], ativo: true,
+}
 const ollama: ProviderDescriptor = {
   id: 'ollama-local', label: 'Ollama', formato: 'ollama', baseUrl: 'http://127.0.0.1:11434',
   apiKeyRef: undefined, timeoutMs: 120_000, numPredict: 4096, tier: 3, ordem: 28,
@@ -50,13 +61,13 @@ vi.mock('../segredos-providers', () => ({
   chaveConfigurada: vi.fn(() => true),
 }))
 vi.mock('../providers-registry', () => ({
-  filaGlobal: vi.fn(() => [pA, pB, pC]),
+  filaGlobal: vi.fn(() => [pA, pB, pC, pD]),
   configParaProvider: vi.fn((p: ProviderDescriptor) => ({
     id: p.id, formato: p.formato, modelo: p.modelos[0]?.id, baseUrl: p.baseUrl,
   })),
   obterProvider: vi.fn((id: string) => {
     if (id === 'ollama-local') return ollama
-    return [pA, pB, pC].find((x) => x.id === id)
+    return [pA, pB, pC, pD].find((x) => x.id === id)
   }),
 }))
 vi.mock('../registry', () => ({
@@ -86,10 +97,11 @@ const mensagens = [{ role: 'user', content: 'oi' }]
 beforeEach(() => {
   __resetarEstadoParaTestes()
   vi.clearAllMocks()
-  mFilaGlobal.mockReturnValue([pA, pB, pC])
+  mFilaGlobal.mockReturnValue([pA, pB, pC, pD])
   mChaveConfigurada.mockReturnValue(true)
   mNormalizarTarefa.mockImplementation((t: string) => t)
   mChamarProvider.mockReset()
+  // Default: permitirPago desligado (arquivo deletado por __resetarEstadoParaTestes)
 })
 
 afterEach(() => {
@@ -185,5 +197,92 @@ describe('roteador-cota', () => {
     expect(() => statusCotas()).not.toThrow()
     expect(statusCotas()).toEqual([])
     expect(() => proximoDisponivel('codigo')).not.toThrow()
+  })
+
+  // ---------------- FASE D - Guardrail de custo ----------------
+
+  it('com permitirPago=false, tier 2 e pulado e ollama-local e retornado quando so ha tier 2', () => {
+    // Apenas pD (tier 2) tem chave configurada; pA/pB/pC nao
+    mChaveConfigurada.mockImplementation((id) => id === 'prov-d')
+    const agora = new Date()
+    const cfg = proximoDisponivel('codigo')
+    expect(cfg.id).toBe('ollama-local')
+    expect(mAppendFailoverLog).toHaveBeenCalled()
+  })
+
+  it('com permitirPago=true, tier 2 e usado quando tier 1 esgotou', () => {
+    definirPermitirPago(true)
+    mChaveConfigurada.mockImplementation((id) => id === 'prov-d')
+    const agora = new Date()
+    // Esgota todos os tier 1
+    marcarEsgotado('prov-a', 'model-a', 'rate_limit', 999999, agora)
+    marcarEsgotado('prov-b', 'model-b', 'rate_limit', 999999, agora)
+    marcarEsgotado('prov-c', 'model-c', 'rate_limit', 999999, agora)
+    const cfg = proximoDisponivel('codigo')
+    expect(cfg.id).toBe('prov-d')
+  })
+
+  it('registrarCusto acumula corretamente e marca esgotado ao bater o teto', () => {
+    // prov-a tem preco definido
+    mObterProvider.mockReturnValue({ ...pA, preco: { entradaPor1M: 1.0, saidaPor1M: 2.0 } } as unknown as ProviderDescriptor)
+    const agora = new Date()
+
+    // Define teto de $3.00
+    definirTetoDiarioUSD(3.0)
+
+    // 1M tokens entrada = $1.00, 1M saida = $2.00. Total teto = $3.00
+    // Chama 2 vezes com 500k entrada + 500k saida = $0.50 + $1.00 = $1.50 cada
+    registrarCusto('prov-a', 500_000, 500_000, agora)
+    registrarCusto('prov-a', 500_000, 500_000, agora) // agora gasto = $3.00, bate o teto
+
+    const g = gastoHoje()
+    expect(g.usd).toBeCloseTo(3.0, 4)
+    expect(g.porProvider['prov-a']).toBeCloseTo(3.0, 4)
+
+    // prov-a deve estar esgotado por quota
+    expect(estaEsgotado('prov-a', 'model-a', agora)).toBe(true)
+    const entrada = statusCotas().find((e) => e.providerId === 'prov-a')
+    expect(entrada?.motivo).toBe('quota')
+  })
+
+  it('provider sem preco nao acumula custo', () => {
+    // prov-a SEM preco
+    const agora = new Date()
+    registrarCusto('prov-a', 1_000_000, 1_000_000, agora)
+    const g = gastoHoje()
+    expect(g.usd).toBe(0)
+    expect(g.porProvider['prov-a']).toBeUndefined()
+    expect(estaEsgotado('prov-a', 'model-a', agora)).toBe(false)
+  })
+
+  it('migracao de versao 1 -> 2 adiciona permitirPago: false', () => {
+    __resetarEstadoParaTestes()
+    // Simula arquivo v1
+    writeFileSync(ARQUIVO, JSON.stringify({ versao: 1, entradas: [] }), 'utf-8')
+    // Ler estado deve migrar para v2
+    const estadoInicial = statusCotas()
+    expect(estadoInicial).toEqual([])
+    expect(permitirPagoAtivo()).toBe(false)
+    // Verifica que o arquivo foi regravado como v2
+    const conteudo = readFileSync(ARQUIVO, 'utf-8')
+    const j = JSON.parse(conteudo)
+    expect(j.versao).toBe(2)
+    expect(j.permitirPago).toBe(false)
+  })
+
+  it('gastoHoje() retorna shape correto', () => {
+    const g = gastoHoje()
+    expect(typeof g.usd).toBe('number')
+    expect(g.usd).toBe(0)
+    expect(g.teto).toBeUndefined()
+    expect(typeof g.porProvider).toBe('object')
+    expect(Object.keys(g.porProvider).length).toBe(0)
+  })
+
+  it('definirPermitirPago persiste e emite evento', () => {
+    definirPermitirPago(true)
+    expect(permitirPagoAtivo()).toBe(true)
+    definirPermitirPago(false)
+    expect(permitirPagoAtivo()).toBe(false)
   })
 })
