@@ -13,13 +13,13 @@ import {
   type Tarefa
 } from './registry'
 import {
-  chamarProviderSharp,
   ErroProvider,
   type ProviderConfig,
   type Message,
   type ToolDef,
   type RespostaProvider
 } from './providers'
+import { chamarComCascata } from './chamar-com-cascata'
 import { streamOllamaChat, streamOpenAIChat } from './stream-chat'
 import { garantirSkillsPadrao, skillsRelevantes } from './skills'
 import { garantirAgentesPadrao, lerAgente } from './agentes'
@@ -276,6 +276,7 @@ async function finalizarAgente(
 }
 
 async function responderRodada(
+  tarefa: Tarefa,
   cfg: ProviderConfig,
   mensagens: Message[],
   toolsAgora: ToolDef[] | undefined,
@@ -312,16 +313,22 @@ async function responderRodada(
         return { content: texto, tool_calls: [], providerId: cfg.id, modeloUsado: cfg.modelo }
       }
     } catch {
-      /* cai no pedido completo */
+      /* cai no pedido completo via cascata */
     }
   }
-  return chamarProviderSharp(cfg, mensagens, toolsAgora)
+  const r = await chamarComCascata(tarefa, mensagens, toolsAgora, signal)
+  dglog(
+    '[agente] cascata provedor=' + r.providerFinal +
+    ' tentativas=' + r.tentativas.join(',')
+  )
+  return r
 }
 
 async function rodarLoopComProvider(
   raiz: string,
   pergunta: string,
   cfg: ProviderConfig,
+  tarefa: Tarefa,
   tools: McpTool[],
   systemExtra: string,
   opts?: {
@@ -379,7 +386,7 @@ async function rodarLoopComProvider(
     }
 
     const toolsAgora = !jaUsouTool ? toolDefs : undefined
-    const r = await responderRodada(cfg, mensagens, toolsAgora, emit, opts?.signal)
+    const r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal)
     if (r.content) emit({ tipo: 'texto', texto: r.content.slice(0, 2000) })
 
     let chamadas = r.tool_calls
@@ -721,7 +728,7 @@ export async function executarAgente(
             '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
             ' motivo=tentativa resultado=...'
           )
-          const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tools, systemExtra, {
+          const resp = await rodarLoopComProvider(raiz, pergunta, cfg, tarefa, tools, systemExtra, {
             proposeWrites,
             pastas: opcoes.pastas,
             onEvent: opcoes.onEvent,

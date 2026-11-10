@@ -58,3 +58,10 @@
 - A auditoria confere, linha a linha, se cada ferramenta da interface tem canal no preload e handler no processo principal.
 # === REGRA ADICIONADA 2026-11-09 (Rodrigo) ===
 - Sempre resolver todos os problemas automaticamente e entregar o resultado ao usuario.
+
+# === FILA DE PROVEDORES ===
+- Ordem de preferencia: tier 1 gratuito (OpenRouter :free, Gemini Flash-Lite, Z.AI direto, Groq) antes de tier 2 pago.
+- Nunca hardcodar chave de API; usar o cofre criptografado (canal providers:configurar).
+- Antes de propor um modelo novo, consultar providers:fila.
+- Se um provider retornar 429/402, nao insistir: o roteador ja marca esgotado e desce a fila.
+- O piso garantido e Ollama local (qwen2.5-coder:7b) quando todos os provedores online estiverem esgotados.
