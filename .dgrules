@@ -65,4 +65,4 @@
 - Antes de propor um modelo novo, consultar providers:fila.
 - Se um provider retornar 429/402, nao insistir: o roteador ja marca esgotado e desce a fila.
 - O piso garantido e Ollama local (qwen2.5-coder:7b) quando todos os provedores online estiverem esgotados.
-- Teto de gasto so cobre providers com preco conhecido. Antes de confiar no teto, verificar providers:gasto (campo naoRastreados).
+- Teto de gasto cobre os 10 providers com preço conhecido (7 grátis + gemini-pago, deepseek, zai-pago). Os demais aparecem em naoRastreados em providers:gasto.
