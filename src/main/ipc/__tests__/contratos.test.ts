@@ -34,6 +34,14 @@ vi.mock('electron', () => {
     dialog: { showOpenDialog: vi.fn(async () => ({ canceled: true, filePaths: [] })) },
     BrowserWindow: class {},
     app: { getPath: () => 'C:/tmp/dg-editor-test', getVersion: () => '0.0.0-test' },
+    safeStorage: {
+      isEncryptionAvailable: () => true,
+      encryptString: (texto: string) => Buffer.from('enc:' + texto),
+      decryptString: (buf: Buffer) => {
+        const s = Buffer.isBuffer(buf) ? buf.toString() : String(buf)
+        return s.startsWith('enc:') ? s.slice(4) : s
+      },
+    },
   }
 })
 
@@ -253,5 +261,82 @@ describe('IPC contratos (shapes)', () => {
     expect(reord.ok).toBe(true)
     expect(Array.isArray(reord.regras)).toBe(true)
     expect((reord.regras as Regra[])[0].id).toBe('b')
+  })
+})
+
+describe('IPC providers (shapes)', () => {
+  async function providersHandlers() {
+    const mod = await import('../providers')
+    const electron = (await import('electron')) as unknown as { ipcMain: { __handlers: Map<string, (...a: unknown[]) => unknown> } }
+    electron.ipcMain.__handlers.clear()
+    if (typeof mod.registrarHandlersProviders === 'function') mod.registrarHandlersProviders()
+    return electron.ipcMain.__handlers
+  }
+
+  it('providers:listar retorna shape e NAO expoe valor da chave', async () => {
+    process.env.OPENROUTER_API_KEY = 'sk-test-123'
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:listar')
+    expect(typeof fn).toBe('function')
+    const out = (await fn!({} as never)) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+    expect(Array.isArray(out.providers)).toBe(true)
+    const serializado = JSON.stringify(out)
+    expect(serializado).not.toContain('sk-test-123')
+    const provs = out.providers as unknown[]
+    expect(provs.length).toBeGreaterThan(0)
+    const ink = provs.find((p: unknown) => (p as { id?: string }).id === 'openrouter-inkling')
+    expect(ink).toBeDefined()
+    const item = ink as Record<string, unknown>
+    hasStr(item, 'id'); hasStr(item, 'label'); hasNum(item, 'tier'); hasStr(item, 'formato')
+    hasStr(item, 'baseUrl'); hasBool(item, 'ativo'); hasBool(item, 'chaveConfigurada')
+    expect(Array.isArray((item as { modelos?: unknown }).modelos)).toBe(true)
+    expect(item.esgotadoAte).toBe(null)
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  it('providers:configurar retorna ok ao salvar chave', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:configurar')
+    expect(typeof fn).toBe('function')
+    const out = (await fn!({} as never, { id: 'openrouter-inkling', chave: 'sk-nova-abc' })) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+  })
+
+  it('providers:testar retorna shape sem chave configurada', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:testar')
+    expect(typeof fn).toBe('function')
+    const out = (await fn!({} as never, { id: 'openrouter-inkling' })) as Record<string, unknown>
+    expect(typeof out.ok).toBe('boolean')
+    if (!out.ok) expect(typeof out.erro).toBe('string')
+  })
+
+  it('providers:cotas retorna {ok, cotas: array}', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:cotas')
+    const out = (await fn!({} as never)) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+    expect(Array.isArray(out.cotas)).toBe(true)
+  })
+
+  it('providers:resetar retorna ok', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:resetar')
+    const out = (await fn!({} as never, { id: 'openrouter-inkling' })) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+  })
+
+  it('providers:fila retorna {ok, fila: array com ordem,id,tier,modelo,disponivel}', async () => {
+    const handlers = await providersHandlers()
+    const fn = handlers.get('providers:fila')
+    const out = (await fn!({} as never)) as Record<string, unknown>
+    expect(out.ok).toBe(true)
+    expect(Array.isArray(out.fila)).toBe(true)
+    const fila = out.fila as unknown[]
+    if (fila.length > 0) {
+      const item = fila[0] as Record<string, unknown>
+      hasNum(item, 'ordem'); hasStr(item, 'id'); hasNum(item, 'tier'); hasStr(item, 'modelo'); hasBool(item, 'disponivel')
+    }
   })
 })
