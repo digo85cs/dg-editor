@@ -48,6 +48,12 @@ export interface EstadoCota {
 
 let estadoCache: EstadoCota | null = null
 
+/** Providers que consumiram tokens mas nao tem preco conhecido (rastreado apenas em memoria, nao persistido). */
+const naoRastreadosSet = new Set<string>()
+
+/** Providers ja logados como "nao rastreado" nesta sessao (para nao poluir logs). */
+const naoRastreadosLogadoSet = new Set<string>()
+
 function lerEstado(): EstadoCota {
   if (estadoCache) return estadoCache
   if (!existsSync(ARQUIVO)) {
@@ -231,10 +237,17 @@ export function registrarCusto(
   agora: Date = new Date()
 ): void {
   const p = obterProvider(providerId)
-  if (!p?.preco) return
+  if (!p?.preco) {
+    if (!naoRastreadosLogadoSet.has(providerId)) {
+      naoRastreadosLogadoSet.add(providerId)
+      dglog('[roteador-cota] custo nao rastreado: ' + providerId)
+    }
+    naoRastreadosSet.add(providerId)
+    return
+  }
   const preco = p.preco
   const custo = (tokensEntrada / 1_000_000) * preco.entradaPor1M + (tokensSaida / 1_000_000) * preco.saidaPor1M
-  if (!custo || custo <= 0) return
+  if (!Number.isFinite(custo) || custo < 0) return
 
   const estado = lerEstado()
   estado.gastoHojeUSD += custo
@@ -255,13 +268,20 @@ export function registrarCusto(
   dglog('[roteador-cota] custo provider=' + providerId + ' usd=' + custo.toFixed(6) + ' hoje=' + estado.gastoHojeUSD.toFixed(6))
 }
 
-export function gastoHoje(): { usd: number; teto?: number; porProvider: Record<string, number> } {
+export function gastoHoje(): { usd: number; teto?: number; porProvider: Record<string, number>; naoRastreados: string[] } {
   const estado = lerEstado()
   return {
     usd: estado.gastoHojeUSD,
     teto: estado.tetoDiarioUSD,
     porProvider: estado.gastoPorProvider || {},
+    naoRastreados: [...naoRastreadosSet],
   }
+}
+
+/** Retorna true se o provider tem preco definido (custo sera rastreado). */
+export function precoConhecido(providerId: string): boolean {
+  const p = obterProvider(providerId)
+  return !!p?.preco
 }
 
 export function proximoDisponivel(
@@ -336,9 +356,11 @@ export function emitirEventoCota(): void {
   } catch { /* renderer indisponível ou sem janelas */ }
 }
 
-/** Apenas testes: limpa cache e arquivo de estado. */
+/** Apenas testes: limpa cache, arquivo de estado e sets de naoRastreados. */
 export function __resetarEstadoParaTestes(): void {
   estadoCache = null
+  naoRastreadosSet.clear()
+  naoRastreadosLogadoSet.clear()
   try {
     if (existsSync(ARQUIVO)) unlinkSync(ARQUIVO)
   } catch { /* */ }

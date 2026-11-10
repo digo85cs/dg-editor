@@ -51,6 +51,7 @@ function desc(
     fusoReset?: string
     ordem: number
     modelos: ModeloCatalogo[]
+    preco?: { entradaPor1M: number; saidaPor1M: number }
     ativo?: boolean
   }
 ): ProviderDescriptor {
@@ -70,6 +71,7 @@ function desc(
     fusoReset: opts.fusoReset,
     ordem: opts.ordem,
     modelos: opts.modelos,
+    preco: opts.preco,
     ativo: opts.ativo ?? true,
   }
 }
@@ -93,6 +95,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
       modelos: [
         { id: 'thinkingmachines/inkling-2-small:free', contexto: 1_000_000, capacidades: ['chat', 'codigo', 'analise'] },
       ],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -107,6 +110,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
       cotaDiaria: 30,
       ordem: 2,
       modelos: [{ id: 'z-ai/glm-4.5-air:free', capacidades: ['chat', 'codigo', 'analise'] }],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -121,6 +125,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
       cotaDiaria: 50,
       ordem: 3,
       modelos: [{ id: 'cohere/north-mini-code:free', contexto: 256_000, capacidades: ['codigo', 'analise'] }],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -135,6 +140,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
       cotaDiaria: 30,
       ordem: 4,
       modelos: [{ id: 'moonshotai/kimi-k2.6:free', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -153,6 +159,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
         { id: 'gemini-3.5-flash-lite', capacidades: ['chat', 'codigo', 'analise'] },
         { id: 'gemini-3.1-flash-lite', capacidades: ['chat', 'codigo', 'analise'] },
       ],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -169,6 +176,7 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
         { id: 'glm-4.7-flash', capacidades: ['chat', 'codigo', 'analise'] },
         { id: 'glm-4.5-flash', capacidades: ['chat', 'codigo', 'analise'] },
       ],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
   desc(
@@ -279,12 +287,13 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
     'ollama',
     'http://127.0.0.1:11434',
     {
-      apiKeyRef: undefined, tier: 3, ordem: 28,
+      apiKeyRef: undefined, tier: 3,       ordem: 28,
       modelos: [
         { id: 'qwen2.5-coder:7b', contexto: 8192, capacidades: ['chat', 'codigo', 'analise'] },
         { id: 'qwen2.5-coder:3b', contexto: 8192, capacidades: ['chat', 'codigo', 'analise'] },
         { id: 'llama3.2', contexto: 4096, capacidades: ['chat', 'analise'] },
       ],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }
   ),
 ]
