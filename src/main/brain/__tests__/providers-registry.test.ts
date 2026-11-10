@@ -96,9 +96,6 @@ describe('providers-registry', () => {
       'arli',
       'litellm',
       'openai',
-      'gemini-pago',
-      'deepseek',
-      'zai-pago',
     ])
 
     for (const p of CATALOGO_PROVIDERS) {
@@ -107,6 +104,16 @@ describe('providers-registry', () => {
       const listadoSemPreco = semPrecoConfirmado.has(p.id)
       expect(temPreco || listadoSemPreco).toBe(true,
         'Provider ativo "' + p.id + '" deve ter preco definido ou estar na lista semPrecoConfirmado')
+    }
+  })
+
+  it('providers pagos gemini-pago, deepseek, zai-pago tem preco definido com valores > 0', () => {
+    for (const id of ['gemini-pago', 'deepseek', 'zai-pago']) {
+      const p = obterProvider(id)
+      expect(p).toBeDefined()
+      expect(p!.preco).toBeDefined()
+      expect(p!.preco!.entradaPor1M).toBeGreaterThan(0)
+      expect(p!.preco!.saidaPor1M).toBeGreaterThan(0)
     }
   })
 
