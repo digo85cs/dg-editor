@@ -7,6 +7,7 @@ import { resolve, join, isAbsolute, relative, normalize } from 'path';
 import { homedir } from 'os';
 import { existsSync, mkdirSync } from 'fs';
 import { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
+import { app } from 'electron';
 
 export { RAIZ_WINDOWS_CANONICA } from '../shared/raiz-canonica';
 
@@ -342,6 +343,21 @@ export function getQaArtifactsDir(raizProjeto?: string): string {
 export function getUserDataPath(): string {
   const { app } = require('electron');
   return app.getPath('userData');
+}
+
+/**
+ * Caminho do diretorio de dados do usuario (appData)
+ * Com fallback seguro quando executado fora do Electron.
+ */
+export function userDataDir(): string {
+  try {
+    if (app && typeof app.getPath === 'function') {
+      return app.getPath('userData');
+    }
+  } catch {}
+  const envDir = process.env.DG_USERDATA;
+  if (envDir) return envDir;
+  return join(homedir(), '.dg-editor', 'userdata');
 }
 
 /**

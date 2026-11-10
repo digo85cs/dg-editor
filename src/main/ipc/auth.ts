@@ -6,6 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
+import { conectarAdapta, desconectarAdapta } from '../auth/adapta-oauth';
 
 // ============================================================================
 // HANDLERS DE AUTENTICACAO
@@ -54,6 +55,32 @@ export function handleAuthLogout(
   }
 }
 
+/**
+ * Handler para conectar conta Adapta
+ */
+export async function handleAdaptaConectar(
+  _event: Electron.IpcMainInvokeEvent
+): Promise<IpcResult & { ok: boolean; erro?: string; email?: string }> {
+  try {
+    return await conectarAdapta();
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) };
+  }
+}
+
+/**
+ * Handler para desconectar conta Adapta
+ */
+export function handleAdaptaDesconectar(
+  _event: Electron.IpcMainInvokeEvent
+): IpcResult & { ok: boolean; erro?: string } {
+  try {
+    return desconectarAdapta();
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) };
+  }
+}
+
 // ============================================================================
 // FUNCAO DE REGISTRO
 // ============================================================================
@@ -67,6 +94,8 @@ export function registrarHandlersAuth(): void {
   ipcMain.handle('auth:get-state', handleAuthGetState);
   ipcMain.handle('auth:ensure-identity', handleAuthEnsureIdentity);
   ipcMain.handle('auth:logout', handleAuthLogout);
+  ipcMain.handle('auth:adapta:conectar', handleAdaptaConectar);
+  ipcMain.handle('auth:adapta:desconectar', handleAdaptaDesconectar);
 
   dglog('[ipc:auth] handlers registrados!');
 }

@@ -1,6 +1,6 @@
 # Contexto de Continuidade — DG Editor
 
-> Gerado pelo DG Editor (`continuidade.md`) para Adapta ONE (Contextos) e Maestro.
+> Gerado pelo DG Editor (continuidade.md) para Adapta ONE (Contextos) e Maestro.
 
 ## Conta
 
@@ -9,15 +9,15 @@
 
 ## Resumo do dossiê
 
-- **Projeto (raiz):** `/proj`
+- **Projeto (raiz):** `C:\dev\DGEditor`
 - **Mensagens no chat:** 1
 - **Provedor mais recente:** ollama
-- **Atualizado em:** 2026-01-01
+- **Atualizado em:** 2026-11-10T13:38:00Z
 
 ### Últimas mensagens
 
 ```
-[2026-01-01T00:00:00.000Z] DONO: oi
+[2026-11-10T13:38:00.000Z] DONO: Código de verificação: PARDAL-7431 — dado exclusivo da ponte manual DG Editor → Adapta ONE
 ```
 
 ---
@@ -25,7 +25,7 @@
 ## Como usar
 
 1. **Adapta ONE:** + → Contextos → novo contexto "DG Editor" → cole este markdown.
-2. **Maestro:** conecte o MCP do DG (ver `docs/adapta.md`) e peça `dossie_read` / tools do projeto.
+2. **Maestro:** conecte o MCP do DG (ver docs/adapta.md) e peça dossie_read / tools do projeto.
 
 ## Próximo passo sugerido
 

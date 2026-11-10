@@ -4,11 +4,10 @@
  * Nunca lança exceções em proximoDisponivel; arquivo corrompido é regenerado vazio.
  * Comentários/logs em pt-BR; identificadores técnicos em inglês.
  */
-import { app } from 'electron'
+import { BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { dglog } from '../dglog'
-import { BrowserWindow } from 'electron'
 import {
   appendFailoverLog,
   normalizarTarefa,
@@ -16,8 +15,9 @@ import {
 import type { ProviderConfig } from './providers'
 import { filaGlobal, configParaProvider, type ProviderDescriptor, obterProvider } from './providers-registry'
 import { chaveConfigurada } from './segredos-providers'
+import { userDataDir } from '../paths'
 
-const ARQUIVO = join(app.getPath('userData'), 'cota-modelos.json')
+const ARQUIVO = join(userDataDir(), 'cota-modelos.json')
 const VERSAO = 2
 const DIA_MS = 24 * 60 * 60 * 1000
 const RAIZ = process.env.DG_ROOT || process.cwd()
@@ -94,7 +94,7 @@ function lerEstado(): EstadoCota {
 
 function salvarEstado(estado: EstadoCota): void {
   try {
-    const dir = app.getPath('userData')
+    const dir = userDataDir()
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(ARQUIVO, JSON.stringify(estado, null, 2), 'utf-8')
   } catch (e) {

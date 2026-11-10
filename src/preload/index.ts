@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
 const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
+  'auth:adapta:conectar', 'auth:adapta:desconectar',
   'system:get-profile', 'system:profile-strength',
   'folder:scan', 'folder:format-summary', 'folder:select',
   'brain:ask', 'brain:providers', 'brain:ollama-status', 'brain:models', 'brain:avaliar',

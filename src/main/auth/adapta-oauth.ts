@@ -8,7 +8,7 @@ import { criarJanelaNavegador } from '../navegador/janela'
 
 function authDir(){ const dir=join(app.getPath('userData'),'auth'); if(!existsSync(dir)) mkdirSync(dir,{recursive:true}); return dir }
 function authPath(){ return join(authDir(),'adapta.json') }
-function salvarSeguro(obj:any){ const p=authPath(); const json=JSON.stringify(obj,null,2); try{ if(safeStorage.isEncryptionAvailable()){ const enc=safeStorage.encryptString(json); writeFileSync(p+'.enc',enc); try{if(existsSync(p))unlinkSync(p)}catch{} return }}catch{} writeFileSync(p,json,'utf8') }
+function salvarSeguro(obj:any){ const p=authPath(); const json=JSON.stringify(obj,null,2); if(safeStorage.isEncryptionAvailable()){ const enc=safeStorage.encryptString(json); writeFileSync(p+'.enc',enc); try{if(existsSync(p))unlinkSync(p)}catch{} return } throw new Error('safeStorage nao disponível: recusa gravar token de Adapta em texto puro') }
 function lerSeguro():any|null{ try{ const penc=authPath()+'.enc'; const p=authPath(); if(existsSync(penc)&&safeStorage.isEncryptionAvailable()){ const buf=readFileSync(penc); return JSON.parse(safeStorage.decryptString(buf)) } if(existsSync(p)) return JSON.parse(readFileSync(p,'utf8')) }catch{} return null }
 export function getAdaptaStatus(){ const data=lerSeguro(); if(!data) return {conectado:false}; return {conectado:true, email:data.email, nome:data.nome} }
 export function desconectarAdapta(){ try{ const p=authPath(); const penc=p+'.enc'; if(existsSync(p))unlinkSync(p); if(existsSync(penc))unlinkSync(penc); return {ok:true} }catch(e:any){return {ok:false,erro:e.message}} }

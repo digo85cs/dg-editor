@@ -5,13 +5,14 @@
  * Formato: JSON { versao: 1, chaves: Record<string, string> } criptografado.
  * Nunca loga o valor da chave; máscara: primeiros 4 + '****'.
  */
-import { app, safeStorage } from 'electron'
+import { safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { dglog } from '../dglog'
 import { listarProviders, obterProvider } from './providers-registry'
+import { userDataDir } from '../paths'
 
-const ARQUIVO = join(app.getPath('userData'), 'providers-keys.bin')
+const ARQUIVO = join(userDataDir(), 'providers-keys.bin')
 const VERSAO = 1
 
 function mascarar(chave: string | undefined | null): string {
@@ -37,7 +38,7 @@ function lerArquivoCofre(): { versao: number; chaves: Record<string, string> } |
 }
 
 function gravarArquivoCofre(dados: { versao: number; chaves: Record<string, string> }): void {
-  const dir = app.getPath('userData')
+  const dir = userDataDir()
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   const texto = JSON.stringify(dados)
   const buf = safeStorage.encryptString(texto)
