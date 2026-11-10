@@ -10,6 +10,7 @@ import { join } from 'path'
 import { URL } from 'url'
 import { dglog } from '../dglog'
 import { OLLAMA_URL } from './ollama'
+import { lerChave } from './segredos-providers'
 import { resolverRaizProjeto } from '../paths'
 import { executarCodex, CodexCliError, statusCodexEmCache } from './codex-cli'
 
@@ -20,6 +21,8 @@ export interface ProviderConfig {
   modelo: string
   baseUrl: string
   apiKeyEnv?: string
+  /** referência lógica da chave no cofre de segredos (precede a env) */
+  apiKeyRef?: string
   numPredict: number
   timeoutMs: number
   /** caminho do binario (cursor-agent.ps1 / .cmd); resolvido em runtime se vazio */
@@ -164,6 +167,7 @@ export function classificarHttp(status: number, body: string, providerId: string
     return new ErroProvider('modelo_morto', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
   }
   if (status === 429) return new ErroProvider('rate_limit', 'HTTP 429: ' + body.slice(0, 200), providerId, status)
+  if (status === 402) return new ErroProvider('rate_limit', 'HTTP 402: cota/pagamento: ' + body.slice(0, 200), providerId, status)
   if (status === 401 || status === 403) return new ErroProvider('auth', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
   if (status >= 500) return new ErroProvider('server', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
   return new ErroProvider('outro', 'HTTP ' + status + ': ' + body.slice(0, 200), providerId, status)
@@ -269,10 +273,12 @@ async function adapterOpenAI(
   tools?: ToolDef[],
   signal?: AbortSignal
 ): Promise<RespostaProvider> {
-  const keyName = cfg.apiKeyEnv || ''
-  const key = keyName ? process.env[keyName] : undefined
+  const key = cfg.apiKeyRef
+    ? lerChave(cfg.apiKeyRef) || (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined)
+    : cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined
+  const keyName = cfg.apiKeyRef || cfg.apiKeyEnv || ''
   if (!key) {
-    throw new ErroProvider('auth', 'chave ausente: env ' + keyName, cfg.id, 401)
+    throw new ErroProvider('auth', 'chave ausente: ' + keyName, cfg.id, 401)
   }
 
   const base = cfg.baseUrl.replace(/\/$/, '')

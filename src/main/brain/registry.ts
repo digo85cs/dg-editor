@@ -13,6 +13,7 @@ import {
   cursorCliAprovadoNaSessao,
   resolverBinarioCursorAgent
 } from './providers'
+import { filaGlobal, configParaProvider } from './providers-registry'
 
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'chat-rapido' | 'analise' | 'analisar' | 'codigo' | 'raciocinio' | 'revisao'
@@ -220,11 +221,27 @@ function cfg(
 }
 
 /** Fila ordenada por tarefa. Online sem chave permanece (disponivel=false em runtime). */
+function comPrefixoGlobal(tail: ProviderConfig[]): ProviderConfig[] {
+  const visto = new Set<string>()
+  const out: ProviderConfig[] = []
+  const add = (p: ProviderConfig): void => {
+    const chave = (p.baseUrl || '') + '|' + (p.modelo || '')
+    if (visto.has(chave)) return
+    visto.add(chave)
+    out.push(p)
+  }
+  // Provedores do catálogo dinâmico primeiro (ordem menor = preferência maior).
+  for (const p of filaGlobal()) add(configParaProvider(p))
+  // Cauda legada preservada para compatibilidade (OpenRouter legado + cursor-cli + ollama).
+  for (const p of tail) add(p)
+  return out
+}
+
 function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
   const t = normalizarTarefa(String(tarefa))
 
   if (t === 'analise' || t === 'analisar') {
-    return [
+    return comPrefixoGlobal([
       cfg({
         id: 'openrouter:deepseek-v4-flash',
         tipo: 'online',
@@ -244,11 +261,11 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         numPredict: 512,
         timeoutMs: 180_000
       })
-    ]
+    ])
   }
 
   if (t === 'chat-rapido') {
-    return [
+    return comPrefixoGlobal([
       cfg({
         id: 'openrouter:deepseek-v4-flash',
         tipo: 'online',
@@ -268,11 +285,11 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         numPredict: 400,
         timeoutMs: 30_000
       })
-    ]
+    ])
   }
 
   if (t === 'chat') {
-    return [
+    return comPrefixoGlobal([
       cfg({
         id: 'openrouter:deepseek-v4-flash',
         tipo: 'online',
@@ -312,11 +329,11 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         timeoutMs: 300_000
       }),
       cfgCursorCli()
-    ]
+    ])
   }
 
   if (t === 'raciocinio') {
-    return [
+    return comPrefixoGlobal([
       cfg({
         id: 'openrouter:deepseek-v4-flash',
         tipo: 'online',
@@ -355,11 +372,11 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         numPredict: 2048,
         timeoutMs: 600_000
       })
-    ]
+    ])
   }
 
   if (t === 'revisao') {
-    return [
+    return comPrefixoGlobal([
       cfg({
         id: 'openrouter:deepseek-v4-flash',
         tipo: 'online',
@@ -390,11 +407,11 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         numPredict: 1024,
         timeoutMs: 300_000
       })
-    ]
+    ])
   }
 
   // codigo: v4-flash → v3.2 → qwen → cursor-cli → ollama → ollama (A/B2)
-  return [
+  return comPrefixoGlobal([
     cfg({
       id: 'openrouter:deepseek-v4-flash',
       tipo: 'online',
@@ -444,7 +461,7 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
       numPredict: 512,
       timeoutMs: 180_000
     })
-  ]
+  ])
 }
 
 /** A escolha explícita nunca altera a ordem automática já estabelecida. */
