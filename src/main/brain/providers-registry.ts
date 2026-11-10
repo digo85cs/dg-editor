@@ -269,14 +269,17 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
   }),
   desc('gemini-pago', 'Google Gemini (pago)', 'openai', 'https://generativelanguage.googleapis.com/v1beta/openai', {
     apiKeyRef: 'gemini', apiKeyEnv: 'GEMINI_API_KEY', tier: 2, ordem: 24,
+    preco: { entradaPor1M: 0.75, saidaPor1M: 3.75 }, // Google Gemini 3.8-flash — fonte: https://aistudio.google.com/docs/pricing — consulta 2026-11-10 (pago até 31/12/2026; depois $1.50/$7.50)
     modelos: [{ id: 'gemini-3.8-flash', capacidades: ['chat', 'codigo', 'analise'] }],
   }),
   desc('deepseek', 'DeepSeek', 'openai', 'https://api.deepseek.com/v1', {
     apiKeyRef: 'deepseek', tier: 2, ordem: 25,
+    preco: { entradaPor1M: 0.15, saidaPor1M: 0.60 }, // DeepSeek deepseek-flash cache miss — fonte: https://api-docs.deepseek.com/quick_start/pricing/ — consulta 2026-11-10 (valores off-peak; cache miss é o caso conservador)
     modelos: [{ id: 'deepseek-chat', capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] }],
   }),
   desc('zai-pago', 'Z.AI (pago)', 'openai', 'https://api.z.ai/api/paas/v4', {
     apiKeyRef: 'zai', tier: 2, ordem: 26,
+    preco: { entradaPor1M: 1.40, saidaPor1M: 4.40 }, // Z.AI GLM-5.3 — fonte: https://docs.z.ai/guides/overview/pricing — consulta 2026-11-10
     modelos: [{ id: 'glm-5.3', capacidades: ['chat', 'codigo', 'analise'] }],
   }),
 
