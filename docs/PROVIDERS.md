@@ -40,16 +40,14 @@ A fila global e ordenada por `ordem` (menor = preferencia maior). O roteador des
 | 21 | arli | 1 | https://api.arliai.com/v1 | 40 | UTC | sim | llama-3.3-70b |
 | 22 | litellm | 1 | http://127.0.0.1:4000/v1 | 0 | UTC | **nao** | gpt-3.5-turbo |
 | 23 | openai | 2 | https://api.openai.com/v1 | — | UTC | sim | gpt-5.3-mini |
-| 24 | anthropic-openai-shim | 2 | https://api.anthropic.com/v1 | — | UTC | **nao** | (sem endpoint confirmado) |
-| 25 | gemini-pago | 2 | https://generativelanguage.googleapis.com/v1beta/openai | — | UTC | sim | gemini-3.8-flash |
-| 26 | deepseek | 2 | https://api.deepseek.com/v1 | — | UTC | sim | deepseek-chat |
-| 27 | zai-pago | 2 | https://api.z.ai/api/paas/v4 | — | UTC | sim | glm-5.3 |
+| 24 | gemini-pago | 2 | https://generativelanguage.googleapis.com/v1beta/openai | — | UTC | sim | gemini-3.8-flash |
+| 25 | deepseek | 2 | https://api.deepseek.com/v1 | — | UTC | sim | deepseek-chat |
+| 26 | zai-pago | 2 | https://api.z.ai/api/paas/v4 | — | UTC | sim | glm-5.3 |
 | 28 | ollama-local | 3 | http://127.0.0.1:11434 | — | UTC | sim | qwen2.5-coder:7b, qwen2.5-coder:3b, llama3.2 |
 
 ## Provedores desativados (ativo:false)
 
 - **litellm** (ordem 22): gateway local opcional na porta 4000. So ativar se estiver rodando um LiteLLM local.
-- **anthropic-openai-shim** (ordem 24): endpoint OpenAI-compatible da Anthropic ainda nao confirmado. Ativar apenas quando o endpoint estiver disponível.
 
 Nenhum provedor foi removido por falta de chave: todos permanecem cadastrados. Os que nao tiverem chave configurada sao pulados em tempo de execucao.
 
@@ -121,17 +119,53 @@ desc('meu-provedor', 'Meu Provedor', 'openai', 'https://api.meuprovedor.com/v1',
 | `providers:cotas` | invoke | — | `{ ok, cotas: [...] }` |
 | `providers:resetar` | invoke | `{ id }` | `{ ok }` |
 | `providers:fila` | invoke | — | `{ ok, fila: [{ordem,id,tier,modelo,disponivel}] }` |
+| `providers:permitir-pago` | invoke | `{ v: boolean }` | `{ ok }` (liga/desliga uso de tier 2 pago) |
+| `providers:gasto` | invoke | — | `{ ok, usd, teto?, porProvider: {id: usd} }` |
+| `providers:cotas` | invoke | — | `{ ok, cotas: [...] }` |
+| `providers:resetar` | invoke | `{ id }` | `{ ok }` |
 | `brain:cota` | evento (webContents) | — | `{ status: [...] }` (atualizacao ao vivo na UI) |
+
+## Validacao real da fila (`testar:fila`)
+
+O script `scripts/testar-fila.mjs` faz uma chamada de 1 token (`max_tokens: 1`) em cada
+provider ativo que tenha chave configurada (via variavel de ambiente `apiKeyEnv`, pois o
+cofre de segredos depende do `safeStorage` do Electron e nao esta disponivel em Node puro).
+
+Executa com:
+```
+npm run testar:fila
+npm run testar:fila -- --json   # saida JSON em stdout
+```
+
+Estados possíveis na saida:
+
+| Estado | Significado |
+|--------|-------------|
+| `[OK ] id — 200 — Nms` | Provider respondeu com sucesso (HTTP 200) |
+| `[429] id — rate_limit (retry-after: N) — Nms` | Rate limit atingido |
+| `[402] id — cota/pagamento (HTTP 402)` | Cota esgotada / pagamento necessario |
+| `[AUTH] id — chave invalida (HTTP 401/403)` | Chave de API invalida |
+| `[SKIP] id — sem chave` | Nenhuma chave configurada (ni cofre, ni env) |
+| `[SKIP] id — desativado` | Provider marcado como `ativo: false` |
+| `[FAIL] id — erro de rede` | Falha de rede / timeout / nao alcançavel |
+
+Nunca imprime o valor da chave. Nao grava nada em disco.
 
 ## Observabilidade
 
 O roteador emite o evento `brain:cota` apos cada `marcarEsgotado` e apos `limparExpirados` quando houve limpeza. A UI escuta esse canal e atualiza a tabela de cotas ao vivo. Os logs de arquivo (`dg-log.txt`) registram provedor escolhido, tentativas e esgotamentos, sem expor chaves (mascara `primeiros4 + '****'`).
 
+## Provedores descartados
+
+| ID | Motivo da remocao | Alternativa |
+|-----|-------------------|-------------|
+| `anthropic-openai-shim` | `https://api.anthropic.com/v1` nao e um endpoint OpenAI-compatible. Forcar o formato `openai` criaria dívida, ja que a Anthropic possui SDK proprio e o `chamarProvider` ja suporta caminhos CLI (`cursor-cli`, `codex-cli`). | Usar o SDK oficial da Anthropic separadamente, ou acessar modelos Claude via OpenRouter (ex: `anthropic/claude-3-5-sonnet`) no provider `openrouter-*`. |
+
 ## Testes
 
 - `src/main/brain/__tests__/providers-registry.test.ts` — catálogo, ordem, configParaProvider, registrar/remover, sem duplicatas, cota tier 1.
 - `src/main/brain/__tests__/segredos-providers.test.ts` — round-trip cofre, arquivo sem texto plano, fallback env, sem criptografia.
-- `src/main/brain/__tests__/roteador-cota.test.ts` — 429/402, cancelled, rede, cap 24h, fuso LA, piso ollama, expirados, arquivo corrompido.
+- `src/main/brain/__tests__/roteador-cota.test.ts` — 429/402, cancelled, rede, cap 24h, fuso LA, piso ollama, expirados, arquivo corrompido, guardrail tier 2, teto diario, registrarCusto, migracao v1->v2.
 - `src/main/ipc/__tests__/contratos.test.ts` — shapes dos canais providers e nao-exposicao de chave.
 
 Executa com: `npx vitest run`
@@ -140,5 +174,5 @@ Executa com: `npx vitest run`
 
 - Provedores online (ordens 1-27) nao foram validados por chamada real por falta de chave; permanecem cadastrados mas pulados sem chave.
 - Endpoints OpenAI-compatible de terceiros podem mudar de formato sem aviso.
-- `anthropic-openai-shim` esta desativado ate confirmacao do endpoint.
 - `chamarProvider` continua usando `node:http` nativo (sem lib de retry externa); o retry de rede e controlado pelo roteador (max 2 falhas de rede, 4 de server).
+- `preco` nao e preenchido para nenhum provider (valores reais nao confirmados); `registrarCusto` ignora providers sem preco ate que precos reais sejam informados.
