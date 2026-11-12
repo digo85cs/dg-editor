@@ -1,9 +1,12 @@
 /**
- * Metricas leves em memoria para o orquestrador de agentes.
+ * Metricas leves para o orquestrador de agentes.
  * Registra duracao, sucesso/erro e timeouts por agente.
- * Nao depende de dependencias externas; so log via dglog.
+ * Persiste em .dg-editor/metrics.json para sobreviver a reinicializacoes.
  */
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs'
+import { join } from 'path'
 import { dglog } from './dglog'
+import { resolverRaizProjeto } from './paths'
 
 type RegistroAgente = {
   chamadas: number
@@ -15,6 +18,34 @@ type RegistroAgente = {
 }
 
 const metricas: Map<string, RegistroAgente> = new Map()
+let caminhoMetricas: string | null = null
+
+function caminhoArquivo(raiz: string): string {
+  return join(raiz, '.dg-editor', 'metrics.json')
+}
+
+function carregar(raiz: string): void {
+  const arquivo = caminhoArquivo(raiz)
+  if (!existsSync(arquivo)) return
+  try {
+    const dados = JSON.parse(readFileSync(arquivo, 'utf8')) as Record<string, RegistroAgente>
+    for (const [agente, r] of Object.entries(dados)) {
+      metricas.set(agente, r)
+    }
+  } catch { /* ignora, comeca do zero */ }
+}
+
+function salvar(raiz: string): void {
+  const arquivo = caminhoArquivo(raiz)
+  try {
+    mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+    const dados: Record<string, RegistroAgente> = {}
+    for (const [agente, r] of metricas) {
+      dados[agente] = r
+    }
+    writeFileSync(arquivo, JSON.stringify(dados, null, 2), 'utf8')
+  } catch { /* ignora */ }
+}
 
 function obter(agente: string): RegistroAgente {
   let r = metricas.get(agente)
@@ -26,6 +57,7 @@ function obter(agente: string): RegistroAgente {
 }
 
 export function registrarMetricaAgente(
+  raiz: string,
   agente: string,
   opts: { ok: boolean; duracaoMs: number; foiTimeout: boolean }
 ): void {
@@ -41,6 +73,7 @@ export function registrarMetricaAgente(
   } else {
     r.erros++
   }
+  salvar(raiz)
 }
 
 export function obterMetricasAgente(agente: string): RegistroAgente | undefined {
@@ -51,7 +84,7 @@ export function listarMetricasAgentes(): RegistroAgente[] {
   return Array.from(metricas.entries()).map(([agente, r]) => ({ agente, ...r }))
 }
 
-export function logResumoMetricas(): void {
+export function logResumoMetricas(raiz?: string): void {
   if (metricas.size === 0) return
   dglog('[metricas] resumo agentes:')
   for (const [agente, r] of metricas) {
@@ -62,8 +95,14 @@ export function logResumoMetricas(): void {
       `timeouts=${r.timeouts} taxaSucesso=${taxaSucesso}% mediaMs=${media} maxMs=${r.duracaoMaxMs}`
     )
   }
+  if (raiz) salvar(raiz)
 }
 
 export function resetarMetricas(): void {
   metricas.clear()
+}
+
+export function inicializarMetricas(raiz: string): void {
+  caminhoMetricas = raiz
+  carregar(raiz)
 }

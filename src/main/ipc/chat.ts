@@ -503,7 +503,8 @@ export async function handleChatSend(
           const fila = [idAgente, ...todos.filter((id) => id !== idAgente)];
           try {
             const orc = await orquestrarAgentes(rootOk, textoPedido, fila, undefined, {
-              pararNoPrimeiroSucesso: true
+              pararNoPrimeiroSucesso: true,
+              tarefa: modoValido
             });
             const ultimo = orc.passos[orc.passos.length - 1];
             const respostaTexto = orc.textoFinal || (ultimo ? ultimo.texto : '');

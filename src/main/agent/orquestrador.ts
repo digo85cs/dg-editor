@@ -11,14 +11,16 @@ import {
   registrarMetricaAgente,
   logResumoMetricas,
   resetarMetricas,
-  obterMetricasAgente
+  obterMetricasAgente,
+  inicializarMetricas
 } from '../metrics'
 
 export {
   registrarMetricaAgente,
   logResumoMetricas,
   resetarMetricas,
-  obterMetricasAgente
+  obterMetricasAgente,
+  inicializarMetricas
 }
 
 export type PassoOrquestracao = {
@@ -39,17 +41,25 @@ export type ResultadoOrquestracao = {
 
 const FILA_PADRAO = ['dg-engenheiro', 'revisor']
 
-// Tempo máximo que cada agente tem para responder antes de ser descartado.
-// 30s: resposta rápida — se travar ou não responder, salta imediatamente para o próximo.
-const AGENT_TIMEOUT_MS = 30_000
+// Tempo máximo por tipo de tarefa antes de descartar o agente.
+// Chat simples precisa de resposta rapida; codigo/edicao pode demorar mais.
+const AGENT_TIMEOUT_MS: Record<string, number> = {
+  chat: 30_000,
+  codigo: 60_000,
+  plan: 60_000,
+  debug: 60_000,
+  agent: 60_000,
+  auto: 60_000
+}
 
 export async function orquestrarAgentes(
   raiz: string,
   pedido: string,
   fila?: string[],
   contextoExtra?: string,
-  opts?: { pararNoPrimeiroSucesso?: boolean }
+  opts?: { pararNoPrimeiroSucesso?: boolean; tarefa?: string }
 ): Promise<ResultadoOrquestracao> {
+  inicializarMetricas(raiz)
   const disponiveis = listarAgentes(raiz).map((a) => a.id)
   let ids = (fila && fila.length ? fila : FILA_PADRAO).filter(Boolean)
   ids = ids.map((id) => {
@@ -65,6 +75,11 @@ export async function orquestrarAgentes(
   for (const id of ids) {
     dglog('[orquestrador] agente=' + id)
     const t0 = Date.now()
+
+    // AbortController próprio deste agente: quando o timeout dispara,
+    // o signal cancela o executarAgente em vez de deixar órfão no background.
+    const tarefa = opts?.tarefa || 'auto'
+    const timeoutMs = AGENT_TIMEOUT_MS[tarefa] || AGENT_TIMEOUT_MS.auto
 
     // AbortController próprio deste agente: quando o timeout dispara,
     // o signal cancela o executarAgente em vez de deixar órfão no background.
@@ -95,10 +110,10 @@ export async function orquestrarAgentes(
         promise,
         new Promise<never>((_, reject) => {
           raceTimer = setTimeout(() => {
-            dglog('[orquestrador] timeout agente=' + id + ' (' + AGENT_TIMEOUT_MS / 1000 + 's) — abortando e pulando')
+            dglog('[orquestrador] timeout agente=' + id + ' (' + timeoutMs / 1000 + 's) — abortando e pulando')
             controller.abort()
-            reject(new Error('timeout: ' + AGENT_TIMEOUT_MS / 1000 + 's'))
-          }, AGENT_TIMEOUT_MS)
+            reject(new Error('timeout: ' + timeoutMs / 1000 + 's'))
+          }, timeoutMs)
         })
       ])
 
@@ -113,7 +128,7 @@ export async function orquestrarAgentes(
         passos: r.passos,
         duracaoMs: r.duracaoMs || Date.now() - t0
       })
-      registrarMetricaAgente(id, { ok: r.ok !== false, duracaoMs: Date.now() - t0, foiTimeout: false })
+      registrarMetricaAgente(raiz, id, { ok: r.ok !== false, duracaoMs: Date.now() - t0, foiTimeout: false })
 
       if (opts?.pararNoPrimeiroSucesso && r.ok !== false) {
         break
@@ -137,7 +152,7 @@ export async function orquestrarAgentes(
         erro: msg,
         duracaoMs: Date.now() - t0
       })
-      registrarMetricaAgente(id, { ok: false, duracaoMs: Date.now() - t0, foiTimeout: foiTimeout })
+      registrarMetricaAgente(raiz, id, { ok: false, duracaoMs: Date.now() - t0, foiTimeout: foiTimeout })
       // Nunca encerra o fluxo: segue imediatamente para o próximo agente da fila.
       continue
     }

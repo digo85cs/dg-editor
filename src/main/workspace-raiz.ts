@@ -37,7 +37,7 @@ export function obterRaizWorkspace(): string | null {
 }
 
 /** Resolve root do chat: prefer payload, senao raiz ativa persistida. */
-export function resolverRaizChat(rootPayload: string): { ok: true; abs: string } | { ok: false; erro: string } {
+export function resolverRaizChat(rootPayload: string): { ok: true; abs: string; erro?: string } | { ok: false; erro: string } {
   const cand = String(rootPayload || '').trim() || obterRaizWorkspace() || ''
   if (!cand) {
     return {

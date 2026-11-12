@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
-import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, watch } from 'fs'
+import { join, basename } from 'path'
 import { scanFolder } from './scanner'
 import { readRules } from './dgrules'
 import { dglog } from './dglog'
@@ -22,6 +22,32 @@ const COMPLETE_KEY_FILE_PATTERNS = [
   'index.php', 'index.ts', 'index.js', 'main.ts', 'main.py',
   'app.py', 'app.ts', 'Dockerfile', '.env.example'
 ]
+
+let watchers: Map<string, ReturnType<typeof watch>> = new Map()
+
+/** Inicia watch de arquivos-chave para invalidar cache de analise automaticamente. */
+export function inicializarWatchAnalise(root: string): void {
+  if (watchers.has(root)) return
+  const w = watch(root, { recursive: true }, (eventType, filename) => {
+    if (!filename) return
+    const nome = basename(filename!)
+    const ehChave = KEY_FILE_PATTERNS.includes(nome) || COMPLETE_KEY_FILE_PATTERNS.includes(nome)
+    if (eventType === 'change' && ehChave) {
+      dglog('[analysis] watch: arquivo chave alterado=' + nome + ' — invalido cache')
+      invalidarCacheAnalise(root)
+    }
+  })
+  watchers.set(root, w)
+}
+
+/** Para o watch de um root (ex.: ao fechar workspace). */
+export function pararWatchAnalise(root: string): void {
+  const w = watchers.get(root)
+  if (w) {
+    try { w.close() } catch { /* */ }
+    watchers.delete(root)
+  }
+}
 
 function cacheDir(root: string): string {
   return join(root, CACHE_DIR)
@@ -181,6 +207,7 @@ export async function runAnalysis(
   escopoOrForce: EscopoAnalise | boolean = 'rapida',
   force = false
 ): Promise<AnalysisRunResult> {
+  inicializarWatchAnalise(root)
   const escopo = typeof escopoOrForce === 'string' ? escopoOrForce : 'rapida'
   const forceAtual = typeof escopoOrForce === 'boolean' ? escopoOrForce : force
   const inicioMs = Date.now()

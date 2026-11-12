@@ -4,6 +4,7 @@
 import fs from 'fs'
 import path from 'path'
 import { askOllama } from './ollama'
+import { dglog } from '../dglog'
 
 export interface AgenteDef {
   id: string
@@ -45,6 +46,16 @@ function parseAgente(arquivo: string, brutoIn: string): AgenteDef {
   return { id, nome, especialidade, system, skills, arquivo }
 }
 
+/** Valida que o agente tem campos obrigatórios preenchidos. */
+export function validarAgente(a: AgenteDef): { ok: boolean; erros: string[] } {
+  const erros: string[] = []
+  if (!a.nome || a.nome === a.id) erros.push('nome não preenchido no frontmatter')
+  if (!a.especialidade || a.especialidade === a.id) erros.push('especialidade não preenchida no frontmatter')
+  if (!a.skills.length) erros.push('skills não informadas no frontmatter')
+  if (!a.system.trim()) erros.push('system prompt vazio')
+  return { ok: erros.length === 0, erros }
+}
+
 export function listarAgentes(raiz: string): AgenteDef[] {
   const dir = dirAgentes(raiz)
   if (!fs.existsSync(dir)) return []
@@ -54,6 +65,10 @@ export function listarAgentes(raiz: string): AgenteDef[] {
       const abs = path.join(dir, f)
       const a = parseAgente(f, fs.readFileSync(abs, 'utf8'))
       a.arquivo = abs
+      const v = validarAgente(a)
+      if (!v.ok) {
+        dglog('[agentes] aviso: ' + a.id + ' invalido — ' + v.erros.join(', '))
+      }
       return a
     })
 }
