@@ -1,4 +1,4 @@
-﻿---
+---
 titulo: Navegador embutido
 gatilho: navegador, painel web, login site, baixar pagina, abrir site, navegar
 ---

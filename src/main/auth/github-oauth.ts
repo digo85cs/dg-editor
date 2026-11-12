@@ -6,8 +6,7 @@ import { join } from 'path'
 import { safeStorage } from 'electron'
 import { criarJanelaNavegador } from '../navegador/janela'
 
-const CLIENT_ID = process.env.GITHUB_CLIENT_ID || ''
-const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || ''
+import { githubClientId, githubClientSecret } from './oauth-clients'
 
 function authDir() { const dir = join(app.getPath('userData'), 'auth'); if (!existsSync(dir)) mkdirSync(dir, { recursive: true }); return dir }
 function authPath() { return join(authDir(), 'github.json') }
@@ -40,6 +39,11 @@ export function desconectarGithub() {
   try { const p = authPath(); const penc = p + '.enc'; if (existsSync(p)) unlinkSync(p); if (existsSync(penc)) unlinkSync(penc); return { ok: true } } catch(e:any){ return { ok: false, erro: e.message } }
 }
 export async function conectarGithub(): Promise<{ ok: boolean; erro?: string; email?: string }> {
+  const CLIENT_ID = githubClientId()
+  const CLIENT_SECRET = githubClientSecret()
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    return { ok: false, erro: 'Defina GitHub Client ID/Secret em Contas ou GITHUB_CLIENT_ID/SECRET.' }
+  }
   const state = randomBytes(16).toString('hex')
   return new Promise((resolve) => {
     const server = createServer(async (req, res) => {

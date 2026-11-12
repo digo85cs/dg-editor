@@ -14,6 +14,11 @@ export function salvarPastas() {
   } catch (e) {
     console.warn('[pastas] falha ao salvar localStorage:', e)
   }
+  try {
+    window.dispatchEvent(new CustomEvent('dg:workspace-sujo'))
+  } catch {
+    /* */
+  }
 }
 
 export function carregarPastas() {

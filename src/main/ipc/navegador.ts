@@ -13,6 +13,9 @@ import {
   mostrarNavegadorEmbutido,
   layoutNavegador,
   statusEmbedNavegador,
+  navegadorVoltar,
+  navegadorAvancar,
+  navegadorRecarregar,
 } from '../navegador/janela';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
@@ -121,6 +124,18 @@ export function handleNavegadorFechar(): IpcResult & { ok: boolean } {
   return { ok: true };
 }
 
+export function handleNavegadorVoltar(): IpcResult & { ok: boolean } {
+  return navegadorVoltar();
+}
+
+export function handleNavegadorAvancar(): IpcResult & { ok: boolean } {
+  return navegadorAvancar();
+}
+
+export function handleNavegadorRecarregar(): IpcResult & { ok: boolean } {
+  return navegadorRecarregar();
+}
+
 // ============================================================================
 // EVENTOS DO NAVEGADOR
 // ============================================================================
@@ -149,6 +164,9 @@ export function registrarHandlersNavegador(): void {
   ipcMain.handle('navegador:abrir', handleNavegadorAbrir);
   ipcMain.handle('navegador:embed-status', handleNavegadorEmbedStatus);
   ipcMain.handle('navegador:fechar', handleNavegadorFechar);
+  ipcMain.handle('navegador:voltar', handleNavegadorVoltar);
+  ipcMain.handle('navegador:avancar', handleNavegadorAvancar);
+  ipcMain.handle('navegador:recarregar', handleNavegadorRecarregar);
 
   ipcMain.on('navegador:bounds', handleNavegadorBounds);
   ipcMain.on('navegador:mostrar', handleNavegadorMostrar);

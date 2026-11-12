@@ -14,14 +14,16 @@ import { css } from '@codemirror/lang-css'
 import { markdown } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
 import { xml } from '@codemirror/lang-xml'
+import { detectarFimDeLinha, paraDisco, paraDocumento } from './editor-texto.js'
+import { anexarOverviewRuler } from './features/editor/overview-ruler.js'
 
 const langCompartment = new Compartment()
 const themeCompartment = new Compartment()
 
 const setDiffMarks = StateEffect.define()
 
-const delMark = CMDecoration.mark({ class: 'cm-diff-del' })
-const addMark = CMDecoration.mark({ class: 'cm-diff-add' })
+const delMark = CMDecoration.line({ class: 'cm-diff-del-line' })
+const addMark = CMDecoration.line({ class: 'cm-diff-add-line' })
 
 class GhostTexto extends WidgetType {
   constructor(texto) {
@@ -117,11 +119,11 @@ function buildDiffDecorations(doc, linhasDel, linhasAdd) {
   const ranges = []
   for (const n of linhasDel || []) {
     const r = lineRange(doc, n)
-    if (r) ranges.push(delMark.range(r.from, r.to))
+    if (r) ranges.push(delMark.range(r.from))
   }
   for (const n of linhasAdd || []) {
     const r = lineRange(doc, n)
-    if (r) ranges.push(addMark.range(r.from, r.to))
+    if (r) ranges.push(addMark.range(r.from))
   }
   ranges.sort((a, b) => a.from - b.from)
   return CMDecoration.of(ranges)
@@ -131,6 +133,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
   let view = null
   let caminhoAtual = null
   let salvo = ''
+  let fimDeLinha = '\n'
   let sugestao = ''
   let pedidoSug = 0
   let timerSug = null
@@ -188,6 +191,8 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
   ]))
   /** @type {EditorView | null} */
   let sideView = null
+  /** @type {{ refresh: Function, setDiff: Function, destroy: Function } | null} */
+  let overview = null
 
   const saveKey = keymap.of([
     {
@@ -203,6 +208,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     doc: '',
     extensions: [
       basicSetup,
+      EditorView.lineWrapping,
       keymap.of(searchKeymap),
       saveKey,
       tabSugestao,
@@ -215,15 +221,30 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
           onChange(u.state.doc.toString())
         }
         if (u.docChanged) agendarSugestao(u.view)
+        if (u.docChanged || u.selectionSet || u.geometryChanged) {
+          overview?.refresh()
+        }
       }),
       EditorView.theme({
-        '&': { height: '100%' },
+        '&': { height: '100%', position: 'relative' },
         '.cm-scroller': {
           overflow: 'auto',
-          fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)"
+          fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)",
+          paddingRight: '14px'
         },
-        '.cm-diff-del': { backgroundColor: 'rgba(248, 81, 73, 0.22)' },
-        '.cm-diff-add': { backgroundColor: 'rgba(61, 214, 140, 0.22)' },
+        '.cm-content': { wordBreak: 'break-word' },
+        '.cm-diff-del-line': {
+          backgroundColor: 'rgba(248, 81, 73, 0.14)'
+        },
+        '.cm-diff-del-line .cm-gutterElement': {
+          borderLeft: '3px solid #f85149'
+        },
+        '.cm-diff-add-line': {
+          backgroundColor: 'rgba(61, 214, 140, 0.14)'
+        },
+        '.cm-diff-add-line .cm-gutterElement': {
+          borderLeft: '3px solid #3dd68c'
+        },
         '.cm-dg-ghost': { color: '#8b949e', fontStyle: 'italic' }
       })
     ]
@@ -231,8 +252,13 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
 
   view = new EditorView({ state, parent })
 
+  overview = anexarOverviewRuler(view, {
+    getSalvo: () => salvo
+  })
+
   function limparDiff() {
     view.dispatch({ effects: setDiffMarks.of(CMDecoration.none) })
+    overview?.setDiff({ del: [], add: [], ia: [] })
     if (sideView) {
       sideView.destroy()
       sideView = null
@@ -255,6 +281,11 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     limparDiff()
     const dec = buildDiffDecorations(view.state.doc, opts.linhasDel || [], [])
     view.dispatch({ effects: setDiffMarks.of(dec) })
+    overview?.setDiff({
+      del: opts.linhasDel || [],
+      add: opts.linhasAdd || [],
+      ia: [...(opts.linhasDel || []), ...(opts.linhasAdd || [])]
+    })
 
     const side = document.getElementById('editor-diff-side')
     const host = document.getElementById('editor-host')
@@ -276,8 +307,13 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
             overflow: 'auto',
             fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)"
           },
-          '.cm-diff-add': { backgroundColor: 'rgba(61, 214, 140, 0.22)' },
-        '.cm-dg-ghost': { color: '#8b949e', fontStyle: 'italic' }
+          '.cm-diff-add-line': {
+            backgroundColor: 'rgba(61, 214, 140, 0.16)'
+          },
+          '.cm-diff-add-line .cm-gutterElement': {
+            borderLeft: '3px solid #3dd68c'
+          },
+          '.cm-dg-ghost': { color: '#8b949e', fontStyle: 'italic' }
         }),
         (() => {
           const field = StateField.define({
@@ -296,7 +332,8 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
 
   return {
     view,
-    getConteudo: () => view.state.doc.toString(),
+    getConteudo: () => paraDisco(view.state.doc.toString(), fimDeLinha),
+    getDocumento: () => view.state.doc.toString(),
     getCaminho: () => caminhoAtual,
     getSalvo: () => salvo,
     getSelecao: () => {
@@ -306,7 +343,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     },
     isDirty: () => view.state.doc.toString() !== salvo,
     setSalvo: (texto) => {
-      salvo = texto
+      salvo = paraDocumento(texto)
     },
     marcarSalvo: () => {
       salvo = view.state.doc.toString()
@@ -314,9 +351,11 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     abrir: (caminho, conteudo) => {
       limparDiff()
       caminhoAtual = caminho
-      salvo = conteudo
+      fimDeLinha = detectarFimDeLinha(conteudo)
+      const doc = paraDocumento(conteudo)
+      salvo = doc
       view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: conteudo },
+        changes: { from: 0, to: view.state.doc.length, insert: doc },
         effects: [
           langCompartment.reconfigure(langPorExt(caminho)),
           themeCompartment.reconfigure(temaEscuro() ? oneDark : []),
@@ -328,6 +367,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
       limparDiff()
       caminhoAtual = null
       salvo = ''
+      fimDeLinha = '\n'
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: '' },
         effects: [langCompartment.reconfigure([]), setDiffMarks.of(CMDecoration.none)]
@@ -349,8 +389,12 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
       openSearchPanel(view)
     },
     focar: () => view.focus(),
+    overviewRefresh: () => overview?.refresh(),
+    overviewDiff: (parcial) => overview?.setDiff(parcial || {}),
     destruir: () => {
       limparDiff()
+      overview?.destroy()
+      overview = null
       view.destroy()
     }
   }

@@ -15,6 +15,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { dglog } from './dglog';
 import { aplicarIdentidadeDg, resolverIconeApp, DG_APP_NAME } from './branding';
 import { getAuthStore } from './auth';
+import { iniciarAutoUpdate } from './auto-update';
+import { agendarManutencaoNoBoot } from './deps-manutencao';
 
 // ============================================================================
 // ESTADO GLOBAL
@@ -38,9 +40,17 @@ if (SAFE_MODE) ativarSafeMode();
 // ============================================================================
 
 function caminhoTravaInstancia(): string | null {
-  const raiz = process.env.DG_ROOT || (process.platform === 'win32' ? 'D:\\CURSOR\\DG Editor' : '');
-  if (!raiz) return null;
-  return join(raiz, '.dg-editor', 'instance.lock');
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { resolverRaizProjeto } = require('./paths') as { resolverRaizProjeto: () => string }
+    const raiz = process.env.DG_ROOT || resolverRaizProjeto()
+    if (!raiz) return null
+    return join(raiz, '.dg-editor', 'instance.lock')
+  } catch {
+    const raiz = process.env.DG_ROOT || ''
+    if (!raiz) return null
+    return join(raiz, '.dg-editor', 'instance.lock')
+  }
 }
 
 function marcarInstanciaAberta(): void {
@@ -376,27 +386,70 @@ app.whenReady().then(() => {
   // Registrar handlers IPC
   setMainWindow(mainWindow);
   registrarTodosHandlers();
+  try {
+    iniciarAutoUpdate(() => mainWindow)
+  } catch (e) {
+    dglog('[boot] auto-update: ' + String(e))
+  }
+  try {
+    if (!SAFE_MODE && !qaE2e) agendarManutencaoNoBoot()
+  } catch (e) {
+    dglog('[boot] deps-manutencao: ' + String(e))
+  }
+  try {
+    const { garantirHardwareProfile } = require('./hardware-profile') as {
+      garantirHardwareProfile: (f?: boolean) => unknown
+    }
+    garantirHardwareProfile(false)
+  } catch (e) {
+    dglog('[boot] hardware-profile: ' + String(e))
+  }
   registerVaultIpc();
   registerOpenClawIpc();
   registerAgentExtrasIpc();
+  try {
+    const { garantirToken } = require('./openclaw/secrets');
+    const tok = garantirToken();
+    if (tok?.ok) dglog('[openclaw] token ' + (tok.criado ? 'criado' : 'ok') + ' prefixo=' + (tok.prefixo || ''));
+  } catch (e) {
+    dglog('[openclaw] token-ensure falhou: ' + String(e));
+  }
+  try {
+    const { sincronizarChavesDoAmbiente } = require('./brain/providers-sync-env');
+    const sync = sincronizarChavesDoAmbiente();
+    dglog('[providers-sync] boot gravadas=' + (sync?.gravadas || []).join(',') + ' semEnv=' + (sync?.semEnv || []).length);
+  } catch (e) {
+    dglog('[providers-sync] boot falhou: ' + String(e));
+  }
 
   if (!SAFE_MODE && !qaE2e) {
     // Detectacao de modelos NAO no boot - libera o event loop para terminal:create.
     void import('./paths').then(({ resolverRaizProjeto }) => {
       const raiz = resolverRaizProjeto();
       setTimeout(() => {
+        void import('./ollama-keeper').then(({ ensureOllama }) => ensureOllama()).catch(() => {});
         void import('./brain/modelos-catalogo').then(async (mod) => {
           try {
             const cat = await mod.detectarModelosLocais(raiz);
             const v = mod.validarCatalogo(cat);
             if (!v.ok) dglog('[modelos] validarCatalogo: ' + v.problemas.join('; '));
             else dglog('[modelos] validarCatalogo: ok');
+            // Warmup leve 1.5b para evitar ERR_LLM_TIMEOUT no 1o uso
+            try {
+              const { medirLatenciaModelo } = await import('./brain/ollama');
+              const leve = cat.modelosPorTarefa?.['chat-rapido'] || 'qwen2.5-coder:1.5b';
+              void medirLatenciaModelo(leve, 90_000).then((r) => {
+                dglog('[modelos] warmup ' + leve + ' ok=' + String(r.ok === true));
+              });
+            } catch (e) {
+              dglog('[modelos] warmup falhou: ' + String(e));
+            }
             if (!SAFE_MODE) mod.iniciarHealthPeriodico(raiz, 120000);
           } catch (e) {
             dglog('[modelos] boot falhou: ' + String(e));
           }
         });
-      }, 15000);
+      }, 3000);
     });
   }
 

@@ -287,17 +287,28 @@ function corrigirAtivoSecundarioEmMemoria(cat: CatalogoModelos): void {
   }
 }
 
-/** Status 'down' legado (timeout 8s) nao deve excluir modelo instalado ate o health novo. */
+/** Status 'down'/'offline' legado nao deve excluir modelo instalado na escolha. */
 function limparDownObsoletoInstalado(cat: CatalogoModelos): void {
   for (const m of cat.modelos) {
     if (m.provider !== 'ollama' || m.instalado === false) continue
-    if (m.status !== 'down') continue
+    if (m.status !== 'down' && m.status !== 'offline') continue
     m.status = 'desconhecido'
     // latencia == valor do timeout antigo (~8s) nao e medicao real
     if (m.latenciaMs != null && m.latenciaMs >= 7500 && m.latenciaMs <= 9500) {
       m.latenciaMs = null
     }
   }
+}
+
+const FALLBACKS_CHAT = ['qwen2.5-coder:1.5b', 'qwen2.5-coder:3b', 'llama3.2:latest', 'qwen2.5-coder:7b']
+
+function usavelParaChat(m: ModeloEntrada, excluirEmbedding: boolean): boolean {
+  if (m.provider !== 'ollama') return false
+  if (m.ativo === false) return false
+  if (m.instalado === false) return false
+  if (excluirEmbedding && m.tipo === 'embedding') return false
+  // offline/down/lento: ainda tentar — Ollama pode ter voltado; so 'not found' real e instalado=false
+  return true
 }
 
 export function lerCatalogo(raiz: string): CatalogoModelos {
@@ -415,12 +426,13 @@ export async function detectarModelosLocais(raiz: string): Promise<CatalogoModel
   const cat = lerCatalogo(raiz)
   const tags = await listarModelosOllama()
   if (!tags) {
+    // Falha transitória: NÃO zerar instalado — evita "Nenhum modelo de chat instalado"
     for (const m of cat.modelos) {
-      if (m.provider === 'ollama') {
-        m.instalado = false
-        m.status = 'down'
+      if (m.provider === 'ollama' && m.instalado !== false) {
+        m.status = 'desconhecido'
       }
     }
+    dglog('[modelos] detectar: tags indisponiveis; mantendo instalado conhecido')
     salvarCatalogo(raiz, cat)
     return cat
   }
@@ -568,44 +580,63 @@ const TAREFAS_SEM_EMBEDDING = new Set([
   'codigo'
 ])
 
-export function modeloParaTarefa(raiz: string, tarefa: string): string | null {
+export function modeloParaTarefaComMotivo(
+  raiz: string,
+  tarefa: string
+): { modelo: string | null; motivo: string } {
   const cat = lerCatalogo(raiz)
   const excluirEmbedding = TAREFAS_SEM_EMBEDDING.has(tarefa) || !tarefa
   const modeloPreferido = cat.modelosPorTarefa?.[tarefa]
-  const preferido = modeloPreferido && cat.modelos.find(
-    (m) => m.id === modeloPreferido && m.ativo && m.instalado !== false &&
-      m.status !== 'down' && m.status !== 'offline' && (!excluirEmbedding || m.tipo !== 'embedding')
-  )
-  if (preferido) return preferido.id
+  const preferido =
+    modeloPreferido &&
+    cat.modelos.find((m) => m.id === modeloPreferido && usavelParaChat(m, excluirEmbedding))
+  if (preferido) {
+    return { modelo: preferido.id, motivo: 'mapeado em modelosPorTarefa:' + tarefa }
+  }
   const porte = cat.roteamento[tarefa] || cat.roteamento.codigo || 'padrao'
   const cand = cat.modelos.find(
-    (m) =>
-      m.ativo &&
-      m.instalado !== false &&
-      m.status !== 'down' &&
-      m.status !== 'offline' &&
-      m.porte === porte &&
-      (!excluirEmbedding || m.tipo !== 'embedding')
+    (m) => usavelParaChat(m, excluirEmbedding) && m.porte === porte
   )
-  if (cand) return cand.id
+  if (cand) {
+    return { modelo: cand.id, motivo: 'porte ' + porte + ' (roteamento:' + tarefa + ')' }
+  }
   if (cat.ativo) {
     const a = cat.modelos.find((m) => m.id === cat.ativo)
-    const porteCompativel = !!a && a.porte === porte
-    if (
-      a &&
-      porteCompativel &&
-      a.instalado !== false &&
-      a.status !== 'down' &&
-      a.status !== 'offline' &&
-      (!excluirEmbedding || a.tipo !== 'embedding')
-    ) {
-      return cat.ativo
+    if (a && usavelParaChat(a, excluirEmbedding)) {
+      return { modelo: cat.ativo, motivo: 'modelo ativo do catálogo' }
     }
   }
-  const qualquer = cat.modelos.find(
-    (m) => m.instalado && (!excluirEmbedding || m.tipo !== 'embedding')
-  )
-  return qualquer?.id || null
+  const qualquer = cat.modelos.find((m) => usavelParaChat(m, excluirEmbedding))
+  if (qualquer) {
+    return { modelo: qualquer.id, motivo: 'primeiro modelo instalado disponível' }
+  }
+  // Preferencia pelo perfil de hardware (local so como fallback da fila online)
+  try {
+    const { modeloLocalSugerido } = require('../hardware-profile') as {
+      modeloLocalSugerido: (tarefa: string) => string
+    }
+    const sug = modeloLocalSugerido(tarefa)
+    if (sug) {
+      const hit = cat.modelos.find((m) => m.id === sug || m.id.startsWith(sug.split(':')[0]))
+      if (!hit || hit.instalado !== false) {
+        return { modelo: hit?.id || sug, motivo: 'hardware-profile ' + sug }
+      }
+    }
+  } catch {
+    /* */
+  }
+  // Hard fallback: modelos conhecidos neste PC (mesmo se catálogo ficou sujo)
+  for (const id of FALLBACKS_CHAT) {
+    const hit = cat.modelos.find((m) => m.id === id)
+    if (!hit || hit.instalado !== false) {
+      return { modelo: id, motivo: 'fallback hard ' + id }
+    }
+  }
+  return { modelo: FALLBACKS_CHAT[0], motivo: 'fallback ultimo recurso 1.5b' }
+}
+
+export function modeloParaTarefa(raiz: string, tarefa: string): string | null {
+  return modeloParaTarefaComMotivo(raiz, tarefa).modelo
 }
 
 let healthTimer: ReturnType<typeof setInterval> | null = null
@@ -620,12 +651,13 @@ export async function healthCheckLeve(raiz: string): Promise<CatalogoModelos> {
   for (const m of cat.modelos) {
     if (m.provider !== 'ollama') continue
     if (!ok) {
-      m.status = 'offline'
+      // Ping falhou: nao marcar offline sticky (evita bloquear chat/analise)
+      if (m.instalado !== false) m.status = 'desconhecido'
       m.latenciaMs = null
     } else if (m.instalado === false) {
       m.status = 'down'
       m.latenciaMs = null
-    } else if (m.status === 'offline' || !m.status) {
+    } else if (m.status === 'offline' || m.status === 'down' || !m.status) {
       m.status = 'desconhecido'
     }
   }

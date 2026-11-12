@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Continue Rules Agent
 especialidade: contexto e regras estilo Continue.dev
 skills: leitor-codigo, arvore-projeto, documentador

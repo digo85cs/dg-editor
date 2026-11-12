@@ -10,7 +10,10 @@
   }
 
   function host() {
-    return document.querySelector('#modal-config .modal-box, #modal-config') || document.body
+    return document.querySelector('#modal-config .modal-body.config-body') ||
+      document.querySelector('#modal-config .modal-box') ||
+      document.getElementById('modal-config') ||
+      document.body
   }
 
   function ensure() {
@@ -21,12 +24,15 @@
     box.setAttribute('aria-label', 'Diagnóstico do Sistema')
     box.innerHTML =
       '<div class="dg-diag__head">' +
-        '<div><h4>Diagnóstico do Sistema</h4><p class="muted" style="margin:2px 0 0">Verificação do ambiente local (Ollama, disco, pasta, encoding, build).</p></div>' +
-        '<button type="button" id="dg-diag-refresh" class="btn-small">Verificar novamente</button>' +
+        '<div><h4>Diagnóstico do Sistema</h4><p class="muted" style="margin:2px 0 0">Status do Ollama, API e ambiente. Arraste a janela pela barra de título.</p></div>' +
+        '<button type="button" id="dg-diag-refresh" class="btn-small" title="Rodar verificação de novo">Verificar novamente</button>' +
       '</div>' +
       '<div id="dg-diag-grid" class="dg-diag__grid" aria-live="polite"></div>' +
       '<div id="dg-diag-foot" class="dg-diag__foot muted" role="status"></div>'
-    host().appendChild(box)
+    const h = host()
+    // No topo do corpo, para as bolinhas Ollama/API ficarem sempre visíveis
+    if (h.firstChild) h.insertBefore(box, h.firstChild)
+    else h.appendChild(box)
     $('dg-diag-refresh').addEventListener('click', () => { void verificar(true) })
     renderSkeleton()
   }

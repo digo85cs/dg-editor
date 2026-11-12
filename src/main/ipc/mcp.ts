@@ -5,7 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import { mcpAtivo } from '../mcp/client';
+import { mcpAtivo, mcpHabilitado } from '../mcp/client';
 import type { IpcResult } from './types';
 
 // ============================================================================
@@ -32,11 +32,41 @@ export async function handleMcpTools(
  */
 export function handleMcpStatus(
   _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string; ativo?: boolean } {
+): IpcResult & { ok: boolean; erro?: string; ativo?: boolean; habilitado?: boolean } {
   try {
-    return { ok: true, ativo: mcpAtivo() };
+    return { ok: true, ativo: mcpAtivo(), habilitado: mcpHabilitado() };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
+  }
+}
+
+export async function handleMcpSetHabilitado(
+  _event: Electron.IpcMainInvokeEvent,
+  valor: unknown
+): Promise<IpcResult & { ok: boolean; habilitado?: boolean; erro?: string }> {
+  try {
+    const { setMcpHabilitado } = await import('../mcp/client');
+    return await setMcpHabilitado(valor === true);
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function handleMcpSmoke(
+  _event: Electron.IpcMainInvokeEvent
+): Promise<IpcResult & {
+  ok: boolean
+  habilitado?: boolean
+  conectado?: boolean
+  tools?: number
+  nomes?: string[]
+  erro?: string
+}> {
+  try {
+    const { smokeMcp } = await import('../mcp/client');
+    return await smokeMcp();
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -47,11 +77,26 @@ export function handleMcpStatus(
 /**
  * Registra todos os handlers de MCP
  */
+export async function handleConectoresListar(
+  _event: Electron.IpcMainInvokeEvent
+): Promise<IpcResult & { ok: boolean; conectores?: unknown[]; erro?: string }> {
+  try {
+    const { listarConectores } = await import('../conectores-status');
+    const conectores = await listarConectores();
+    return { ok: true, conectores };
+  } catch (e: unknown) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e), conectores: [] };
+  }
+}
+
 export function registrarHandlersMcp(): void {
   dglog('[ipc:mcp] registrando handlers...');
 
   ipcMain.handle('mcp:tools', handleMcpTools);
   ipcMain.handle('mcp:status', handleMcpStatus);
+  ipcMain.handle('mcp:set-habilitado', handleMcpSetHabilitado);
+  ipcMain.handle('mcp:smoke', handleMcpSmoke);
+  ipcMain.handle('conectores:listar', handleConectoresListar);
 
   dglog('[ipc:mcp] handlers registrados!');
 }

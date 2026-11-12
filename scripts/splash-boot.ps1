@@ -5,8 +5,20 @@ $ErrorActionPreference = 'Continue'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$raizFixa = 'D:\CURSOR\DG Editor'
-$raiz = if (Test-Path (Join-Path $raizFixa 'package.json')) { $raizFixa } else { (Get-Location).Path }
+$raizFixa = 'C:\dev\DGEditor'
+if (-not (Test-Path (Join-Path $raizFixa 'package.json'))) { $raizFixa = 'D:\CURSOR\DG Editor' }
+$raizScript = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { '' }
+if (Test-Path (Join-Path $raizFixa 'package.json')) {
+  $raiz = $raizFixa
+} elseif ($env:DG_ROOT -and (Test-Path (Join-Path $env:DG_ROOT 'package.json'))) {
+  $raiz = $env:DG_ROOT
+} elseif (Test-Path (Join-Path (Get-Location).Path 'package.json')) {
+  $raiz = (Get-Location).Path
+} elseif ($raizScript -and (Test-Path (Join-Path $raizScript 'package.json'))) {
+  $raiz = $raizScript
+} else {
+  $raiz = (Get-Location).Path
+}
 Set-Location $raiz
 $env:DG_ROOT = $raiz
 
@@ -19,50 +31,100 @@ function Write-BootLog([string]$msg) {
   try { Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8 } catch {}
 }
 
-# ---------- Splash UI ----------
+# ---------- Splash UI (marca DG: #121214 + accent #0080ff) ----------
+$bg = [System.Drawing.Color]::FromArgb(18, 18, 20)
+$accent = [System.Drawing.Color]::FromArgb(0, 128, 255)
+$muted = [System.Drawing.Color]::FromArgb(168, 176, 188)
+$text = [System.Drawing.Color]::FromArgb(245, 245, 245)
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'DG Editor'
 $form.FormBorderStyle = 'None'
 $form.StartPosition = 'CenterScreen'
-$form.Size = New-Object System.Drawing.Size(420, 220)
-$form.BackColor = [System.Drawing.Color]::FromArgb(18, 18, 20)
+$form.Size = New-Object System.Drawing.Size(460, 248)
+$form.BackColor = $bg
 $form.TopMost = $true
 $form.ShowInTaskbar = $true
 
 $painel = New-Object System.Windows.Forms.Panel
 $painel.Dock = 'Fill'
-$painel.BackColor = [System.Drawing.Color]::FromArgb(18, 18, 20)
+$painel.BackColor = $bg
 $form.Controls.Add($painel)
+
+$faixa = New-Object System.Windows.Forms.Panel
+$faixa.Size = New-Object System.Drawing.Size(460, 3)
+$faixa.Location = New-Object System.Drawing.Point(0, 0)
+$faixa.BackColor = $accent
+$painel.Controls.Add($faixa)
 
 $titulo = New-Object System.Windows.Forms.Label
 $titulo.Text = 'DG Editor'
-$titulo.ForeColor = [System.Drawing.Color]::FromArgb(232, 232, 232)
+$titulo.ForeColor = $text
 $titulo.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 22, [System.Drawing.FontStyle]::Bold)
 $titulo.AutoSize = $true
-$titulo.Location = New-Object System.Drawing.Point(36, 48)
-$painel.Controls.Add($titulo)
+$titulo.Location = New-Object System.Drawing.Point(36, 52)
+$logoPath = Join-Path $raiz 'resources\logo-wide-lg.png'
+if (-not (Test-Path $logoPath)) { $logoPath = Join-Path $raiz 'resources\logo-wide.png' }
+$logoBox = New-Object System.Windows.Forms.PictureBox
+$logoBox.SizeMode = 'Zoom'
+$logoBox.Size = New-Object System.Drawing.Size(300, 88)
+$logoBox.Location = New-Object System.Drawing.Point(80, 28)
+$logoBox.BackColor = $bg
+if (Test-Path $logoPath) {
+  try {
+    $logoBox.Image = [System.Drawing.Image]::FromFile($logoPath)
+    $painel.Controls.Add($logoBox)
+    $titulo.Visible = $false
+  } catch {
+    $painel.Controls.Add($titulo)
+  }
+} else {
+  $painel.Controls.Add($titulo)
+}
+
+$sub = New-Object System.Windows.Forms.Label
+$sub.Text = 'Editor de sistemas com IA local'
+$sub.ForeColor = $muted
+$sub.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$sub.AutoSize = $true
+$sub.Location = New-Object System.Drawing.Point(38, 122)
+$painel.Controls.Add($sub)
 
 $status = New-Object System.Windows.Forms.Label
 $status.Text = 'Carregando'
-$status.ForeColor = [System.Drawing.Color]::FromArgb(140, 200, 190)
-$status.Font = New-Object System.Drawing.Font('Segoe UI', 12)
+$status.ForeColor = $accent
+$status.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
 $status.AutoSize = $true
-$status.Location = New-Object System.Drawing.Point(38, 108)
+$status.Location = New-Object System.Drawing.Point(38, 152)
 $painel.Controls.Add($status)
 
-$barra = New-Object System.Windows.Forms.ProgressBar
-$barra.Style = 'Marquee'
-$barra.MarqueeAnimationSpeed = 28
-$barra.Size = New-Object System.Drawing.Size(340, 6)
-$barra.Location = New-Object System.Drawing.Point(40, 150)
-$painel.Controls.Add($barra)
+$trilha = New-Object System.Windows.Forms.Panel
+$trilha.Size = New-Object System.Drawing.Size(384, 4)
+$trilha.Location = New-Object System.Drawing.Point(38, 190)
+$trilha.BackColor = [System.Drawing.Color]::FromArgb(40, 44, 52)
+$painel.Controls.Add($trilha)
+
+$barra = New-Object System.Windows.Forms.Panel
+$barra.Size = New-Object System.Drawing.Size(96, 4)
+$barra.Location = New-Object System.Drawing.Point(0, 0)
+$barra.BackColor = $accent
+$trilha.Controls.Add($barra)
 
 $dots = 0
+$barX = 0
+$barDir = 1
 $timerDots = New-Object System.Windows.Forms.Timer
-$timerDots.Interval = 420
+$timerDots.Interval = 36
 $timerDots.Add_Tick({
-  $script:dots = ($script:dots + 1) % 4
-  $status.Text = 'Carregando' + ('.' * $script:dots)
+  $script:dots = ($script:dots + 1) % 28
+  if (($script:dots % 12) -eq 0) {
+    $fase = [int]([Math]::Floor($script:dots / 12)) % 4
+    $status.Text = 'Carregando' + ('.' * $fase)
+  }
+  $script:barX += (6 * $script:barDir)
+  if ($script:barX -gt 288) { $script:barX = 288; $script:barDir = -1 }
+  if ($script:barX -lt 0) { $script:barX = 0; $script:barDir = 1 }
+  $barra.Location = New-Object System.Drawing.Point($script:barX, 0)
 })
 
 $jobScript = Join-Path $raiz 'dg-boot.ps1'
@@ -125,8 +187,9 @@ $timerPoll.Add_Tick({
     $timerDots.Stop(); $timerPoll.Stop()
     $status.ForeColor = [System.Drawing.Color]::FromArgb(220, 90, 90)
     $status.Text = 'Falha no boot — veja .dg-editor\logs\boot.log'
-    $barra.Style = 'Continuous'
-    $barra.Value = 0
+    $barra.BackColor = [System.Drawing.Color]::FromArgb(220, 90, 90)
+    $barra.Width = 384
+    $barra.Location = New-Object System.Drawing.Point(0, 0)
     Start-Sleep -Seconds 4
     $form.Close()
     return

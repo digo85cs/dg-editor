@@ -6,7 +6,7 @@ import { join } from 'path'
 import { safeStorage } from 'electron'
 import { criarJanelaNavegador } from '../navegador/janela'
 
-const CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || ''
+import { microsoftClientId } from './oauth-clients'
 const TENANT = 'common'
 const SCOPES = ['openid', 'profile', 'email', 'User.Read', 'Files.ReadWrite', 'offline_access']
 
@@ -43,6 +43,10 @@ export function desconectarMicrosoft() {
   try { const p = authPath(); const penc = p + '.enc'; if (existsSync(p)) unlinkSync(p); if (existsSync(penc)) unlinkSync(penc); return { ok: true } } catch(e:any){ return { ok: false, erro: e.message } }
 }
 export async function conectarMicrosoft(): Promise<{ ok: boolean; erro?: string; email?: string }> {
+  const CLIENT_ID = microsoftClientId()
+  if (!CLIENT_ID) {
+    return { ok: false, erro: 'Defina Microsoft Client ID em Contas ou MICROSOFT_CLIENT_ID (app gratuito Azure).' }
+  }
   const verifier = base64url(randomBytes(32))
   const challenge = base64url(sha256(verifier))
   const state = base64url(randomBytes(16))

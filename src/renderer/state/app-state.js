@@ -15,6 +15,7 @@ export const state = {
 export function setPastaAtual(v) {
   state.pastaAtual = v || null
   try { window.__DG_PASTA_ATUAL__ = state.pastaAtual } catch { /* */ }
+  try { window.dispatchEvent(new CustomEvent('dg:workspace-sujo')) } catch { /* */ }
 }
 
 if (typeof window !== 'undefined' && window.__DG_DEBUG) window.__DG_STATE = state

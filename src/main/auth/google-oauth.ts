@@ -6,7 +6,7 @@ import { join } from 'path'
 import { safeStorage } from 'electron'
 import { criarJanelaNavegador } from '../navegador/janela'
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
+import { googleClientId } from './oauth-clients'
 const SCOPES = ['openid', 'email', 'profile']
 
 function base64url(buffer: Buffer) { return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') }
@@ -42,6 +42,10 @@ export function desconectarGoogle() {
   try { const p = authPath(); const penc = p + '.enc'; if (existsSync(p)) unlinkSync(p); if (existsSync(penc)) unlinkSync(penc); return { ok: true } } catch(e:any){ return { ok: false, erro: e.message } }
 }
 export async function conectarGoogle(): Promise<{ ok: boolean; erro?: string; email?: string }> {
+  const CLIENT_ID = googleClientId()
+  if (!CLIENT_ID) {
+    return { ok: false, erro: 'Defina Google Client ID em Contas (OAuth gratuito) ou GOOGLE_CLIENT_ID.' }
+  }
   const verifier = base64url(randomBytes(32))
   const challenge = base64url(sha256(verifier))
   const state = base64url(randomBytes(16))

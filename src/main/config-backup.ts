@@ -30,9 +30,24 @@ export function backupConfigs(motivo = 'manual', diretorioDados?: string): {
     const raiz = resolverRaizProjeto()
     const candidatos = [
       join(dados, 'dg-editor.json'),
+      join(dados, 'tema.json'),
+      join(dados, 'workspace.json'),
+      join(dados, 'dg-config.json'),
       join(raiz, 'qa-artifacts', 'baseline.json'),
-      join(raiz, '.dg-editor', 'modelos.json')
+      join(raiz, '.dg-editor', 'modelos.json'),
+      join(raiz, '.dg-editor', 'dossie', 'continuidade.md'),
+      join(raiz, '.dgrules')
     ]
+    const chatsDir = join(raiz, '.dg-editor', 'chats')
+    if (existsSync(chatsDir)) {
+      const sub = join(dest, 'chats')
+      mkdirSync(sub, { recursive: true })
+      for (const f of readdirSync(chatsDir)) {
+        if (!f.endsWith('.json')) continue
+        copyFileSync(join(chatsDir, f), join(sub, f))
+        copiados.push('chats/' + f)
+      }
+    }
     const agentesDir = join(raiz, '.dg-editor', 'agentes')
     for (const c of candidatos) {
       if (!existsSync(c)) continue

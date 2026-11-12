@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Kilo Orchestrator
 especialidade: orquestracao multi-agente
 skills: leitor-codigo, arvore-projeto, documentador

@@ -12,28 +12,32 @@ import type { IpcResult } from './types';
 // ============================================================================
 
 /**
- * Handler para obter perfil do sistema
+ * Handler para obter perfil do sistema (sempre { ok, ...campos } para o renderer).
  */
 export function handleSystemGetProfile(
   _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string } {
+): IpcResult & { ok: boolean; erro?: string; cpus?: unknown; totalMemory?: number; hostname?: string } {
   try {
     const { getSystemProfile } = require('../profile');
-    return getSystemProfile();
+    const p = getSystemProfile();
+    return { ok: true, ...p };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
   }
 }
 
 /**
- * Handler para obter forca do perfil
+ * Handler para obter forca do perfil — string estável (não objeto cru).
  */
 export function handleSystemProfileStrength(
   _event: Electron.IpcMainInvokeEvent
-): IpcResult & { ok: boolean; erro?: string } {
+): IpcResult & { ok: boolean; erro?: string; forca?: string; label?: string } {
   try {
     const { getSystemProfile, profileStrength } = require('../profile');
-    return profileStrength(getSystemProfile());
+    const forca = profileStrength(getSystemProfile()) as string;
+    const label =
+      forca === 'strong' ? 'forte' : forca === 'medium' ? 'média' : forca === 'light' ? 'leve' : String(forca);
+    return { ok: true, forca, label };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
   }

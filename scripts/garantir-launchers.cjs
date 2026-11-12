@@ -12,17 +12,17 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')
-const RAIZ_WIN = 'D:\\CURSOR\\DG Editor'
+const RAIZ_WIN = ROOT
 
 const VBS = [
   "' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).",
-  "' Atalho: wscript + ESTE arquivo.",
+  "' Atalho: wscript + ESTE arquivo. A raiz e a pasta deste .vbs.",
   'Option Explicit',
   'Dim sh, raiz, splash, boot, cmd, fso',
-  'raiz = "D:\\CURSOR\\DG Editor"',
+  'Set fso = CreateObject("Scripting.FileSystemObject")',
+  'raiz = fso.GetParentFolderName(WScript.ScriptFullName)',
   'splash = raiz & "\\scripts\\splash-boot.ps1"',
   'boot = raiz & "\\dg-boot.ps1"',
-  'Set fso = CreateObject("Scripting.FileSystemObject")',
   'On Error Resume Next',
   'fso.CreateTextFile(raiz & "\\.dg-root", True).Write raiz',
   'On Error GoTo 0',
@@ -41,7 +41,8 @@ const VBS = [
 
 const BAT_ABRIR = [
   '@echo off',
-  'set "DG_ROOT=D:\\CURSOR\\DG Editor"',
+  'set "DG_ROOT=%~dp0"',
+  'if "%DG_ROOT:~-1%"=="\\" set "DG_ROOT=%DG_ROOT:~0,-1%"',
   'if not exist "%DG_ROOT%\\abrir-dg-editor.vbs" exit /b 1',
   'start "" /min wscript.exe //nologo "%DG_ROOT%\\abrir-dg-editor.vbs"',
   'exit /b 0',
@@ -50,9 +51,9 @@ const BAT_ABRIR = [
 
 const BAT_ATALHO = [
   '@echo off',
-  'cd /d "D:\\CURSOR\\DG Editor"',
-  'if not exist "D:\\CURSOR\\DG Editor\\package.json" exit /b 1',
-  'powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "D:\\CURSOR\\DG Editor\\scripts\\criar-atalho-desktop.ps1"',
+  'cd /d "%~dp0"',
+  'if not exist "%~dp0package.json" exit /b 1',
+  'powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0scripts\\criar-atalho-desktop.ps1"',
   'exit /b %ERRORLEVEL%',
   ''
 ].join('\r\n')
@@ -158,7 +159,7 @@ function instalarShimElectronVite() {
 
 function main() {
   const feitos = []
-  // No Windows a raiz oficial e sempre D:\CURSOR\DG Editor
+  // Raiz = pasta deste repositorio (nao depende de D:\CURSOR)
   const alvo =
     process.platform === 'win32' && fs.existsSync(path.join(RAIZ_WIN, 'package.json'))
       ? RAIZ_WIN

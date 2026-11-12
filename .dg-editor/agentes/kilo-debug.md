@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Kilo Debug
 especialidade: diagnostico e correcao
 skills: debugger, leitor-codigo, testador

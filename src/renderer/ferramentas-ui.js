@@ -43,7 +43,47 @@ export function ligarFerramentas(pastaFn) {
   }
 
   function pedirPasta() {
-    corpo.appendChild(bloco('Pasta', ['Abra uma pasta no Explorer para ver os dados deste projeto.']))
+    corpo.appendChild(bloco('Repositório', ['Abra um repositório no Explorer para ver os dados deste projeto.']))
+  }
+
+  function formCriar(titulo, campos, onSalvar) {
+    const box = document.createElement('section')
+    box.className = 'tool-bloco'
+    const h = document.createElement('h4')
+    h.textContent = titulo
+    box.appendChild(h)
+    const form = document.createElement('div')
+    form.className = 'tool-criar-form'
+    const refs = {}
+    for (const c of campos) {
+      const el = c.tipo === 'textarea' ? document.createElement('textarea') : document.createElement('input')
+      if (c.tipo === 'textarea') el.rows = c.rows || 3
+      else el.type = 'text'
+      el.placeholder = c.placeholder || c.label
+      el.setAttribute('aria-label', c.label)
+      refs[c.key] = el
+      form.appendChild(el)
+    }
+    const acoes = document.createElement('div')
+    acoes.className = 'tool-criar-acoes'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'btn-small btn-primary'
+    btn.textContent = 'Criar'
+    btn.addEventListener('click', async () => {
+      const vals = {}
+      for (const k of Object.keys(refs)) vals[k] = String(refs[k].value || '').trim()
+      btn.disabled = true
+      try {
+        await onSalvar(vals)
+      } finally {
+        btn.disabled = false
+      }
+    })
+    acoes.appendChild(btn)
+    form.appendChild(acoes)
+    box.appendChild(form)
+    return box
   }
 
   async function seguro(channel, ...args) {
@@ -99,6 +139,28 @@ export function ligarFerramentas(pastaFn) {
       pedirPasta()
       return
     }
+    corpo.appendChild(
+      formCriar(
+        'Criar agente',
+        [
+          { key: 'nome', label: 'Nome', placeholder: 'Nome do agente' },
+          { key: 'especialidade', label: 'Especialidade', placeholder: 'Ex.: revisão de PRs' },
+          { key: 'skills', label: 'Skills', placeholder: 'skills separadas por vírgula' },
+          { key: 'system', label: 'Instruções', tipo: 'textarea', placeholder: 'Como o agente deve agir…' }
+        ],
+        async (vals) => {
+          if (!vals.nome) {
+            if (window.dgToast) window.dgToast('Informe o nome do agente', 'aviso')
+            return
+          }
+          const r = await seguro('agente:criar', raiz, vals)
+          if (r && r.ok) {
+            if (window.dgToast) window.dgToast('Agente criado: ' + (r.id || vals.nome), 'ok')
+            await pintarAutomacoes(raiz)
+          } else if (window.dgToast) window.dgToast((r && r.erro) || 'Falha ao criar', 'erro')
+        }
+      )
+    )
     const ag = await seguro('agente:listar', raiz)
     const agentes = (ag && ag.agentes) || []
     corpo.appendChild(bloco(
@@ -109,14 +171,85 @@ export function ligarFerramentas(pastaFn) {
     ir.type = 'button'
     ir.className = 'tool-nav-btn'
     ir.textContent = 'Abrir a aba Agent'
+    ir.title = 'Focar o painel de execução do agente'
     ir.addEventListener('click', () => {
-      if (window.dgUi && window.dgUi.ativarAbaCentro) window.dgUi.ativarAbaCentro('agent')
+      if (window.dgUi?.focarPainelIa) window.dgUi.focarPainelIa('agent')
+      else if (window.dgUi?.ativarAbaCentro) window.dgUi.ativarAbaCentro('agent')
     })
     corpo.appendChild(ir)
+
+    // Assistente ComfyUI (imagem / vídeo)
+    const media = document.createElement('section')
+    media.className = 'tool-bloco tool-comfy'
+    media.innerHTML =
+      '<h4>Assistente de mídia (ComfyUI)</h4>' +
+      '<p class="muted" style="margin:0 0 8px;font-size:12px">Gera imagem ou vídeo via ComfyUI local (porta 8188). Importe um workflow Wan/SDXL no ComfyUI antes.</p>' +
+      '<label class="muted" style="display:block;font-size:11px;margin-bottom:4px">Prompt' +
+      '<textarea id="comfy-prompt" rows="3" class="whereis-input" style="width:100%;margin-top:4px;resize:vertical" placeholder="Descreva a cena…"></textarea></label>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">' +
+      '<button type="button" class="btn-small" id="comfy-status" title="Checar se o ComfyUI está no ar">Status</button>' +
+      '<button type="button" class="btn-small" id="comfy-docs" title="Ver passos de uso">Como usar</button>' +
+      '<button type="button" class="btn-small btn-primary" id="comfy-gerar-img" title="Enfileirar geração de imagem">Gerar imagem</button>' +
+      '<button type="button" class="btn-small btn-primary" id="comfy-gerar-vid" title="Enfileirar geração de vídeo">Gerar vídeo</button>' +
+      '</div>' +
+      '<p id="comfy-msg" class="muted" style="font-size:11px;margin:0"></p>'
+    corpo.appendChild(media)
+    const msg = () => media.querySelector('#comfy-msg')
+    const promptEl = () => /** @type {HTMLTextAreaElement|null} */ (media.querySelector('#comfy-prompt'))
+    media.querySelector('#comfy-status')?.addEventListener('click', async () => {
+      const r = await seguro('dg:comfyui:status')
+      const el = msg()
+      if (el) {
+        el.textContent = r?.ok
+          ? 'ComfyUI online · ' + (r.docs || '')
+          : 'ComfyUI offline · ' + (r?.erro || 'inicie em 127.0.0.1:8188')
+      }
+      if (window.dgToast) window.dgToast(r?.ok ? 'ComfyUI online' : 'ComfyUI offline', r?.ok ? 'ok' : 'erro')
+    })
+    media.querySelector('#comfy-docs')?.addEventListener('click', async () => {
+      const r = await seguro('dg:comfyui:docs')
+      const el = msg()
+      if (el) el.textContent = (r?.passos || []).join(' ')
+      if (r?.url && window.api?.invoke) {
+        try { await window.api.invoke('navegador:abrir', r.url) } catch { /* */ }
+      }
+    })
+    const gerar = async (modo) => {
+      const prompt = promptEl()?.value?.trim() || ''
+      if (!prompt) {
+        if (window.dgToast) window.dgToast('Digite o prompt', 'aviso')
+        return
+      }
+      const el = msg()
+      if (el) el.textContent = 'Enviando ao ComfyUI…'
+      const r = await seguro('dg:comfyui:gerar', { prompt, modo })
+      if (el) el.textContent = r?.ok ? (r.mensagem || 'Enfileirado') : (r?.erro || 'Falha')
+      if (window.dgToast) window.dgToast(r?.ok ? 'Pedido enviado ao ComfyUI' : (r?.erro || 'Falha'), r?.ok ? 'ok' : 'erro')
+    }
+    media.querySelector('#comfy-gerar-img')?.addEventListener('click', () => void gerar('imagem'))
+    media.querySelector('#comfy-gerar-vid')?.addEventListener('click', () => void gerar('video'))
   }
 
   async function pintarArtefatos() {
     corpo.textContent = ''
+    corpo.appendChild(
+      formCriar(
+        'Novo checkpoint',
+        [{ key: 'origem', label: 'Rótulo', placeholder: 'Ex.: antes do refactor' }],
+        async (vals) => {
+          const raiz = pasta()
+          if (!raiz) {
+            if (window.dgToast) window.dgToast('Abra um repositório antes', 'aviso')
+            return
+          }
+          const r = await seguro('agente:checkpoint-criar', [], vals.origem || 'manual-ui')
+          if (r && r.ok !== false) {
+            if (window.dgToast) window.dgToast('Checkpoint criado', 'ok')
+            await pintarArtefatos()
+          } else if (window.dgToast) window.dgToast((r && r.erro) || 'Falha no checkpoint', 'erro')
+        }
+      )
+    )
     const prop = await seguro('propostas:listar')
     const pendentes = (prop && prop.pendentes) || []
     corpo.appendChild(bloco(
@@ -140,31 +273,277 @@ export function ligarFerramentas(pastaFn) {
       pedirPasta()
       return
     }
+    corpo.appendChild(
+      formCriar(
+        'Criar skill',
+        [
+          { key: 'titulo', label: 'Título', placeholder: 'Nome da skill' },
+          { key: 'gatilho', label: 'Gatilho', placeholder: 'palavras que ativam a skill' },
+          { key: 'instrucao', label: 'Instrução', tipo: 'textarea', placeholder: 'O que a skill deve fazer…' }
+        ],
+        async (vals) => {
+          if (!vals.titulo) {
+            if (window.dgToast) window.dgToast('Informe o título', 'aviso')
+            return
+          }
+          const r = await seguro('skills:criar', raiz, vals)
+          if (r && r.ok) {
+            if (window.dgToast) window.dgToast('Skill criada: ' + (r.id || vals.titulo), 'ok')
+            await pintarSkills(raiz)
+          } else if (window.dgToast) window.dgToast((r && r.erro) || 'Falha ao criar', 'erro')
+        }
+      )
+    )
     const r = await seguro('skills:listar', raiz)
     const skills = (r && r.skills) || []
-    corpo.appendChild(bloco(
-      'Instruções em .dg-editor/skills',
-      skills.map((s) => s.titulo + (s.gatilho ? ' — quando: ' + s.gatilho : ''))
-    ))
+    const caixa = document.createElement('section')
+    caixa.className = 'tool-bloco'
+    const h = document.createElement('h4')
+    h.textContent = 'Skills em .dg-editor/skills'
+    caixa.appendChild(h)
+    if (!skills.length) {
+      const p = document.createElement('p')
+      p.className = 'tool-vazio'
+      p.textContent = 'Nenhuma skill encontrada.'
+      caixa.appendChild(p)
+    }
+    caixa.classList.add('tool-skills-lista')
+    for (const sk of skills) {
+      const linha = document.createElement('div')
+      linha.className = 'tool-acao-linha tool-skill-row'
+      const info = document.createElement('div')
+      info.className = 'tool-acao-info'
+      const titulo = document.createElement('div')
+      titulo.className = 'tool-skill-titulo'
+      titulo.textContent = sk.titulo || sk.id
+      info.appendChild(titulo)
+      if (sk.gatilho) {
+        const gat = document.createElement('div')
+        gat.className = 'tool-skill-meta muted'
+        gat.textContent = 'Quando: ' + sk.gatilho
+        info.appendChild(gat)
+      }
+      const usar = document.createElement('button')
+      usar.type = 'button'
+      usar.className = 'btn-small'
+      usar.textContent = 'Usar'
+      usar.title = 'Ativar skill no próximo turno do chat'
+      usar.addEventListener('click', () => {
+        if (window.dgChatUsarSkill) window.dgChatUsarSkill(sk.id || sk.titulo, sk.titulo || sk.id)
+        else {
+          try { localStorage.setItem('dg-chat-skill', sk.id || sk.titulo) } catch {}
+        }
+      })
+      linha.appendChild(info)
+      linha.appendChild(usar)
+      caixa.appendChild(linha)
+    }
+    corpo.appendChild(caixa)
   }
 
   async function pintarConectores() {
     corpo.textContent = ''
+    corpo.appendChild(
+      formCriar(
+        'Novo conector (nota local)',
+        [
+          { key: 'nome', label: 'Nome', placeholder: 'Ex.: API interna' },
+          { key: 'detalhe', label: 'Detalhe', placeholder: 'URL ou descrição' }
+        ],
+        async (vals) => {
+          if (!vals.nome) {
+            if (window.dgToast) window.dgToast('Informe o nome', 'aviso')
+            return
+          }
+          try {
+            const key = 'dg-conectores-custom'
+            const prev = JSON.parse(localStorage.getItem(key) || '[]')
+            prev.unshift({ id: 'custom-' + Date.now(), nome: vals.nome, detalhe: vals.detalhe || '', ativo: false })
+            localStorage.setItem(key, JSON.stringify(prev.slice(0, 40)))
+            if (window.dgToast) window.dgToast('Conector anotado: ' + vals.nome, 'ok')
+            await pintarConectores()
+          } catch (e) {
+            if (window.dgToast) window.dgToast(String(e), 'erro')
+          }
+        }
+      )
+    )
+    try {
+      const custom = JSON.parse(localStorage.getItem('dg-conectores-custom') || '[]')
+      if (Array.isArray(custom) && custom.length) {
+        corpo.appendChild(
+          bloco(
+            'Conectores anotados',
+            custom.slice(0, 12).map((c) => c.nome + (c.detalhe ? ' — ' + c.detalhe : ''))
+          )
+        )
+      }
+    } catch { /* ignore */ }
     const oll = await seguro('brain:ollama-status')
     const ollamaLinha = oll && oll.installed === false
       ? 'Ollama não está instalado.'
       : oll && oll.reachable
         ? 'Ollama no ar. Modelos vistos: ' + ((oll.models && oll.models.length) || 0)
         : 'Ollama instalado, mas parado.'
-    corpo.appendChild(bloco('IA local', [ollamaLinha]))
+    const iaBox = bloco('IA local', [ollamaLinha])
+    if (oll && !oll.reachable && oll.installed !== false) {
+      const start = document.createElement('button')
+      start.type = 'button'
+      start.className = 'tool-nav-btn'
+      start.textContent = 'Iniciar Ollama'
+      start.addEventListener('click', async () => {
+        start.disabled = true
+        start.textContent = 'Iniciando...'
+        await seguro('deps:ollama:start')
+        await pintarConectores()
+      })
+      iaBox.appendChild(start)
+    }
+    corpo.appendChild(iaBox)
+
+    const conn = await seguro('conectores:listar')
+    const conectores = (conn && conn.conectores) || []
+    const caixa = document.createElement('section')
+    caixa.className = 'tool-bloco'
+    const h = document.createElement('h4')
+    h.textContent = 'Conectores do DG Editor'
+    caixa.appendChild(h)
+    if (!conectores.length) {
+      const p = document.createElement('p')
+      p.className = 'tool-vazio'
+      p.textContent = conn && conn.erro ? String(conn.erro) : 'Nenhum conector listado.'
+      caixa.appendChild(p)
+    }
+    for (const c of conectores) {
+      const linha = document.createElement('div')
+      linha.className = 'tool-acao-linha'
+      const info = document.createElement('div')
+      info.className = 'tool-acao-info'
+      info.textContent = (c.ativo ? '● ' : '○ ') + c.nome + ' — ' + c.detalhe
+      const testar = document.createElement('button')
+      testar.type = 'button'
+      testar.className = 'tool-nav-btn'
+      testar.textContent = 'Testar'
+      testar.addEventListener('click', async () => {
+        testar.disabled = true
+        testar.textContent = '...'
+        let msg = 'sem resposta'
+        try {
+          if (c.id === 'ollama' || /ollama/i.test(c.nome || '')) {
+            const st = await seguro('brain:ollama-status')
+            msg = st && st.reachable ? 'OK — Ollama no ar' : 'Falha — Ollama parado'
+          } else if (c.tipo === 'mcp' || c.id === 'mcp') {
+            const st = await seguro('mcp:status')
+            msg = st && st.ativo ? 'OK — MCP ativo' : 'Falha — MCP inativo'
+          } else {
+            const again = await seguro('conectores:listar')
+            const hit = ((again && again.conectores) || []).find((x) => x.id === c.id)
+            msg = hit && hit.ativo ? 'OK — ' + (hit.detalhe || 'ativo') : 'Falha — ' + ((hit && hit.detalhe) || 'inativo')
+          }
+        } catch (e) {
+          msg = 'Erro: ' + String(e && e.message ? e.message : e)
+        }
+        if (window.dgToast) window.dgToast(c.nome + ': ' + msg, /OK/i.test(msg) ? 'ok' : 'erro')
+        testar.disabled = false
+        testar.textContent = 'Testar'
+        await pintarConectores()
+      })
+      const docs = document.createElement('button')
+      docs.type = 'button'
+      docs.className = 'tool-nav-btn'
+      docs.textContent = 'Docs'
+      docs.title = 'Abrir documentação relacionada'
+      docs.addEventListener('click', () => {
+        const mapa = {
+          ollama: 'docs/ollama-mcp.md',
+          mcp: 'docs/ollama-mcp.md',
+          cursor: 'docs/PROVIDERS.md',
+          codex: 'docs/PROVIDERS.md',
+          adapta: 'docs/adapta.md'
+        }
+        const arq = mapa[c.id] || (c.usa ? null : 'docs/PROVIDERS.md')
+        const raiz = pasta()
+        if (arq && raiz && window.dgUi) {
+          // best-effort: abrir no editor se existir caminho relativo
+          const full = raiz.replace(/[\/]+$/, '') + '\\' + arq.replace(/\//g, '\\')
+          void window.api.invoke('arquivo:existe', full, [raiz]).then((ex) => {
+            if (ex && ex.ok && ex.existe && typeof window.abrirArquivoNaAba === 'function') {
+              void window.abrirArquivoNaAba(full)
+            } else if (window.dgToast) window.dgToast('Docs: ' + arq, 'aviso')
+          })
+        } else if (window.dgToast) window.dgToast((c.usa ? 'Canal: ' + c.usa : 'Sem docs mapeados'), 'aviso')
+      })
+      linha.appendChild(info)
+      linha.appendChild(testar)
+      linha.appendChild(docs)
+      caixa.appendChild(linha)
+    }
+    corpo.appendChild(caixa)
+
     const st = await seguro('mcp:status')
     const tools = await seguro('mcp:tools')
     const nomes = (tools && tools.tools) || []
+    const mcpBox = document.createElement('section')
+    mcpBox.className = 'tool-bloco'
+    const mcpTitulo = document.createElement('h4')
+    mcpTitulo.textContent =
+      st && st.habilitado === false
+        ? 'MCP desligado'
+        : st && st.ativo
+          ? 'MCP ligado'
+          : 'MCP'
+    mcpBox.appendChild(mcpTitulo)
+    const mcpAcoes = document.createElement('div')
+    mcpAcoes.className = 'tool-acao-linha'
+    const toggle = document.createElement('button')
+    toggle.type = 'button'
+    toggle.className = 'tool-nav-btn'
+    toggle.textContent = st && st.habilitado === false ? 'Ativar MCP' : 'Desativar MCP'
+    toggle.addEventListener('click', async () => {
+      const novo = !(st && st.habilitado !== false)
+      const r = await seguro('mcp:set-habilitado', novo)
+      if (window.dgToast) {
+        window.dgToast(
+          r && r.ok ? (novo ? 'MCP ativado' : 'MCP desativado') : 'Falha: ' + ((r && r.erro) || ''),
+          r && r.ok ? 'ok' : 'erro'
+        )
+      }
+      await pintarConectores()
+    })
+    const smoke = document.createElement('button')
+    smoke.type = 'button'
+    smoke.className = 'tool-nav-btn'
+    smoke.textContent = 'Smoke MCP'
+    smoke.addEventListener('click', async () => {
+      smoke.disabled = true
+      smoke.textContent = '...'
+      const r = await seguro('mcp:smoke')
+      const msg =
+        r && r.ok
+          ? 'OK — ' + (r.tools || 0) + ' tools'
+          : 'Falha — ' + ((r && r.erro) || 'sem tools')
+      if (window.dgToast) window.dgToast(msg, r && r.ok ? 'ok' : 'erro')
+      smoke.disabled = false
+      smoke.textContent = 'Smoke MCP'
+      await pintarConectores()
+    })
+    mcpAcoes.appendChild(toggle)
+    mcpAcoes.appendChild(smoke)
+    mcpBox.appendChild(mcpAcoes)
+    const lista = document.createElement('p')
+    lista.className = 'tool-vazio'
+    lista.textContent = nomes.length
+      ? nomes.map((t) => t.name).slice(0, 24).join(', ')
+      : tools && tools.erro
+        ? String(tools.erro)
+        : 'Nenhuma ferramenta MCP respondeu.'
+    mcpBox.appendChild(lista)
+    corpo.appendChild(mcpBox)
+    const skills = await seguro('skills:listar', pasta())
+    const listaSkills = (skills && skills.skills) || []
     corpo.appendChild(bloco(
-      st && st.ativo ? 'MCP ligado' : 'MCP',
-      nomes.length
-        ? nomes.map((t) => t.name + (t.description ? ' — ' + String(t.description).slice(0, 80) : ''))
-        : [tools && tools.erro ? String(tools.erro) : 'Nenhuma ferramenta MCP respondeu.']
+      'Skills locais',
+      listaSkills.length ? listaSkills.map((s) => s.titulo || s.id) : ['Nenhuma skill em .dg-editor/skills']
     ))
   }
 
@@ -189,7 +568,14 @@ export function ligarFerramentas(pastaFn) {
     caixa.appendChild(tituloFatos)
     const nota = document.createElement('p')
     nota.className = 'tool-vazio'
-    nota.textContent = 'So entra no chat depois de aceito.'
+    const aceitasN = itens.filter((i) => i.status === 'aceita').length
+    const pendN = itens.filter((i) => i.status !== 'aceita').length
+    nota.textContent =
+      'Só entra no chat depois de aceito. Agora: ' +
+      aceitasN +
+      ' no contexto automático · ' +
+      pendN +
+      ' pendente(s).'
     caixa.appendChild(nota)
     if (!itens.length) {
       const vazio = document.createElement('p')
@@ -208,6 +594,10 @@ export function ligarFerramentas(pastaFn) {
         aceitar.textContent = 'Aceitar'
         aceitar.addEventListener('click', async () => {
           await seguro('memoria:decidir', raiz, item.id, true)
+          if (window.dgToast) window.dgToast('Memória aceita — entra no próximo turno', 'ok')
+          if (typeof window.dgAtualizarChipMemoria === 'function') {
+            void window.dgAtualizarChipMemoria()
+          }
           await pintarMemoria(raiz)
         })
         caixa.appendChild(aceitar)
@@ -218,6 +608,9 @@ export function ligarFerramentas(pastaFn) {
       apagar.textContent = 'Apagar'
       apagar.addEventListener('click', async () => {
         await seguro('memoria:decidir', raiz, item.id, false)
+        if (typeof window.dgAtualizarChipMemoria === 'function') {
+          void window.dgAtualizarChipMemoria()
+        }
         await pintarMemoria(raiz)
       })
       caixa.appendChild(apagar)

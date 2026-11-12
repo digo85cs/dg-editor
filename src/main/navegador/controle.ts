@@ -721,6 +721,38 @@ async function capturePageComTimeout(
   }
 }
 
+async function captureViaCdp(wc: WebContents): Promise<{ ok: true; mime: string; base64: string; bytes: number } | { ok: false; motivo: string }> {
+  const dbg = wc.debugger
+  let attached = false
+  try {
+    if (!dbg.isAttached()) {
+      dbg.attach('1.3')
+      attached = true
+    }
+    const r = (await dbg.sendCommand('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false
+    })) as { data?: string }
+    const b64 = typeof r?.data === 'string' ? r.data : ''
+    if (!b64 || b64.length < 80) {
+      return { ok: false, motivo: 'CDP screenshot vazio' }
+    }
+    const bytes = Buffer.from(b64, 'base64').length
+    return { ok: true, mime: 'image/png', base64: b64, bytes }
+  } catch (e) {
+    return { ok: false, motivo: 'CDP: ' + String((e as Error)?.message || e) }
+  } finally {
+    if (attached) {
+      try {
+        dbg.detach()
+      } catch {
+        /* */
+      }
+    }
+  }
+}
+
 async function handleScreenshot(): Promise<Json> {
   const wc = getContentWebContents()
   if (!wc) return { erro: 'navegador fechado' }
@@ -733,6 +765,7 @@ async function handleScreenshot(): Promise<Json> {
   }
   await new Promise((r) => setTimeout(r, 200))
   const timeoutMs = process.env.DG_NAV_SMOKE === '1' ? 8000 : 20000
+  let lastMotivo = ''
   try {
     let img = await capturePageComTimeout(wc, undefined, timeoutMs)
     let png = img.toPNG()
@@ -744,21 +777,26 @@ async function handleScreenshot(): Promise<Json> {
       )
       png = img.toPNG()
     }
-    if (png.length < 100) {
-      return { ok: false, motivo: 'capturePage vazio (view sem paint?)', bounds: bounds || null }
+    if (png.length >= 100) {
+      return {
+        ok: true,
+        mime: 'image/png',
+        base64: png.toString('base64'),
+        bytes: png.length
+      }
     }
-    return {
-      ok: true,
-      mime: 'image/png',
-      base64: png.toString('base64'),
-      bytes: png.length
-    }
+    lastMotivo = 'capturePage vazio (view sem paint?)'
   } catch (e) {
-    return {
-      ok: false,
-      motivo: String((e as Error)?.message || e),
-      bounds: bounds || null
-    }
+    lastMotivo = String((e as Error)?.message || e)
+  }
+  // Embed/oculto: capturePage falha sem surface — fallback CDP
+  const cdp = await captureViaCdp(wc)
+  if (cdp.ok) return cdp
+  return {
+    ok: false,
+    motivo: lastMotivo + (cdp.ok === false ? ' | ' + cdp.motivo : ''),
+    erro: lastMotivo,
+    bounds: bounds || null
   }
 }
 

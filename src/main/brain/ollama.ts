@@ -163,12 +163,9 @@ export async function escolherModelo(
       return doCat
     }
     const cat = lerCatalogo(raiz)
-    const temChat = cat.modelos.some((m) => m.instalado !== false && m.tipo !== 'embedding')
-    if (!temChat && cat.modelos.some((m) => m.tipo === 'embedding')) {
-      throw new Error('Nenhum modelo de chat instalado')
-    }
-  } catch (e) {
-    if (e instanceof Error && /Nenhum modelo de chat/.test(e.message)) throw e
+    // Nunca abortar aqui: fallbacks hard cobrem chat mesmo com catálogo sujo
+  } catch {
+    /* segue para registry */
   }
   const { escolherModeloPorTarefa } = await import('./registry')
   const escolhido = await escolherModeloPorTarefa(tarefa, opts)
@@ -371,7 +368,8 @@ export async function askOllama(
     }
   }
   if (!model) {
-    throw new Error('Nenhum modelo de chat instalado')
+    model = tarefa === 'chat-rapido' ? 'qwen2.5-coder:1.5b' : 'qwen2.5-coder:3b'
+    dglog('[ollama] ask sem catalogo — usando ' + model)
   }
   // Chat e analise ficam no modelo pequeno. 7b/14b so entram em codigo, revisao ou raciocinio.
   if (
@@ -383,39 +381,71 @@ export async function askOllama(
   }
   const lim = limitesPorTarefa(tarefa)
   const numPredict = requestOptions.numPredict ?? lim.num_predict
-  const timeoutMs = Math.max(1, Math.min(requestOptions.timeoutMs ?? lim.timeoutMs, lim.timeoutMs))
+  // Cold load do Ollama pode passar de 2 min — nao cortar abaixo do limite da tarefa
+  const timeoutMs = Math.max(
+    lim.timeoutMs,
+    Math.max(1, requestOptions.timeoutMs ?? lim.timeoutMs)
+  )
   const leve =
     tarefa === 'chat' || tarefa === 'chat-rapido' || tarefa === 'analise' || tarefa === 'analisar'
   dglog('[ollama] modelo escolhido=' + model)
   dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
     ' num_predict=' + numPredict + ' timeoutMs=' + timeoutMs + ' via=modeloParaTarefa')
   const cfg = loadDgConfig()
-  const r = (await ollamaHttpJson(
-    OLLAMA_URL + '/api/chat',
-    {
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: requestOptions.systemPrompt || 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.'
-        },
-        { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
-      ],
-      stream: false,
-      keep_alive: leve ? '2m' : cfg.ollama?.keepAlive || '5m',
-      options: {
-        num_ctx: leve ? 4096 : 8192,
-        temperature: 0.3,
-        num_predict: numPredict
-      }
-    },
-    'POST',
-    timeoutMs
-  )) as { message?: { content?: string }; eval_count?: number }
-  return {
-    text: r.message?.content || '',
-    provider: 'ollama',
+  const corpo = {
     model,
-    ...(typeof r.eval_count === 'number' ? { evalCount: r.eval_count } : {})
+    messages: [
+      {
+        role: 'system',
+        content: requestOptions.systemPrompt || 'Voce e o DG Editor. Responda SEMPRE em portugues do Brasil, completo e alinhado ao pedido — sem cortar a resposta.'
+      },
+      { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
+    ],
+    stream: false,
+    keep_alive: leve ? '5m' : cfg.ollama?.keepAlive || '5m',
+    options: {
+      num_ctx: leve ? 4096 : 8192,
+      temperature: 0.3,
+      num_predict: numPredict
+    }
+  }
+  try {
+    const r = (await ollamaHttpJson(
+      OLLAMA_URL + '/api/chat',
+      corpo,
+      'POST',
+      timeoutMs
+    )) as { message?: { content?: string }; eval_count?: number }
+    return {
+      text: r.message?.content || '',
+      provider: 'ollama',
+      model,
+      ...(typeof r.eval_count === 'number' ? { evalCount: r.eval_count } : {})
+    }
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e)
+    const podeRetry =
+      leve &&
+      model !== 'qwen2.5-coder:1.5b' &&
+      /timeout|abort|ECONNREFUSED|fetch failed|socket/i.test(msg)
+    if (!podeRetry) throw e
+    dglog('[ollama] ask falhou (' + msg.slice(0, 80) + ') — retry 1.5b')
+    const corpo2 = {
+      ...corpo,
+      model: 'qwen2.5-coder:1.5b',
+      options: { ...corpo.options, num_predict: Math.min(numPredict, 400) }
+    }
+    const r2 = (await ollamaHttpJson(
+      OLLAMA_URL + '/api/chat',
+      corpo2,
+      'POST',
+      Math.max(timeoutMs, 180_000)
+    )) as { message?: { content?: string }; eval_count?: number }
+    return {
+      text: r2.message?.content || '',
+      provider: 'ollama',
+      model: 'qwen2.5-coder:1.5b',
+      ...(typeof r2.eval_count === 'number' ? { evalCount: r2.eval_count } : {})
+    }
   }
 }

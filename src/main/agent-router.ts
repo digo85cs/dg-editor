@@ -1,12 +1,28 @@
 export type Intencao = 'video' | 'imagem' | 'planilha' | 'pdf' | 'codigo' | 'geral'
 
+/** Pedido curto de conversa — sem tools. Tudo o mais age como o Cursor Agent. */
+export function pedidoSoConversacional(pedido: string): boolean {
+  const p = (pedido || '').trim().toLowerCase()
+  if (!p) return true
+  if (p.length > 48) return false
+  return /^(oi+|ol[aá]|hey|e a[ií]|obrigad[oa]|valeu|tmj|bom dia|boa tarde|boa noite|tudo bem\??|ok|beleza|certo|sim|n[aã]o|thanks|thx)[\s!.?]*$/i.test(
+    p
+  )
+}
+
 export function detectarIntencao(pedido: string): Intencao {
   const p = (pedido || '').toLowerCase()
   if (/video|short|reels|tiktok|youtube|wan|hunyuan/.test(p)) return 'video'
   if (/imagem|image|foto|flux|sdxl|comfy|gerar imagem/.test(p)) return 'imagem'
   if (/planilha|csv|excel|xlsx|sql|duckdb|analisar planilha/.test(p)) return 'planilha'
   if (/pdf|docx|pptx|markdown|converter|tabela|ocr/.test(p)) return 'pdf'
-  if (/refator|bug|fix|implementar|criar arquivo|teste|typecheck/.test(p)) return 'codigo'
+  if (
+    /refator|bug|fix|implementar|implemente|aplica|aplique|criar arquivo|teste|typecheck|listar|abrir|salvar|editar|configur|validar|integr|instal|verific|status|corrig|consert|atalho|conectar|skill|agente|tool|deploy|commit|diagnost|quebra de linha|provedor|conta|autonom|melhor[ae]|modo agent/.test(
+      p
+    )
+  ) {
+    return 'codigo'
+  }
   return 'geral'
 }
 
@@ -19,9 +35,8 @@ export type RotaChat = {
 }
 
 /**
- * Um roteador: agente escolhido pelo usuario permanece.
- * Em auto, codigo vai para free-coder; o resto fica no chat com modelo pequeno.
- * A fila serial fica em chat:send (enfileirarAgente).
+ * Comportamento base = Cursor Agent: pedido → tools → resultado no mesmo turno.
+ * Chat sem tools só em cumprimento curto (ou quando o UI força modo ask).
  */
 export function resolverRotaChat(agenteSel: string, pedido: string): RotaChat {
   const intencao = detectarIntencao(pedido)
@@ -30,26 +45,34 @@ export function resolverRotaChat(agenteSel: string, pedido: string): RotaChat {
     return {
       kind: 'agente',
       agente: sel,
-      tarefa: intencao === 'codigo' ? 'codigo' : 'chat',
+      tarefa: intencao === 'codigo' || intencao === 'geral' ? 'codigo' : 'chat',
       intencao,
       dica: 'agente escolhido: ' + sel
+    }
+  }
+  if (pedidoSoConversacional(pedido)) {
+    return {
+      kind: 'chat',
+      tarefa: 'chat',
+      intencao,
+      dica: 'cumprimento curto — chat sem tools'
     }
   }
   if (intencao === 'codigo') {
     return {
       kind: 'agente',
-      agente: 'free-coder',
+      agente: 'dg-engenheiro',
       tarefa: 'codigo',
       intencao,
-      dica: 'codigo -> free-coder (fila serial, modelo de codigo)'
+      dica: 'acao/codigo -> dg-engenheiro com tools (qualidade online primeiro)'
     }
   }
-  const sug = sugerirRota(intencao)
   return {
-    kind: 'chat',
-    tarefa: 'chat',
+    kind: 'agente',
+    agente: 'hibrido-core',
+    tarefa: 'codigo',
     intencao,
-    dica: 'chat no modelo pequeno. ' + sug.dica
+    dica: 'pedido geral -> hibrido-core com tools (estilo Cursor, online primeiro)'
   }
 }
 
@@ -75,10 +98,10 @@ export function decidirAutoAprovacao(
 }
 
 export function sugerirRota(intencao: Intencao): { modo?: string; mcp?: string[]; dica: string } {
-  if (intencao === 'video') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI/Wan para gerar vdeo local' }
+  if (intencao === 'video') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI/Wan para gerar video local' }
   if (intencao === 'imagem') return { modo: 'criar', mcp: ['comfyui'], dica: 'Usar ComfyUI para gerar imagem' }
   if (intencao === 'planilha') return { modo: 'analise', mcp: ['duckdb'], dica: 'Usar DuckDB para consultar planilhas localmente' }
-  if (intencao === 'pdf') return { modo: 'analise', mcp: ['markitdown', 'docling'], dica: 'Converter com MarkItDown/Docling para melhor anlise' }
-  if (intencao === 'codigo') return { modo: 'dg', dica: 'Modo cdigo padro com ferramentas de edio' }
-  return { dica: 'Rota geral' }
+  if (intencao === 'pdf') return { modo: 'analise', mcp: ['markitdown', 'docling'], dica: 'Converter com MarkItDown/Docling para melhor analise' }
+  if (intencao === 'codigo') return { modo: 'dg', dica: 'Modo codigo com ferramentas (estilo Cursor)' }
+  return { dica: 'Agente com tools (estilo Cursor)' }
 }

@@ -28,35 +28,42 @@
       '<h3 id="modal-provedores-title">Provedores de IA</h3>' +
       '<button type="button" id="btn-provedores-x" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar provedores de IA">×</button>' +
       '</header>' +
-      '<div style="padding:12px;max-width:980px">' +
+      '<div class="modal-body config-body" style="max-width:720px">' +
+      '<p id="providers-sync-banner" class="prov-sync-banner" aria-live="polite"></p>' +
+      '<div class="prov-toolbar">' +
+      '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px">' +
+      '<input type="checkbox" id="filtro-so-disponiveis"> Só disponíveis' +
+      '</label>' +
+      '<span style="flex:1"></span>' +
+      '<button type="button" id="btn-provedores-sync" class="btn-small">Sincronizar env</button>' +
+      '<button type="button" id="btn-provedores-testar-todos" class="btn-small">Testar IAs</button>' +
+      '</div>' +
       '<div class="config-section">' +
-      '<h4>Fila de provedores (ordem de preferência)</h4>' +
+      '<h4>Fila de provedores</h4>' +
       '<div id="providers-fila"></div>' +
       '</div>' +
-      '<div class="config-section" style="margin-top:12px">' +
+      '<div class="config-section">' +
       '<h4>Configurar chaves</h4>' +
       '<div id="providers-config"></div>' +
       '</div>' +
-      '<div class="config-section" style="margin-top:12px">' +
+      '<div class="config-section">' +
       '<h4>Cotas / esgotamentos</h4>' +
-      '<div style="margin-bottom:8px;padding:8px;background:#f4f4f4;border:1px solid #ddd;border-radius:6px">' +
-      '<label style="display:flex;align-items:center;gap:8px;font-weight:600">' +
-      '<input type="checkbox" id="toggle-permitir-pago"> Permitir provedores pagos (tier 2)' +
-      '<span style="margin-left:auto;font-weight:normal;color:#666;font-size:12px">Desligado por default para evitar cobranca acidental</span>' +
+      '<div style="margin-bottom:8px;padding:8px;border:1px solid var(--dg-border-subtle);border-radius:6px;background:var(--dg-sidebar)">' +
+      '<label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px">' +
+      '<input type="checkbox" id="toggle-permitir-pago"> Permitir pagos (tier 2)' +
+      '<span style="margin-left:auto;font-weight:normal;color:var(--dg-text-muted);font-size:11px">Desligado por padrão</span>' +
       '</label>' +
       '<div style="margin-top:6px">' +
-       '<label style="display:flex;align-items:center;gap:8px">Teto diario (USD): ' +
+       '<label style="display:flex;align-items:center;gap:8px;font-size:12px">Teto diário (USD): ' +
        '<input type="number" id="teto-diario" min="0" step="0.01" style="width:100px" placeholder="sem teto"> ' +
-       '<span style="font-size:11px;color:#666">0 = sem limite</span>' +
-       '<span id="teto-aviso" style="font-size:11px;color:#b45309;margin-left:8px;display:none">O teto so protege os provedores com preco conhecido.</span>' +
+       '<span id="teto-aviso" style="font-size:11px;color:#b45309;margin-left:8px;display:none">O teto só protege provedores com preço conhecido.</span>' +
        '</label>' +
       '</div>' +
-      '<div id="gasto-hoje" style="margin-top:8px;font-family:monospace,monospace;font-size:12px"></div>' +
+      '<div id="gasto-hoje" style="margin-top:8px;font-family:var(--fonte-mono);font-size:12px"></div>' +
       '</div>' +
       '<div id="providers-cotas"></div>' +
-      '<div style="margin-top:8px"><small class="muted">Atualizado ao vivo pelo canal brain:cota.</small></div>' +
       '</div>' +
-      '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">' +
+      '<div class="config-actions config-actions--footer">' +
       '<button type="button" id="btn-provedores-fechar" class="btn-ghost">Fechar</button>' +
       '</div>' +
       '</div>' +
@@ -64,6 +71,39 @@
     document.body.appendChild(modal);
     document.getElementById('btn-provedores-x').onclick = fechar;
     document.getElementById('btn-provedores-fechar').onclick = fechar;
+    document.getElementById('btn-provedores-sync').onclick = async () => {
+      const btn = document.getElementById('btn-provedores-sync');
+      if (btn) { btn.disabled = true; btn.textContent = 'Sync…'; btn.classList.add('is-loading'); }
+      try {
+        const r = await api.invoke('providers:sincronizar-env');
+        const n = (r && r.gravadas && r.gravadas.length) || 0;
+        const ja = (r && r.jaTinham && r.jaTinham.length) || 0;
+        const banner = document.getElementById('providers-sync-banner');
+        if (banner) banner.textContent = 'Sync: ' + n + ' novas · ' + ja + ' já ok';
+        mostrarToast('Sync: ' + n + ' novas · ' + ja + ' já ok', r && r.ok === false ? 'erro' : 'ok');
+        void render();
+      } catch (e) {
+        mostrarToast('Falha no sync: ' + String(e), 'erro');
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Sincronizar env'; btn.classList.remove('is-loading'); }
+    };
+    const filtro = document.getElementById('filtro-so-disponiveis');
+    if (filtro) filtro.onchange = () => void render();
+    document.getElementById('btn-provedores-testar-todos').onclick = async () => {
+      const btn = document.getElementById('btn-provedores-testar-todos');
+      if (btn) { btn.disabled = true; btn.textContent = 'Testando…'; }
+      try {
+        const r = await api.invoke('providers:testar-todos');
+        mostrarToast(
+          'Teste: ' + (r.okN || 0) + ' ok · ' + (r.falhas || 0) + ' falha(s)',
+          (r.falhas || 0) > 0 ? 'erro' : 'ok'
+        );
+        void render();
+      } catch (e) {
+        mostrarToast('Falha nos testes: ' + String(e), 'erro');
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Testar IAs'; }
+    };
     modal.onclick = (ev) => { if (ev.target === modal) fechar(); };
 
     // Guardrail de custo: toggle permitir pago + teto diario
@@ -94,13 +134,18 @@
 
   function abrir() {
     if (!modal) criacaoModal();
+    modal.classList.remove('hidden');
     modal.hidden = false;
-    render();
+    void api.invoke('providers:sincronizar-env').catch(() => null).then(() => render());
   }
 
   function fechar() {
-    if (modal) modal.hidden = true;
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.hidden = true;
   }
+
+  window.dgAbrirProvedores = abrir;
 
   function badgeTier(tier) {
     const cores = { 1: '#1e5a32', 2: '#5a4a1e', 3: '#6b1e1e' };
@@ -109,10 +154,19 @@
     return '<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;background:' + cor + ';color:#fff">' + (rotulos[tier] || 'tier ' + tier) + '</span>';
   }
 
-  function badgeDisponivel(disponivel) {
-    return disponivel
-      ? '<span style="color:#1e5a32">● disponível</span>'
-      : '<span style="color:#6b1e1e">● indisponível</span>';
+  function badgeDisponivel(it) {
+    const motivo = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
+    const map = {
+      ok: ['#1e5a32', 'disponível'],
+      local: ['#1e5a32', 'local ok'],
+      'sem-chave': ['#8b1e1e', 'sem chave'],
+      'chave-invalida': ['#9a3412', 'chave inválida'],
+      esgotado: ['#854d0e', 'cota esgotada'],
+      desativado: ['#666', 'desativado']
+    };
+    const [cor, lab] = map[motivo] || ['#6b1e1e', it && it.disponivel ? 'disponível' : 'indisponível'];
+    const lat = it && it.latenciaMs != null ? ' · ' + it.latenciaMs + 'ms' : '';
+    return '<span style="color:' + cor + '">● ' + lab + lat + '</span>';
   }
 
   async function renderFila(fila) {
@@ -122,57 +176,57 @@
       el.innerHTML = '<p class="muted">Nenhum provedor na fila.</p>';
       return;
     }
-    let html = '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
-      '<th style="text-align:left">Ordem</th>' +
-      '<th style="text-align:left">Provedor</th>' +
-      '<th style="text-align:left">Tier</th>' +
-      '<th style="text-align:left">Modelo</th>' +
-      '<th style="text-align:left">Status</th>' +
-      '</tr></thead><tbody>';
-    for (const it of fila) {
-      html += '<tr>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' + esc(it.ordem) + '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' + esc(it.id) + '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' + badgeTier(it.tier) + '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd;font-family:monospace,monospace;font-size:12px">' + esc(it.modelo || '—') + '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' + badgeDisponivel(it.disponivel) + '</td>' +
-        '</tr>';
+    const soDisp = !!(document.getElementById('filtro-so-disponiveis') || {}).checked;
+    const lista = soDisp
+      ? fila.filter((it) => {
+          const m = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
+          return m === 'ok' || m === 'local';
+        })
+      : fila;
+    if (!lista.length) {
+      el.innerHTML = '<p class="muted">Nenhum provedor disponível com o filtro atual.</p>';
+      return;
     }
-    html += '</tbody></table>';
+    let html = '<div class="prov-list">';
+    for (const it of lista) {
+      const motivo = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
+      html +=
+        '<div class="prov-row" data-motivo="' + esc(motivo) + '">' +
+        '<div class="prov-row-bar" aria-hidden="true"></div>' +
+        '<div class="prov-row-main">' +
+        '<div class="prov-row-title">' + esc(it.id) + ' ' + badgeTier(it.tier) + '</div>' +
+        '<div class="prov-row-meta">#' + esc(it.ordem) + ' · ' + esc(it.modelo || '—') + '</div>' +
+        '<div style="margin-top:4px">' + badgeDisponivel(it) + '</div>' +
+        '</div></div>';
+    }
+    html += '</div>';
     el.innerHTML = html;
   }
 
   async function renderConfig(providers) {
     const el = document.getElementById('providers-config');
     if (!el) return;
-    let html = '<p class="muted">Informe a chave de API de cada provedor online. As chaves sao gravadas criptografadas no cofre do usuario (userData) e nunca sao exibidas.</p>' +
-      '<table style="width:100%;border-collapse:collapse;margin-top:8px"><thead><tr>' +
-      '<th style="text-align:left">Provedor</th>' +
-      '<th style="text-align:left">Chave</th>' +
-      '<th style="text-align:left">Ativo</th>' +
-      '<th style="text-align:left">Acoes</th>' +
-      '</tr></thead><tbody>';
+    let html = '<p class="muted" style="margin-bottom:8px">Chaves no cofre local — nunca exibidas depois de salvas.</p>';
     for (const p of providers) {
       const temChave = p.chaveConfigurada;
-      html += '<tr>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd"><b>' + esc(p.label) + '</b><br><small style="color:#666">' + esc(p.id) + '</small>' +
-        (p.ativo === false ? ' <span style="color:#6b1e1e">(desativado)</span>' : '') +
-        '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' +
-        '<input type="password" id="pk-' + esc(p.id) + '" placeholder="Cole a chave (apenas ao salvar)" style="width:260px" autocomplete="off" ' +
-        (temChave ? 'title="Ja configurada"' : '') + '>' +
-        (temChave ? '<span style="color:#1e5a32;font-size:11px;margin-left:6px">configurada</span>' : '<span style="color:#888;font-size:11px;margin-left:6px">nao configurada</span>') +
-        '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' +
-        '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="atv-' + esc(p.id) + '" ' + (p.ativo !== false ? 'checked' : '') + '> Ativo</label>' +
-        '</td>' +
-        '<td style="padding:6px 4px;border-bottom:1px solid #ddd">' +
+      html +=
+        '<div class="prov-config-row">' +
+        '<div><b>' + esc(p.label) + '</b><div class="muted" style="font-size:11px">' + esc(p.id) +
+        (p.ativo === false ? ' · desativado' : '') +
+        (temChave ? ' · chave ok' : ' · sem chave') +
+        '</div></div>' +
+        '<div>' +
+        '<input type="password" id="pk-' + esc(p.id) + '" placeholder="' +
+        (temChave ? 'Já configurada — cole para trocar' : 'Cole a chave') +
+        '" autocomplete="off">' +
+        '<label style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:11px">' +
+        '<input type="checkbox" id="atv-' + esc(p.id) + '" ' + (p.ativo !== false ? 'checked' : '') + '> Ativo</label>' +
+        '</div>' +
+        '<div class="prov-row-actions">' +
         '<button type="button" class="btn-small btn-provedores-testar" data-id="' + esc(p.id) + '">Testar</button>' +
         '<button type="button" class="btn-small btn-provedores-salvar" data-id="' + esc(p.id) + '">Salvar</button>' +
-        '</td>' +
-        '</tr>';
+        '</div></div>';
     }
-    html += '</tbody></table>';
     el.innerHTML = html;
 
     el.querySelectorAll('.btn-provedores-testar').forEach((b) => {
@@ -377,13 +431,19 @@
 
   function init() {
     const ref = document.getElementById('btn-config');
-    if (!ref) return;
+    if (!ref || !ref.parentNode) return;
+    if (document.getElementById('btn-provedores-ia')) {
+      btnAbrir = document.getElementById('btn-provedores-ia');
+      btnAbrir.onclick = abrir;
+      return;
+    }
     btnAbrir = document.createElement('button');
     btnAbrir.id = 'btn-provedores-ia';
+    btnAbrir.type = 'button';
     btnAbrir.className = 'btn-ghost';
     btnAbrir.title = 'Provedores de IA';
     btnAbrir.textContent = 'Provedores IA';
-    ref.parentNode.insertBefore(btnAbrir, ref.nextSibling);
+    ref.parentNode.insertBefore(btnAbrir, ref);
     btnAbrir.onclick = abrir;
   }
 

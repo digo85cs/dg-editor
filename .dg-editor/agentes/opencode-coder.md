@@ -1,4 +1,4 @@
-﻿---
+---
 nome: OpenCode Coder
 especialidade: implementacao segura inspirado em OpenCode
 skills: leitor-codigo, editar-seguro, arvore-projeto, testador

@@ -121,7 +121,20 @@ export async function handleChatSend(
     };
   }
 
-  const seg = caminhoSeguro(r, r);
+  const { resolverRaizChat, definirRaizWorkspace } = await import('../workspace-raiz');
+  const raizResolvida = resolverRaizChat(r);
+  if (!raizResolvida.ok) {
+    return {
+      ok: false,
+      message: {
+        role: 'assistant' as const,
+        content: raizResolvida.erro,
+        at: Date.now(),
+        provider: 'erro'
+      }
+    };
+  }
+  const seg = caminhoSeguro(raizResolvida.abs, raizResolvida.abs);
   if (!seg.ok) {
     return {
       ok: false,
@@ -130,6 +143,8 @@ export async function handleChatSend(
   }
 
   const rootOk = seg.abs;
+  definirRaizWorkspace(rootOk);
+  process.env.DG_ROOT = rootOk;
   const assistantMsg = {
     role: 'assistant' as const,
     content: '',
@@ -147,8 +162,16 @@ export async function handleChatSend(
     : {};
   const agenteSel = typeof options.agente === 'string' ? options.agente.slice(0, 100) : 'auto';
   const modoSel = typeof options.modo === 'string' ? options.modo : 'auto';
-  const modoValido = ['auto', 'code', 'plan', 'ask', 'debug'].includes(modoSel) ? modoSel : 'auto';
+  const modoValido = ['auto', 'code', 'plan', 'ask', 'debug', 'agent'].includes(modoSel)
+    ? modoSel
+    : 'auto';
   const autoAprovar = options.autoAprovar === true;
+  const verificarAposOpt =
+    options.verificarApos === false
+      ? false
+      : options.verificarApos === true
+        ? true
+        : modoValido !== 'plan' && modoValido !== 'ask';
   const publicarDelta = (payload: { delta?: string; reset?: boolean }) => {
     if (event.sender.isDestroyed()) return;
     try { event.sender.send('chat:delta', payload); } catch { /* janela fechada */ }
@@ -190,10 +213,56 @@ export async function handleChatSend(
       ? textoPedido.replace(/^\/hibrido\b/i, '').trim() || textoPedido
       : textoPedido;
     const rota = resolverRotaChat(agenteSel, textoPedido);
-    const chatLeve = rota.kind === 'chat' && agenteSel === 'auto' && !forceHibrido && modoValido !== 'code' && modoValido !== 'debug';
+    // Estilo Cursor: ask = so texto; cumprimento curto = chat leve; resto = agente com tools.
+    const chatLeve =
+      modoValido === 'ask' ||
+      (rota.kind === 'chat' &&
+        agenteSel === 'auto' &&
+        !forceHibrido &&
+        modoValido !== 'code' &&
+        modoValido !== 'debug' &&
+        modoValido !== 'agent');
     let context = '';
+    // Ancora obrigatoria: SEMPRE a pasta do repositorio ligado no Bloco 1
+    context +=
+      '### REPOSITORIO ATIVO (obrigatorio)\n' +
+      'Pasta: ' +
+      rootOk +
+      '\nResponda e analise SOMENTE este repositorio. Nao invente outro projeto. ' +
+      'Se precisar de arquivos, use tools nesta pasta.\n';
     if (analysis) {
-      context += `SISTEMA ABERTO: ${analysis.root}\nO QUE E: ${analysis.oQueE}\nSTACK: ${analysis.stack}\n`;
+      context +=
+        `SISTEMA ABERTO: ${analysis.root || rootOk}\nO QUE E: ${analysis.oQueE}\nSTACK: ${analysis.stack}\n`;
+    } else {
+      context += 'SISTEMA ABERTO: ' + rootOk + ' (analise em cache ainda nao gerada)\n';
+    }
+    try {
+      const { mapaCompacto } = await import('../mapa-projeto');
+      const mapa = mapaCompacto(rootOk, chatLeve ? 1400 : 2200);
+      if (mapa) context += '\n### MAPA DO REPOSITORIO\n' + mapa + '\n';
+    } catch {
+      /* mapa opcional */
+    }
+    try {
+      const { blocoMemoriaProjeto } = await import('../autonomia-tools');
+      context += blocoMemoriaProjeto(rootOk);
+    } catch {
+      /* memoria projeto opcional */
+    }
+    try {
+      const { analisarWorkspace } = await import('../brain/hibrido');
+      const snap = analisarWorkspace(rootOk, rootOk);
+      context +=
+        'TOPO: ' +
+        (snap.topNivel || []).slice(0, 20).join(', ') +
+        '\nGIT: ' +
+        snap.branch +
+        '@' +
+        snap.commit +
+        (snap.treeSujo ? ' (sujo)' : '') +
+        '\n';
+    } catch {
+      /* snapshot opcional */
     }
     try {
       const arquivo = typeof options.arquivo === 'string' ? options.arquivo : '';
@@ -202,40 +271,145 @@ export async function handleChatSend(
       if (rules) context += `\nREGRAS DO PROJETO (.dgrules - respeite):\n${rules.slice(0, chatLeve ? 1800 : 12000)}\n`;
     }
     try {
+      const { obterRegrasAtivas } = await import('../regras-gerais');
+      const rg = obterRegrasAtivas();
+      if (rg) context += '\nREGRAS GERAIS:\n' + rg + '\n';
+    } catch { /* opcional */ }
+    try {
       const { proporMemoria, textoMemoriasAceitas } = await import('../memorias');
       const pedidoMemoria = textoPedido.match(/^(?:lembre|memorize|guarde)(?:\s+que)?\s+(.{8,400})$/i);
       if (pedidoMemoria) proporMemoria(rootOk, pedidoMemoria[1]);
       const fatos = textoMemoriasAceitas(rootOk);
       if (fatos) context += '\nFATOS ACEITOS:\n' + fatos + '\n';
     } catch { /* memoria e opcional */ }
-    if (!chatLeve) {
-      try {
-        const { contextoChatHibrido } = await import('../brain/hibrido');
-        context += '\n' + contextoChatHibrido(rootOk, textoPedido) + '\n';
-      } catch { /* briefing e opcional */ }
-    }
+    // Briefing do repo sempre — inclusive modo ask/leve (sem isso o chat "nao sabe" a pasta)
+    try {
+      const { contextoChatHibrido } = await import('../brain/hibrido');
+      context += '\n' + contextoChatHibrido(rootOk, textoPedido) + '\n';
+    } catch { /* briefing e opcional */ }
     const anexos = blocoAnexos(options.anexos);
     if (anexos) context += '\n\n### ANEXOS DO TURNO\n' + anexos + '\n';
     context += '\nRota: ' + rota.dica + '\n';
+    const skillId = typeof options.skill === 'string' ? options.skill.slice(0, 120) : ''
+    if (skillId) {
+      try {
+        const { lerSkill } = await import('../brain/skills')
+        const sk = lerSkill(rootOk, skillId)
+        if (sk?.instrucao) {
+          context += '\nSKILL ATIVA (' + sk.titulo + '):\n' + sk.instrucao.slice(0, 4000) + '\n'
+        } else {
+          context += '\nSKILL ATIVA: ' + skillId + '\n'
+        }
+      } catch {
+        context += '\nSKILL ATIVA: ' + skillId + '\n'
+      }
+    }
+    context +=
+      '\nCOMPORTAMENTO (espelho Cursor — obrigatorio em inventariar/modificar/corrigir/melhorar/editar): ' +
+      'tools no mesmo turno; ler antes de editar; resultado real; checklist completo; ' +
+      'falso positivo Windows = descartar; falta = NÃO ENCONTRADO; resposta curta em um bloco limpo. ' +
+      'Nao diga que vai fazer — faca.\n';
     if (modoValido === 'debug') context += '\nMODO DEBUG: investigue causas provaveis, reproduza mentalmente o fluxo e priorize correcoes pequenas e verificaveis.\n';
-    if (modoValido === 'code') context += '\nMODO CODE: priorize implementacao concreta, mantendo os padroes e testes existentes.\n';
+    if (modoValido === 'code' || modoValido === 'agent') {
+      context +=
+        '\nMODO AGENT: encadeie explorar → editar → validar no mesmo turno sem pedir confirmacao a cada passo. ' +
+        'Implementacao concreta, padroes e testes existentes. Pare so em risco alto.\n'
+    }
     if (modoValido === 'ask') context += '\nMODO ASK: explique e responda sem propor alteracoes de arquivos.\n';
-
+   
     const rodarAgente = async (idAgente: string, tarefa: 'chat' | 'codigo') => {
+      process.env.DG_ROOT = rootOk;
+      try {
+        const { garantirMcpNaRaiz } = await import('../mcp/client');
+        await garantirMcpNaRaiz(rootOk);
+      } catch {
+        /* MCP opcional — agente tenta de novo */
+      }
+      const arquivoAtivo = typeof options.arquivo === 'string' ? options.arquivo : '';
+      let perguntaAgente = textoPedido;
+      let contextoAgente = context;
+      try {
+        const { expandirMencoes } = await import('../agent/mencoes');
+        const expansao = await expandirMencoes({
+          raiz: rootOk,
+          pergunta: textoPedido,
+          arquivoAtivo: arquivoAtivo || undefined,
+          pastas: [rootOk]
+        });
+        perguntaAgente = expansao.perguntaLimpa || textoPedido;
+        if (expansao.contextoExtra) {
+          contextoAgente += '\n\n### MENÇÕES\n' + expansao.contextoExtra + '\n';
+        }
+      } catch (error) {
+        dglog('[chat] mencoes: ' + String(error));
+      }
       const { executarAgente } = await import('../brain/agent');
-      const resposta = await executarAgente(rootOk, textoPedido, {
+      const onEvent = (ev: { tipo?: string; texto?: string; [k: string]: unknown }) => {
+        if (ev.tipo === 'texto-delta' && ev.texto) publicarDelta({ delta: ev.texto });
+        if (!event.sender.isDestroyed()) {
+          try {
+            event.sender.send('agente:progresso', { ...ev, raiz: rootOk });
+          } catch { /* janela fechada */ }
+        }
+      };
+      let resposta = await executarAgente(rootOk, perguntaAgente, {
         agente: idAgente,
         tarefa,
         modo: modoValido === 'plan' ? 'plan' : 'agent',
         proposeWrites: true,
         pastas: [rootOk],
-        contextoExtra: context,
-        onEvent: (ev) => {
-          if (ev.tipo === 'texto-delta') publicarDelta({ delta: ev.texto });
-        }
+        contextoExtra: contextoAgente,
+        onEvent
       });
+      let diagnostico: unknown;
       let contentOut = resposta?.texto || 'Sem resposta do agente.';
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
+      // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
+      if (
+        verificarAposOpt &&
+        modoValido !== 'plan' &&
+        modoValido !== 'ask' &&
+        propostas.length > 0
+      ) {
+        try {
+          const { rodarVerifyAposAgente } = await import('../agent/verify-apos');
+          const v = await rodarVerifyAposAgente({
+            raiz: rootOk,
+            pastas: [rootOk],
+            agente: idAgente,
+            contextoExtra: contextoAgente,
+            onEvent: onEvent as (ev: unknown) => void,
+            resposta
+          });
+          resposta = v.resposta;
+          diagnostico = v.diagnostico;
+          contentOut = resposta?.texto || contentOut;
+        } catch (error) {
+          dglog('[chat] verify-apos: ' + String(error));
+        }
+      }
+      let planoSalvo: unknown = undefined;
+      if (modoValido === 'plan' && resposta?.texto) {
+        try {
+          const { salvarPlano, lerPlano } = await import('../agent/plano');
+          salvarPlano({
+            texto: resposta.texto,
+            raiz: rootOk,
+            salvoEm: new Date().toISOString(),
+            agente: idAgente
+          });
+          planoSalvo = lerPlano();
+        } catch (error) {
+          dglog('[chat] falha ao salvar plano: ' + String(error));
+        }
+      } else {
+        try {
+          const { lerPlano } = await import('../agent/plano');
+          planoSalvo = lerPlano();
+        } catch {
+          /* */
+        }
+      }
       let autoAprovacao: { aplicada: boolean; motivo: string } = { aplicada: false, motivo: 'desligada' };
       if (autoAprovar && propostas.length) {
         const { predizerImpacto, analisarWorkspace } = await import('../brain/hibrido');
@@ -254,9 +428,25 @@ export async function handleChatSend(
           contentOut += '\n\nAprovacao automatica nao aplicada: ' + gate.motivo + '. As propostas seguem para revisao.';
         }
       }
-      return publicar(contentOut, resposta?.modelo || 'agente:' + idAgente, { propostas, autoAprovacao }, true);
+      return publicar(
+        contentOut,
+        resposta?.modelo || 'agente:' + idAgente,
+        { propostas, autoAprovacao, plano: planoSalvo, modo: modoValido, diagnostico },
+        true
+      );
     };
 
+    try {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('agente:progresso', {
+          tipo: 'status',
+          texto: 'Na fila do Agent — preparando…',
+          raiz: rootOk
+        })
+      }
+    } catch {
+      /* */
+    }
     const resultado = await enfileirarAgente(async () => {
       if (agenteSel && agenteSel !== 'auto' && modoValido !== 'ask') {
         try {
@@ -282,13 +472,30 @@ export async function handleChatSend(
         return publicar(hibrido.texto, 'hibrido:' + (hibrido.modelo || 'core'), { hibrido: hibrido.briefing });
       }
 
-      if (modoValido === 'plan' || modoValido === 'code' || modoValido === 'debug' || (rota.kind === 'agente' && rota.agente && modoValido !== 'ask')) {
-        const idAgente = rota.kind === 'agente' && rota.agente
-          ? rota.agente
-          : modoValido === 'plan' ? 'free-auto' : 'free-coder';
+      // Estilo Cursor: qualquer pedido acionavel usa agente + tools.
+      if (
+        modoValido !== 'ask' &&
+        (modoValido === 'plan' ||
+          modoValido === 'code' ||
+          modoValido === 'agent' ||
+          modoValido === 'debug' ||
+          modoValido === 'auto' ||
+          (rota.kind === 'agente' && !!rota.agente))
+      ) {
+        const idAgente =
+          rota.kind === 'agente' && rota.agente
+            ? rota.agente
+            : modoValido === 'plan'
+              ? 'hibrido-core'
+              : modoValido === 'debug'
+                ? 'kilo-debug'
+                : 'dg-engenheiro';
         const tarefa = modoValido === 'ask' ? 'chat' : 'codigo';
-        try { return await rodarAgente(idAgente, tarefa); }
-        catch (error) { dglog('[chat] rota de codigo falhou; usando chat: ' + String(error)); }
+        try {
+          return await rodarAgente(idAgente, tarefa);
+        } catch (error) {
+          dglog('[chat] rota agente falhou; usando chat: ' + String(error));
+        }
       }
 
       persistirUsuario();
@@ -296,51 +503,104 @@ export async function handleChatSend(
       const { guardianPodeOperar } = await import('../guardian');
       const { ensureOllama } = await import('../ollama-keeper');
       const { streamOllamaChat, streamOpenAIChat } = await import('../brain/stream-chat');
-      const { primeiroProvider, limitesPorTarefa } = await import('../brain/registry');
-      const modeloChat = modeloParaTarefa(rootOk, 'chat');
+      const { filaPronta, limitesPorTarefa } = await import('../brain/registry');
+      const { lerChave } = await import('../brain/segredos-providers');
       const tarefaLocal = guardianPodeOperar() ? 'chat' : 'chat-rapido';
-      const modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat;
-      const provider = primeiroProvider('chat');
-      const system = 'Voce e o DG Editor, assistente de analise de sistemas. Responda sempre em portugues brasileiro correto.';
-      const user = (context ? 'Contexto:\n' + context + '\n\n' : '') + 'Pedido: ' + textoPedido;
-      if (provider?.formato === 'openai' && provider.apiKeyEnv) {
-        const key = String(process.env[provider.apiKeyEnv] || '').trim();
-        if (key) {
-          try {
-            const resposta = (await streamOpenAIChat({
-              baseUrl: provider.baseUrl,
-              apiKey: key,
-              model: provider.modelo,
-              system,
-              user,
-              numPredict: provider.numPredict || 512,
-              timeoutMs: provider.timeoutMs || 45_000,
-              onDelta: (delta) => publicarDelta({ delta })
-            })).trim();
-            if (resposta) return publicar(resposta, provider.id + ':' + provider.modelo);
-          } catch (error) {
-            publicarDelta({ reset: true });
-            dglog('[chat] provider online falhou; usando modelo local: ' + String(error));
+      let modeloChat = modeloParaTarefa(rootOk, 'chat');
+      let modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat;
+      const system =
+        'Voce e o DG Editor. Responda SEMPRE em portugues do Brasil, de forma COMPLETA, precisa e direta ao pedido. ' +
+        'O repositorio ativo esta no contexto (pasta, mapa, git). Responda SOBRE ESSE projeto — nao ignore a pasta. ' +
+        'Priorize qualidade: nao invente passos irrelevantes, nao despeje inventario do Windows, nao corte no meio. ' +
+        'Se o pedido exigir acao no projeto, diga para sair do modo Ask — o padrao do DG e executar com tools como o Cursor.';
+      const user =
+        (context ? 'Contexto do repositorio:\n' + context + '\n\n' : '') +
+        'Pedido (sobre a pasta ' +
+        rootOk +
+        '): ' +
+        textoPedido;
+
+      // Qualidade: melhores ONLINE primeiro; Ollama local so como ultimo recurso
+      let filaChat: Array<{ id: string; tipo: string; formato: string; modelo: string; baseUrl: string; apiKeyEnv?: string; apiKeyRef?: string; numPredict: number; timeoutMs: number }> = [];
+      try {
+        filaChat = filaPronta('chat');
+      } catch (e) {
+        dglog('[chat] filaPronta vazia: ' + String(e));
+      }
+      for (const provider of filaChat) {
+        if (provider.tipo === 'local' || provider.formato === 'ollama') continue;
+        if (provider.formato !== 'openai') continue;
+        if (/:free\b/i.test(provider.modelo)) continue;
+        let key = '';
+        try {
+          if (provider.apiKeyRef) key = String(lerChave(provider.id) || '').trim();
+        } catch {
+          /* segue */
+        }
+        if (!key && provider.apiKeyEnv) key = String(process.env[provider.apiKeyEnv] || '').trim();
+        if (!key) continue;
+        try {
+          const limites = limitesPorTarefa('chat');
+          const resposta = (await streamOpenAIChat({
+            baseUrl: provider.baseUrl,
+            apiKey: key,
+            model: provider.modelo,
+            system,
+            user,
+            numPredict: Math.max(provider.numPredict || 1024, limites.num_predict, 1024),
+            timeoutMs: Math.max(provider.timeoutMs || 45_000, 90_000),
+            onDelta: (delta) => publicarDelta({ delta })
+          })).trim();
+          if (resposta && resposta.length >= 8) {
+            return publicar(resposta, provider.id + ':' + provider.modelo);
           }
+        } catch (error) {
+          publicarDelta({ reset: true });
+          dglog('[chat] provider online falhou ' + provider.id + ': ' + String(error));
         }
       }
-      if (!modeloLocal) throw new Error('Nenhum modelo de chat instalado');
-      await ensureOllama();
-      try {
-        const limites = limitesPorTarefa('chat');
-        const resposta = (await streamOllamaChat({
-          model: modeloLocal,
-          system,
-          user,
-          numPredict: limites.num_predict,
-          timeoutMs: limites.timeoutMs,
-          onDelta: (delta) => publicarDelta({ delta })
-        })).trim();
-        if (resposta) return publicar(resposta, 'ollama:' + modeloLocal);
-      } catch (error) {
-        publicarDelta({ reset: true });
-        dglog('[chat] stream local falhou: ' + String(error));
+
+      const ollamaOk = await ensureOllama();
+      if (!modeloLocal || !ollamaOk) {
+        try {
+          const { detectarModelosLocais } = await import('../brain/modelos-catalogo');
+          await detectarModelosLocais(rootOk);
+        } catch (e) {
+          dglog('[chat] detectarModelosLocais: ' + String(e));
+        }
+        modeloChat = modeloParaTarefa(rootOk, 'chat');
+        modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat || 'qwen2.5-coder:1.5b';
       }
+      if (!modeloLocal) modeloLocal = 'qwen2.5-coder:1.5b';
+      if (ollamaOk) {
+        try {
+          const limites = limitesPorTarefa(tarefaLocal === 'chat-rapido' ? 'chat-rapido' : 'chat');
+          const resposta = (await streamOllamaChat({
+            model: modeloLocal,
+            system,
+            user,
+            numPredict: Math.max(limites.num_predict, 1024),
+            timeoutMs: limites.timeoutMs,
+            onDelta: (delta) => publicarDelta({ delta })
+          })).trim();
+          if (resposta && resposta.length >= 8) {
+            return publicar(resposta, 'ollama:' + modeloLocal);
+          }
+        } catch (error) {
+          publicarDelta({ reset: true });
+          dglog('[chat] stream local falhou: ' + String(error));
+        }
+        try {
+          const { askOllama } = await import('../brain/ollama');
+          const resposta = await askOllama(textoPedido, context, 'chat');
+          if (resposta?.text?.trim()) {
+            return publicar(resposta.text, resposta.provider + ':' + (resposta.model || modeloChat));
+          }
+        } catch (error) {
+          dglog('[chat] askOllama falhou: ' + String(error));
+        }
+      }
+
       const { askOllama } = await import('../brain/ollama');
       const resposta = await askOllama(textoPedido, context, 'chat');
       return publicar(resposta.text, resposta.provider + ':' + (resposta.model || modeloChat));

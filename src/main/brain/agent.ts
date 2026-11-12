@@ -1,5 +1,6 @@
+import path from 'path'
 import { obterPromptRapido } from './fast-chat'
-import { chamarTool, listarTools, type McpTool } from '../mcp/client'
+import { chamarTool, listarTools, garantirMcpNaRaiz, type McpTool } from '../mcp/client'
 import { montarContexto, blocoMemoria } from '../memory/hybrid'
 import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
@@ -21,7 +22,7 @@ import {
 } from './providers'
 import { chamarComCascata } from './chamar-com-cascata'
 import { streamOllamaChat, streamOpenAIChat } from './stream-chat'
-import { garantirSkillsPadrao, skillsRelevantes } from './skills'
+import { garantirSkillsPadrao, skillsAtivasParaTurno } from './skills'
 import { garantirAgentesPadrao, lerAgente } from './agentes'
 import { normalizarArgs, validarChamadaTool } from './tool-call-validation'
 
@@ -29,7 +30,17 @@ import { normalizarArgs, validarChamadaTool } from './tool-call-validation'
  * Agente do DG Editor: fila hibrida (OpenRouter → Ollama) com failover.
  */
 
-const MAX_ITER = 4
+/** 2 passos no fluxo curto; Agent Mode sobe o teto (Cursor Parity). */
+const MAX_ITER = 2
+const MAX_ITER_CODIGO = 10
+const MAX_ITER_INVENTARIO = 6
+
+/** Tools seguras para executar em paralelo no mesmo turno. */
+function ehToolLeituraParalela(nome: string): boolean {
+  return /^(codigo_ler|projeto_arvore|disco_inspecionar|disco_buscar|codigo_buscar|git_status|git_diff|vault_read|dossie_read|skill_ler|skill_listar|agente_listar|conector_listar|vault_list|navegador_ler|ftp_listar)$/.test(
+    String(nome || '')
+  )
+}
 
 /** Profundidade de executarAgente — bloqueia agente_executar recursivo. */
 let profundidadeAgente = 0
@@ -51,12 +62,56 @@ export interface TentativaProvider {
   resultado: string
 }
 
+/** Categoria para faixa de progresso estilo Cursor Agent. */
+export type CategoriaToolAgente = 'edit' | 'search' | 'explore' | 'command' | 'tool'
+
+export function classificarToolAgente(nome: string): CategoriaToolAgente {
+  const id = String(nome || '').toLowerCase()
+  if (/codigo_editar|vault_write|dossie_write|ftp_deploy/.test(id)) return 'edit'
+  if (/codigo_buscar|disco_buscar|busca/.test(id)) return 'search'
+  if (
+    /codigo_ler|projeto_arvore|disco_inspecionar|git_status|git_diff|vault_read|dossie_read|skill_ler|listar|navegador_ler/.test(
+      id
+    )
+  ) {
+    return 'explore'
+  }
+  if (/terminal_exec|testes_rodar|qualidade_checar|projeto_smoke|navegador_|git_commit|resultado_avaliar/.test(id)) {
+    return 'command'
+  }
+  return 'tool'
+}
+
 export type EventoAgente =
-  | { tipo: 'status'; texto: string }
-  | { tipo: 'tool'; nome: string; fase: 'inicio' | 'fim'; detalhe?: string }
-  | { tipo: 'texto'; texto: string }
-  | { tipo: 'texto-delta'; texto: string }
-  | { tipo: 'proposta'; id: string; path: string }
+  | { tipo: 'status'; texto: string; raiz?: string; modelo?: string; elapsedMs?: number }
+  | {
+      tipo: 'tool'
+      nome: string
+      fase: 'inicio' | 'fim'
+      detalhe?: string
+      categoria?: CategoriaToolAgente
+      raiz?: string
+    }
+  | { tipo: 'texto'; texto: string; raiz?: string }
+  | { tipo: 'texto-delta'; texto: string; raiz?: string }
+  | { tipo: 'proposta'; id: string; path: string; raiz?: string }
+  | {
+      tipo: 'stats'
+      edits: number
+      explored: number
+      searches: number
+      tools: number
+      commands: number
+      raiz?: string
+    }
+  | {
+      tipo: 'heartbeat'
+      passo: number
+      max: number
+      modelo: string
+      elapsedMs: number
+      raiz?: string
+    }
 
 export interface RespostaAgente {
   texto: string
@@ -86,15 +141,23 @@ export interface OpcoesExecutarAgente {
 
 export { escolherModelo, detectarGpu } from './ollama'
 
-const SYSTEM = `Voce e o DG, agente interno do DG Editor.
-Voce opera o projeto localmente usando ferramentas (tools) do MCP interno.
-Regras:
-- Use as tools para ler e escrever arquivos do projeto, consultar o dossie e a arvore.
-- Nunca invente conteudo de arquivo: leia antes de afirmar.
-- Respostas curtas, tecnicas, em portugues do Brasil.
-- Se a tool falhar, relate o erro e proponha alternativa.
-- NUNCA anunciar acao sem executar no mesmo turno.
-- NUNCA incluir o nome do modelo (ollama:/qwen/llama) no corpo da resposta.`
+const SYSTEM = `Voce e o DG Editor Agent — espelho do Cursor Agent em TODO turno
+(inventar, modificar, corrigir, melhorar, editar, analisar, buscar, validar).
+
+Modo Agent automatico: encadeie explorar → editar → validar no mesmo turno, sem pedir confirmacao
+a cada passo. So pare para risco alto (deletar em massa, deploy prod, credenciais).
+
+Padrao Cursor (obrigatorio):
+1. Entenda o pedido → chame tools → entregue o RESULTADO no mesmo turno.
+2. Nao diga "posso", "vou verificar", "deseja que eu" — faca e mostre.
+3. Leitura/listagem/status/busca/diagnostico/inventario: execute direto, sem confirmacao.
+4. Edicao/correcao/melhoria: leia com tools → edite com tools → mostre o que mudou (diff/trecho).
+5. Nunca invente arquivo, linha, caminho ou saida de comando — so o que a tool devolveu.
+6. Se o pedido tiver checklist/blocos/N linhas: complete TODOS; falta = NÃO ENCONTRADO.
+7. Falso positivo (ex.: Windows Autopilot no lugar do projeto): descarte e continue a busca.
+8. Resposta final: curta, em portugues do Brasil, um bloco limpo (estilo Cursor), so o util.
+9. Tool falhou: diga o erro e tente alternativa no mesmo turno.
+10. NUNCA colocar nome do modelo (ollama:/qwen/…) no corpo da resposta.`
 
 /**
  * Modelos pequenos (3b) as vezes escrevem o tool_call como TEXTO em vez de
@@ -226,18 +289,114 @@ function pareceJsonTool(texto: string): boolean {
   return /^\s*\{\s*"name"\s*:/.test(t) || /^\s*\{\s*"\w+"\s*:\s*\{/.test(t)
 }
 
-function sintetizarDeTools(passos: PassoAgente[]): string {
+function extrairTextoUtilTool(raw: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return ''
+  try {
+    const j = JSON.parse(t) as { ok?: boolean; texto?: string; stdout?: string; output?: string; erro?: string }
+    if (j && typeof j === 'object') {
+      const corpo = String(j.texto || j.stdout || j.output || j.erro || '').trim()
+      if (corpo) return corpo
+    }
+  } catch {
+    /* nao e json puro */
+  }
+  // Evita eco tecnico "A tool X retornou"
+  if (/A tool ["']/i.test(t) || /retornou \d+ linhas/i.test(t)) {
+    const m = t.match(/"texto"\s*:\s*"((?:\\.|[^"\\])*)"/)
+    if (m) {
+      try {
+        return JSON.parse('"' + m[1] + '"')
+      } catch {
+        return m[1].replace(/\\n/g, '\n')
+      }
+    }
+  }
+  return t
+}
+
+function tokensPedido(pedido: string): string[] {
+  return String(pedido || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .split(/[^a-z0-9]+/i)
+    .filter((w) => w.length >= 4)
+}
+
+function textoRelacionadoAoPedido(texto: string, pedido: string): boolean {
+  const toks = tokensPedido(pedido)
+  if (!toks.length) return true
+  const t = String(texto || '').toLowerCase()
+  const hits = toks.filter((w) => t.includes(w)).length
+  // systeminfo / inventario Windows quando pedido e MySQL/instalar
+  if (
+    /\b(mysql|mariadb|instalar|install)\b/i.test(pedido) &&
+    /\b(hotfix|hypervisor|zerotier|memoria virtual|windows 11|familia 6)\b/i.test(t)
+  ) {
+    return false
+  }
+  // Autopilot/Autoplay nunca respondem pedido de projeto (AutoPartz etc.)
+  if (
+    /(partz|autopartz|auto\s*parts|invent[aá]rio|achar o projeto)/i.test(pedido) &&
+    /(autopilot|autoplay|winsxs|\\windows\\)/i.test(t) &&
+    !/(composer\.json|routes\.php|oneDrive|auto parts app)/i.test(t)
+  ) {
+    return false
+  }
+  return hits >= Math.min(2, toks.length)
+}
+
+/** Resposta final estilo Cursor: so o que responde o pedido. */
+function sintetizarDeTools(passos: PassoAgente[], pedido: string): string {
   const tools = passos.filter((p) => p.tipo === 'tool' && p.resultado)
-  if (tools.length === 0) return 'Nao obtive resultado das ferramentas.'
-  const partes: string[] = []
+  if (tools.length === 0) {
+    return 'Nao consegui executar uma acao util para: "' + String(pedido).slice(0, 120) + '". Tente de novo.'
+  }
+  const uteis: string[] = []
   for (const t of tools) {
-    const linhas = String(t.resultado || '').split(/\r?\n/).filter((l) => l.trim().length > 0)
-    partes.push(
-      'A tool "' + t.nome + '" retornou ' + linhas.length + ' linhas.' +
-      (linhas.length > 0 ? ' Trecho:\n' + linhas.slice(0, 30).join('\n') : '')
+    const util = extrairTextoUtilTool(String(t.resultado || '')).trim()
+    if (!util) continue
+    if (!textoRelacionadoAoPedido(util, pedido)) continue
+    uteis.push(util.slice(0, 3500))
+  }
+  if (!uteis.length) {
+    // Pedido tipico de install: nao mentir com systeminfo
+    if (/\b(mysql|mariadb)\b/i.test(pedido)) {
+      return (
+        'Nao consegui instalar ou iniciar MySQL/MariaDB automaticamente neste turno ' +
+        '(a verificacao do sistema nao substitui a instalacao). ' +
+        'Proximo passo: instalar MariaDB/MySQL no Windows (winget/choco ou instalador oficial) ' +
+        'e deixar o servico em execucao; depois peço de novo para eu validar na pasta do projeto.'
+      )
+    }
+    if (/(partz|autopartz|invent[aá]rio|achar o projeto)/i.test(pedido)) {
+      return (
+        '1. NÃO ENCONTRADO (a busca so trouxe ruido do Windows Autopilot/Autoplay — isso nao e o projeto).\n' +
+        '2. NÃO ENCONTRADO\n' +
+        '3. NÃO ENCONTRADO\n' +
+        '4. NÃO ENCONTRADO\n' +
+        '5. NÃO ENCONTRADO\n' +
+        'Use disco_buscar com padrao partz|autopartz (raizes: OneDrive/CURSOR, dev, xampp) e complete os blocos.'
+      )
+    }
+    return (
+      'As tools rodaram, mas o resultado nao respondeu ao seu pedido: "' +
+      String(pedido).slice(0, 160) +
+      '". Diga se quer que eu tente de outro jeito na pasta do projeto.'
     )
   }
-  return partes.join('\n\n')
+  return uteis.join('\n\n').trim()
+}
+
+function pareceDumpTool(texto: string): boolean {
+  const t = String(texto || '')
+  return (
+    /A tool ["']/i.test(t) ||
+    /retornou \d+ linhas/i.test(t) ||
+    /Trecho:\s*[\{\[]/i.test(t) ||
+    /"ok"\s*:\s*true/.test(t) && /terminal_exec|tool/i.test(t)
+  )
 }
 
 /** Remove eco de id de modelo no corpo (metadado só em dglog/provider). */
@@ -263,10 +422,39 @@ async function finalizarAgente(
   passos: PassoAgente[]
 ): Promise<RespostaAgente> {
   let final = texto
-  if (pareceJsonTool(final) || !final.trim()) {
-    final = sintetizarDeTools(passos)
+  if (
+    pareceJsonTool(final) ||
+    !final.trim() ||
+    pareceDumpTool(final) ||
+    !textoRelacionadoAoPedido(final, pergunta)
+  ) {
+    final = sintetizarDeTools(passos, pergunta)
   }
   final = removerEcoModelo(final, modelo)
+  if (pareceDumpTool(final) || pareceJsonTool(final) || !textoRelacionadoAoPedido(final, pergunta)) {
+    final = sintetizarDeTools(passos, pergunta)
+  }
+  try {
+    const { resultadoAvaliar, gravarMemoriaProjeto } = await import('../autonomia-tools')
+    const resumo = passos
+      .filter((p) => p.tipo === 'tool')
+      .map((p) => ('nome' in p ? String(p.nome) : ''))
+      .filter(Boolean)
+      .join(', ')
+    const av = resultadoAvaliar(pergunta, final, resumo)
+    if (!av.ok && !/revisar|pendente|falhou/i.test(final)) {
+      final =
+        final +
+        '\n\n_Verificação: score ' +
+        av.score +
+        '/4 — ' +
+        String(av.recomendacao || 'revisar') +
+        '._'
+    }
+    gravarMemoriaProjeto(raiz, {})
+  } catch {
+    /* */
+  }
   passos.push({ tipo: 'texto', texto: final })
   appendChat(raiz, { role: 'user', content: pergunta, at: Date.now(), provider: modelo })
   appendChat(raiz, { role: 'assistant', content: final, at: Date.now(), provider: modelo })
@@ -336,6 +524,7 @@ async function rodarLoopComProvider(
     pastas?: string[]
     onEvent?: (ev: EventoAgente) => void
     signal?: AbortSignal
+    modo?: string
   }
 ): Promise<RespostaAgente> {
   const mensagens: Message[] = [
@@ -353,6 +542,7 @@ async function rodarLoopComProvider(
   const passos: PassoAgente[] = []
   const propostasAcc: NonNullable<RespostaAgente['propostas']> = []
   const assinaturasFeitas = new Set<string>()
+  const statsAcc = { edits: 0, explored: 0, searches: 0, tools: 0, commands: 0 }
   let pediuResumo = false
   const labelModelo = cfg.modelo
   const emit = (ev: EventoAgente) => {
@@ -363,7 +553,22 @@ async function rodarLoopComProvider(
     }
   }
 
-  for (let i = 0; i < MAX_ITER; i++) {
+  let maxIter = MAX_ITER
+  try {
+    const { ehPedidoInventarioDisco } = await import('../disco-inventario')
+    if (ehPedidoInventarioDisco(pergunta)) maxIter = MAX_ITER_INVENTARIO
+    else if (
+      opts?.modo === 'agent' ||
+      tarefa === 'codigo' ||
+      /\b(implement|implementar|corrig|fix|editar|refator|criar|adicionar|tool|autonom)/i.test(pergunta)
+    ) {
+      maxIter = MAX_ITER_CODIGO
+    }
+  } catch {
+    /* */
+  }
+
+  for (let i = 0; i < maxIter; i++) {
     if (opts?.signal?.aborted) {
       emit({ tipo: 'status', texto: 'cancelado' })
       return {
@@ -374,19 +579,77 @@ async function rodarLoopComProvider(
         ok: false
       }
     }
-    emit({ tipo: 'status', texto: 'iteracao ' + (i + 1) + '/' + MAX_ITER })
+    const passoN = i + 1
+    emit({
+      tipo: 'status',
+      texto: 'Passo ' + passoN + ' de ' + maxIter + ' — chamando ' + labelModelo + '…',
+      modelo: labelModelo
+    })
     const jaUsouTool = passos.some((p) => p.tipo === 'tool')
-    if (jaUsouTool && !pediuResumo) {
+    const toolsFeitas = passos.filter((p) => p.tipo === 'tool').length
+    const inventarioLongo = maxIter > MAX_ITER
+    const ultimaIter = i >= maxIter - 1
+    // Parity v2: tools em TODAS as iters exceto a ultima (explore→edit→validate).
+    const toolsAgora = ultimaIter ? undefined : toolDefs
+    const horaDeResumir =
+      jaUsouTool &&
+      !pediuResumo &&
+      (ultimaIter ||
+        (!inventarioLongo && toolsFeitas >= Math.min(4, Math.max(2, maxIter - 1))) ||
+        (inventarioLongo && toolsFeitas >= 5))
+    if (horaDeResumir) {
       mensagens.push({
         role: 'user',
         content:
-          'Com o resultado da tool acima, responda em portugues do Brasil, em linguagem natural. Nao emita JSON nem chame tools de novo.'
+          'Pedido do usuario (obrigatorio responder isto): "' +
+          pergunta.slice(0, 400) +
+          '". Workspace: ' +
+          raiz +
+          '. Com o resultado das tools, responda em portugues do Brasil, curto e direto AO PEDIDO. ' +
+          'Se a tool nao ajudou (ex.: systeminfo/Autopilot quando pediram projeto), diga NÃO ENCONTRADO' +
+          (ultimaIter ? '. ' : ' e continue com disco_buscar/codigo_ler se precisar. ') +
+          (inventarioLongo
+            ? 'Se o pedido tem blocos A/B/C/D ou N linhas, COMPLETE todos — nao pare no Bloco A. '
+            : '') +
+          'Nao resuma inventarios de Windows. Nao emita JSON.' +
+          (ultimaIter
+            ? ' Nao chame tools de novo — sintetize a resposta final.'
+            : ' Pode chamar mais tools se faltar evidencia.')
       })
       pediuResumo = true
     }
 
-    const toolsAgora = !jaUsouTool ? toolDefs : undefined
-    const r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal)
+    const tRodada = Date.now()
+    const hb = setInterval(() => {
+      if (opts?.signal?.aborted) return
+      const elapsedMs = Date.now() - tRodada
+      emit({
+        tipo: 'heartbeat',
+        passo: passoN,
+        max: maxIter,
+        modelo: labelModelo,
+        elapsedMs
+      })
+      emit({
+        tipo: 'status',
+        texto:
+          'Passo ' +
+          passoN +
+          ' de ' +
+          maxIter +
+          ' — aguardando modelo (' +
+          labelModelo +
+          ')…',
+        modelo: labelModelo,
+        elapsedMs
+      })
+    }, 2500)
+    let r: Awaited<ReturnType<typeof responderRodada>>
+    try {
+      r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal)
+    } finally {
+      clearInterval(hb)
+    }
     if (r.content) emit({ tipo: 'texto', texto: r.content.slice(0, 2000) })
 
     let chamadas = r.tool_calls
@@ -449,24 +712,19 @@ async function rodarLoopComProvider(
       })
     }
 
-    for (let ti = 0; ti < chamadas.length; ti++) {
-      if (opts?.signal?.aborted) {
-        emit({ tipo: 'status', texto: 'cancelado' })
-        return {
-          texto: 'Execucao cancelada pelo usuario.',
-          modelo: labelModelo,
-          passos,
-          propostas: propostasAcc,
-          ok: false
-        }
-      }
-      const ch = chamadas[ti]
+    const processarChamada = async (ti: number, ch: (typeof chamadas)[0]): Promise<'ok' | 'loop'> => {
       const nomeBruto = ch.function?.name || ''
       const argsBrutos = normalizarArgs(ch.function?.arguments)
       const validado = validarChamadaTool(nomeBruto, argsBrutos, tools)
       if (!validado.ok) {
         const vErr = validado as { ok: false; erro: string; erroApp?: unknown }
         dglog('[agente] tool_call inválida: ' + vErr.erro)
+        try {
+          const { registrarFalhaTool } = await import('../tools-telemetry')
+          registrarFalhaTool(nomeBruto || 'invalida', vErr.erro, raiz)
+        } catch {
+          /* */
+        }
         emit({ tipo: 'tool', nome: nomeBruto || 'invalida', fase: 'fim', detalhe: vErr.erro.slice(0, 180) })
         passos.push({ tipo: 'tool', nome: nomeBruto || 'invalida', args: argsBrutos, resultado: vErr.erro })
         mensagens.push({
@@ -476,19 +734,54 @@ async function rodarLoopComProvider(
           name: nomeBruto || 'invalida',
           content: JSON.stringify({ ok: false, erro: vErr.erro, erroApp: vErr.erroApp }).slice(0, 2400)
         })
-        continue
+        return 'ok'
       }
       const { tool, args } = validado
       const nome = tool.name
+      if (nome === 'terminal_exec') {
+        const linha = (
+          String((args as { comando?: string }).comando || '') +
+          ' ' +
+          (Array.isArray((args as { args?: string[] }).args)
+            ? ((args as { args?: string[] }).args || []).join(' ')
+            : '')
+        ).toLowerCase()
+        const pedidoInstal =
+          /\b(mysql|mariadb|instalar|install|winget|choco)\b/i.test(pergunta)
+        const cmdSistema =
+          /\b(systeminfo|get-computerinfo|win32_operatingsystem|hostname|whoami|ipconfig|get-netadapter)\b/i.test(
+            linha
+          )
+        if (pedidoInstal && cmdSistema) {
+          const msg =
+            'Comando de inventario do Windows ignorado — nao responde ao pedido de instalar/iniciar MySQL/MariaDB.'
+          emit({ tipo: 'tool', nome, fase: 'fim', detalhe: msg })
+          passos.push({ tipo: 'tool', nome, args, resultado: JSON.stringify({ ok: false, erro: msg }) })
+          mensagens.push({
+            role: 'tool',
+            tool_name: nome,
+            tool_call_id: 'call_' + ti,
+            name: nome,
+            content: JSON.stringify({ ok: false, erro: msg })
+          })
+          return 'ok'
+        }
+      }
       const sig = nome + '|' + JSON.stringify(args)
       if (assinaturasFeitas.has(sig)) {
         dglog('[agente] tool repetida ignorada: ' + sig.slice(0, 80))
-        const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
-        return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente repetiu a mesma ação e foi interrompido.', acao: 'Refine o pedido ou tente novamente.' } as any }
+        return 'loop'
       }
       assinaturasFeitas.add(sig)
       dglog('[agente] tool ' + nome + ' ' + JSON.stringify(args).slice(0, 120))
-      emit({ tipo: 'tool', nome, fase: 'inicio' })
+      const categoria = classificarToolAgente(nome)
+      if (categoria === 'edit') statsAcc.edits += 1
+      else if (categoria === 'search') statsAcc.searches += 1
+      else if (categoria === 'explore') statsAcc.explored += 1
+      else if (categoria === 'command') statsAcc.commands += 1
+      statsAcc.tools += 1
+      emit({ tipo: 'tool', nome, fase: 'inicio', categoria })
+      emit({ tipo: 'stats', ...statsAcc })
 
       let textoRes = ''
       const propostasMod = await import('../agent/propostas')
@@ -549,6 +842,37 @@ async function rodarLoopComProvider(
         textoRes = res.texto
       }
 
+      try {
+        const { filtrarRuidoWindows, pareceRuidoWindows } = await import('../disco-inventario')
+        if (pareceRuidoWindows(textoRes) || nome === 'terminal_exec') {
+          const limpo = filtrarRuidoWindows(textoRes)
+          if (pareceRuidoWindows(textoRes) && (!limpo || limpo.length < 8)) {
+            textoRes = JSON.stringify({
+              ok: false,
+              erro:
+                'Resultado era so ruido do Windows (Autopilot/Autoplay/WinSxS). Use disco_buscar. NÃO ENCONTRADO neste comando.',
+              brutoDescartado: true
+            })
+          } else if (limpo && limpo !== textoRes) {
+            textoRes = limpo
+          }
+        }
+      } catch {
+        /* */
+      }
+
+      try {
+        const falhou =
+          /"ok"\s*:\s*false/.test(textoRes) ||
+          /^\s*\{[\s\S]*"erro"\s*:/.test(textoRes.slice(0, 200))
+        if (falhou) {
+          const { registrarFalhaTool } = await import('../tools-telemetry')
+          registrarFalhaTool(nome, textoRes.slice(0, 300), raiz)
+        }
+      } catch {
+        /* */
+      }
+
       emit({ tipo: 'tool', nome, fase: 'fim', detalhe: textoRes.slice(0, 200) })
       passos.push({ tipo: 'tool', nome, args, resultado: textoRes })
       mensagens.push({
@@ -558,6 +882,87 @@ async function rodarLoopComProvider(
         name: nome,
         content: textoRes.slice(0, 6000)
       })
+      return 'ok'
+    }
+
+    // Cursor-like: leituras consecutivas no mesmo turno em paralelo; escritas sequenciais.
+    let tiCursor = 0
+    while (tiCursor < chamadas.length) {
+      if (opts?.signal?.aborted) {
+        emit({ tipo: 'status', texto: 'cancelado' })
+        return {
+          texto: 'Execucao cancelada pelo usuario.',
+          modelo: labelModelo,
+          passos,
+          propostas: propostasAcc,
+          ok: false
+        }
+      }
+      const nomePeek = chamadas[tiCursor].function?.name || ''
+      if (ehToolLeituraParalela(nomePeek)) {
+        const inicioBatch = tiCursor
+        while (
+          tiCursor < chamadas.length &&
+          ehToolLeituraParalela(chamadas[tiCursor].function?.name || '')
+        ) {
+          tiCursor++
+        }
+        const batchIdx: number[] = []
+        for (let t = inicioBatch; t < tiCursor; t++) batchIdx.push(t)
+        if (batchIdx.length > 1) {
+          emit({
+            tipo: 'status',
+            texto: 'Lendo ' + batchIdx.length + ' arquivos em paralelo…'
+          })
+          const resultados = await Promise.all(
+            batchIdx.map((t) => processarChamada(t, chamadas[t]))
+          )
+          if (resultados.includes('loop')) {
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+            return {
+              ...fin,
+              propostas: propostasAcc,
+              ok: false,
+              erro: {
+                codigo: 'ERR_TOOL_LOOP_CAP',
+                mensagem: 'O agente repetiu a mesma ação e foi interrompido.',
+                acao: 'Refine o pedido ou tente novamente.'
+              } as any
+            }
+          }
+        } else {
+          const r1 = await processarChamada(batchIdx[0], chamadas[batchIdx[0]])
+          if (r1 === 'loop') {
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+            return {
+              ...fin,
+              propostas: propostasAcc,
+              ok: false,
+              erro: {
+                codigo: 'ERR_TOOL_LOOP_CAP',
+                mensagem: 'O agente repetiu a mesma ação e foi interrompido.',
+                acao: 'Refine o pedido ou tente novamente.'
+              } as any
+            }
+          }
+        }
+      } else {
+        const r1 = await processarChamada(tiCursor, chamadas[tiCursor])
+        tiCursor++
+        if (r1 === 'loop') {
+          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+          return {
+            ...fin,
+            propostas: propostasAcc,
+            ok: false,
+            erro: {
+              codigo: 'ERR_TOOL_LOOP_CAP',
+              mensagem: 'O agente repetiu a mesma ação e foi interrompido.',
+              acao: 'Refine o pedido ou tente novamente.'
+            } as any
+          }
+        }
+      }
     }
   }
 
@@ -575,6 +980,12 @@ export async function executarAgente(
     typeof modeloForcadoOuOpcoes === 'string'
       ? { modeloForcado: modeloForcadoOuOpcoes }
       : modeloForcadoOuOpcoes || {}
+
+  // Timeout global de 120 segundos para evitar que o agente trave o chat para sempre.
+  const controller = new AbortController()
+  let timeoutId: ReturnType<typeof setTimeout>
+  timeoutId = setTimeout(() => controller.abort(), 120_000)
+  opcoes.signal = controller.signal
 
   if (profundidadeAgente > 0) {
     throw new Error(
@@ -602,7 +1013,13 @@ export async function executarAgente(
 
     const ctx = await montarContexto(raiz, pergunta)
     const memoria = blocoMemoria(ctx)
-    const skills = skillsRelevantes(raiz, pergunta)
+    let blocoFatos = ''
+    try {
+      const { textoMemoriasAceitas } = await import('../memorias')
+      const fatos = textoMemoriasAceitas(raiz)
+      if (fatos) blocoFatos = '\n\n### FATOS ACEITOS\n' + fatos
+    } catch { /* opcional */ }
+    const skills = skillsAtivasParaTurno(raiz, pergunta, ag?.skills || [])
     const blocoSkills = skills.length
       ? '\n\n### SKILLS ATIVAS\n' + skills.map((s) => '- ' + s.titulo + ': ' + s.instrucao.slice(0, tarefa === 'codigo' ? 500 : 2000)).join('\n')
       : ''
@@ -620,23 +1037,52 @@ export async function executarAgente(
         'o runtime convertera em diff pendente.'
       : ''
     let blocoMapa = ''
-    if (tarefa === 'codigo') {
-      try {
-        const { mapaCompacto } = await import('../mapa-projeto')
-        const { regrasParaContexto } = await import('../regras-escopo')
-        const citados = pergunta.match(/[\w./\\-]+\.(?:ts|js|php|css|html|py|json|md)/gi) || []
-        blocoMapa =
-          '\n\n### MAPA DO PROJETO (so estrutura)\n' + mapaCompacto(raiz) +
-          regrasParaContexto(raiz, citados, pergunta, 1600)
-      } catch {
-        /* mapa opcional */
-      }
+    try {
+      const { mapaCompacto } = await import('../mapa-projeto')
+      const { regrasParaContexto } = await import('../regras-escopo')
+      const citados = pergunta.match(/[\w./\\-]+\.(?:ts|js|php|css|html|py|json|md)/gi) || []
+      const mapa = mapaCompacto(raiz, tarefa === 'codigo' ? 2200 : 1400)
+      blocoMapa =
+        '\n\n### REPOSITORIO ATIVO\n' +
+        raiz +
+        '\n### MAPA DO PROJETO (so estrutura)\n' +
+        mapa +
+        regrasParaContexto(raiz, citados, pergunta, tarefa === 'codigo' ? 1600 : 900)
+    } catch {
+      /* mapa opcional */
     }
     const extraCheio = opcoes.contextoExtra || ''
     const extra = tarefa === 'codigo' ? extraCheio.slice(0, 3500) : extraCheio
+    let blocoRegrasGerais = ''
+    try {
+      const { obterRegrasAtivas } = await import('../regras-gerais')
+      const rg = obterRegrasAtivas()
+      if (rg) blocoRegrasGerais = '\n\n### REGRAS GERAIS\n' + rg
+    } catch {
+      /* opcional */
+    }
+    const ancoraWorkspace =
+      '\n\n### WORKSPACE ATIVO (obrigatorio)\n' +
+      'Pasta selecionada no Bloco 1: ' +
+      raiz +
+      '\nTodo codigo, terminal e analise DEVEM usar esta pasta. Nao invente outro projeto. ' +
+      'Nao rode systeminfo/Get-ComputerInfo a menos que o usuario peca explicitamente status do PC.\n'
+
+    let blocoInventario = ''
+    try {
+      const { ehPedidoInventarioDisco, blocoPromptInventario } = await import('../disco-inventario')
+      if (ehPedidoInventarioDisco(pergunta)) blocoInventario = blocoPromptInventario()
+    } catch {
+      /* */
+    }
+
     const systemExtra =
+      ancoraWorkspace +
+      blocoInventario +
       blocoAgente +
+      blocoRegrasGerais +
       (memoria ? '\n\n' + memoria : '') +
+      blocoFatos +
       blocoSkills +
       blocoPlan +
       blocoPropose +
@@ -646,10 +1092,12 @@ export async function executarAgente(
     let tools: McpTool[] = []
     if (modo === 'agent') {
       try {
+        process.env.DG_ROOT = path.resolve(raiz)
+        await garantirMcpNaRaiz(raiz)
         tools = await listarTools()
         // Anti-recursao: nunca expor agente_executar ao loop interno
         tools = tools.filter((t) => t.name !== 'agente_executar')
-        dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar)')
+        dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar) raiz=' + raiz)
       } catch (e) {
         dglog('[agente] MCP indisponivel: ' + String(e))
       }
@@ -732,7 +1180,8 @@ export async function executarAgente(
             proposeWrites,
             pastas: opcoes.pastas,
             onEvent: opcoes.onEvent,
-            signal: opcoes.signal
+            signal: opcoes.signal,
+            modo: opcoes.modo
           })
           const ms = Date.now() - t0
           dglog(
@@ -807,6 +1256,7 @@ export async function executarAgente(
       'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')
     )
   } finally {
+    clearTimeout(timeoutId)
     profundidadeAgente--
   }
 }

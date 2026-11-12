@@ -3,7 +3,8 @@
  * Extraido de src/main/index.ts
  */
 
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow } from 'electron';
+import { perguntarDialogo } from '../ui-dialog';
 import { runAnalysis, getCachedAnalysis, invalidarCacheAnalise } from '../analyzer';
 import { whereIs, formatWhereIs } from '../whereis';
 import { checkOllama } from '../ollama-keeper';
@@ -91,14 +92,51 @@ export async function handleAnaliseRun(
   dglog('[analysis] handler acionado escopo=' + escopo);
 
   try {
-    const ollama = await checkOllama();
+    const { ensureOllama } = await import('../ollama-keeper');
+    const ollama = await ensureOllama().then(async (ativo) => {
+      if (ativo) return { ativo: true, instalado: true };
+      return checkOllama();
+    });
     if (!ollama.ativo) {
       const temKey = !!(process.env.LLM_API_KEY || process.env.OPENAI_API_KEY);
       if (!temKey) {
         return falha(CodigoErro.ERR_OLLAMA_OFFLINE, 'O Ollama não está ativo.', 'Inicie "ollama serve" ou clique em Iniciar Ollama.');
       }
     }
-    const result = await runAnalysis(seg.abs, escopo, f);
+    try {
+      const { detectarModelosLocais } = await import('../brain/modelos-catalogo');
+      await detectarModelosLocais(seg.abs);
+    } catch { /* segue com catálogo atual */ }
+    let result;
+    try {
+      result = await runAnalysis(seg.abs, escopo, f);
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e);
+      if (!/timeout|abort/i.test(msg)) throw e;
+      dglog('[analysis] timeout — retry com modelo leve 1.5b');
+      const { askOllama } = await import('../brain/ollama');
+      const retry = await askOllama(
+        'Analise o sistema de forma breve em portugues do Brasil. Responda com: o que e, stack e estrutura.',
+        'raiz=' + seg.abs,
+        'analise',
+        {},
+        { model: 'qwen2.5-coder:1.5b', numPredict: 400, timeoutMs: 180_000 }
+      );
+      if (!retry?.text?.trim()) throw e;
+      result = {
+        fromCache: false,
+        changedFiles: [] as string[],
+        report: {
+          oQueE: retry.text.slice(0, 2000),
+          stack: '',
+          estrutura: '',
+          raw: retry.text,
+          analyzedAt: Date.now(),
+          provider: retry.provider,
+          model: retry.model
+        }
+      };
+    }
     const safe = { ...result, report: normalizarRelatorio((result as any)?.report) };
     if (!String((safe.report as any).oQueE || (safe.report as any).stack || (safe.report as any).estrutura || '').trim() && !String((safe.report as any).raw || '').trim()) {
       return falha(CodigoErro.ERR_ANALYSIS_SHAPE, 'A análise retornou formato inválido/vazio.', 'Tente novamente.', 'report sem campos');
@@ -120,36 +158,33 @@ export async function handleAnaliseChooseScope(
     return falha(CodigoErro.ERR_UNKNOWN, 'Modo de escolha de análise inválido.', undefined, String(mode));
   }
 
-  const options = mode === 'choose-scope'
-    ? {
-        type: 'question' as const,
-        title: 'Escopo da analise',
-        message: 'Escolha o tipo de analise:',
-        detail: 'Analise rapida = apenas arquivos-chave (rapida)\nAnalise completa = projeto inteiro (pode demorar)',
-        buttons: ['Analise rapida', 'Analise completa', 'Cancelar'],
-        defaultId: 0,
-        cancelId: 2,
-        noLink: true,
-      }
-    : {
-        type: 'warning' as const,
-        title: 'Analise completa',
-        message: 'Analisar o projeto inteiro pode levar varios minutos. Continuar?',
-        buttons: ['Continuar', 'Cancelar'],
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true,
-      };
+  const options =
+    mode === 'choose-scope'
+      ? {
+          type: 'question' as const,
+          title: 'Escopo da análise',
+          message: 'Escolha o tipo de análise:',
+          detail:
+            'Análise rápida = apenas arquivos-chave (rápida)\nAnálise completa = projeto inteiro (pode demorar)',
+          buttons: ['Análise rápida', 'Análise completa', 'Cancelar'],
+          defaultId: 0,
+          cancelId: 2
+        }
+      : {
+          type: 'warning' as const,
+          title: 'Análise completa',
+          message: 'Analisar o projeto inteiro pode levar vários minutos. Continuar?',
+          buttons: ['Continuar', 'Cancelar'],
+          defaultId: 0,
+          cancelId: 1
+        };
 
   const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
 
   try {
-    const result = parent
-      ? await dialog.showMessageBox(parent, options)
-      : await dialog.showMessageBox(options);
-
-    dglog('[analysis] dialog mode=' + mode + ' response=' + result.response);
-    return { ok: true, response: result.response };
+    const response = await perguntarDialogo(parent, options);
+    dglog('[analysis] dialog mode=' + mode + ' response=' + response);
+    return { ok: true, response };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     dglog(`[analysis:choose-scope] erro: ${msg}`);

@@ -1,4 +1,4 @@
-﻿---
+---
 nome: OpenCode Debug
 especialidade: diagnostico e correcao inspirado em OpenCode
 skills: debugger, leitor-codigo, testador

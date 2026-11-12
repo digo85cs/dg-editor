@@ -14,6 +14,7 @@ import {
   resolverBinarioCursorAgent
 } from './providers'
 import { filaGlobal, configParaProvider } from './providers-registry'
+import { lerChave } from './segredos-providers'
 
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'chat-rapido' | 'analise' | 'analisar' | 'codigo' | 'raciocinio' | 'revisao'
@@ -192,9 +193,13 @@ export function disponivel(cfg: ProviderConfig): StatusDisponivel {
   }
   if (cfg.tipo === 'local') return 'ok'
 
-  // online
-  if (!cfg.apiKeyEnv || !String(process.env[cfg.apiKeyEnv] || '').trim()) {
-    return 'sem-chave'
+  // online — cofre (id/apiKeyRef) ou env
+  {
+    const key =
+      lerChave(cfg.id) ||
+      (cfg.apiKeyRef ? lerChave(cfg.apiKeyRef) : null) ||
+      (cfg.apiKeyEnv ? String(process.env[cfg.apiKeyEnv] || '').trim() : '')
+    if (!key) return 'sem-chave'
   }
   if (cfg.formato === 'openai' && (cfg.baseUrl || '').includes('openrouter.ai')) {
     // Catalogo quente só quando já está em cache. Sem cache, segue: um 404 cai no próximo da fila.
@@ -297,8 +302,8 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         modelo: 'deepseek/deepseek-v4-flash',
         baseUrl: OPENROUTER_BASE,
         apiKeyEnv: KEY_ENV,
-        numPredict: 512,
-        timeoutMs: 45_000
+        numPredict: 2048,
+        timeoutMs: 90_000
       }),
       cfg({
         id: 'openrouter:deepseek-v3.2',
@@ -307,16 +312,17 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         modelo: 'deepseek/deepseek-v3.2',
         baseUrl: OPENROUTER_BASE,
         apiKeyEnv: KEY_ENV,
-        numPredict: 512,
-        timeoutMs: 60_000
+        numPredict: 2048,
+        timeoutMs: 120_000
       }),
+      cfgCursorCli(),
       cfg({
         id: 'ollama:qwen2.5-coder:3b',
         tipo: 'local',
         formato: 'ollama',
         modelo: 'qwen2.5-coder:3b',
         baseUrl: OLLAMA_BASE,
-        numPredict: 512,
+        numPredict: 1024,
         timeoutMs: 120_000
       }),
       cfg({
@@ -325,10 +331,9 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
         formato: 'ollama',
         modelo: 'qwen2.5-coder:14b',
         baseUrl: OLLAMA_BASE,
-        numPredict: 512,
+        numPredict: 1024,
         timeoutMs: 300_000
-      }),
-      cfgCursorCli()
+      })
     ])
   }
 
@@ -503,6 +508,11 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
       motivos.push(p.id + '=modelo-grande')
       continue
     }
+    // Free online raso: so como ultimo recurso (depois do Ollama)
+    if (p.tipo === 'online' && /:free\b/i.test(p.modelo)) {
+      logStderr('[dg-fila] adiando free ' + p.id + '/' + p.modelo)
+      continue
+    }
     const st = disponivel(p)
     if (st === 'ok') {
       ok.push(p)
@@ -510,6 +520,24 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
       logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=' + st)
       motivos.push(p.id + '=' + st)
     }
+  }
+  // Free :free so no fim absoluto (depois de online bom + CLI + local)
+  const freeOk: ProviderConfig[] = []
+  for (const p of bruta) {
+    if (modeloPesadoDemais(t, p)) continue
+    if (!(p.tipo === 'online' && /:free\b/i.test(p.modelo))) continue
+    if (disponivel(p) === 'ok') freeOk.push(p)
+  }
+  // Qualidade: online/CLI primeiro; local por ultimo; free raso depois do local
+  const rank = (p: ProviderConfig): number => {
+    if (p.tipo === 'local') return 2
+    if (p.tipo === 'cli') return 1
+    if (/:free\b/i.test(p.modelo)) return 3
+    return 0
+  }
+  ok.sort((a, b) => rank(a) - rank(b))
+  for (const p of freeOk) {
+    if (!ok.some((x) => x.id === p.id && x.modelo === p.modelo)) ok.push(p)
   }
   if (ok.length === 0) {
     throw new Error(
@@ -521,9 +549,18 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
 
 export function limitesPorTarefa(tarefa: string): { num_predict: number; timeoutMs: number } {
   const t = normalizarTarefa(tarefa)
-  if (t === 'analise' || t === 'analisar') return { num_predict: 512, timeoutMs: 180_000 }
-  if (t === 'chat-rapido') return { num_predict: 400, timeoutMs: 30_000 }
-  if (t === 'chat') return { num_predict: 512, timeoutMs: 120_000 }
+  try {
+    const { limitesPorHardware } = require('../hardware-profile') as {
+      limitesPorHardware: (tarefa: string) => { num_predict: number; timeoutMs: number } | null
+    }
+    const hw = limitesPorHardware(t)
+    if (hw) return hw
+  } catch {
+    /* perfil opcional no boot */
+  }
+  if (t === 'analise' || t === 'analisar') return { num_predict: 900, timeoutMs: 180_000 }
+  if (t === 'chat-rapido') return { num_predict: 700, timeoutMs: 120_000 }
+  if (t === 'chat') return { num_predict: 1600, timeoutMs: 240_000 }
   if (t === 'codigo') return { num_predict: 1024, timeoutMs: 300_000 }
   const fila = filaDeModelos(t)
   const local = fila.find((p) => p.tipo === 'local') || fila[0]

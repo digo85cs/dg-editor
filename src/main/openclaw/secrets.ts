@@ -1,4 +1,5 @@
 import { app, safeStorage } from 'electron'
+import { randomBytes } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 
@@ -49,4 +50,16 @@ export function lerToken(): string | null {
   } catch {
     return null
   }
+}
+
+/** Gera e grava token se ainda não houver (gateway local). */
+export function garantirToken(): { ok: boolean; criado: boolean; prefixo?: string; erro?: string } {
+  const atual = lerToken()
+  if (atual && atual.trim()) {
+    return { ok: true, criado: false, prefixo: atual.slice(0, 8) }
+  }
+  const token = 'oc_' + randomBytes(24).toString('hex')
+  const r = salvarToken(token)
+  if (!r.ok) return { ok: false, criado: false, erro: r.erro }
+  return { ok: true, criado: true, prefixo: token.slice(0, 8) }
 }

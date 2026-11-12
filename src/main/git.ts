@@ -171,3 +171,48 @@ export async function gitDiff(raiz: string, relPath: string): Promise<GitDiffRes
   const parts = [staged.stdout, unstaged.stdout].filter((s) => s && s.trim())
   return { ok: true, diff: parts.join('\n') || '(sem diferencas)\n' }
 }
+
+export interface GitCommitResult {
+  ok: boolean
+  hash?: string
+  erro?: string
+}
+
+/**
+ * Commit local com confirmação já feita na UI.
+ * Arquivos opcionais: se vazios, `git add -A` no repo.
+ */
+export async function gitCommit(
+  raiz: string,
+  mensagem: string,
+  arquivos: string[] = []
+): Promise<GitCommitResult> {
+  const msg = String(mensagem || '').trim()
+  if (!raiz || !msg) return { ok: false, erro: 'raiz ou mensagem invalidos' }
+  if (msg.length > 500) return { ok: false, erro: 'mensagem longa demais' }
+  const inside = await git(raiz, ['rev-parse', '--is-inside-work-tree'])
+  if (!inside.ok) return { ok: false, erro: 'nao e repositorio git' }
+
+  if (arquivos.length) {
+    for (const a of arquivos) {
+      const clean = String(a || '').replace(/^[/\\]+/, '').replace(/\\/g, '/')
+      if (!clean || clean.includes('..')) return { ok: false, erro: 'caminho invalido: ' + a }
+      const add = await git(raiz, ['add', '--', clean])
+      if (!add.ok) return { ok: false, erro: add.erro || 'git add falhou: ' + clean }
+    }
+  } else {
+    const add = await git(raiz, ['add', '-A'])
+    if (!add.ok) return { ok: false, erro: add.erro || 'git add -A falhou' }
+  }
+
+  const commit = await git(raiz, ['commit', '-m', msg])
+  if (!commit.ok) {
+    const err = commit.erro || ''
+    if (/nothing to commit|nada a submeter/i.test(err + commit.stdout)) {
+      return { ok: false, erro: 'nada para commitar' }
+    }
+    return { ok: false, erro: err || 'git commit falhou' }
+  }
+  const hash = await git(raiz, ['rev-parse', '--short', 'HEAD'])
+  return { ok: true, hash: hash.ok ? hash.stdout.trim() : undefined }
+}

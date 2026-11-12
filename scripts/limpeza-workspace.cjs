@@ -47,6 +47,7 @@ const ESSENCIAIS_TOPO = new Set([
   'dg-boot.ps1',
   'docs',
   'electron-vite.config.ts',
+  'electron.vite.config.ts',
   'faxina.bat',
   'node_modules',
   'out',
@@ -58,13 +59,25 @@ const ESSENCIAIS_TOPO = new Set([
   'scripts',
   'src',
   'test',
-  'tsconfig.json'
+  'tsconfig.json',
+  'vitest.config.ts',
+  'ARQUITETURA.md',
+  'MIGRACAO.md',
+  'SINCRONIZAR.bat',
+  'dg-config.json',
+  '.github',
+  '.agents',
+  '.gitattributes',
+  '.dgignore',
+  'dist-app'
 ])
 
 /** Em .dg-editor, o que fica após faxina orgânica. */
 const ESSENCIAIS_DG = new Set([
   'agentes',
   'skills',
+  'regras',
+  'bin',
   'modelos.default.json',
   'mcp-config.json',
   'modelos.json'
@@ -144,6 +157,15 @@ function fmt(n) {
 function limpezaBase() {
   // --- sempre: logs soltos, tmp, dumps de QA ---
   limparGlobDir(ROOT, (n) => /^smoke-.*\.log$/i.test(n) || /^dg-.*\.log$/i.test(n), 'log raiz')
+  limparGlobDir(
+    ROOT,
+    (n) =>
+      /^boot(-.*)?\.log$/i.test(n) ||
+      /^boot-.*\.stdout\.log$/i.test(n) ||
+      /^boot-.*\.stderr\.log$/i.test(n) ||
+      /^debug\.log$/i.test(n),
+    'log boot/debug'
+  )
   limparGlobDir(ROOT, (n) => /^fase0-snapshot\.txt$/i.test(n), 'snapshot')
   limparGlobDir(
     ROOT,
@@ -152,10 +174,26 @@ function limpezaBase() {
       /^teste-.*\.(cjs|log)$/i.test(n) ||
       /^diag-.*\.cjs$/i.test(n) ||
       /^_test-.*\.mjs$/i.test(n) ||
-      /_teste_.*\.mjs$/i.test(n),
+      /_teste_.*\.mjs$/i.test(n) ||
+      /^_tmp_/i.test(n) ||
+      /^\d{1,3}$/.test(n),
     'lixo raiz'
   )
+  rm('_logos_preview', 'preview logos obsoleto')
   rm('tmp', 'pasta tmp/')
+  // aliases icon-* duplicam dg-editor-* (regeneráveis via npm run branding)
+  limparGlobDir(
+    path.join(ROOT, 'resources'),
+    (n) => /^icon-\d+\.png$/i.test(n),
+    'resources icon-* duplicado'
+  )
+  // build Linux incompleto no Windows (symlink) — regenerável
+  rm(path.join('dist-app', 'linux-unpacked'), 'dist-app linux-unpacked')
+  limparGlobDir(
+    path.join(ROOT, 'dist-app'),
+    (n) => /^__appImage/i.test(n) || /^builder-debug\.yml$/i.test(n),
+    'dist-app restos'
+  )
   if (existe(path.join(ROOT, 'logs'))) {
     limparGlobDir(path.join(ROOT, 'logs'), () => true, 'logs/')
     rm('logs', 'pasta logs/')
@@ -200,7 +238,8 @@ function limpezaBase() {
   )
 
   if (!LEVE) {
-    for (const sub of ['bin', 'backup', '_backups', 'chats', 'avaliacoes', 'memoria', 'logs', 'downloads']) {
+    // bin/ = MCP compilado (npm run build:mcp) — nao apagar
+    for (const sub of ['backup', '_backups', 'chats', 'avaliacoes', 'memoria', 'logs', 'downloads']) {
       rm(path.join('.dg-editor', sub), '.dg-editor/' + sub)
     }
   } else {
@@ -215,23 +254,25 @@ function limpezaBase() {
 }
 
 function limpezaOrganica() {
-  // packaging / caches / restos típicos no Windows
+  // packaging / caches — NÃO apaga instaladores finais em dist-app/*.exe
   for (const pasta of [
-    'dist-app',
     'dist',
     'release',
     'release-builds',
-    'win-unpacked',
     'coverage',
     '.vite',
     '.turbo',
     'playwright-report',
     'test-results',
     '.cache',
-    'electron-builder-cache'
+    'electron-builder-cache',
+    '.vs'
   ]) {
     rm(pasta, 'cache/packaging')
   }
+  // win-unpacked é regenerável; mantém NSIS/Portable/latest.yml
+  rm(path.join('dist-app', 'win-unpacked'), 'dist-app win-unpacked')
+  rm(path.join('dist-app', 'linux-unpacked'), 'dist-app linux-unpacked')
 
   // pasta "electron" na raiz = cópia errada (nunca node_modules\electron)
   const electronRaiz = path.join(ROOT, 'electron')

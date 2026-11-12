@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Inicia o Electron sem prender console. Em checkout limpo (sem out/),
- * roda build inicial automaticamente.
+ * Inicia o Electron SEM console visivel.
  * Uso: node scripts/iniciar-app.cjs
  */
 'use strict'
@@ -20,7 +19,9 @@ try {
     stdio: 'ignore',
     windowsHide: true
   })
-} catch { /* ignore */ }
+} catch {
+  /* ignore */
+}
 
 function resolverRaiz() {
   if (process.env.DG_ROOT && fs.existsSync(path.join(process.env.DG_ROOT, 'package.json'))) {
@@ -35,28 +36,16 @@ function resolverRaiz() {
 
 function garantirBuild(raiz) {
   const outMain = path.join(raiz, 'out', 'main', 'index.js')
-  if (fs.existsSync(outMain)) {
-    console.log('[iniciar-app] out/ OK — iniciando')
-    return true
-  }
-  console.log('[iniciar-app] out/ ausente — rodando build inicial...')
+  if (fs.existsSync(outMain)) return true
   const r = spawnSync('npx', ['--no-install', 'electron-vite', 'build'], {
     cwd: raiz,
-    stdio: 'inherit',
+    stdio: 'ignore',
     env: process.env,
     windowsHide: true,
-    shell: isWin,
+    shell: isWin
   })
-  if (r.error || r.status !== 0) {
-    console.error('[iniciar-app] Build falhou (exit ' + String(r && r.status) + '). Rode: npm run build')
-    return false
-  }
-  if (!fs.existsSync(outMain)) {
-    console.error('[iniciar-app] Build concluiu mas out/main/index.js não existe. Rode: npm run build')
-    return false
-  }
-  console.log('[iniciar-app] build OK')
-  return true
+  if (r.error || r.status !== 0) return false
+  return fs.existsSync(outMain)
 }
 
 const raiz = resolverRaiz()
@@ -68,23 +57,18 @@ const electronExe =
     : path.join(raiz, 'node_modules', 'electron', 'dist', 'electron')
 
 if (!fs.existsSync(electronExe)) {
-  console.error('[iniciar-app] electron nao encontrado em ' + electronExe)
   process.exit(1)
 }
 
 if (!garantirBuild(raiz)) process.exit(1)
 
-const child = spawn(electronExe, [raiz, '--no-sandbox'], {
+const child = spawn(electronExe, ['.', '--no-sandbox'], {
   cwd: raiz,
   env: { ...process.env, DG_ROOT: raiz },
-  stdio: 'inherit',
-  windowsHide: false
+  stdio: 'ignore',
+  windowsHide: true,
+  detached: true
 })
-child.on('error', (e) => {
-  console.error('[iniciar-app] falha ao iniciar Electron:', e && e.message ? e.message : e)
-  process.exit(1)
-})
-child.on('exit', (code, signal) => {
-  if (signal) process.exit(1)
-  process.exit(code == null ? 1 : code)
-})
+child.on('error', () => process.exit(1))
+child.unref()
+process.exit(0)

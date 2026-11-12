@@ -15,6 +15,8 @@ import { registrarHandlersBrain, ensureOllamaOnBoot } from './brain';
 import { registrarHandlersGit } from './git';
 import { registrarHandlersChat } from './chat';
 import { registrarHandlersAnalise, setAnaliseMainWindow } from './analise';
+import { registrarDialogUi } from '../ui-dialog';
+import { registrarUpdateIpc } from '../auto-update';
 
 // Importar novos registradores extraidos
 import { registrarHandlersFolder, setFolderMainWindow } from './folder';
@@ -42,6 +44,11 @@ import { registrarHandlersRegrasGerais } from './regras-gerais';
 import { registrarHandlersFerramentas } from './ferramentas';
 import { registrarHandlersDeps } from './deps';
 import { registrarHandlersProviders } from './providers';
+import { registrarHandlersDeploy } from './deploy';
+import { registrarHubExtras } from './hub-extras';
+import { registrarHandlersPerfil } from './perfil';
+import { registrarHandlersAutomation } from './automation';
+import { registrarComfyUIIpc } from '../comfyui-mcp';
 
 // ============================================================================
 // ESTADO
@@ -79,6 +86,7 @@ export function registrarTodosHandlers(): void {
   dglog('[ipc:registry] >>> Iniciando registro de todos os handlers IPC...');
 
   try {
+    registrarDialogUi()
     // Registrar handlers por categoria
     registrarHandlersArquivo();
     registrarHandlersTerminal();
@@ -115,6 +123,23 @@ export function registrarTodosHandlers(): void {
     registrarHandlersFerramentas();
     registrarHandlersDeps();
     registrarHandlersProviders();
+    registrarHandlersDeploy();
+    registrarHandlersAutomation();
+    registrarComfyUIIpc();
+    registrarHubExtras();
+    registrarHandlersPerfil();
+    registrarUpdateIpc()
+    try {
+      const { ipcMain } = require('electron') as typeof import('electron')
+      const hw = require('../hardware-profile') as {
+        garantirHardwareProfile: (f?: boolean) => unknown
+        lerHardwareProfile: () => unknown
+      }
+      ipcMain.handle('hardware:perfil', () => hw.garantirHardwareProfile(false))
+      ipcMain.handle('hardware:atualizar', () => hw.garantirHardwareProfile(true))
+    } catch (e) {
+      dglog('[ipc:registry] hardware ipc: ' + String(e))
+    }
 
     dglog('[ipc:registry] <<< Todos os handlers IPC registrados com sucesso!');
   } catch (e) {

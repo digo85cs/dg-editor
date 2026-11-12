@@ -32,7 +32,6 @@ export async function orquestrarAgentes(
 ): Promise<ResultadoOrquestracao> {
   const disponiveis = listarAgentes(raiz).map((a) => a.id)
   let ids = (fila && fila.length ? fila : FILA_PADRAO).filter(Boolean)
-  // fallback se ids do padrao nao existem
   ids = ids.map((id) => {
     if (disponiveis.includes(id)) return id
     const alt = disponiveis.find((d) => d.includes(id) || id.includes(d))
@@ -42,6 +41,9 @@ export async function orquestrarAgentes(
   const out: PassoOrquestracao[] = []
   let acumulado = pedido
   let ultimoTexto = ''
+
+  // Tempo máximo que cada agente tem para responder antes de ser descartado.
+  const AGENT_TIMEOUT_MS = 90_000
 
   for (const id of ids) {
     dglog('[orquestrador] agente=' + id)
@@ -57,11 +59,21 @@ export async function orquestrarAgentes(
             '):\n' +
             ultimoTexto +
             '\n\nContinue a partir daqui conforme sua especialidade.'
-      const r: RespostaAgente = await executarAgente(raiz, prompt, {
+
+      const promise = executarAgente(raiz, prompt, {
         agente: id,
         modo: 'agent',
         contextoExtra
       })
+
+      // Promise.race garante que um agente travado nao bloqueia o chat para sempre.
+      const r: RespostaAgente = await Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout: ' + AGENT_TIMEOUT_MS / 1000 + 's')), AGENT_TIMEOUT_MS)
+        )
+      ])
+
       ultimoTexto = r.texto || ''
       out.push({
         agente: id,
@@ -79,7 +91,8 @@ export async function orquestrarAgentes(
         erro: String((e as Error).message || e),
         duracaoMs: Date.now() - t0
       })
-      return { ok: false, passos: out, textoFinal: ultimoTexto }
+      // Nao encerra o fluxo: segue para o proximo agente da fila.
+      continue
     }
   }
 

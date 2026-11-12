@@ -3,7 +3,7 @@ import { readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { exigirString, exigirArrayStrings, isErroPayload, exigirObjeto } from '../ipc-seguro'
 import { lerConfigOpenClaw, salvarConfigOpenClaw } from './config'
-import { limparToken, salvarToken, tokenConfigurado } from './secrets'
+import { garantirToken, limparToken, salvarToken, tokenConfigurado } from './secrets'
 import { pedirOpenClaw } from './cliente'
 import {
   aplicarPendenteAprovado,
@@ -64,6 +64,17 @@ export function registerOpenClawIpc(): void {
     ok: true,
     configurado: tokenConfigurado()
   }))
+
+  ipcMain.handle('openclaw:token-ensure', () => {
+    const r = garantirToken()
+    return {
+      ok: r.ok,
+      criado: r.criado,
+      configurado: tokenConfigurado(),
+      prefixo: r.prefixo,
+      erro: r.erro
+    }
+  })
 
   ipcMain.handle('openclaw:pedir', async (_e, payload: unknown) => {
     const o = exigirObjeto(payload, 'payload')

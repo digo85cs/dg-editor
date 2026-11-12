@@ -10,10 +10,18 @@ import { resolverRaizProjeto, RAIZ_WINDOWS_CANONICA } from './paths'
 
 const RAIZ_CANONICA = RAIZ_WINDOWS_CANONICA
 
-const VBS = `' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
+function escVbs(pathAbs: string): string {
+  return pathAbs.replace(/\\/g, '\\\\').replace(/"/g, '""')
+}
+
+function templatesLaunchers(raiz: string): { vbs: string; batAbrir: string; batAtalho: string } {
+  const r = raiz
+  const vbsRaiz = escVbs(raiz)
+  return {
+    vbs: `' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
 Option Explicit
 Dim sh, raiz, ps1, cmd, fso
-raiz = "D:\\CURSOR\\DG Editor"
+raiz = "${vbsRaiz}"
 ps1 = raiz & "\\scripts\\splash-boot.ps1"
 Set fso = CreateObject("Scripting.FileSystemObject")
 If Not fso.FileExists(ps1) Then
@@ -26,21 +34,21 @@ Set sh = CreateObject("WScript.Shell")
 sh.CurrentDirectory = raiz
 cmd = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & ps1 & """"
 sh.Run cmd, 0, False
-`
-
-const BAT_ABRIR = `@echo off
-set "DG_ROOT=D:\\CURSOR\\DG Editor"
+`,
+    batAbrir: `@echo off
+set "DG_ROOT=${r}"
 if not exist "%DG_ROOT%\\abrir-dg-editor.vbs" exit /b 1
 start "" /min wscript.exe //nologo "%DG_ROOT%\\abrir-dg-editor.vbs"
 exit /b 0
-`
-
-const BAT_ATALHO = `@echo off
-cd /d "D:\\CURSOR\\DG Editor"
-if not exist "D:\\CURSOR\\DG Editor\\package.json" exit /b 1
-powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "D:\\CURSOR\\DG Editor\\scripts\\criar-atalho-desktop.ps1"
+`,
+    batAtalho: `@echo off
+cd /d "${r}"
+if not exist "${r}\\package.json" exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${r}\\scripts\\criar-atalho-desktop.ps1"
 exit /b %ERRORLEVEL%
 `
+  }
+}
 
 function escreverSeMudou(abs: string, conteudo: string): boolean {
   try {
@@ -130,12 +138,13 @@ export function selfHealWindowsLaunchers(): { ok: boolean; escritos: string[] } 
     return { ok: false, escritos: [] }
   }
 
+  const t = templatesLaunchers(raiz)
   const escritos: string[] = []
   const alvos: Array<[string, string]> = [
-    [join(raiz, 'abrir-dg-editor.vbs'), VBS],
-    [join(raiz, 'abrir-dg-editor.bat'), BAT_ABRIR],
-    [join(raiz, 'atualizar-atalho-desktop.bat'), BAT_ATALHO],
-    [join(raiz, 'corrigir-atalho-desktop.bat'), BAT_ATALHO]
+    [join(raiz, 'abrir-dg-editor.vbs'), t.vbs],
+    [join(raiz, 'abrir-dg-editor.bat'), t.batAbrir],
+    [join(raiz, 'atualizar-atalho-desktop.bat'), t.batAtalho],
+    [join(raiz, 'corrigir-atalho-desktop.bat'), t.batAtalho]
   ]
 
   for (const [abs, body] of alvos) {

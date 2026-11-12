@@ -20,7 +20,7 @@
 - Nao misturar idiomas na mesma resposta.
 
 # === 4. PASTA DE TRABALHO ===
-- Pasta oficial: D:\CURSOR\DG Editor. App local (Electron neste PC).
+- Pasta oficial: C:\dev\DGEditor. App local (Electron neste PC).
 - Nao usar nuvem, espelho remoto nem sync no boot.
 - Nao abrir node_modules\electron\dist. Atalho diario: abrir-dg-editor.vbs (wscript).
 

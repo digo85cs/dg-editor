@@ -8,7 +8,8 @@
   }
   function ensureHost() {
     if (document.getElementById('regras-gerais-box')) return
-    const host = document.querySelector('#modal-config .modal-box, #modal-config') || document.querySelector('#configuracoes, .painel-config, [data-painel="config"]') || document.body
+    const host = document.getElementById('config-regras') || document.querySelector('#modal-config .config-body')
+    if (!host) return
     const box = document.createElement('section')
     box.id = 'regras-gerais-box'
     box.className = 'regras-gerais'
@@ -16,7 +17,7 @@
     box.innerHTML = '' +
       '<header class="regras-gerais__header">' +
         '<div class="regras-gerais__title-group">' +
-          '<h2>Regras Gerais</h2>' +
+          '<h4>Regras Gerais</h4>' +
           '<span id="rg-count" class="regras-gerais__badge-count">0 ativas</span>' +
         '</div>' +
         '<p class="regras-gerais__subtitle">Aplicadas a todos os agentes, skills e ferramentas do DG Editor.</p>' +

@@ -17,8 +17,10 @@ import { filaGlobal, configParaProvider, type ProviderDescriptor, obterProvider 
 import { chaveConfigurada } from './segredos-providers'
 import { userDataDir } from '../paths'
 
-const ARQUIVO = join(userDataDir(), 'cota-modelos.json')
 const VERSAO = 2
+function arquivoCota(): string {
+  return join(userDataDir(), 'cota-modelos.json')
+}
 const DIA_MS = 24 * 60 * 60 * 1000
 const RAIZ = process.env.DG_ROOT || process.cwd()
 
@@ -56,12 +58,12 @@ const naoRastreadosLogadoSet = new Set<string>()
 
 function lerEstado(): EstadoCota {
   if (estadoCache) return estadoCache
-  if (!existsSync(ARQUIVO)) {
+  if (!existsSync(arquivoCota())) {
     estadoCache = { versao: VERSAO, permitirPago: false, tetoDiarioUSD: undefined, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] }
     return estadoCache
   }
   try {
-    const j = JSON.parse(readFileSync(ARQUIVO, 'utf-8')) as EstadoCota
+    const j = JSON.parse(readFileSync(arquivoCota(), 'utf-8')) as EstadoCota
     if (!j || typeof j !== 'object' || !Array.isArray(j.entradas)) throw new Error('estado invalido')
     // Migracao v1 -> v2
     if (j.versao === 1) {
@@ -96,7 +98,7 @@ function salvarEstado(estado: EstadoCota): void {
   try {
     const dir = userDataDir()
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(ARQUIVO, JSON.stringify(estado, null, 2), 'utf-8')
+    writeFileSync(arquivoCota(), JSON.stringify(estado, null, 2), 'utf-8')
   } catch (e) {
     dglog('[roteador-cota] falha ao salvar estado de cota: ' + String((e as Error)?.message || e))
   }
@@ -362,6 +364,6 @@ export function __resetarEstadoParaTestes(): void {
   naoRastreadosSet.clear()
   naoRastreadosLogadoSet.clear()
   try {
-    if (existsSync(ARQUIVO)) unlinkSync(ARQUIVO)
+    if (existsSync(arquivoCota())) unlinkSync(arquivoCota())
   } catch { /* */ }
 }

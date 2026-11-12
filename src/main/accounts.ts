@@ -20,13 +20,21 @@ export async function getAccountsState(): Promise<AccountsState> {
       tokenPrefix: auth.session ? auth.session.token.slice(0, 8) : '—',
       criadoEm: auth.user ? auth.user.createdAt : 0
     },
-    maquina: {
-      hostname: profile.hostname,
-      plataforma: profile.platform + ' ' + profile.arch,
-      cpus: profile.cpus.length,
-      ramGB: (profile.totalMemory / 1073741824).toFixed(1),
-      forca: profileStrength(profile)
-    },
+    maquina: (() => {
+      const cores = Array.isArray(profile.cpus) ? profile.cpus.length : Number(profile.cpus) || 0
+      const total = Number(profile.totalMemory)
+      const ramGB = Number.isFinite(total) && total > 0 ? (total / 1073741824).toFixed(1) : '?'
+      const nivel = profileStrength(profile)
+      const forca =
+        nivel === 'strong' ? 'forte' : nivel === 'medium' ? 'média' : nivel === 'light' ? 'leve' : String(nivel || '—')
+      return {
+        hostname: profile.hostname || '—',
+        plataforma: (profile.platform || '') + ' ' + (profile.arch || ''),
+        cpus: cores,
+        ramGB,
+        forca
+      }
+    })(),
     ia: {
       ollamaInstalado: ollama.installed,
       ollamaRodando: ollama.reachable,

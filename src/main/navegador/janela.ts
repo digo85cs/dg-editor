@@ -346,6 +346,35 @@ export async function detectarLogado(): Promise<boolean | null> {
   }
 }
 
+/** Controles de histórico/recarregar para a toolbar do Bloco 3. */
+export function navegadorVoltar(): { ok: boolean; canBack?: boolean; erro?: string } {
+  if (!contentView) return { ok: false, erro: 'navegador fechado' }
+  const wc = contentView.webContents
+  if (!canGoBack(wc)) return { ok: true, canBack: false }
+  goBack(wc)
+  emitirEstadoChrome()
+  return { ok: true, canBack: true }
+}
+
+export function navegadorAvancar(): { ok: boolean; canForward?: boolean; erro?: string } {
+  if (!contentView) return { ok: false, erro: 'navegador fechado' }
+  const wc = contentView.webContents
+  if (!canGoForward(wc)) return { ok: true, canForward: false }
+  goForward(wc)
+  emitirEstadoChrome()
+  return { ok: true, canForward: true }
+}
+
+export function navegadorRecarregar(): { ok: boolean; erro?: string } {
+  if (!contentView) return { ok: false, erro: 'navegador fechado' }
+  try {
+    contentView.webContents.reload()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, erro: String(e) }
+  }
+}
+
 export function getContentWebContents(): WebContents | null {
   return contentView?.webContents ?? null
 }

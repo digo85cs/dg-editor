@@ -4,6 +4,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { basename, join } from 'path'
 import { readRules } from './dgrules'
+import { contextoLinguagensFree } from './linguagens-contexto'
 
 function casaGlob(glob: string, rel: string): boolean {
   const g = glob.trim().replace(/\\/g, '/')
@@ -23,6 +24,8 @@ export function regrasParaContexto(
   const sempre = readRules(raiz).slice(0, Math.min(maxChars, 1800))
   let out = ''
   if (sempre.trim()) out += '\nREGRAS DO PROJETO (.dgrules - respeite):\n' + sempre + '\n'
+  const budgetLang = Math.min(900, Math.max(200, Math.floor(maxChars * 0.25)))
+  out += contextoLinguagensFree(arquivos, texto, budgetLang)
   const dir = join(raiz, '.dg-editor', 'regras')
   if (!existsSync(dir)) return out.slice(0, maxChars)
   let nomes: string[] = []

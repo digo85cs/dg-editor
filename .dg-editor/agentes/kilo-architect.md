@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Kilo Architect
 especialidade: arquitetura e design
 skills: leitor-codigo, arvore-projeto, refatorador, documentador

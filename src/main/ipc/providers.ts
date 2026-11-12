@@ -46,6 +46,8 @@ interface FilaItem {
   tier: number;
   modelo: string;
   disponivel: boolean;
+  motivo?: 'ok' | 'sem-chave' | 'chave-invalida' | 'esgotado' | 'local' | 'desativado';
+  latenciaMs?: number;
 }
 
 // ============================================================================
@@ -112,6 +114,7 @@ async function handleProvidersTestar(
   _event: Electron.IpcMainInvokeEvent,
   payload: unknown
 ): Promise<IpcResult & { latenciaMs?: number }> {
+  const { registrarHealth } = await import('../brain/providers-health')
   try {
     const p = (payload || {}) as { id?: string };
     if (!p.id || typeof p.id !== 'string') {
@@ -129,10 +132,16 @@ async function handleProvidersTestar(
     cfg.timeoutMs = Math.min(cfg.timeoutMs, 15_000);
     const t0 = Date.now();
     await chamarProvider(cfg, [{ role: 'user', content: 'ping' }] as Message[]);
-    return { ok: true, latenciaMs: Date.now() - t0 };
+    const latenciaMs = Date.now() - t0
+    registrarHealth({ id: p.id, ok: true, at: Date.now(), latenciaMs })
+    return { ok: true, latenciaMs };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    dglog(`[providers:testar] ${String((payload as { id?: string }).id)} erro: ${msg}`);
+    const id = String((payload as { id?: string }).id || '')
+    if (id) {
+      try { registrarHealth({ id, ok: false, at: Date.now(), erro: msg.slice(0, 300) }) } catch { /* */ }
+    }
+    dglog(`[providers:testar] ${id} erro: ${msg}`);
     return { ok: false, erro: msg };
   }
 }
@@ -163,15 +172,38 @@ async function handleProvidersResetar(
 
 async function handleProvidersFila(): Promise<IpcResult & { fila?: FilaItem[] }> {
   try {
+    const { chaveRecenteInvalida, obterHealth } = await import('../brain/providers-health')
     const agora = new Date();
     const fila: FilaItem[] = listarProviders()
       .filter((p) => p.ativo)
       .sort((a, b) => a.ordem - b.ordem)
       .map((p) => {
         const modelo = p.modelos[0]?.id || '';
-        const temChave = p.id === 'ollama-local' || chaveConfigurada(p.id);
-        const disponivel = temChave && !estaEsgotado(p.id, modelo, agora);
-        return { ordem: p.ordem, id: p.id, tier: p.tier, modelo, disponivel };
+        const health = obterHealth(p.id)
+        if (p.id === 'ollama-local' || p.formato === 'ollama') {
+          const ok = !health || health.ok !== false
+          return {
+            ordem: p.ordem, id: p.id, tier: p.tier, modelo,
+            disponivel: ok, motivo: ok ? 'local' : 'chave-invalida',
+            latenciaMs: health?.latenciaMs
+          }
+        }
+        if (!chaveConfigurada(p.id)) {
+          return { ordem: p.ordem, id: p.id, tier: p.tier, modelo, disponivel: false, motivo: 'sem-chave' }
+        }
+        if (chaveRecenteInvalida(p.id) || (health && health.ok === false)) {
+          return {
+            ordem: p.ordem, id: p.id, tier: p.tier, modelo,
+            disponivel: false, motivo: 'chave-invalida', latenciaMs: health?.latenciaMs
+          }
+        }
+        if (estaEsgotado(p.id, modelo, agora)) {
+          return { ordem: p.ordem, id: p.id, tier: p.tier, modelo, disponivel: false, motivo: 'esgotado' }
+        }
+        return {
+          ordem: p.ordem, id: p.id, tier: p.tier, modelo,
+          disponivel: true, motivo: 'ok', latenciaMs: health?.latenciaMs
+        }
       });
     return { ok: true, fila };
   } catch (e: unknown) {
@@ -236,6 +268,30 @@ export function registrarHandlersProviders(): void {
   ipcMain.handle('providers:permitir-pago', handleProvidersPermitirPago);
   ipcMain.handle('providers:gasto', handleProvidersGasto);
   ipcMain.handle('providers:teto-diario', handleProvidersTetoDiario);
+  ipcMain.handle('providers:sincronizar-env', async () => {
+    try {
+      const { sincronizarChavesDoAmbiente } = require('../brain/providers-sync-env') as typeof import('../brain/providers-sync-env')
+      return sincronizarChavesDoAmbiente()
+    } catch (e: unknown) {
+      return { ok: false, erro: String(e), gravadas: [], jaTinham: [], semEnv: [] }
+    }
+  })
+
+  ipcMain.handle('providers:testar-todos', async () => {
+    const alvos = listarProviders().filter((p) => p.ativo && (p.id === 'ollama-local' || p.formato === 'ollama' || chaveConfigurada(p.id)))
+    const resultados: Array<{ id: string; ok: boolean; erro?: string; latenciaMs?: number }> = []
+    for (const p of alvos.slice(0, 12)) {
+      const r = await handleProvidersTestar({} as Electron.IpcMainInvokeEvent, { id: p.id })
+      resultados.push({ id: p.id, ok: !!r.ok, erro: r.erro as string | undefined, latenciaMs: r.latenciaMs })
+    }
+    const okN = resultados.filter((x) => x.ok).length
+    return { ok: true, testados: resultados.length, okN, falhas: resultados.length - okN, resultados }
+  })
+
+  ipcMain.handle('providers:health', async () => {
+    const { listarHealth } = await import('../brain/providers-health')
+    return { ok: true, itens: listarHealth() }
+  })
 
   dglog('[ipc:providers] handlers registrados!');
 }

@@ -99,6 +99,23 @@ export async function diagnosticoCompleto(root: string | null): Promise<Diagnost
         if (!s.ramOk) throw new Error('RAM ' + mb + ' MB abaixo do minimo')
         return 'RAM ' + mb + ' MB (' + s.freePct + '%), CPU ' + s.cpuPercent + '%'
       }
+    },
+    {
+      id: 'tools-falhas',
+      nome: 'Falhas recentes de tools',
+      fn: async () => {
+        const { listarFalhasTool } = await import('./tools-telemetry')
+        const lista = listarFalhasTool(8)
+        if (!lista.length) return 'nenhuma falha registrada'
+        return (
+          lista.length +
+          ' recente(s): ' +
+          lista
+            .slice(0, 3)
+            .map((f) => f.nome + ' — ' + f.resumo.slice(0, 60))
+            .join(' | ')
+        )
+      }
     }
   ]
 

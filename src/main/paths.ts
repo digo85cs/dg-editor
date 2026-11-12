@@ -30,9 +30,10 @@ export function resolverRaizDGEditor(): string {
     return resolve(dgRoot);
   }
 
-  // 2. Padrao Windows
-  if (process.platform === 'win32' && existsSync(RAIZ_WINDOWS_CANONICA)) {
-    return resolve(RAIZ_WINDOWS_CANONICA);
+  // 2. Padrao Windows: C:\\dev\\DGEditor, depois legado D:\\CURSOR\\DG Editor
+  if (process.platform === 'win32') {
+    if (existsSync(RAIZ_WINDOWS_CANONICA)) return resolve(RAIZ_WINDOWS_CANONICA)
+    if (existsSync('D:\\CURSOR\\DG Editor')) return resolve('D:\\CURSOR\\DG Editor')
   }
 
   // 3. Padrao Linux/macOS

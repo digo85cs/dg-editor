@@ -16,21 +16,60 @@ function regrasPath() {
   return join(dir, 'regras-gerais.json')
 }
 
+function regrasPadraoCursor(): Regra[] {
+  const agora = new Date().toISOString()
+  return [
+    {
+      id: 'cursor-resultado',
+      titulo: 'Como o Cursor',
+      descricao:
+        'Pedido → ferramentas → resultado no mesmo turno. Nunca só prometer. Mostre o que as tools devolveram.',
+      ativo: true,
+      criadoEm: agora
+    },
+    {
+      id: 'direto',
+      titulo: 'Resposta direta',
+      descricao: 'Sempre responder direto ao ponto, sem enrolação.',
+      ativo: true,
+      criadoEm: agora
+    },
+    {
+      id: 'acao',
+      titulo: 'Ação direta',
+      descricao:
+        'Executar o que foi pedido sem pedir confirmação para leitura, listagem, status ou diagnóstico.',
+      ativo: true,
+      criadoEm: agora
+    },
+    {
+      id: 'pratico',
+      titulo: 'Foco prático',
+      descricao: 'Priorizar solução funcional e objetiva.',
+      ativo: true,
+      criadoEm: agora
+    }
+  ]
+}
+
 export function listarRegrasGerais(): Regra[] {
   try {
     const p = regrasPath()
     if (!existsSync(p)) {
-      const def: Regra[] = [
-        { id: 'direto', titulo: 'Resposta direta', descricao: 'Sempre responder direto ao ponto, sem enrolação.', ativo: true, criadoEm: new Date().toISOString() },
-        { id: 'acao', titulo: 'Ação direta', descricao: 'Executar o que foi pedido sem pedir confirmação desnecessária.', ativo: true, criadoEm: new Date().toISOString() },
-        { id: 'pratico', titulo: 'Foco prático', descricao: 'Priorizar solução funcional e objetiva.', ativo: true, criadoEm: new Date().toISOString() }
-      ]
+      const def = regrasPadraoCursor()
       writeFileSync(p, JSON.stringify(def, null, 2), 'utf8')
       return def
     }
-    return JSON.parse(readFileSync(p, 'utf8')) as Regra[]
+    const atuais = JSON.parse(readFileSync(p, 'utf8')) as Regra[]
+    if (!Array.isArray(atuais)) return regrasPadraoCursor()
+    if (!atuais.some((r) => r.id === 'cursor-resultado')) {
+      const mesclado = [...regrasPadraoCursor().filter((d) => d.id === 'cursor-resultado'), ...atuais]
+      writeFileSync(p, JSON.stringify(mesclado, null, 2), 'utf8')
+      return mesclado
+    }
+    return atuais
   } catch {
-    return []
+    return regrasPadraoCursor()
   }
 }
 

@@ -7,6 +7,11 @@ import { ollamaAlive, ollamaInstalado, startOllama } from '../ollama-keeper';
 import { OLLAMA_URL } from '../brain/ollama';
 import { CodigoErro, criarErro, type ErroApp } from '@shared/erros';
 import { resolverRaizProjeto } from '../paths';
+import {
+  configurarManutencao,
+  obterEstadoManutencao,
+  rodarManutencaoDeps
+} from '../deps-manutencao';
 
 export function registrarHandlersDeps(): void {
   ipcMain.handle('deps:status', async () => {
@@ -126,5 +131,41 @@ export function registrarHandlersDeps(): void {
       pending.delete(raced.k);
     }
     return out;
+  });
+
+  /** Agente UniGetUI-like: status das ferramentas externas (winget). */
+  ipcMain.handle('deps:manutencao-status', async () => {
+    try {
+      const st = await obterEstadoManutencao();
+      return { ok: true, ...st };
+    } catch (e) {
+      return { ok: false, erro: String(e instanceof Error ? e.message : e) };
+    }
+  });
+
+  ipcMain.handle('deps:manutencao-rodar', async (_e, opts?: unknown) => {
+    const o = opts && typeof opts === 'object' ? (opts as Record<string, unknown>) : {};
+    try {
+      const r = await rodarManutencaoDeps({
+        forcar: o.forcar === true,
+        silencioso: o.silencioso !== false
+      });
+      return { ...r, ok: r.ok !== false };
+    } catch (e) {
+      return { ok: false, erro: String(e instanceof Error ? e.message : e) };
+    }
+  });
+
+  ipcMain.handle('deps:manutencao-config', async (_e, opts?: unknown) => {
+    const o = opts && typeof opts === 'object' ? (opts as Record<string, unknown>) : {};
+    try {
+      const st = configurarManutencao({
+        ativo: typeof o.ativo === 'boolean' ? o.ativo : undefined,
+        intervaloHoras: typeof o.intervaloHoras === 'number' ? o.intervaloHoras : undefined
+      });
+      return { ok: true, ...st };
+    } catch (e) {
+      return { ok: false, erro: String(e instanceof Error ? e.message : e) };
+    }
   });
 }

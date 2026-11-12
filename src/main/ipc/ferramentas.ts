@@ -11,6 +11,7 @@ import { resolverRotaChat } from '../agent-router'
 import { dglog } from '../dglog'
 import { carregarChat, listarChats, apagarChat, salvarChat, type ChatMensagem } from '../chats'
 import { backupConfigs } from '../config-backup'
+import { carregarWorkspace, salvarWorkspace } from '../workspace-store'
 import { caminhoSeguro } from '../ipc-seguro'
 import { askOllama } from '../brain/ollama'
 import { modeloParaTarefa } from '../brain/modelos-catalogo'
@@ -200,6 +201,92 @@ export function registrarHandlersFerramentas(): void {
   ipcMain.handle('config:backup', (_event, motivo?: unknown) => {
     const m = typeof motivo === 'string' && motivo.trim() ? motivo.trim().slice(0, 80) : 'manual'
     return backupConfigs(m)
+  })
+
+  ipcMain.handle('workspace:carregar', () => {
+    const ws = carregarWorkspace()
+    return { ok: true, workspace: ws }
+  })
+
+  ipcMain.handle('workspace:salvar', (_event, doc: unknown) => {
+    try {
+      const o = doc && typeof doc === 'object' ? (doc as { pastaAtual?: string }) : {}
+      if (typeof o.pastaAtual === 'string' && o.pastaAtual.trim()) {
+        const { definirRaizWorkspace } = require('../workspace-raiz') as {
+          definirRaizWorkspace: (p: string) => string | null
+        }
+        definirRaizWorkspace(o.pastaAtual)
+      }
+    } catch {
+      /* */
+    }
+    return salvarWorkspace(doc)
+  })
+
+  ipcMain.handle('workspace:definir-raiz', (_event, pasta: unknown) => {
+    const p = typeof pasta === 'string' ? pasta.trim() : ''
+    if (!p) return { ok: false, erro: 'pasta vazia' }
+    try {
+      const { definirRaizWorkspace, obterRaizWorkspace } = require('../workspace-raiz') as {
+        definirRaizWorkspace: (p: string) => string | null
+        obterRaizWorkspace: () => string | null
+      }
+      const abs = definirRaizWorkspace(p)
+      return { ok: !!abs, raiz: obterRaizWorkspace() }
+    } catch (e) {
+      return { ok: false, erro: String(e) }
+    }
+  })
+
+  ipcMain.handle('backup:onedrive', async () => {
+    const { spawn } = await import('child_process')
+    const { join } = await import('path')
+    const { existsSync, readFileSync } = await import('fs')
+    const { resolverRaizProjeto } = await import('../paths')
+    const script = join(resolverRaizProjeto(), 'scripts', 'backup-onedrive.ps1')
+    if (!existsSync(script)) {
+      return { ok: false, erro: 'scripts/backup-onedrive.ps1 ausente' }
+    }
+    const local = backupConfigs('antes-onedrive')
+    return await new Promise((resolve) => {
+      const child = spawn(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script],
+        { windowsHide: true }
+      )
+      let stderr = ''
+      child.stderr?.on('data', (c: Buffer) => {
+        stderr += c.toString('utf8')
+      })
+      const timer = setTimeout(() => {
+        try {
+          child.kill()
+        } catch {
+          /* */
+        }
+        resolve({ ok: false, erro: 'timeout backup OneDrive', local })
+      }, 280000)
+      child.on('close', (code) => {
+        clearTimeout(timer)
+        const txt =
+          process.env.OneDrive ||
+          join(process.env.USERPROFILE || 'C:\\Users\\digo8', 'OneDrive')
+        const status = join(txt, 'BACKUP_DG_EDITOR', 'ULTIMO_BACKUP.txt')
+        let ultimo: string | null = null
+        try {
+          if (existsSync(status)) ultimo = readFileSync(status, 'utf8').slice(0, 800)
+        } catch {
+          /* */
+        }
+        resolve({
+          ok: code === 0,
+          codigo: code,
+          local,
+          status: ultimo,
+          erro: code === 0 ? undefined : (stderr || 'backup OneDrive falhou').slice(0, 400)
+        })
+      })
+    })
   })
 
   ipcMain.handle('sistema:safe-mode', () => ({ ok: true, safeMode: emSafeMode() }))

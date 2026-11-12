@@ -61,13 +61,14 @@ export async function handleModelosRecarregar(
 export async function handleModelosParaTarefa(
   _event: Electron.IpcMainInvokeEvent,
   tarefa: unknown
-): Promise<IpcResult & { ok: boolean; erro?: string; modelo?: string | null }> {
+): Promise<IpcResult & { ok: boolean; erro?: string; modelo?: string | null; motivo?: string }> {
   const t = exigirString(tarefa, 'tarefa');
   if (isErroPayload(t)) return t;
   try {
     const { resolverRaizProjeto } = await import('../paths');
-    const { modeloParaTarefa } = await import('../brain/modelos-catalogo');
-    return { ok: true, modelo: modeloParaTarefa(resolverRaizProjeto(), t) };
+    const { modeloParaTarefaComMotivo } = await import('../brain/modelos-catalogo');
+    const r = modeloParaTarefaComMotivo(resolverRaizProjeto(), t);
+    return { ok: true, modelo: r.modelo, motivo: r.motivo };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
   }

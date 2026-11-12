@@ -1,4 +1,4 @@
-﻿---
+---
 nome: RooCode Orchestrator
 especialidade: orquestracao multi-agente estilo RooCode
 skills: leitor-codigo, arvore-projeto, documentador

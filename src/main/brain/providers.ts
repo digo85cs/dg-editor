@@ -273,10 +273,11 @@ async function adapterOpenAI(
   tools?: ToolDef[],
   signal?: AbortSignal
 ): Promise<RespostaProvider> {
-  const key = cfg.apiKeyRef
-    ? lerChave(cfg.apiKeyRef) || (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined)
-    : cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined
-  const keyName = cfg.apiKeyRef || cfg.apiKeyEnv || ''
+  const key =
+    lerChave(cfg.id) ||
+    (cfg.apiKeyRef ? lerChave(cfg.apiKeyRef) : null) ||
+    (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined)
+  const keyName = cfg.apiKeyRef || cfg.apiKeyEnv || cfg.id
   if (!key) {
     throw new ErroProvider('auth', 'chave ausente: ' + keyName, cfg.id, 401)
   }
@@ -630,7 +631,9 @@ export function disponivel(cfg: ProviderConfig): boolean {
     return !!bin && cursorCliAprovadoNaSessao()
   }
   if (cfg.tipo === 'local') return true
-  if (!cfg.apiKeyEnv) return false
-  const v = process.env[cfg.apiKeyEnv]
-  return typeof v === 'string' && v.trim().length > 0
+  const key =
+    lerChave(cfg.id) ||
+    (cfg.apiKeyRef ? lerChave(cfg.apiKeyRef) : null) ||
+    (cfg.apiKeyEnv ? String(process.env[cfg.apiKeyEnv] || '').trim() : '')
+  return !!key
 }

@@ -18,7 +18,7 @@ export async function renderizarArvoreEm(lista, deps) {
   if (!lista) return
   lista.innerHTML = ''
   if (state.pastasRecentes.length === 0) {
-    lista.innerHTML = '<p class="muted" style="padding:12px">Nenhuma pasta. Clique em + para abrir.</p>'
+    lista.innerHTML = '<p class="muted" style="padding:12px">Nenhum repositório. Clique em + para adicionar.</p>'
     return
   }
   const promessasFilhos = []
@@ -48,23 +48,23 @@ export async function renderizarArvoreEm(lista, deps) {
 
     header.addEventListener('click', async (e) => {
       if (e.target.closest('.pasta-remover')) return
-      if (state.carregandoNos.has(children)) return
-      const noChevron = !e.target.closest('.chevron')
-      if (st.expandida && noChevron && e.target.closest('.tab-name, .file-icon')) {
-        deps.selecionarPasta(p)
+      // Chevron = só expandir/retrair. Nome/ícone = contexto bloco 2/3 (sem exigir expandir).
+      if (e.target.closest('.chevron')) {
+        if (state.carregandoNos.has(children)) return
+        st.expandida = !st.expandida
+        chev.classList.toggle('open', st.expandida)
+        children.classList.toggle('open', st.expandida)
+        if (!st.expandida) return
+        if (children.childElementCount > 0) return
+        state.carregandoNos.add(children)
+        try {
+          await deps.carregarFilhos(p, children, 1)
+        } finally {
+          state.carregandoNos.delete(children)
+        }
         return
       }
-      st.expandida = !st.expandida
-      chev.classList.toggle('open', st.expandida)
-      children.classList.toggle('open', st.expandida)
-      if (!st.expandida) return
-      if (children.childElementCount > 0) return
-      state.carregandoNos.add(children)
-      try {
-        await deps.carregarFilhos(p, children, 1)
-      } finally {
-        state.carregandoNos.delete(children)
-      }
+      deps.selecionarPasta(p)
     })
     root.appendChild(header)
     root.appendChild(children)
@@ -102,21 +102,28 @@ export function criarNoDir(ent, nivel, deps) {
   let carregado = false
   row.addEventListener('click', async (e) => {
     e.stopPropagation()
-    if (state.carregandoNos.has(kids)) return
-    aberto = !aberto
-    row.querySelector('.chevron').classList.toggle('open', aberto)
-    kids.classList.toggle('open', aberto)
-    if (!aberto) return
-    if (carregado || kids.childElementCount > 0) {
-      carregado = kids.childElementCount > 0
+    const rz = typeof deps.raizWorkspaceDe === 'function' ? deps.raizWorkspaceDe(ent.caminho) : null
+    if (e.target.closest('.chevron')) {
+      if (state.carregandoNos.has(kids)) return
+      aberto = !aberto
+      row.querySelector('.chevron').classList.toggle('open', aberto)
+      kids.classList.toggle('open', aberto)
+      if (!aberto) return
+      if (carregado || kids.childElementCount > 0) {
+        carregado = kids.childElementCount > 0
+        return
+      }
+      state.carregandoNos.add(kids)
+      try {
+        carregado = await deps.carregarFilhos(ent.caminho, kids, nivel + 1)
+      } finally {
+        state.carregandoNos.delete(kids)
+      }
       return
     }
-    state.carregandoNos.add(kids)
-    try {
-      carregado = await deps.carregarFilhos(ent.caminho, kids, nivel + 1)
-    } finally {
-      state.carregandoNos.delete(kids)
-    }
+    // Clique no nome da pasta: contexto do workspace (bloco 2/3), sem expandir
+    if (rz && typeof deps.definirContextoPasta === 'function') deps.definirContextoPasta(rz)
+    else if (rz && typeof deps.selecionarPasta === 'function') deps.selecionarPasta(rz)
   })
   wrap.appendChild(row)
   wrap.appendChild(kids)
@@ -135,9 +142,23 @@ export function criarNoFile(ent, nivel, deps) {
   const raiz = deps.raizWorkspaceDe(ent.caminho) || state.pastaAtual
   const rel = raiz ? relPosix(ent.caminho, raiz) : ''
   const st = rel ? gitStatusMap.get(rel) : null
+  const amigavel =
+    typeof deps.nomeAmigavelArquivo === 'function'
+      ? deps.nomeAmigavelArquivo(ent.nome, rel)
+      : ent.nome
+  const mostrar = amigavel && amigavel !== ent.nome ? amigavel : ent.nome
   row.innerHTML =
-    deps.extIcon(ent.nome) + '<span>' + escapar(ent.nome) + '</span>' + badgeGitHtml(st)
-  row.title = ent.caminho
+    deps.extIcon(ent.nome) +
+    '<span class="tree-file-name" title="' +
+    escapar(ent.nome) +
+    '">' +
+    escapar(mostrar) +
+    '</span>' +
+    (amigavel && amigavel !== ent.nome
+      ? '<span class="tree-file-real muted" title="Nome real">' + escapar(ent.nome) + '</span>'
+      : '') +
+    badgeGitHtml(st)
+  row.title = ent.caminho + (amigavel && amigavel !== ent.nome ? ' · ' + ent.nome : '')
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'file'
   row.addEventListener('click', (e) => {

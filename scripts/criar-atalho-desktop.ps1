@@ -69,11 +69,12 @@ function Test-AlvoRuim {
   if ($alvo -match '(^|[\\/])(npm|npm\.cmd|npx|npx\.cmd)$') { return $true }
   if ($alvo -match '(^|[\\/])cmd\.exe$' -and $argumentos -match 'npm|electron-vite|vite') { return $true }
   if ($nome -eq 'DG Editor.lnk') {
-    $alvoBaixo = $alvo.ToLowerInvariant()
-    $argsBaixo = [string]$argumentos
+    $alvoBaixo = ([string]$alvo).Trim().ToLowerInvariant()
+    $argsBaixo = ([string]$argumentos).Trim()
     # Correto APENAS: wscript + abrir-dg-editor.vbs (bat direto abre cmd — proibido)
-    $okWscript = ($alvoBaixo -match 'wscript\.exe$') -and ($argsBaixo -match 'abrir-dg-editor\.vbs')
-    if (-not $okWscript) { return $true }
+    $okWscript = ($alvoBaixo -like '*wscript.exe') -and ($argsBaixo -match 'abrir-dg-editor\.vbs')
+    if ($okWscript) { return $false }
+    return $true
   }
   return $false
 }
@@ -96,10 +97,10 @@ $vbsBody = @'
 ' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
 Option Explicit
 Dim sh, raiz, splash, boot, cmd, fso
-raiz = "D:\CURSOR\DG Editor"
+Set fso = CreateObject("Scripting.FileSystemObject")
+raiz = fso.GetParentFolderName(WScript.ScriptFullName)
 splash = raiz & "\scripts\splash-boot.ps1"
 boot = raiz & "\dg-boot.ps1"
-Set fso = CreateObject("Scripting.FileSystemObject")
 On Error Resume Next
 fso.CreateTextFile(raiz & "\.dg-root", True).Write raiz
 On Error GoTo 0
@@ -119,7 +120,8 @@ Set-Content -LiteralPath $launcher -Value $vbsBody -Encoding ASCII -Force
 $batAbrir = Join-Path $raiz 'abrir-dg-editor.bat'
 @(
   '@echo off',
-  'set "DG_ROOT=D:\CURSOR\DG Editor"',
+  'set "DG_ROOT=%~dp0"',
+  'if "%DG_ROOT:~-1%"=="\" set "DG_ROOT=%DG_ROOT:~0,-1%"',
   'if not exist "%DG_ROOT%\abrir-dg-editor.vbs" exit /b 1',
   'start "" /min wscript.exe //nologo "%DG_ROOT%\abrir-dg-editor.vbs"',
   'exit /b 0'
@@ -156,7 +158,10 @@ if (-not $desktops -or $desktops.Count -eq 0) {
 Write-Host ('[info] pastas Desktop: ' + ($desktops -join ' | ')) -ForegroundColor Gray
 
 $nome = 'DG Editor.lnk'
-$icoCandidate = Join-Path $raiz 'resources\dg-editor.ico'
+$icoCandidate = Join-Path $raiz 'resources\dg-editor-desktop.ico'
+if (-not (Test-Path $icoCandidate)) {
+  $icoCandidate = Join-Path $raiz 'resources\dg-editor.ico'
+}
 if (-not (Test-Path $icoCandidate)) {
   $icoCandidate = Join-Path $raiz 'resources\dg-studio.ico'
 }

@@ -24,4 +24,20 @@ DG_NAV_SMOKE=1 DG_NAV_SMOKE_EMBED=1 DG_QA_E2E=1 npx electron out/main/index.js -
 
 (`DG_QA_E2E=1` evita o keeper Ollama competir com o smoke neste ambiente.)
 
-**Ainda aberto:** a suíte CI oficial continua no host `BaseWindow` por padrão. Remover o legado exige trocar o gate oficial para `DG_NAV_SMOKE_EMBED=1` com decisão explícita.
+**Gate oficial (2026-11):** smoke embed e BaseWindow em `SMOKE=22/22` (screenshot com fallback CDP se capturePage sem surface).
+
+
+## Automacao (dispatch)
+
+Implementado e integrado:
+- `windows.*`, `dg-editor`, **Office COM** (`office-com.ts`), **Browser Bloco 3** + **CDP 9222** (`browser-cdp.ts`)
+- IPC: `automation:listar` / `automation:executar` / `automation:aprovacao-resolver` + UI `automation-aprovacao.js`
+- MCP: `automacao_listar` / `automacao_executar` (browser → `navegador_*` Bloco 3)
+
+## ProductName no .exe
+
+`signAndEditExecutable` permanece `false` (symlink winCodeSign). `afterPack` → `scripts/afterPack-rcedit.cjs` (resedit/pe-library) grava ProductName/FileDescription = DG Editor.
+
+## Modularizacao renderer
+
+`app.js` orquestra; módulos: `features/ui/tema.js`, `features/chat/reeditar.js`, `features/layout/browser-bloco3.js`. Refator adicional continua sem urgência.

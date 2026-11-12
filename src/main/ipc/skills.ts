@@ -40,5 +40,19 @@ export function registrarHandlersSkills(): void {
 
   ipcMain.handle('skills:listar', handleSkillsListar);
 
+  ipcMain.handle('skills:criar', async (_e, raiz: unknown, payload: unknown = {}) => {
+    const r = exigirString(raiz, 'raiz');
+    if (isErroPayload(r)) return r;
+    const o = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+    const titulo = exigirString(o.titulo ?? o.nome, 'titulo');
+    if (isErroPayload(titulo)) return titulo;
+    const { criarSkill } = await import('../brain/skills');
+    return criarSkill(r, {
+      titulo,
+      gatilho: typeof o.gatilho === 'string' ? o.gatilho : undefined,
+      instrucao: typeof o.instrucao === 'string' ? o.instrucao : undefined
+    });
+  });
+
   dglog('[ipc:skills] handlers registrados!');
 }

@@ -1,4 +1,4 @@
-﻿---
+---
 nome: OpenCode Architect
 especialidade: arquitetura e design inspirado em OpenCode
 skills: leitor-codigo, arvore-projeto, refatorador, documentador

@@ -1,11 +1,11 @@
 ' Abre o DG Editor sem NENHUMA janela de console (cmd/powershell/vite).
-' Atalho: wscript + ESTE arquivo.
+' Atalho: wscript + ESTE arquivo. A raiz e a pasta deste .vbs.
 Option Explicit
 Dim sh, raiz, splash, boot, cmd, fso
-raiz = "D:\CURSOR\DG Editor"
+Set fso = CreateObject("Scripting.FileSystemObject")
+raiz = fso.GetParentFolderName(WScript.ScriptFullName)
 splash = raiz & "\scripts\splash-boot.ps1"
 boot = raiz & "\dg-boot.ps1"
-Set fso = CreateObject("Scripting.FileSystemObject")
 On Error Resume Next
 fso.CreateTextFile(raiz & "\.dg-root", True).Write raiz
 On Error GoTo 0

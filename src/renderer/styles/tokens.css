@@ -35,7 +35,7 @@ body.tema-claro {
   --dg-text-muted: var(--texto-secundario);
   --dg-text-faint: var(--texto-secundario);
   --dg-accent: var(--verde-status);
-  --dg-accent-brand: #00b894;
+  --dg-accent-brand: #0080ff;
   --dg-danger: var(--vermelho-erro);
   --dg-danger-close: #d13438;
   --dg-code-bg: var(--bg-painel);
@@ -77,11 +77,18 @@ body.tema-claro {
   --dg-gap-sm: 6px;
   --dg-iconbar-w: 48px;
   --dg-sidebar-w: 260px;
-  --dg-panel-w: 320px;
+  --dg-panel-w: 420px;
   --dg-statusbar-h: 24px;
   --dg-tabbar-h: 34px;
   /* Alias legado: 36 → 34 (tabbar Cursor). Manter nome para CSS antigo. */
   --dg-tab-height: var(--dg-tabbar-h);
+
+  /* Controles unificados */
+  --dg-btn-h: 28px;
+  --dg-btn-h-sm: 26px;
+  --dg-icon-size: 14px;
+  --dg-toast-z: 40000;
+  --dg-panel-header-h: 34px;
 
   /* Aliases legados → estrutura (drag/layout e CSS antigo) */
   --dg-activitybar-width: var(--dg-iconbar-w);
@@ -90,23 +97,40 @@ body.tema-claro {
 }
 
 body.tema-escuro {
-  /* === LEGADO (hexes dark — INTACTOS) === */
-  --bg-principal: #1a1a1a;
-  --bg-sidebar: #151515;
-  --bg-painel: #1f1f1f;
-  --bg-ativo: #2d5a4d;
-  --bg-hover: #2a2a2a;
-  --texto-primario: #f2f2f2;
-  --texto-secundario: #bdbdbd;
-  --texto-fraco: #a0a0a0;
-  --verde-status: #2dd4a0;
-  --vermelho-erro: #d9534f;
-  --borda: #333333;
-  --borda-tenue: #2a2a2a;
+  /* === LEGADO (hexes dark) === */
+  --bg-principal: #121212;
+  --bg-sidebar: #0e0e0e;
+  --bg-painel: #1a1a1a;
+  --bg-ativo: #1f4f42;
+  --bg-hover: #262626;
+  --texto-primario: #f5f5f5;
+  --texto-secundario: #c8c8c8;
+  --texto-fraco: #b0b0b0;
+  --verde-status: #3ddc97;
+  --vermelho-erro: #f07178;
+  --borda: #3a3a3a;
+  --borda-tenue: #2c2c2c;
 
+  /* espelhos --dg-* redefinidos (var() no :root ja resolveu claro) */
+  --dg-bg: var(--bg-principal);
+  --dg-surface: var(--bg-painel);
+  --dg-surface-raised: var(--bg-hover);
+  --dg-sidebar: var(--bg-sidebar);
+  --dg-active: var(--bg-ativo);
+  --dg-border: var(--borda);
+  --dg-border-subtle: var(--borda-tenue);
+  --dg-text: var(--texto-primario);
+  --dg-text-muted: var(--texto-secundario);
   --dg-text-faint: var(--texto-fraco);
-  --dg-selection: rgba(45, 212, 160, 0.28);
-  --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --dg-accent: var(--verde-status);
+  --dg-accent-brand: #0080ff;
+  --dg-danger: var(--vermelho-erro);
+  --dg-danger-close: #e04848;
+  --dg-code-bg: #161616;
+  --dg-selection: rgba(61, 220, 151, 0.28);
+  --dg-placeholder: #a8a8a8;
+  --dg-ink-on-accent: #0b0b0b;
+  --dg-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --dg-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --dg-shadow-3: 0 12px 40px rgba(0, 0, 0, 0.6);
 }

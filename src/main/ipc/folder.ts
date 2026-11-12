@@ -85,7 +85,14 @@ export async function handleFolderSelect(
   if (result.canceled || result.filePaths.length === 0) {
     return { canceled: true };
   }
-  return { canceled: false, path: result.filePaths[0] };
+  const pathSel = result.filePaths[0];
+  try {
+    const { definirRaizWorkspace } = await import('../workspace-raiz');
+    definirRaizWorkspace(pathSel);
+  } catch {
+    /* */
+  }
+  return { canceled: false, path: pathSel };
 }
 
 // ============================================================================

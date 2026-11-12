@@ -6,8 +6,12 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { promises as fs } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { join, relative, resolve } from 'node:path'
 import { z } from 'zod'
+
+const execFileAsync = promisify(execFile)
 import { gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
 import { projectStateDir, resolverRaizProjeto, caminhoDentroDaRaiz } from '../paths'
 import { loadChat } from '../chatstore'
@@ -22,10 +26,27 @@ import {
 import { chamarControle } from './navegador-client'
 import { executeOllamaTool, OLLAMA_TOOL_DEFINITIONS } from './ollama-tools'
 
-const RAIZ = resolverRaizProjeto()
-const VAULT = projectStateDir(RAIZ)
+function raizAtual(): string {
+  const env = process.env.DG_ROOT
+  if (env && env.trim()) return resolve(env.trim())
+  return resolverRaizProjeto()
+}
+
+let RAIZ = raizAtual()
+let VAULT = projectStateDir(RAIZ)
 garantirSkillsPadrao(RAIZ)
 garantirAgentesPadrao(RAIZ)
+
+function syncRaiz(): string {
+  const r = raizAtual()
+  if (r !== RAIZ) {
+    RAIZ = r
+    VAULT = projectStateDir(RAIZ)
+    garantirSkillsPadrao(RAIZ)
+    garantirAgentesPadrao(RAIZ)
+  }
+  return RAIZ
+}
 
 function dentroDoVault(p: string): boolean {
   const abs = resolve(p)
@@ -144,6 +165,11 @@ const TOOLS = [
       },
       required: ['arquivo', 'ancora', 'novo']
     }
+  },
+  {
+    name: 'conector_listar',
+    description: 'Lista conectores do DG Editor (editor, Ollama, MCP, Cursor, Codex) e o estado de cada um',
+    inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
     name: 'skill_listar',
@@ -271,6 +297,135 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'terminal_exec',
+    description:
+      'Executa comando local na raiz do projeto (timeout 20s). Leitura livre; destrutivo exige confirmado=true. Para achar projeto no disco (AutoPartz etc.) prefira disco_buscar — nao varra C:\\Windows.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        comando: { type: 'string', description: 'Binario (ex: git, npm, node)' },
+        args: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Argumentos (sem shell)'
+        },
+        confirmado: {
+          type: 'boolean',
+          description: 'Obrigatorio true para install/rm/push --force/reset'
+        }
+      },
+      required: ['comando']
+    }
+  },
+  {
+    name: 'disco_buscar',
+    description:
+      'Busca pastas de projeto no disco (dev, xampp, OneDrive/CURSOR, D:) SEM varrer C:\\Windows. Use para inventarios (AutoPartz/AUTO PARTS). Retorna caminhos absolutos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        padrao: {
+          type: 'string',
+          description: 'Regex ou nome (ex: partz|autopartz|AUTO PARTS)'
+        },
+        profundidade: { type: 'number', description: '1-4 (padrao 3)' }
+      },
+      required: ['padrao']
+    }
+  },
+  {
+    name: 'disco_inspecionar',
+    description:
+      'Inspeciona um caminho de projeto: public/index.php, app/routes.php, config, vendor, composer.json, .env, .git.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caminho: { type: 'string', description: 'Caminho absoluto do projeto' }
+      },
+      required: ['caminho']
+    }
+  },
+  {
+    name: 'ftp_deploy',
+    description: 'Publica pasta/arquivos via FTP usando um site salvo no DG Editor (deploy:ftp-*).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Id do site FTP salvo' },
+        localPath: { type: 'string' },
+        remotePath: { type: 'string' },
+        arquivos: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'ftp_listar',
+    description: 'Lista sites FTP configurados (sem senhas).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'git_status',
+    description: 'Status git do workspace (branch + porcelain). Preferivel a terminal_exec git status.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'git_diff',
+    description: 'Diff git do workspace ou de um caminho relativo.',
+    inputSchema: {
+      type: 'object',
+      properties: { caminho: { type: 'string', description: 'Arquivo/pasta relativa (opcional)' } },
+      required: []
+    }
+  },
+  {
+    name: 'testes_rodar',
+    description: 'Roda o script de teste detectado (npm test / validar-melhorias). Retorna resumo.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'qualidade_checar',
+    description: 'Checagens leves de qualidade (encoding/sintaxe) no projeto.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'projeto_smoke',
+    description: 'Smoke rapido: package.json + git + qualidade.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'resultado_avaliar',
+    description: 'Avalia se a resposta final atende o pedido (checklist de qualidade antes de entregar).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pedido: { type: 'string' },
+        textoFinal: { type: 'string' },
+        passosResumo: { type: 'string' }
+      },
+      required: ['pedido', 'textoFinal']
+    }
+  },
+  {
+    name: 'automacao_listar',
+    description:
+      'Lista comandos da allowlist de automacao DG (Office COM, Windows, browser). Browser: preferir navegador_* (Bloco 3).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'automacao_executar',
+    description:
+      'Executa comando allowlist (ex.: excel.abrir, windows.sistema.info). Browser: use navegador_abrir (Bloco 3). CSV/texto: preferir Editor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        comandoId: { type: 'string', description: 'Id allowlist (excel.abrir, word.abrir, ...)' },
+        args: { type: 'object', description: 'Argumentos do comando' }
+      },
+      required: ['comandoId']
+    }
   }
 ]
 
@@ -283,6 +438,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
 
 server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: string; arguments?: unknown } }, extra) => {
   const { name, arguments: args = {} } = req.params
+  syncRaiz()
 
   try {
     if (name === 'ollama_ask' || name === 'ollama_script') {
@@ -405,6 +561,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         content: [{ type: 'text', text: JSON.stringify(res, null, 2) }],
         isError: !res.ok
       }
+    }
+
+    if (name === 'conector_listar') {
+      const { listarConectores } = await import('../conectores-status')
+      const lista = await listarConectores()
+      return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
     }
 
     if (name === 'skill_listar') {
@@ -576,6 +738,237 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       return {
         content: [{ type: 'text', text: JSON.stringify(r.json, null, 2) }],
         isError: !!err
+      }
+    }
+
+    if (name === 'terminal_exec') {
+      const parsed = z
+        .object({
+          comando: z.string().min(1).max(80),
+          args: z.array(z.string().max(400)).max(40).optional(),
+          confirmado: z.boolean().optional()
+        })
+        .parse(args)
+      const cmd = parsed.comando.trim()
+      const argv = parsed.args || []
+      const linha = (cmd + ' ' + argv.join(' ')).toLowerCase()
+      const destrutivo =
+        /\b(rm|del|rmdir|unlink|format|shutdown|reboot)\b/.test(linha) ||
+        /\b(install|uninstall|remove)\b/.test(linha) ||
+        /push\s+--force|--force\s+push|reset\s+--hard|clean\s+-fdx/.test(linha)
+      if (destrutivo && !parsed.confirmado) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              erro: 'comando destrutivo — peça confirmação ao usuário e chame de novo com confirmado=true',
+              comando: cmd,
+              args: argv
+            })
+          }],
+          isError: true
+        }
+      }
+      if (!/^[a-zA-Z0-9._+-]+$/.test(cmd)) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'comando invalido' }) }],
+          isError: true
+        }
+      }
+      try {
+        const { stdout, stderr } = await execFileAsync(cmd, argv, {
+          cwd: RAIZ,
+          timeout: 20000,
+          windowsHide: true,
+          maxBuffer: 1024 * 1024,
+          shell: false,
+          encoding: 'utf8'
+        })
+        const texto = (String(stdout || '') + (stderr ? '\n' + String(stderr) : '')).slice(0, 12000)
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: true, texto }, null, 2) }]
+        }
+      } catch (e: unknown) {
+        const err = e as { message?: string; stdout?: string; stderr?: string }
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              ok: false,
+              erro: String(err.stderr || err.message || e).slice(0, 800),
+              stdout: String(err.stdout || '').slice(0, 4000)
+            })
+          }],
+          isError: true
+        }
+      }
+    }
+
+    if (name === 'disco_buscar') {
+      const parsed = z
+        .object({
+          padrao: z.string().min(1).max(120),
+          profundidade: z.number().min(1).max(4).optional()
+        })
+        .parse(args)
+      const { buscarPastasProjeto } = await import('../disco-inventario')
+      const r = buscarPastasProjeto(parsed.padrao, { profundidade: parsed.profundidade })
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                ok: true,
+                pastas: r.pastas,
+                raizes: r.raizes,
+                aviso:
+                  r.pastas.length === 0
+                    ? 'NÃO ENCONTRADO nas raizes uteis (dev/xampp/OneDrive/D:). Nao use Autopilot/WinSxS.'
+                    : 'Ignore qualquer caminho sob C:\\Windows.'
+              },
+              null,
+              2
+            )
+          }
+        ]
+      }
+    }
+
+    if (name === 'disco_inspecionar') {
+      const parsed = z.object({ caminho: z.string().min(1).max(500) }).parse(args)
+      const { inspecionarProjeto } = await import('../disco-inventario')
+      const r = inspecionarProjeto(parsed.caminho)
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r, null, 2) }],
+        isError: !r.existe
+      }
+    }
+
+    if (name === 'ftp_listar') {
+      const { listarFtpSites } = await import('../deploy/ftp')
+      return { content: [{ type: 'text', text: JSON.stringify(listarFtpSites(), null, 2) }] }
+    }
+
+    if (name === 'ftp_deploy') {
+      const parsed = z
+        .object({
+          id: z.string().min(1),
+          localPath: z.string().optional(),
+          remotePath: z.string().optional(),
+          arquivos: z.array(z.string()).optional()
+        })
+        .parse(args)
+      const { deployFtp } = await import('../deploy/ftp')
+      const r = await deployFtp(parsed)
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r, null, 2) }],
+        isError: !r.ok
+      }
+    }
+
+    if (name === 'git_status') {
+      const auto = await import('../autonomia-tools')
+      const r = await auto.gitStatus(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+    if (name === 'git_diff') {
+      const parsed = z.object({ caminho: z.string().optional() }).parse(args)
+      const auto = await import('../autonomia-tools')
+      const r = await auto.gitDiff(RAIZ, parsed.caminho)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+    if (name === 'testes_rodar') {
+      const auto = await import('../autonomia-tools')
+      const r = await auto.testesRodar(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+    if (name === 'qualidade_checar') {
+      const auto = await import('../autonomia-tools')
+      const r = await auto.qualidadeChecar(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+    if (name === 'projeto_smoke') {
+      const auto = await import('../autonomia-tools')
+      const r = await auto.projetoSmoke(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+    if (name === 'resultado_avaliar') {
+      const parsed = z
+        .object({
+          pedido: z.string(),
+          textoFinal: z.string(),
+          passosResumo: z.string().optional()
+        })
+        .parse(args)
+      const auto = await import('../autonomia-tools')
+      const r = auto.resultadoAvaliar(parsed.pedido, parsed.textoFinal, parsed.passosResumo || '')
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'automacao_listar') {
+      const { listarComandos } = await import('../automation/allowlist')
+      const cmds = listarComandos().map((c) => ({
+        id: c.id,
+        dominio: c.dominio,
+        descricao: c.descricao,
+        risco: c.risco
+      }))
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                ok: true,
+                preferir: 'Editor / Navegador Bloco 3 / Terminal',
+                comandos: cmds
+              },
+              null,
+              2
+            )
+          }
+        ]
+      }
+    }
+
+    if (name === 'automacao_executar') {
+      const parsed = z
+        .object({
+          comandoId: z.string().min(1),
+          args: z.record(z.string(), z.unknown()).optional()
+        })
+        .parse(args)
+      if (parsed.comandoId.startsWith('browser.')) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ok: false,
+                preferiu: 'bloco3',
+                erro:
+                  'Use a tool navegador_abrir / navegador_ler (Bloco 3). CDP externo so via UI automation:executar com args.externo=true.'
+              })
+            }
+          ],
+          isError: true
+        }
+      }
+      const { obterComando } = await import('../automation/allowlist')
+      const { executarComandoDominio } = await import('../automation/dispatch')
+      const cmd = obterComando(parsed.comandoId)
+      if (!cmd) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'comando nao autorizado' }) }],
+          isError: true
+        }
+      }
+      const r = await executarComandoDominio(cmd, parsed.args || {}, { origem: 'mcp' })
+      return {
+        content: [{ type: 'text', text: JSON.stringify(r, null, 2) }],
+        isError: !r.ok
       }
     }
 

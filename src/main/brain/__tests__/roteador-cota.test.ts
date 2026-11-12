@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { userDataDir } from '../../paths'
 import {
   __resetarEstadoParaTestes,
   definirPermitirPago,
@@ -21,6 +22,9 @@ import { ErroProvider } from '../providers'
 import type { ProviderDescriptor } from '../providers-registry'
 
 const USERDATA = 'C:/tmp/dg-editor-cota-test'
+function arquivoTeste(): string {
+  return join(userDataDir(), 'cota-modelos.json')
+}
 const ARQUIVO = join(USERDATA, 'cota-modelos.json')
 
 const pA: ProviderDescriptor = {
@@ -194,7 +198,9 @@ describe('roteador-cota', () => {
 
   it('arquivo corrompido regenera vazio sem lancar', () => {
     __resetarEstadoParaTestes()
-    writeFileSync(ARQUIVO, '{ json quebrado', 'utf-8')
+    const arq = arquivoTeste()
+    mkdirSync(userDataDir(), { recursive: true })
+    writeFileSync(arq, '{ json quebrado', 'utf-8')
     expect(() => statusCotas()).not.toThrow()
     expect(statusCotas()).toEqual([])
     expect(() => proximoDisponivel('codigo')).not.toThrow()
@@ -258,14 +264,16 @@ describe('roteador-cota', () => {
 
   it('migracao de versao 1 -> 2 adiciona permitirPago: false', () => {
     __resetarEstadoParaTestes()
+    const arq = arquivoTeste()
+    mkdirSync(userDataDir(), { recursive: true })
     // Simula arquivo v1
-    writeFileSync(ARQUIVO, JSON.stringify({ versao: 1, entradas: [] }), 'utf-8')
+    writeFileSync(arq, JSON.stringify({ versao: 1, entradas: [] }), 'utf-8')
     // Ler estado deve migrar para v2
     const estadoInicial = statusCotas()
     expect(estadoInicial).toEqual([])
     expect(permitirPagoAtivo()).toBe(false)
     // Verifica que o arquivo foi regravado como v2
-    const conteudo = readFileSync(ARQUIVO, 'utf-8')
+    const conteudo = readFileSync(arq, 'utf-8')
     const j = JSON.parse(conteudo)
     expect(j.versao).toBe(2)
     expect(j.permitirPago).toBe(false)

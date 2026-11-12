@@ -9,17 +9,16 @@
   <link rel="stylesheet" href="./styles/tokens.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body class="tema-escuro">
   <header id="titlebar">
     <div class="tb-leading">
-      <img class="tb-logo" src="../../resources/dg-editor-64.png" width="28" height="28" alt="" aria-hidden="true" />
-      <span class="tb-marca">DG<span class="tb-marca-acento">Editor</span></span>      <div class="tb-nav" aria-label="Navegação de abas">
-        <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
-        </button>
-        <button type="button" id="tb-avancar" class="tb-btn tb-nav-btn" title="Avançar (Alt+Setas)" disabled aria-disabled="true">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
-        </button>
+      <span class="tb-logo-wrap" title="DG Editor">
+        <img class="tb-logo tb-logo--wide" src="../../resources/logo-wide-tb.png" height="22" alt="DG Editor" />
+      </span>
+      <span class="tb-marca sr-only">DG Editor</span>
+      <div class="tb-nav sr-only" aria-hidden="true" hidden>
+        <button type="button" id="tb-voltar" class="tb-btn tb-nav-btn" title="Voltar (Alt+Setas)" disabled aria-disabled="true" tabindex="-1"></button>
+        <button type="button" id="tb-avancar" class="tb-btn tb-nav-btn" title="Avançar (Alt+Setas)" disabled aria-disabled="true" tabindex="-1"></button>
       </div>
       <nav id="menubar" aria-label="Barra de menus" role="menubar">
         <div class="mb-item" role="none">
@@ -52,31 +51,25 @@
     </div>
   </header>
 
-  <div id="tabbar" role="tablist" aria-label="Abas de arquivo" style="display:none">
+  <div id="tabbar" role="tablist" aria-label="Abas de arquivo">
     <div id="editor-tabs"></div>
   </div>
 
   <div id="app">
-    <!-- Activity bar: chat/busca/explorer · spacer · terminal/navegador/tema (Contas/Config na base do Explorer) -->
+    <!-- Activity bar: só Chat / Busca / Explorer (terminal+navegador no bloco 3; tema/config na base) -->
     <nav id="activity-bar" aria-label="Barra de atividades">
-      <button type="button" class="ab-btn" data-action="chat" data-tip="Chat / IA (Ctrl+Alt+B)" aria-label="Chat">
+      <button type="button" class="ab-btn" data-action="chat" data-tip="Chat / IA (Ctrl+L)" title="Chat / IA" aria-label="Chat">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 3V5z"/></svg>
       </button>
-      <button type="button" class="ab-btn" data-action="busca" data-tip="Buscar em arquivos" aria-label="Busca">
+      <button type="button" class="ab-btn" data-action="busca" data-tip="Buscar em arquivos" title="Buscar em arquivos" aria-label="Busca">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       </button>
-        <button type="button" class="ab-btn active" data-action="explorer" data-tip="Arquivos (Ctrl+Shift+E)" aria-label="Arquivos">
+      <button type="button" class="ab-btn active" data-action="explorer" data-tip="Repositórios (Ctrl+Shift+E)" title="Repositórios" aria-label="Repositórios">
         <svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"/></svg>
       </button>
       <div class="ab-spacer"></div>
-      <div class="ab-base" aria-label="Ferramentas">
-        <button type="button" class="ab-btn" id="btn-terminal-toggle" data-action="terminal" data-tip="Terminal (Ctrl+`)" aria-label="Terminal">
-          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
-        </button>
-        <button type="button" class="ab-btn" data-action="navegador" data-tip="Navegador (Ctrl+Shift+N)" aria-label="Navegador">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-        </button>
-        <button type="button" class="ab-btn" id="btn-tema" data-action="tema" data-tip="Alternar tema" aria-label="Tema">
+      <div class="ab-base">
+        <button type="button" class="ab-btn" id="btn-tema-ab" data-action="tema" data-tip="Alternar tema claro/escuro" title="Alternar tema" aria-label="Alternar tema">
           <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
         </button>
       </div>
@@ -90,7 +83,7 @@
           <button type="button" id="sidebar-mode-explorer" class="sidebar-mode active" role="tab" aria-selected="true">Arquivos</button>
         </div>
         <div class="sidebar-actions">
-          <button id="btn-add-folder" class="btn-icon" title="Abrir pasta de trabalho">
+          <button id="btn-add-folder" class="btn-icon" title="Adicionar repositório" aria-label="Adicionar repositório">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <button id="btn-open-vault" class="btn-icon" title="Abrir vault Markdown">
@@ -105,24 +98,25 @@
         </div>
       </div>
       <div class="sidebar-scroll">
+        <div class="section-label" style="padding:8px 12px 2px">Ferramentas</div>
         <nav id="tool-nav" class="tool-nav" aria-label="Ferramentas">
-          <button type="button" class="tool-nav-btn" data-tool="automacoes">
+          <button type="button" class="tool-nav-btn" data-tool="automacoes" title="Automações e fluxos">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3z"/><path d="M18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14z"/></svg>
             <span>Automações</span>
           </button>
-          <button type="button" class="tool-nav-btn" data-tool="artefatos">
+          <button type="button" class="tool-nav-btn" data-tool="artefatos" title="Propostas e checkpoints">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h6l2 2h8v9a2 2 0 0 1-2 2H4z"/></svg>
             <span>Artefatos</span>
           </button>
-          <button type="button" class="tool-nav-btn" data-tool="skills">
+          <button type="button" class="tool-nav-btn" data-tool="skills" title="Skills (habilidades do Agent)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.2 3.6L17 8l-3.8 1.4L12 13l-1.2-3.6L7 8l3.8-1.4L12 3z"/><path d="M6 15l.7 2 2 .7-2 .7L6 20.4 5.3 18.4 3.3 17.7l2-0.7L6 15z"/></svg>
             <span>Skills</span>
           </button>
-          <button type="button" class="tool-nav-btn" data-tool="conectores">
+          <button type="button" class="tool-nav-btn" data-tool="conectores" title="Conectores e status Ollama">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></svg>
             <span>Conectores</span>
           </button>
-          <button type="button" class="tool-nav-btn" data-tool="memoria">
+          <button type="button" class="tool-nav-btn" data-tool="memoria" title="Memória do projeto">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></svg>
             <span>Memória</span>
           </button>
@@ -133,9 +127,21 @@
           <div id="tool-corpo" class="tool-corpo"></div>
         </div>
         <div id="projects-list" class="projects-list" hidden></div>
-        <div class="sidebar-section">
-          <div class="section-label">Pastas</div>
-          <div id="folder-list" class="folder-list"></div>
+        <div class="sidebar-section" id="repos-section">
+          <div class="section-label section-label-row">
+            <span>Repositórios</span>
+            <button type="button" id="btn-sidebar-nova-chat" class="btn-icon" title="Nova conversa" aria-label="Nova conversa">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button type="button" id="btn-add-repo" class="btn-icon btn-add-repo" title="Adicionar repositório" aria-label="Adicionar repositório">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+          <!-- Estilo Cursor: pasta + chats abaixo (sem árvore de arquivos) -->
+          <div id="folder-list" class="folder-list repos-chats-list agent-chats-list" role="list" aria-label="Repositórios e conversas"></div>
+        </div>
+        <div class="sidebar-section" id="agent-chats-section" hidden aria-hidden="true">
+          <div id="agent-chats-list" hidden></div>
         </div>
         <div class="sidebar-section" id="vault-section" hidden>
           <div class="section-label vault-section-header">
@@ -149,115 +155,141 @@
           <div id="vault-tags" class="vault-list"></div>
         </div>
       </div>
-      <div class="sidebar-footer">
-        <button type="button" id="btn-contas" class="btn-ghost" title="Contas e saúde do sistema">Contas</button>
-        <button type="button" id="btn-config" class="btn-ghost" title="Configurações">Configurações</button>
-      </div>
     </aside>
 
     <div id="resize-sidebar" class="resizer" data-resize="sidebar" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Centro: abas Chat | Editor (#editor-tabs vive em #tabbar acima de #app) -->
+    <!-- Centro: Chat | Editor (estilo Cursor Agent) -->
     <section id="center-panel">
-      <div class="center-tabs" role="tablist" aria-label="Área central">
-        <button type="button" class="center-tab active" data-center-pane="chat" role="tab" aria-selected="true">Chat</button>
-        <button type="button" class="center-tab" data-center-pane="agent" role="tab" aria-selected="false">Agente</button>
-        <button type="button" class="center-tab" data-center-pane="editor" role="tab" aria-selected="false">Editor</button>
+      <div class="center-tabs" role="tablist" aria-label="Centro">
+        <button type="button" class="center-tab active" data-center="chat" role="tab" aria-selected="true">Chat</button>
+        <button type="button" class="center-tab" data-center="editor" role="tab" aria-selected="false">Editor</button>
       </div>
 
-      <div id="center-pane-chat" class="center-pane active">
-        <div id="pane-chat" class="center-pane-inner">
-          <main id="chat-panel">
-            <header id="chat-header">
-              <div class="chat-header-meta">
-                <span id="chat-title">Nenhuma pasta aberta</span>
-                <span id="chat-provider" class="provider-badge"></span>
-                <button type="button" id="btn-ollama-start" class="btn-small" title="Iniciar Ollama (ação do usuário)" style="display:none;margin-left:6px">Iniciar Ollama</button>
-              </div>
-              <div id="chat-header-actions" class="chat-header-actions" role="group" aria-label="Controles e ações do chat">
-                <div id="chat-history-bar" class="chat-history-bar">
-                  <button type="button" id="btn-chat-nova" class="btn-small" title="Nova conversa">Nova</button>
-                  <select id="chat-history-select" aria-label="Historico de chats"></select>
-                </div>
-                <button type="button" id="btn-brain-avaliar" class="btn-small" title="Avaliar modelo ativo">Avaliar</button>
-                <button type="button" id="btn-painel" class="btn-small" title="Alternar painel">Painel</button>
-                <button type="button" id="btn-auditar" class="btn-small" title="Auto auditoria do sistema">Auditar</button>
-                <button type="button" id="btn-prompt-orientador" class="btn-icon" title="Orientar prompt do chat (Ctrl+Alt+P)" aria-label="Orientar prompt do chat" aria-keyshortcuts="Control+Alt+P">Prompt</button>
-              </div>
-            </header>
-            <div id="chat-messages" class="chat-messages">
-              <div class="empty-state" id="empty-state">
-                <h2>Bem-vindo ao DG Editor</h2>
-                <p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>
-                <button id="btn-empty-open" class="btn-primary">Abrir pasta</button>
-              </div>
+      <div id="center-pane-chat" class="center-pane ai-pane active">
+        <main id="chat-panel">
+          <header id="chat-header">
+            <div class="chat-header-meta">
+              <span id="chat-title">Agent</span>
+              <span id="chat-provider" class="provider-badge sr-only" aria-hidden="true"></span>
+              <button type="button" id="btn-ollama-start" class="btn-small sr-only" title="Iniciar Ollama" tabindex="-1" style="display:none">Iniciar Ollama</button>
             </div>
-            <footer id="chat-input-bar">
-              <button type="button" id="btn-chat-anexar" class="btn-icon" title="Anexar arquivo (imagem, áudio, PDF, DOCX, XLSX)" aria-label="Anexar arquivo">+</button>
-              <input type="file" id="chat-anexos-input" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.json,.yaml,.yml,.xml,.mp3,.m4a,.wav,.ogg,.flac,.mp4,.aac" style="display:none" />
-              <textarea id="chat-input" rows="1" placeholder="Pergunte sobre o sistema aberto... (Enter envia)"></textarea>
-              <button id="chat-send" class="btn-primary" disabled>Enviar</button>
-            </footer>
-            <div id="chat-anexos-preview" class="chat-anexos-preview" style="display:none"></div>
-          </main>
-        </div>
-      </div>
-
-      <div id="center-pane-agent" class="center-pane">
-        <div id="pane-agent" class="center-pane-inner agent-pane" role="region" aria-label="Painel do agente">
-          <header class="agent-header">
-            <div class="agent-header-main" role="group" aria-label="Modo e execução do agente">
-              <label class="agent-mode">
-                <input type="checkbox" id="agent-plan-mode" aria-describedby="agent-plan-hint" />
-                Modo de plano
-              </label>
-              <span id="agent-plan-hint" class="sr-only">Quando ativo, o agente só gera plano sem editar arquivos</span>
-              <select id="agent-select" aria-label="Escolher agente"></select>
-              <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor" aria-label="Orquestrar agentes">Orquestrar</button>
-              <button type="button" id="btn-agent-exec-plano" class="btn-small" title="Executar último plano salvo" aria-label="Executar plano salvo">Executar plano</button>
-              <button type="button" id="btn-agent-exec-passo" class="btn-small" title="Executar próximo passo do plano" aria-label="Executar próximo passo">Próximo passo</button>
-              <button type="button" id="btn-agent-verificar" class="btn-small" title="Rodar typecheck e alimentar diagnósticos" aria-label="Verificar typecheck">Verificar</button>
-              <label class="agent-mode" title="Após o turno, roda typecheck e pede correção se falhar">
-                <input type="checkbox" id="agent-verify-loop" />
-                Verificar automaticamente
-              </label>
-            </div>
-            <div class="agent-header-actions" role="group" aria-label="Ações da fila do agente">
-              <button type="button" id="btn-agent-stop" class="btn-ghost" title="Cancelar execução e limpar fila" aria-label="Parar agente">Parar</button>
-              <button type="button" id="btn-agent-undo" class="btn-ghost" title="Desfazer último checkpoint" aria-label="Desfazer apply">Desfazer apply</button>
-              <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
+            <div id="chat-header-actions" class="chat-header-actions" role="group" aria-label="Controles do chat">
+              <div id="chat-history-bar" class="chat-history-bar">
+                <button type="button" id="btn-chat-nova" class="btn-icon chat-ctx-btn" data-chat-ctx="nova" title="Nova conversa" aria-label="Nova conversa" aria-haspopup="dialog">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+                <select id="chat-history-select" class="chat-history-select" aria-label="Historico"></select>
+              </div>
+              <button type="button" id="btn-brain-avaliar" class="btn-small sr-only" title="Avaliar modelo ativo" tabindex="-1">Avaliar</button>
+              <button type="button" id="btn-auditar" class="btn-small sr-only" title="Auto auditoria" tabindex="-1">Auditar</button>
             </div>
           </header>
-          <div id="agent-plano-checklist" class="agent-plano-checklist" hidden role="region" aria-label="Checklist do plano"></div>
-          <div id="agent-trace" class="agent-trace" aria-live="polite" aria-relevant="additions" aria-label="Tool trace" tabindex="0"></div>
-          <div id="agent-output" class="agent-output" tabindex="0" role="log" aria-label="Resposta do agente" aria-live="polite"></div>
-          <div id="agent-propostas-resumo" class="agent-propostas-resumo muted" hidden role="region"></div>
-          <footer class="agent-input-bar">
-            <textarea id="agent-input" rows="2" aria-label="Pedido ao agente" placeholder="Pedido… @projeto @arquivo:path @nota:Nome @selecao"></textarea>
-            <button type="button" id="agent-send" class="btn-primary" aria-label="Executar pedido do agente">Executar</button>
+          <div id="chat-messages" class="chat-messages">
+            <div class="empty-state" id="empty-state">
+              <h2>Agent</h2>
+              <p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>
+              <button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>
+            </div>
+          </div>
+          <div id="chat-live-status" class="chat-live-status" hidden role="status" aria-live="polite"></div>
+          <footer id="chat-input-bar">
+            <div class="chat-composer">
+              <textarea id="chat-input" rows="2" placeholder="Pergunte ou peça uma ação… (Enter envia, Shift+Enter quebra linha)"></textarea>
+              <div class="chat-composer-toolbar" role="toolbar" aria-label="Opções do agente">
+                <button type="button" id="btn-chat-anexar" class="btn-icon chat-composer-attach chat-ctx-btn" data-chat-ctx="anexar" title="Anexar" aria-label="Anexar" aria-haspopup="dialog">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 11.6 12.1 20.9a5.5 5.5 0 0 1-7.8-7.8l9.9-9.9a3.5 3.5 0 0 1 5 5l-9.9 9.9a1.5 1.5 0 0 1-2.1-2.1l9.2-9.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <input type="file" id="chat-anexos-input" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.json,.yaml,.yml,.xml,.mp3,.m4a,.wav,.ogg,.flac,.mp4,.aac" style="display:none" />
+                <button type="button" id="btn-prompt-orientador" class="btn-icon btn-prompt-assist chat-ctx-btn" data-chat-ctx="prompt" title="Melhorar prompt (Ctrl+Alt+P)" aria-label="Melhorar prompt" aria-haspopup="dialog">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.8L18.5 9.5l-4.9 1.7L12 16l-1.6-4.8L5.5 9.5l4.9-1.7L12 3zM18 14l.9 2.6L21.5 17.5l-2.6.9L18 21l-.9-2.6L14.5 17.5l2.6-.9L18 14zM6 15l.7 2L9 17.8l-2.3.7L6 20.5l-.7-2L3 17.8l2.3-.7L6 15z" fill="currentColor" stroke="none"/></svg>
+                </button>
+                <div class="chat-ctx-wrap">
+                  <button type="button" id="btn-chat-mode" class="btn-icon chat-ctx-btn" data-chat-ctx="mode" title="Modo" aria-label="Modo" aria-haspopup="dialog">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  </button>
+                  <select id="chat-mode-select" class="sr-only" tabindex="-1" aria-hidden="true">
+                    <option value="auto">Auto</option>
+                    <option value="code">Agent</option>
+                    <option value="plan">Plan</option>
+                    <option value="ask">Ask</option>
+                    <option value="debug">Debug</option>
+                  </select>
+                </div>
+                <div class="chat-ctx-wrap">
+                  <button type="button" id="btn-chat-agent" class="btn-icon chat-ctx-btn" data-chat-ctx="agent" title="Agente" aria-label="Agente" aria-haspopup="dialog">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 1 4 4v1h1.5A2.5 2.5 0 0 1 20 10.5V14a5 5 0 0 1-5 5h-1v2H10v-2H9a5 5 0 0 1-5-5v-3.5A2.5 2.5 0 0 1 6.5 8H8V7a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="9.5" cy="12.5" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg>
+                  </button>
+                  <select id="chat-agent-select" class="sr-only" tabindex="-1" aria-hidden="true">
+                    <option value="auto">Auto</option>
+                  </select>
+                </div>
+                <input type="checkbox" id="agent-plan-mode" class="sr-only" tabindex="-1" aria-hidden="true" />
+                <input type="checkbox" id="agent-verify-loop" class="sr-only" tabindex="-1" aria-hidden="true" checked />
+                <span id="agent-plan-hint" class="sr-only">Modo plano</span>
+                <div class="chat-more-wrap">
+                  <button type="button" class="btn-icon chat-more-toggle chat-ctx-btn" id="btn-chat-mais" data-chat-ctx="mais" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-mais-menu" title="Mais" aria-label="Mais">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+                  </button>
+                  <div id="chat-mais-menu" class="chat-more-menu" role="menu" hidden></div>
+                </div>
+                <span class="chat-composer-spacer"></span>
+                <button id="chat-send" class="chat-send-btn" disabled title="Enviar" aria-label="Enviar" data-mode="send">
+                  <svg class="chat-send-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg class="chat-stop-icon" viewBox="0 0 24 24" aria-hidden="true" hidden><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/></svg>
+                </button>
+              </div>
+              <div id="chat-ctx-popover" class="chat-ctx-popover" hidden role="dialog" aria-modal="false"></div>
+            </div>
           </footer>
-        </div>
+          <div id="chat-anexos-preview" class="chat-anexos-preview" style="display:none"></div>
+        </main>
       </div>
 
       <div id="center-pane-editor" class="center-pane">
         <div id="editor-breadcrumb"></div>
         <div id="editor-toolbar" class="editor-toolbar hidden">
+          <button type="button" id="btn-editor-salvar" class="btn-small" title="Salvar arquivo (Ctrl+S)">Salvar</button>
           <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+          <span id="editor-wrap-hint" class="muted" style="font-size:12px;margin-left:auto">Quebra de linha automática</span>
+        </div>
+        <div id="editor-diff-bar" class="editor-diff-bar" hidden role="region" aria-label="Proposta de diff">
+          <span id="editor-diff-bar-path" class="editor-diff-bar-path"></span>
+          <span class="editor-diff-bar-meta muted" id="editor-diff-bar-meta"></span>
+          <span class="editor-diff-bar-spacer"></span>
+          <button type="button" id="editor-diff-bar-reject" class="btn-small" data-parity="diff-reject">Rejeitar</button>
+          <button type="button" id="editor-diff-bar-apply" class="btn-small chat-parity-primary" data-parity="diff-apply">Aplicar</button>
         </div>
         <div id="editor-host">
           <div id="editor-mount"></div>
           <div id="editor-diff-side" class="editor-diff-side" hidden aria-hidden="true" aria-label="Preview depois da proposta"></div>
           <div id="md-preview" class="md-preview hidden" aria-hidden="true"></div>
           <div id="image-preview" class="image-preview hidden" aria-hidden="true">
-            <img id="image-preview-img" alt="preview" />
+            <div class="img-edit-toolbar" role="toolbar" aria-label="Editar imagem">
+              <label class="img-edit-field" title="Largura em pixels">Largura
+                <input type="number" id="img-edit-w" min="16" max="8192" step="1" />
+              </label>
+              <label class="img-edit-field" title="Altura em pixels">Altura
+                <input type="number" id="img-edit-h" min="16" max="8192" step="1" />
+              </label>
+              <button type="button" id="img-edit-resize" class="btn-small" title="Redimensionar para a largura/altura informadas">Redimensionar</button>
+              <button type="button" id="img-edit-crop" class="btn-small" title="Recortar o centro (80%)">Recortar centro</button>
+              <button type="button" id="img-edit-reset" class="btn-ghost" title="Voltar à imagem original">Reset</button>
+              <button type="button" id="img-edit-download" class="btn-primary" title="Baixar PNG editado">Baixar PNG</button>
+              <span id="img-edit-info" class="muted img-edit-info"></span>
+            </div>
+            <div class="img-edit-stage">
+              <img id="image-preview-img" alt="preview" />
+              <canvas id="img-edit-canvas" class="img-edit-canvas" hidden></canvas>
+            </div>
           </div>
           <div id="editor-empty">
             <h2>DG Editor</h2>
-            <p>Abra um arquivo na árvore ou use os atalhos abaixo.</p>
+            <p>Abra um arquivo à esquerda. O Agent fica no centro.</p>
             <div class="atalhos">
               <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
-              <div><kbd>Ctrl+B</kbd> Alternar sidebar</div>
-              <div><kbd>Ctrl+Shift+P</kbd> Paleta de comandos</div>
+              <div><kbd>Ctrl+B</kbd> Alternar explorer</div>
+              <div><kbd>Ctrl+L</kbd> Focar chat IA</div>
               <div><kbd>Ctrl+S</kbd> Salvar</div>
               <div><kbd>Ctrl+`</kbd> Terminal</div>
             </div>
@@ -283,15 +315,70 @@
 
     <div id="resize-right" class="resizer" data-resize="right" title="Redimensionar (duplo clique = reset)"></div>
 
-    <!-- Direita: Análise + Terminal + Files (Chat moveu para o centro) -->
+    <!-- Direita: Bloco 3 (rail + abas) -->
     <section id="exec-panel">
+      <nav id="right-rail" class="right-rail" aria-label="Atalhos do Bloco 3">
+        <button type="button" class="right-rail-btn" id="rail-collapse" data-rail="collapse" title="Recolher Bloco 3" aria-label="Recolher Bloco 3">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/></svg>
+        </button>
+        <button type="button" class="right-rail-btn" id="rail-novo" data-rail="novo" title="Novo — o que criar?" aria-label="Novo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 19h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" class="right-rail-btn" id="rail-browser" data-rail="browser" title="Navegador" aria-label="Navegador">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button type="button" class="right-rail-btn" id="rail-terminal" data-rail="terminal" title="Terminal" aria-label="Terminal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 9l3 3-3 3M12 15h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="right-rail-btn" id="rail-files" data-rail="files" title="Arquivos / repositórios" aria-label="Arquivos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l3 3v15H7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+        </button>
+      </nav>
+      <div class="exec-panel-main">
       <div class="right-tabs">
-        <button type="button" class="right-tab" data-pane="analise">Análise</button>
-        <button type="button" class="right-tab active" data-pane="terminal">Terminal</button>
-          <button type="button" class="right-tab" data-pane="files">Arquivos</button>
-          <button type="button" class="right-tab" data-pane="browser">Navegador</button>
+        <button type="button" class="right-tab active" data-pane="agent" title="Painel de execução do agente"><span class="right-tab-label">Execução</span><span class="right-tab-close" data-right-close="agent" title="Fechar painel" aria-label="Fechar Execução">×</span></button>
+        <button type="button" class="right-tab" data-pane="analise" title="Análise do projeto"><span class="right-tab-label">Análise</span><span class="right-tab-close" data-right-close="analise" title="Fechar painel" aria-label="Fechar Análise">×</span></button>
+        <button type="button" class="right-tab" data-pane="terminal" title="Terminal integrado"><span class="right-tab-label">Terminal</span><span class="right-tab-close" data-right-close="terminal" title="Fechar painel" aria-label="Fechar Terminal">×</span></button>
+        <button type="button" class="right-tab" data-pane="browser" title="Navegador embutido"><span class="right-tab-label">Navegador</span><span class="right-tab-close" data-right-close="browser" title="Fechar painel" aria-label="Fechar Navegador">×</span></button>
+        <button type="button" class="right-tab" data-pane="files" title="Arquivos"><span class="right-tab-label">Arquivos</span><span class="right-tab-close" data-right-close="files" title="Fechar painel" aria-label="Fechar Arquivos">×</span></button>
         <button type="button" id="btn-right-collapse" class="btn-icon" title="Recolher painel direito" aria-label="Recolher painel direito" aria-pressed="false">‹</button>
       </div>
+
+      <div id="pane-agent" class="right-pane active">
+        <div id="center-pane-agent" class="ai-pane agent-pane" role="region" aria-label="Painel do agente">
+          <header class="agent-header" id="agent-header">
+            <div class="agent-header-main" role="group" aria-label="Execução avançada do agente">
+              <select id="agent-select" class="sr-only" aria-hidden="true" tabindex="-1"></select>
+              <button type="button" id="btn-agent-orquestrar" class="btn-small" title="Engenheiro → Revisor">Orquestrar</button>
+              <button type="button" id="btn-agent-exec-plano" class="btn-small">Executar plano</button>
+              <button type="button" id="btn-agent-exec-passo" class="btn-small">Próximo passo</button>
+              <button type="button" id="btn-agent-verificar" class="btn-small">Verificar</button>
+            </div>
+            <div class="agent-header-actions" role="group">
+              <div class="agent-more-wrap">
+                <button type="button" id="btn-agent-mais" class="btn-icon" title="Mais ações" aria-label="Mais ações" aria-haspopup="menu" aria-expanded="false" aria-controls="agent-mais-menu">⋯</button>
+                <div id="agent-mais-menu" class="agent-more-menu" role="menu" hidden>
+                  <button type="button" role="menuitem" data-agent-more="passo">Próximo passo</button>
+                  <button type="button" role="menuitem" data-agent-more="verificar">Verificar</button>
+                  <button type="button" role="menuitem" data-agent-more="undo">Desfazer apply</button>
+                </div>
+              </div>
+              <button type="button" id="btn-agent-stop" class="btn-ghost">Parar</button>
+              <button type="button" id="btn-agent-undo" class="btn-ghost sr-only" tabindex="-1">Desfazer apply</button>
+              <span id="agent-fila-status" class="muted agent-fila" aria-live="polite" role="status"></span>
+            </div>
+          </header>
+          <div id="agent-plano-checklist" class="agent-plano-checklist" hidden role="region"></div>
+          <div id="agent-trace" class="agent-trace" aria-live="polite" tabindex="0"></div>
+          <div id="agent-output" class="agent-output" tabindex="0" role="log" aria-live="polite"></div>
+          <div id="agent-propostas-resumo" class="agent-propostas-resumo muted" hidden role="region"></div>
+          <p class="muted agent-hint">Pedidos vão no chat do centro. Use <strong>Novo</strong> na barra do Bloco 3 para criar sistema, site, imagem ou vídeo (ferramentas gratuitas).</p>
+          <!-- input legado oculto: orquestrar/plano ainda podem preencher via JS -->
+          <textarea id="agent-input" class="sr-only" tabindex="-1" aria-hidden="true"></textarea>
+          <button type="button" id="agent-send" class="sr-only" tabindex="-1" aria-hidden="true">Executar</button>
+        </div>
+      </div>
+
 
       <div id="pane-analise" class="right-pane">
           <header class="exec-header">
@@ -301,12 +388,12 @@
               <button type="button" id="btn-analise-completa" class="btn-secondary" title="Analisa o projeto inteiro. Pode levar vários minutos." aria-label="Análise completa" disabled>Análise completa</button>
             </div>
           </header>
-          <div class="whereis-bar" id="whereis-bar">
+          <div class="whereis-bar" id="whereis-bar" hidden aria-hidden="true">
             <label class="sr-only" for="whereis-query">Onde está</label>
-            <input type="text" id="whereis-query" class="whereis-input" placeholder="Onde está… (função, variável, texto)" aria-label="Buscar onde está no projeto" disabled />
-            <button type="button" id="btn-whereis" class="btn-secondary" aria-label="Buscar onde está" disabled>Buscar</button>
+            <input type="text" id="whereis-query" class="whereis-input" placeholder="Onde está… (função, variável, texto)" aria-label="Buscar onde está no projeto" disabled tabindex="-1" />
+            <button type="button" id="btn-whereis" class="btn-secondary" aria-label="Buscar onde está" disabled tabindex="-1" hidden>Buscar</button>
           </div>
-          <div id="whereis-result" class="whereis-result" aria-live="polite"></div>
+          <div id="whereis-result" class="whereis-result" hidden aria-hidden="true"></div>
           <div id="analysis-content" class="analysis-content">
             <p class="muted">A análise aparece aqui quando você abrir uma pasta.</p>
           </div>
@@ -315,7 +402,7 @@
         </div>
       </div>
 
-      <div id="pane-terminal" class="right-pane active">
+      <div id="pane-terminal" class="right-pane">
         <div id="terminal-panel" class="terminal-panel terminal-panel--docked" aria-hidden="true">
           <div id="terminal-resize-handle" class="terminal-resize-handle" title="Arrastar para redimensionar · duplo-clique = 300px"></div>
           <header class="terminal-header">
@@ -337,17 +424,23 @@
       </div>
 
       <div id="pane-files" class="right-pane">
-        <div class="section-label" style="padding:8px 12px 4px">Pastas</div>
+        <div class="section-label" style="padding:8px 12px 4px">Arquivos do repositório</div>
         <div id="files-list" class="folder-list files-panel-list"></div>
       </div>
 
       <div id="pane-browser" class="right-pane">
+        <div class="browser-chrome" id="browser-chrome">
+          <button type="button" class="btn-icon" id="browser-voltar" title="Voltar" aria-label="Voltar">‹</button>
+          <button type="button" class="btn-icon" id="browser-atualizar" title="Atualizar" aria-label="Atualizar">↻</button>
+          <input type="text" id="browser-url" placeholder="https://" aria-label="URL do navegador" />
+          <button type="button" class="btn-small" id="browser-abrir" title="Abrir / ir">Abrir</button>
+        </div>
         <div id="browser-mount" aria-label="Navegador embutido"></div>
         <div class="browser-pane-overlay" id="browser-overlay">
           <p class="browser-status" id="browser-status">Navegador fechado.</p>
-          <button type="button" id="browser-abrir" class="btn-primary">Abrir navegador</button>
         </div>
       </div>
+      </div><!-- /.exec-panel-main -->
     </section>
 
     <footer id="statusbar">
@@ -355,17 +448,83 @@
         <span id="sb-branch" title="Branch do repositório">—</span>
         <span id="sb-pasta" title="Projeto aberto">—</span>
       </div>
-      <div class="sb-center">
-        <span id="sb-ambiente">This PC</span>
-        <span id="sb-agent" title="Agente: modelo / latência / fila">Agent: —</span>
+      <div class="sb-center sb-actions" role="toolbar" aria-label="Atalhos da base">
+        <button type="button" id="btn-tema" class="btn-icon sb-btn" data-action="tema" title="Alternar tema" aria-label="Tema">
+          <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        </button>
+        <button type="button" id="btn-provedores-ia" class="btn-icon sb-btn" title="Provedores de IA" aria-label="Provedores de IA">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 0 1 4 4v1h1.5A2.5 2.5 0 0 1 20 10.5V14a5 5 0 0 1-5 5h-1v2H10v-2H9a5 5 0 0 1-5-5v-3.5A2.5 2.5 0 0 1 6.5 8H8V7a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.5" cy="12.5" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="12.5" r="1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button type="button" id="btn-contas" class="btn-icon sb-btn" title="Contas e saúde" aria-label="Contas e saúde">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" id="btn-config" class="btn-icon sb-btn" title="Configurações" aria-label="Configurações">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a7.8 7.8 0 0 0 .1-2l2-1.5-2-3.4-2.4 1a7.7 7.7 0 0 0-1.7-1L15 3h-6l-.4 2.1a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 .1 2l-2 1.5 2 3.4 2.4-1a7.7 7.7 0 0 0 1.7 1L9 21h6l.4-2.1a7.7 7.7 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" id="btn-desktop-use" class="btn-icon sb-btn" title="Controle do PC (pede permissão)" aria-label="Controle do PC">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 20h8M12 16v4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>
+        <span id="sb-ia" class="sb-meta" title="Status da IA (Ollama / API)">IA: —</span>
+        <span id="sb-agent" class="sb-meta" title="Agente: modelo / latência / fila">Agent: —</span>
+        <span id="sb-workspace" class="sb-meta" title="Autosave da área de trabalho">Workspace: —</span>
+        <span id="sb-safe" class="sb-meta hidden" title="Modo seguro">Safe</span>
+        <button type="button" id="btn-update-check" class="btn-small sb-btn" title="Verificar atualização do DG Editor" aria-label="Verificar atualização">Update</button>
+        <span id="sb-update" class="sb-meta" title="Status de atualização">—</span>
+        <span id="sb-deps" class="sb-meta" title="Ferramentas do sistema (Ollama/Git/FFmpeg)">Deps: —</span>
       </div>
       <div class="sb-right">
-        <button type="button" id="btn-right-expand" class="btn-icon" title="Expandir painel direito" aria-label="Expandir painel direito" aria-pressed="false">›</button>
-        <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos (regra 9)">
-          <span id="guardian-text">Guardião: medindo...</span>
+        <button type="button" id="btn-right-toggle" class="sb-bloco3-btn" title="Abrir ou fechar o Bloco 3 (Execução, Terminal, Navegador)" aria-label="Alternar Bloco 3" aria-pressed="false">Bloco 3</button>
+        <button type="button" id="btn-right-expand" class="sb-bloco3-btn sb-bloco3-expand" title="Abrir Bloco 3" aria-label="Abrir Bloco 3" aria-pressed="false" hidden>Abrir Bloco 3</button>
+        <div id="guardian-bar" class="guardian-bar" title="Guardião de recursos">
+          <span id="guardian-text">Guardião: medindo…</span>
         </div>
+        <div id="guardian-alert" class="guardian-alert hidden" role="alert"></div>
       </div>
     </footer>
+  </div>
+
+  <button type="button" id="bloco3-edge" class="bloco3-edge" title="Abrir Bloco 3" aria-label="Abrir Bloco 3" aria-controls="exec-panel" hidden>‹</button>
+
+  <div id="modal-assistente-novo" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="assistente-novo-title">
+    <div class="modal-box assistente-novo-box">
+      <header class="assistente-novo-head">
+        <h3 id="assistente-novo-title">O que você quer criar?</h3>
+        <button type="button" id="assistente-novo-fechar" class="btn-icon" title="Fechar" aria-label="Fechar">×</button>
+      </header>
+      <p class="muted assistente-novo-sub">Ferramentas gratuitas: Ollama / OpenRouter free · ComfyUI · FFmpeg · templates locais.</p>
+      <div class="assistente-novo-grid" role="group" aria-label="Tipos de criação">
+        <button type="button" class="assistente-novo-card" data-novo="sistema" title="Sistema / app no repositório">
+          <span class="assistente-novo-ico" aria-hidden="true">Sy</span>
+          <strong>Sistema</strong>
+          <span>App ou pasta no projeto (Agent + templates)</span>
+        </button>
+        <button type="button" class="assistente-novo-card" data-novo="site" title="Site / landing">
+          <span class="assistente-novo-ico" aria-hidden="true">Web</span>
+          <strong>Site</strong>
+          <span>Página HTML/CSS com preview no navegador</span>
+        </button>
+        <button type="button" class="assistente-novo-card" data-novo="imagem" title="Imagem com ComfyUI">
+          <span class="assistente-novo-ico" aria-hidden="true">Img</span>
+          <strong>Imagens</strong>
+          <span>Gerar via ComfyUI local (gratis)</span>
+        </button>
+        <button type="button" class="assistente-novo-card" data-novo="video" title="Video com ComfyUI/FFmpeg">
+          <span class="assistente-novo-ico" aria-hidden="true">Vid</span>
+          <strong>Video</strong>
+          <span>ComfyUI / FFmpeg no PC</span>
+        </button>
+        <button type="button" class="assistente-novo-card" data-novo="docs" title="Documentacao">
+          <span class="assistente-novo-ico" aria-hidden="true">Doc</span>
+          <strong>Docs</strong>
+          <span>Markdown / Pandoc se disponivel</span>
+        </button>
+        <button type="button" class="assistente-novo-card" data-novo="chat" title="So conversar">
+          <span class="assistente-novo-ico" aria-hidden="true">Chat</span>
+          <strong>Chat</strong>
+          <span>Perguntar no Agent (centro)</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Paleta de comandos (Ctrl+Shift+P) / arquivos (Ctrl+P) -->
@@ -390,67 +549,110 @@
         <h3 id="modal-config-title">Configurações</h3>
         <button type="button" id="btn-config-close" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar configurações">×</button>
       </header>
-      <div id="config-profile" class="config-section"></div>
-      <div id="config-ollama" class="config-section"></div>
-      <div id="config-adapta" class="config-section">
-        <h4>Adapta ONE / Maestro</h4>
-        <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE + comando MCP para o Maestro. <span class="muted">Detalhes: docs/adapta.md</span></p>
-        <p id="adapta-status-cfg" class="muted" style="margin:0 0 8px;font-size:12px"></p>
-        <div class="config-actions">
-          <button type="button" id="btn-adapta-gerar-cfg" class="btn-small">Gerar continuidade</button>
-          <button type="button" id="btn-adapta-copiar-cfg" class="btn-ghost">Copiar continuidade</button>
-          <button type="button" id="btn-adapta-mcp-cfg" class="btn-ghost">Copiar comando MCP</button>
-          <button type="button" id="btn-adapta-one-cfg" class="btn-ghost">Abrir ONE</button>
-          <button type="button" id="btn-adapta-maestro-cfg" class="btn-ghost">Abrir Maestro</button>
+      <div class="modal-body config-body">
+        <div id="config-profile" class="config-section"></div>
+        <div id="config-ollama" class="config-section"></div>
+        <div id="config-regras" class="config-section"></div>
+        <div id="config-adapta" class="config-section">
+          <h4>Adapta ONE / Maestro</h4>
+          <p class="muted" style="margin:0 0 8px">Continuidade para Contextos do ONE e comando MCP do Maestro.</p>
+          <p id="adapta-status-cfg" class="muted" style="margin:0 0 8px;font-size:12px"></p>
+          <div class="config-actions">
+            <button type="button" id="btn-adapta-gerar-cfg" class="btn-small">Gerar continuidade</button>
+            <button type="button" id="btn-adapta-copiar-cfg" class="btn-ghost">Copiar continuidade</button>
+            <button type="button" id="btn-adapta-mcp-cfg" class="btn-ghost">Copiar comando MCP</button>
+            <button type="button" id="btn-adapta-one-cfg" class="btn-ghost">Abrir ONE</button>
+            <button type="button" id="btn-adapta-maestro-cfg" class="btn-ghost">Abrir Maestro</button>
+          </div>
         </div>
-      </div>
-      <div id="config-openclaw" class="config-section">
-        <h4>OpenClaw</h4>
-        <label class="config-field">Endpoint<br>
-          <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" style="width:100%" autocomplete="off" />
-        </label>
-        <label class="config-field">Model<br>
-          <input type="text" id="oc-model" placeholder="openclaw/default" style="width:100%" autocomplete="off" />
-        </label>
-        <label class="config-field">Gateway Bearer (token)<br>
-          <input type="password" id="oc-token" placeholder="Cole o token (não fica em texto plano)" style="width:100%" autocomplete="off" />
-        </label>
-        <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
-        <div class="config-actions">
-          <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
-          <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
+        <div id="config-openclaw" class="config-section">
+          <h4>OpenClaw</h4>
+          <label class="config-field">Endpoint
+            <input type="text" id="oc-endpoint" placeholder="http://127.0.0.1:18789" autocomplete="off" />
+          </label>
+          <label class="config-field">Modelo
+            <input type="text" id="oc-model" placeholder="openclaw/default" autocomplete="off" />
+          </label>
+          <label class="config-field">Token do gateway
+            <input type="password" id="oc-token" placeholder="Cole o token (não fica em texto plano)" autocomplete="off" />
+          </label>
+          <p id="oc-token-status" class="muted" style="margin:6px 0"></p>
+          <div class="config-actions">
+            <button type="button" id="btn-oc-salvar" class="btn-small">Salvar OpenClaw</button>
+            <button type="button" id="btn-oc-limpar-token" class="btn-ghost">Limpar token</button>
+          </div>
         </div>
       </div>
       <div class="config-actions config-actions--footer">
         <button type="button" id="btn-config-fechar" class="btn-ghost">Fechar</button>
-      </div>    </div>
+      </div>
+    </div>
   </div>
 
   <div id="modal-contas" class="modal modal-float hidden" role="dialog" aria-labelledby="modal-contas-title">
     <div class="modal-box" data-float-box>
       <header class="modal-titlebar" data-float-handle>
-        <h3 id="modal-contas-title">Contas e saúde do sistema</h3>
+        <h3 id="modal-contas-title">Contas e saúde</h3>
         <button type="button" id="btn-contas-close" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar contas">×</button>
       </header>
-      <div id="contas-identidade" class="config-section"></div>
-      <div id="contas-maquina" class="config-section"></div>
-      <div id="contas-ia" class="config-section"></div>
-      <div id="contas-guardian" class="config-section"></div>
-      <div id="contas-adapta" class="config-section">
-        <h4>Adapta ONE / Maestro</h4>
-        <p id="adapta-status" class="muted" style="margin:0 0 8px;font-size:12px;word-break:break-all"></p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button type="button" id="btn-adapta-copiar" class="btn-small" title="Copia continuidade.md para a área de transferência">Copiar continuidade</button>
-          <button type="button" id="btn-adapta-gerar" class="btn-ghost">Gerar</button>
-          <button type="button" id="btn-adapta-mcp" class="btn-ghost" title="JSON command/args/cwd para conector MCP do Maestro">Copiar MCP</button>
-          <button type="button" id="btn-adapta-one" class="btn-ghost">ONE</button>
-          <button type="button" id="btn-adapta-maestro" class="btn-ghost">Maestro</button>
-          <button type="button" id="btn-adapta-docs" class="btn-ghost">Docs</button>
+      <div class="modal-body config-body">
+        <div class="modal-tabs" role="tablist" aria-label="Seções de Contas">
+          <button type="button" class="modal-tab" role="tab" data-contas-tab="contas" aria-selected="true">Contas</button>
+          <button type="button" class="modal-tab" role="tab" data-contas-tab="ftp" aria-selected="false">FTP</button>
+          <button type="button" class="modal-tab" role="tab" data-contas-tab="saude" aria-selected="false">Saúde</button>
+        </div>
+        <div class="modal-tab-panel" data-contas-panel="contas">
+          <div id="contas-identidade" class="config-section"></div>
+          <div id="contas-conectores" class="config-section"></div>
+          <div id="contas-adapta" class="config-section">
+            <h4>Adapta ONE / Maestro</h4>
+            <p id="adapta-status" class="muted" style="margin:0 0 8px;font-size:12px;word-break:break-all"></p>
+            <div class="config-actions">
+              <button type="button" id="btn-adapta-gerar" class="btn-small">Gerar continuidade</button>
+              <button type="button" id="btn-adapta-copiar" class="btn-ghost" title="Copia continuidade.md">Copiar continuidade</button>
+              <button type="button" id="btn-adapta-mcp" class="btn-ghost" title="JSON MCP do Maestro">Copiar MCP</button>
+              <button type="button" id="btn-adapta-one" class="btn-ghost">Abrir ONE</button>
+              <button type="button" id="btn-adapta-maestro" class="btn-ghost">Abrir Maestro</button>
+              <button type="button" id="btn-adapta-docs" class="btn-ghost">Docs</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-tab-panel" data-contas-panel="ftp" hidden>
+          <div id="contas-ftp" class="config-section"></div>
+        </div>
+        <div class="modal-tab-panel" data-contas-panel="saude" hidden>
+          <div id="contas-maquina" class="config-section"></div>
+          <div id="contas-ia" class="config-section"></div>
+          <div id="contas-guardian" class="config-section"></div>
+          <div id="contas-diagnostico" class="config-section">
+            <h4>Diagnóstico</h4>
+            <p class="muted" style="margin:0 0 8px">Roda checagens locais do DG Editor.</p>
+            <button type="button" id="btn-diag" class="btn-small">Rodar diagnóstico</button>
+            <button type="button" id="btn-backup-onedrive" class="btn-small" title="Espelha o projeto no OneDrive\BACKUP_DG_EDITOR" style="margin-left:8px">Backup OneDrive</button>
+            <p id="backup-onedrive-status" class="muted" style="margin:8px 0 0;font-size:12px"></p>
+          </div>
+          <div id="contas-deps" class="config-section">
+            <h4>Ferramentas do sistema</h4>
+            <p class="muted" style="margin:0 0 8px">Agente silencioso (estilo UniGetUI): mantém Ollama, Git, FFmpeg, GitHub CLI e Python atualizados via winget, sem janelas.</p>
+            <label class="muted" style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px">
+              <input type="checkbox" id="deps-manut-ativo" checked /> Atualizar automaticamente em segundo plano
+            </label>
+            <button type="button" id="btn-deps-manut-rodar" class="btn-small">Verificar e atualizar agora</button>
+            <p id="deps-manut-status" class="muted" style="margin:8px 0 0;font-size:12px"></p>
+            <ul id="deps-manut-lista" class="muted" style="margin:8px 0 0;padding-left:18px;font-size:12px"></ul>
+          </div>
+          <div id="contas-perfil" class="config-section">
+            <h4>Perfil (contas / IAs)</h4>
+            <p class="muted" style="margin:0 0 8px">Exporta ou importa chaves e preferências deste PC. Sobrevive a reinstalar o app.</p>
+            <button type="button" id="btn-perfil-exportar" class="btn-small">Exportar perfil</button>
+            <button type="button" id="btn-perfil-importar" class="btn-small" style="margin-left:8px">Importar perfil</button>
+            <p id="perfil-status" class="muted" style="margin:8px 0 0;font-size:12px"></p>
+          </div>
         </div>
       </div>
-      <div id="contas-diagnostico" class="config-section"></div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button type="button" id="btn-diag" class="btn-small">Rodar diagnostico</button>      </div>
+      <div class="config-actions config-actions--footer">
+        <button type="button" id="btn-contas-fechar" class="btn-ghost">Fechar</button>
+      </div>
     </div>
   </div>
 
@@ -480,7 +682,7 @@
   <div id="modal-prompt-orientador" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-prompt-orientador-title">
     <div class="modal-box prompt-modal-box">
       <header class="modal-titlebar" data-float-handle>
-        <h3 id="modal-prompt-orientador-title">Orientador de prompt (experimental)</h3>
+        <h3 id="modal-prompt-orientador-title">Assistente de prompt</h3>
         <button type="button" id="btn-prompt-fechar" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar orientador de prompt">×</button>
       </header>
       <div class="prompt-modal-grid">
@@ -507,6 +709,7 @@
   <script type="module" src="./regras-gerais-ui.js"></script>
   <script type="module" src="./diagnostico-ui.js"></script>
   <script type="module" src="./providers-ui.js"></script>
+  <script type="module" src="./contas-ui.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

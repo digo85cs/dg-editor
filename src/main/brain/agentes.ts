@@ -18,7 +18,12 @@ function dirAgentes(raiz: string): string {
   return path.join(raiz, '.dg-editor', 'agentes')
 }
 
-function parseAgente(arquivo: string, bruto: string): AgenteDef {
+function semBom(bruto: string): string {
+  return bruto.charCodeAt(0) === 0xfeff ? bruto.slice(1) : bruto
+}
+
+function parseAgente(arquivo: string, brutoIn: string): AgenteDef {
+  const bruto = semBom(brutoIn)
   const id = path.basename(arquivo, '.md')
   let nome = id
   let especialidade = id
@@ -55,6 +60,47 @@ export function listarAgentes(raiz: string): AgenteDef[] {
 
 export function lerAgente(raiz: string, id: string): AgenteDef | null {
   return listarAgentes(raiz).find((a) => a.id === id || a.nome === id) || null
+}
+
+/** Cria um agente .md em .dg-editor/agentes (não sobrescreve). */
+export function criarAgente(
+  raiz: string,
+  opts: { id?: string; nome: string; especialidade?: string; skills?: string[]; system?: string }
+): { ok: boolean; id?: string; arquivo?: string; erro?: string } {
+  const nome = String(opts.nome || '').trim()
+  if (!nome) return { ok: false, erro: 'nome obrigatório' }
+  const id =
+    String(opts.id || nome)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'agente'
+  const dir = dirAgentes(raiz)
+  fs.mkdirSync(dir, { recursive: true })
+  const arquivo = path.join(dir, id + '.md')
+  if (fs.existsSync(arquivo)) return { ok: false, erro: 'já existe: ' + id }
+  const especialidade = String(opts.especialidade || nome).trim()
+  const skills = (opts.skills || []).map((s) => String(s).trim()).filter(Boolean)
+  const system =
+    String(opts.system || '').trim() ||
+    'Você é o agente ' + nome + ' do DG Editor. Responda em português do Brasil, curto e técnico.'
+  const corpo =
+    '---\n' +
+    'nome: ' +
+    nome +
+    '\n' +
+    'especialidade: ' +
+    especialidade +
+    '\n' +
+    'skills: ' +
+    (skills.length ? skills.join(', ') : 'leitor-codigo') +
+    '\n' +
+    '---\n' +
+    system +
+    '\n'
+  fs.writeFileSync(arquivo, corpo, 'utf8')
+  return { ok: true, id, arquivo }
 }
 
 export async function invocarAgente(
@@ -207,8 +253,10 @@ Responda em portugues do Brasil.`
   ]
   for (const p of padroes) {
     const dest = path.join(dir, p.nome)
-    // hibrido-core.md sempre atualiza (regras de confirmacao mudam com o produto)
-    if (p.nome === 'hibrido-core.md' || !fs.existsSync(dest)) {
+    // hibrido-core + free-* sempre atualizam (skills/presets mudam com o produto)
+    const forcar =
+      p.nome === 'hibrido-core.md' || p.nome.startsWith('free-')
+    if (forcar || !fs.existsSync(dest)) {
       fs.writeFileSync(dest, p.conteudo, 'utf8')
     }
   }

@@ -177,7 +177,7 @@ export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
   }
 
   const reg = ler(raiz, 'src/main/brain/registry.ts')
-  const chatFila = (reg.match(/if\s*\(\s*t\s*===\s*['"]chat['"]\s*\)\s*\{[\s\S]*?return\s*\[[\s\S]*?\]/) || [''])[0]
+  const chatFila = (reg.match(/if\s*\(\s*t\s*===\s*['"]chat['"]\s*\)\s*\{[\s\S]*?return\s*(?:comPrefixoGlobal\s*\()?\[[\s\S]*?\]/) || [''])[0]
   const chatSem15 = !!chatFila && !chatFila.includes('1.5b') && chatFila.includes('qwen2.5-coder:3b')
   out.push(achado(
     'integracao:chat-sem-15',

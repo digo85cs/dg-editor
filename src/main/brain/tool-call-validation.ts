@@ -1,5 +1,5 @@
 import type { McpTool } from '../mcp/client'
-import { CodigoErro, criarErro, type ErroApp } from '@shared/erros'
+import { CodigoErro, criarErro, type ErroApp } from '../../shared/erros'
 
 export interface ToolCallNorm {
   name: string

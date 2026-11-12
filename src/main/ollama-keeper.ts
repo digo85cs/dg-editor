@@ -75,9 +75,15 @@ export async function startOllama(): Promise<OllamaCheck> {
   return { ativo: false, instalado: true }
 }
 
-/** Apenas verifica (sem auto-start). Mantido por compatibilidade de chamada; não inicia processo. */
+/** Garante Ollama no ar: se parado e instalado, sobe `ollama serve` automaticamente. */
 export async function ensureOllama(): Promise<boolean> {
   const st = await checkOllama()
-  if (!st.ativo) dglog('[keeper] Ollama indisponível (verificação passiva; sem auto-start)')
-  return st.ativo
+  if (st.ativo) return true
+  if (!st.instalado) {
+    dglog('[keeper] Ollama nao instalado no PATH')
+    return false
+  }
+  dglog('[keeper] Ollama parado — auto-start')
+  const up = await startOllama()
+  return up.ativo
 }

@@ -20,7 +20,7 @@ import { orquestrarAgentes } from './orquestrador'
 import { cancelarFilaAgente, enfileirarAgente, statusFilaAgente } from './fila'
 import { executarAgente } from '../brain/agent'
 import { emSafeMode } from '../safe-mode'
-import { listarAgentes } from '../brain/agentes'
+import { criarAgente, listarAgentes } from '../brain/agentes'
 import { getRaizVault } from '../vault/indice'
 import { listarModos, salvarModos } from '../modes'
 import { obterPermissoes, salvarPermissoes } from '../permissoes'
@@ -163,6 +163,25 @@ export function registerAgentExtrasIpc(): void {
     }
   })
 
+  ipcMain.handle('agente:criar', (_e, raiz: unknown, payload: unknown = {}) => {
+    const r = exigirString(raiz, 'raiz')
+    if (isErroPayload(r)) return r
+    const o = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
+    const nome = exigirString(o.nome, 'nome')
+    if (isErroPayload(nome)) return nome
+    const skillsRaw = typeof o.skills === 'string' ? o.skills : ''
+    const skills = skillsRaw
+      .split(/[,;]/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+    return criarAgente(r, {
+      nome,
+      especialidade: typeof o.especialidade === 'string' ? o.especialidade : undefined,
+      skills,
+      system: typeof o.system === 'string' ? o.system : undefined
+    })
+  })
+
   ipcMain.handle('agente:pedir', async (event, payload: unknown) => {
     if (emSafeMode()) return { ok: false, erro: 'safe-mode' }
     const o = exigirObjeto(payload, 'pedido')
@@ -176,7 +195,8 @@ export function registerAgentExtrasIpc(): void {
     if (modo !== 'agent' && modo !== 'plan') return { ok: false, erro: 'modo invalido' }
     const proposeWrites = exigirBoolean(o.proposeWrites, 'proposeWrites', true)
     if (isErroPayload(proposeWrites)) return proposeWrites
-    const verificarApos = exigirBoolean(o.verificarApos, 'verificarApos', false)
+    // Autonomia v1: verify ligado por padrao no modo agent
+    const verificarApos = exigirBoolean(o.verificarApos, 'verificarApos', true)
     if (isErroPayload(verificarApos)) return verificarApos
     const incluirGit = exigirBoolean(o.incluirGit, 'incluirGit', true)
     if (isErroPayload(incluirGit)) return incluirGit
@@ -219,30 +239,21 @@ export function registerAgentExtrasIpc(): void {
         signal
       })
       let diagnostico
-      if (verificarApos && modo === 'agent' && !signal.aborted) {
-        emitirProgresso(event, { tipo: 'status', texto: 'Verificando o projeto…' })
-        diagnostico = await rodarTypecheck(escopo.raiz)
-        if (!diagnostico.ok && !signal.aborted) {
-          emitirProgresso(event, { tipo: 'status', texto: 'Typecheck falhou; preparando uma correção…' })
-          const correcao = await executarAgente(
-            escopo.raiz,
-            'Corrija os erros deste typecheck. Trabalhe apenas nas causas relacionadas e explique as alterações propostas.\n\n' + diagnostico.saida.slice(0, 9000),
-            {
-              modo: 'agent',
-              agente,
-              proposeWrites: true,
-              pastas: escopo.pastas,
-              contextoExtra,
-              onEvent,
-              signal
-            }
-          )
-          resposta = {
-            ...correcao,
-            passos: [...resposta.passos, ...correcao.passos],
-            propostas: [...(resposta.propostas || []), ...(correcao.propostas || [])]
-          }
-        }
+      const propostasAgente = Array.isArray(resposta?.propostas) ? resposta.propostas : []
+      // Verify só com edição real — evita typecheck em todo turno (lentidão).
+      if (verificarApos && modo === 'agent' && !signal.aborted && propostasAgente.length > 0) {
+        const { rodarVerifyAposAgente } = await import('./verify-apos')
+        const v = await rodarVerifyAposAgente({
+          raiz: escopo.raiz,
+          pastas: escopo.pastas,
+          agente,
+          contextoExtra,
+          signal,
+          onEvent,
+          resposta
+        })
+        resposta = v.resposta
+        diagnostico = v.diagnostico
       }
       if (modo === 'plan' && resposta.texto) {
         salvarPlano({

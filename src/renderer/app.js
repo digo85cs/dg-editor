@@ -20,8 +20,60 @@ import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, rem
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
-import { normalizarMensagensChat, bolhaHtml } from './features/chat/render.js'
+import { normalizarMensagensChat, bolhaHtml, organizarRespostaCursor } from './features/chat/render.js'
+import {
+  humanizarStatus,
+  humanizarToolInicio,
+  humanizarToolFim,
+  atualizarCartaoTrabalho,
+  fecharCartaoTrabalho
+} from './features/chat/progresso-humano.js'
+import {
+  criarStatsVazios,
+  aplicarEventoStats,
+  pintarStatsNoCartao,
+  pedidoExigeAgentMode,
+  mostrarBannerAgentMode,
+  ocultarBannerAgentMode
+} from './features/chat/agent-activity.js'
+import {
+  renderChatPlanoCard,
+  renderChatApplyCard,
+  renderChatRestoreStrip,
+  ocultarChatRestoreStrip,
+  limparChatParityCards
+} from './features/chat/chat-parity.js'
+import { ligarContextMenuDg } from './features/ui/context-menu.js'
+import { dgAlert, dgConfirm, ligarDialogosDoMain } from './features/ui/dg-dialog.js'
+import { ligarAutomacaoAprovacao } from './features/ui/automation-aprovacao.js'
+import { abrirSobreDgEditor } from './features/ui/sobre.js'
+import {
+  abrirAssistenteNovo,
+  ligarAssistenteNovo,
+  ligarRightRail
+} from './features/chat/assistente-novo.js'
+import {
+  ligarWorkspaceAutosave,
+  agendarSalvarWorkspace,
+  flushWorkspace,
+  coletarWorkspacePadrao,
+  restaurarWorkspaceNoBoot
+} from './workspace-ui.js'
+import { ligarExtrasUi } from './extras-ui.js'
+import { nomeAmigavelArquivo, formatNomePastaUi } from './utils/nomes-amigaveis.js'
+import {
+  registrarJob,
+  atualizarJob,
+  removerJob,
+  jobDaPasta,
+  pastaTemJob,
+  pintarSidebarJobs,
+  algumJobAtivo
+} from './features/chat/jobs-paralelos.js'
 import { iniciarComposer } from './features/chat/composer.js'
+import { aplicarTema, alternarTema as _alternarTema, carregarTema as _carregarTema } from './features/ui/tema.js'
+import { ligarAcoesBolha as _ligarAcoesBolha, reeditarMensagemUsuario as _reeditarMensagemUsuario } from './features/chat/reeditar.js'
+import { criarBrowserBloco3 } from './features/layout/browser-bloco3.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -51,6 +103,11 @@ function nomeArquivo(p) {
   const s = String(p || '').replace(/\//g, '\\')
   const i = s.lastIndexOf('\\')
   return i >= 0 ? s.slice(i + 1) : s
+}
+
+/** Nome amigável na UI (DGEditor → DG Editor). */
+function nomePastaUi(p) {
+  return formatNomePastaUi(p) || nomeArquivo(p)
 }
 
 function caminhoRelativo(abs) {
@@ -90,14 +147,27 @@ function carregarLayout() {
       app.style.setProperty('--dg-right-panel-width', L.rightWidth + 'px')
     }
     if (L.sidebarCollapsed) app.classList.add('sidebar-collapsed')
-    if (L.rightCollapsed) app.classList.add('right-collapsed')
+    // Bloco 3: migração — se ficou recolhido “para sempre”, reabre uma vez
+    const mig = localStorage.getItem('dg-bloco3-v2')
+    if (mig !== '1') {
+      app.classList.remove('right-collapsed')
+      localStorage.setItem('dg-bloco3-v2', '1')
+      try {
+        localStorage.setItem(
+          'dg-layout',
+          JSON.stringify({ ...L, rightCollapsed: false })
+        )
+      } catch { /* */ }
+    } else if (L.rightCollapsed) {
+      app.classList.add('right-collapsed')
+    }
   } catch { /* ignora */ }
 }
 
 function salvarLayout() {
   const app = $('app')
   const sw = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-w'), 10) || 260
-  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-panel-w'), 10) || 320
+  const rw = parseInt(getComputedStyle(app).getPropertyValue('--dg-panel-w'), 10) || 420
   localStorage.setItem(
     'dg-layout',
     JSON.stringify({
@@ -107,6 +177,7 @@ function salvarLayout() {
       rightCollapsed: app.classList.contains('right-collapsed')
     })
   )
+  agendarSalvarWorkspace()
 }
 
 function initResizers() {
@@ -148,8 +219,8 @@ function initResizers() {
         $('app').style.setProperty('--dg-sidebar-w', '260px')
         $('app').style.setProperty('--dg-sidebar-width', '260px')
       } else {
-        $('app').style.setProperty('--dg-panel-w', '320px')
-        $('app').style.setProperty('--dg-right-panel-width', '320px')
+        $('app').style.setProperty('--dg-panel-w', '420px')
+        $('app').style.setProperty('--dg-right-panel-width', '420px')
       }
       salvarLayout()
     })
@@ -174,6 +245,30 @@ function sincronizarBotoesPainelDireito() {
   const pressed = String(recolhido)
   $('btn-right-collapse')?.setAttribute('aria-pressed', pressed)
   $('btn-right-expand')?.setAttribute('aria-pressed', pressed)
+  const tog = $('btn-right-toggle')
+  if (tog) {
+    tog.hidden = false
+    tog.style.display = 'inline-flex'
+    tog.setAttribute('aria-pressed', pressed)
+    tog.title = recolhido
+      ? 'Abrir Bloco 3 (Execução, Terminal, Navegador)'
+      : 'Fechar Bloco 3'
+    tog.textContent = recolhido ? 'Abrir Bloco 3' : 'Bloco 3'
+  }
+  const exp = $('btn-right-expand')
+  if (exp) exp.hidden = true
+  const rail = $('rail-collapse')
+  if (rail) {
+    rail.title = recolhido ? 'Expandir Bloco 3' : 'Recolher Bloco 3'
+    rail.setAttribute('aria-label', rail.title)
+    rail.setAttribute('aria-pressed', pressed)
+  }
+  const edge = $('bloco3-edge')
+  if (edge) {
+    edge.hidden = !recolhido
+    edge.setAttribute('aria-hidden', recolhido ? 'false' : 'true')
+    edge.title = 'Abrir Bloco 3'
+  }
 }
 
 function toggleRight(forcar) {
@@ -193,8 +288,27 @@ function setActivityActive(action, on) {
   })
 }
 
+function abrirTerminalNoBloco3() {
+  garantirTerminal?.()
+  toggleRight(true)
+  ativarAbaDireita('terminal')
+}
+
+/** Navegador Bloco 3 — módulo dedicado (bounds/status/IPC). */
+const browserBloco3 = criarBrowserBloco3({
+  $,
+  toggleRight: (f) => toggleRight(f),
+  ativarAbaDireita: (p) => ativarAbaDireita(p)
+})
+let browserMountObserver = null
+const setBrowserStatus = (aberto) => browserBloco3.setStatus(aberto)
+const enviarBoundsBrowser = () => browserBloco3.enviarBounds()
+const setBrowserVisivel = (mostrar) => browserBloco3.setVisivel(mostrar)
+const abrirNavegadorUi = (url) => browserBloco3.abrir(url)
+const abrirNavegadorNoBloco3 = (url) => browserBloco3.abrirNoBloco3(url)
+
 function initActivityBar() {
-  document.querySelectorAll('.ab-btn').forEach((btn) => {
+  document.querySelectorAll('#activity-bar .ab-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const a = btn.dataset.action
       if (a === 'explorer') {
@@ -203,103 +317,69 @@ function initActivityBar() {
       } else if (a === 'busca') {
         abrirPaletaArquivos()
       } else if (a === 'chat') {
-        ativarAbaCentro('chat')
-        setTimeout(() => $('chat-input')?.focus(), 0)
-      } else if (a === 'navegador') {
-        toggleRight(true)
-        ativarAbaDireita('browser')
-        void abrirNavegadorUi()
-      } else if (a === 'contas') {
-        abrirContas()
-      } else if (a === 'config') {
-        abrirConfig()
+        focarPainelIa('chat')
       } else if (a === 'tema') {
-        alternarTema()
+        void alternarTema()
       }
     })
   })
+  // Tema também no rodapé da sidebar (statusbar)
+  $('btn-tema')?.addEventListener('click', () => void alternarTema())
 }
 
-let browserAberto = false
-let browserMountObserver = null
-
-function setBrowserStatus(aberto) {
-  browserAberto = !!aberto
-  const st = $('browser-status')
-  const overlay = $('browser-overlay')
-  if (st) {
-    st.textContent = aberto
-      ? 'Navegador ativo nesta aba.'
-      : 'Navegador fechado.'
+/** Alterna Chat | Editor no bloco central (estilo Cursor Agent). */
+function ativarPainelCentro(pane) {
+  const alvo = pane === 'editor' ? 'editor' : 'chat'
+  document.querySelectorAll('.center-tab').forEach((t) => {
+    const on = t.dataset.center === alvo
+    t.classList.toggle('active', on)
+    t.setAttribute('aria-selected', on ? 'true' : 'false')
+  })
+  const chat = $('center-pane-chat')
+  const ed = $('center-pane-editor')
+  if (chat) chat.classList.toggle('active', alvo === 'chat')
+  if (ed) ed.classList.toggle('active', alvo === 'editor')
+  if (alvo === 'chat') {
+    try { initChatAgentSelector() } catch (_) { /* ok */ }
   }
-  if (overlay) overlay.classList.toggle('hidden', !!aberto)
+  return alvo
 }
 
-function enviarBoundsBrowser() {
-  const m = $('browser-mount')
-  const pane = $('pane-browser')
-  if (!m || !pane || !pane.classList.contains('active')) return
-  const r = m.getBoundingClientRect()
-  if (r.width < 2 || r.height < 2) return
-  try {
-    window.api.send('navegador:bounds', {
-      x: Math.round(r.left),
-      y: Math.round(r.top),
-      width: Math.round(r.width),
-      height: Math.round(r.height)
-    })
-  } catch (e) {
-    console.warn('[navegador] bounds', e)
+function focarPainelIa(pane) {
+  const alvo = pane === 'agent' ? 'agent' : 'chat'
+  if (alvo === 'chat') {
+    ativarPainelCentro('chat')
+    setActivityActive('chat', true)
+    setTimeout(() => $('chat-input')?.focus(), 0)
+    return
   }
-}
-
-function setBrowserVisivel(mostrar) {
-  try {
-    window.api.send('navegador:mostrar', !!mostrar)
-  } catch {
-    /* preload antigo */
-  }
-  if (mostrar) {
-    requestAnimationFrame(() => {
-      enviarBoundsBrowser()
-      requestAnimationFrame(enviarBoundsBrowser)
-    })
-  }
-}
-
-async function abrirNavegadorUi() {
-  try {
-    await window.api.invoke('navegador:abrir')
-    setBrowserStatus(true)
-    setBrowserVisivel(true)
-    enviarBoundsBrowser()
-  } catch (e) {
-    console.warn('[navegador]', e)
-    setBrowserStatus(false)
-    setBrowserVisivel(false)
-  }
+  toggleRight(true)
+  ativarAbaDireita('agent')
+  setActivityActive('chat', true)
+  setTimeout(() => $('chat-input')?.focus(), 0)
 }
 
 function ativarAbaDireita(pane) {
-  // Chat saiu do painel direito (Etapa 5) — redirecionar
-  if (pane === 'chat') {
-    ativarAbaCentro('chat')
+  let p = pane
+  if (p === 'chat') {
+    ativarPainelCentro('chat')
     return
   }
   const eraBrowser = $('pane-browser')?.classList.contains('active')
   document.querySelectorAll('.right-tab').forEach((t) => {
-    t.classList.toggle('active', t.dataset.pane === pane)
+    t.classList.toggle('active', t.dataset.pane === p)
   })
-  document.querySelectorAll('.right-pane').forEach((p) => {
-    p.classList.toggle('active', p.id === 'pane-' + pane)
+  document.querySelectorAll('.right-pane').forEach((el) => {
+    el.classList.toggle('active', el.id === 'pane-' + p)
   })
-  if (pane === 'browser') {
-    if (browserAberto) setBrowserVisivel(true)
+  if (p === 'agent') void carregarAgentesUi()
+  if (p === 'browser') {
+    if (browserBloco3.isAberto()) setBrowserVisivel(true)
     else setBrowserVisivel(false)
-  } else if (eraBrowser || pane !== 'browser') {
+  } else if (eraBrowser || p !== 'browser') {
     setBrowserVisivel(false)
   }
-  if (pane === 'terminal') {
+  if (p === 'terminal') {
     garantirTerminal()
     const fit = () => {
       window.dgTerminal?.fit?.()
@@ -318,7 +398,7 @@ function ativarAbaDireita(pane) {
         requestAnimationFrame(fit)
       })
     }
-  } else if (pane === 'files' && filesListaSuja) {
+  } else if (p === 'files' && filesListaSuja) {
     filesListaSuja = false
     void renderizarArvoreEm($('files-list'))
   }
@@ -327,7 +407,31 @@ function ativarAbaDireita(pane) {
 $('browser-abrir')?.addEventListener('click', () => {
   toggleRight(true)
   ativarAbaDireita('browser')
-  void abrirNavegadorUi()
+  const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
+  void abrirNavegadorUi(url)
+})
+$('browser-url')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    $('browser-abrir')?.click()
+  }
+})
+$('browser-atualizar')?.addEventListener('click', async () => {
+  try {
+    const r = await window.api.invoke('navegador:recarregar')
+    if (r?.ok) return
+  } catch {
+    /* fallback abrir */
+  }
+  const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
+  void abrirNavegadorUi(url || undefined)
+})
+$('browser-voltar')?.addEventListener('click', async () => {
+  try {
+    await window.api.invoke('navegador:voltar')
+  } catch {
+    /* canal opcional */
+  }
 })
 try {
   window.api.on?.('navegador:aberto', () => {
@@ -343,7 +447,7 @@ try {
 }
 
 window.addEventListener('resize', () => {
-  if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+  if ($('pane-browser')?.classList.contains('active') && browserBloco3.isAberto()) {
     enviarBoundsBrowser()
   }
 })
@@ -351,7 +455,7 @@ window.addEventListener('resize', () => {
   const m = $('browser-mount')
   if (!m || typeof ResizeObserver === 'undefined') return
   browserMountObserver = new ResizeObserver(() => {
-    if ($('pane-browser')?.classList.contains('active') && browserAberto) {
+    if ($('pane-browser')?.classList.contains('active') && browserBloco3.isAberto()) {
       enviarBoundsBrowser()
     }
   })
@@ -359,33 +463,35 @@ window.addEventListener('resize', () => {
 })()
 
 function ativarAbaCentro(pane) {
-  const alvo = pane === 'editor' || pane === 'agent' ? pane : 'chat'
-  document.querySelectorAll('.center-tab').forEach((t) => {
-  if(t.dataset.centerPane==='chat'){ try{initChatAgentSelector();}catch(e){} }
-    const on = t.dataset.centerPane === alvo
-    t.classList.toggle('active', on)
-    t.setAttribute('aria-selected', on ? 'true' : 'false')
-  })
-  document.querySelectorAll('.center-pane').forEach((p) => {
-    p.classList.toggle('active', p.id === 'center-pane-' + alvo)
-  })
-  if (alvo === 'agent') void carregarAgentesUi()
+  if (pane === 'agent') {
+    focarPainelIa('agent')
+    return
+  }
+  if (pane === 'chat') {
+    ativarPainelCentro('chat')
+    return
+  }
+  ativarPainelCentro(pane === 'editor' ? 'editor' : 'chat')
 }
 
 document.querySelectorAll('.right-tab').forEach((t) => {
   t.addEventListener('click', () => ativarAbaDireita(t.dataset.pane))
 })
-
 document.querySelectorAll('.center-tab').forEach((t) => {
-  if(t.dataset.centerPane==='chat'){ try{initChatAgentSelector();}catch(e){} }
-  t.addEventListener('click', () => ativarAbaCentro(t.dataset.centerPane))
+  t.addEventListener('click', () => {
+    ativarPainelCentro(t.dataset.center === 'editor' ? 'editor' : 'chat')
+    if (t.dataset.center === 'chat') setTimeout(() => $('chat-input')?.focus(), 0)
+  })
 })
 
 // Bridge para terminal.js (toggle Ctrl+` / icon-bar) sem import circular
+window.abrirArquivoNaAba = abrirArquivoNaAba
 window.dgUi = {
   toggleRight,
   ativarAbaDireita,
-  ativarAbaCentro
+  ativarAbaCentro,
+  ativarPainelCentro,
+  focarPainelIa
 }
 
 // ---------- Pastas ----------
@@ -539,16 +645,76 @@ function garantirEmptyStateChat() {
     empty.className = 'empty-state'
     empty.id = 'empty-state'
     empty.innerHTML =
-      '<h2>Bem-vindo ao DG Editor</h2>' +
-      '<p>Abra uma pasta no Explorer. Chat e análise ficam neste painel; o código edita na aba Editor.</p>' +
-      '<button id="btn-empty-open" class="btn-primary">Abrir pasta</button>'
+      '<h2>Agent</h2>' +
+      '<p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>' +
+      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>'
     area.innerHTML = ''
+    area.classList.remove('has-msgs')
     area.appendChild(empty)
     $('btn-empty-open')?.addEventListener('click', abrirPasta)
   } else {
     empty.classList.remove('hidden')
+    area.classList.remove('has-msgs')
   }
 }
+
+/** Controle do PC: pede permissão explícita (sessão). */
+function desktopPermitido() {
+  try {
+    return sessionStorage.getItem('dg-desktop-use') === '1'
+  } catch {
+    return false
+  }
+}
+
+function pedirPermissaoDesktop() {
+  let modal = $('modal-desktop-use')
+  if (!modal) {
+    modal = document.createElement('div')
+    modal.id = 'modal-desktop-use'
+    modal.className = 'modal hidden'
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    modal.innerHTML =
+      '<div class="modal-box modal-desktop-box">' +
+      '<h3>Controle do computador</h3>' +
+      '<p class="muted">O Agent pode abrir o navegador embutido, terminal e testar navegação. ' +
+      'Ele <strong>pede antes</strong> de agir fora do editor. Conceder só nesta sessão?</p>' +
+      '<div class="desktop-perm-actions">' +
+      '<button type="button" class="btn-ghost" id="desktop-use-negar">Agora não</button>' +
+      '<button type="button" class="btn-primary" id="desktop-use-ok">Permitir nesta sessão</button>' +
+      '</div></div>'
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden')
+    })
+    modal.querySelector('#desktop-use-negar')?.addEventListener('click', () => {
+      try { sessionStorage.setItem('dg-desktop-use', '0') } catch {}
+      modal.classList.add('hidden')
+      mostrarToast('Controle do PC negado nesta sessão', 'aviso')
+      $('btn-desktop-use')?.classList.remove('active')
+    })
+    modal.querySelector('#desktop-use-ok')?.addEventListener('click', () => {
+      try { sessionStorage.setItem('dg-desktop-use', '1') } catch {}
+      modal.classList.add('hidden')
+      mostrarToast('Controle do PC permitido nesta sessão', 'ok')
+      $('btn-desktop-use')?.classList.add('active')
+      toggleRight(true)
+      ativarAbaDireita('browser')
+      appendChatToolTrace('… Controle do PC autorizado — posso usar Navegador/Terminal no bloco 3')
+      setChatLiveStatus('Controle do PC ativo')
+    })
+  }
+  if (desktopPermitido()) {
+    mostrarToast('Controle do PC já está ativo nesta sessão', 'ok')
+    $('btn-desktop-use')?.classList.add('active')
+    return
+  }
+  modal.classList.remove('hidden')
+}
+
+window.dgDesktopPedir = pedirPermissaoDesktop
+window.dgDesktopPermitido = desktopPermitido
 
 async function removerPasta(path, opts) {
   if (!path || !state.pastasRecentes.includes(path)) return
@@ -556,9 +722,10 @@ async function removerPasta(path, opts) {
   const confirmar = !(opts && opts.skipConfirm)
   if (
     confirmar &&
-    !window.confirm(
-      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco."
-    )
+    !(await dgConfirm(
+      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco.",
+      'Remover da lista'
+    ))
   ) return
   const res = removerPastaDoState(path)
   if (!res) return
@@ -576,8 +743,9 @@ async function removerPasta(path, opts) {
   }
   if (res.eraPastaAtual) {
     const titulo = $('chat-title')
-    if (titulo) titulo.textContent = 'Nenhuma pasta aberta'
-    $('chat-send') && ($('chat-send').disabled = true)
+    if (titulo) titulo.textContent = 'DG Editor'
+    setChatSendMode('send')
+    if ($('chat-send')) $('chat-send').disabled = true
     habilitarBotoesAnalise(false)
     garantirEmptyStateChat()
     histChat = null
@@ -619,85 +787,136 @@ async function garantirPastaRaizProjeto() {
 
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
-  state.pastaAtual = path
-  void carregarOpcoesAgenteChat(path)
   ativarAbaCentro('chat')
-  void atualizarStatusBar(path)
-  $('chat-title').textContent = nomeArquivo(path)
-  $('empty-state')?.remove()
-  $('chat-send').disabled = false
-  habilitarBotoesAnalise(true)
 
-  // garantir estado no Map SEM re-renderizar
+  // Árvore: marcar expandida no Map (não obrigatório abrir filhos para contexto)
   if (!state.estadoArvore.has(path)) {
     state.estadoArvore.set(path, { expandida: true, filhosCarregados: false })
   } else {
     state.estadoArvore.get(path).expandida = true
   }
 
-  // realce visual do item selecionado (SEM recriar DOM)
-  document.querySelectorAll('.tree-root.selected').forEach((el) => el.classList.remove('selected'))
-  const raizEl = document.querySelector('.tree-root[data-path="' + CSS.escape(path) + '"]')
-  if (raizEl) raizEl.classList.add('selected')
+  // Contexto bloco 2/3 imediato (chat + análise + histórico)
+  await sincronizarContextoPasta(path, { forceAnalise: true })
 
-  // se a raiz clicada ainda não tem filhos no DOM, carregar SÓ ela
+  // Filhos da árvore em paralelo (não bloqueia chat/análise)
+  const raizEl = document.querySelector('.tree-root[data-path="' + CSS.escape(path) + '"]')
   if (raizEl) {
     const children = raizEl.querySelector(':scope > .tree-children')
     const chev = raizEl.querySelector('.chevron')
-    if (children && children.childElementCount === 0) {
+    if (children) {
       chev?.classList.add('open')
       children.classList.add('open')
-      await carregarFilhos(path, children, 1)
-    } else if (children) {
-      chev?.classList.add('open')
-      children.classList.add('open')
+      if (children.childElementCount === 0) {
+        void carregarFilhos(path, children, 1)
+      }
     }
   }
 
-  // 3 chamadas INDEPENDENTES em paralelo
-  const [msgs, cached, temRegras] = await Promise.all([
-    window.api.invoke('chat:load', path),
-    window.api.invoke('analysis:cached', path),
-    window.api.invoke('rules:exists', path)
-  ])
-
-  renderizarChat(msgs)
-  void ligarHistoricoChat(path)
   void atualizarGitStatusArvore()
+  window.api.invoke('rules:exists', path).then((temRegras) => {
+    if (!temRegras) window.api.invoke('rules:create-template', path).catch(() => {})
+  }).catch(() => {})
 
-  // Trocar pasta: 1º clique volta a "Analisando..." (mesmo com cache)
-  delete $('analysis-content').dataset.jaAnalisou
-  if (cached && typeof cached === 'object') {
-    const rep = cached.report && typeof cached.report === 'object' ? cached.report : cached
-    renderizarAnalise(rep, !!cached.fromCache)
-  } else {
-    $('analysis-content').innerHTML =
-      '<p class="muted">Pasta aberta. Escolha Análise rápida ou Análise completa quando quiser analisar.</p>'
-  }
-
-  if (!temRegras) {
-    // fire-and-forget: não bloqueia o clique
-    window.api.invoke('rules:create-template', path).catch(() => {})
-  }
   console.timeEnd('selecionarPasta')
 }
 
 // ---------- Árvore ----------
 /**
- * Contexto do chat (state.pastaAtual / chat-title):
- * muda só aqui — ao selecionar pasta raiz já expandida (clique no nome, não no chevron)
- * ou ao abrir um arquivo. Expandir/retrair árvore NÃO chama isto.
+ * Contexto bloco 2 (chat/editor) + bloco 3 (análise/execução):
+ * sempre segue a pasta/workspace selecionada. Fluido — sem esperar expandir árvore.
  */
 function definirContextoPasta(p) {
   if (!p) return
-  if (state.pastaAtual && state.pastaAtual !== p) {
+  void sincronizarContextoPasta(p)
+}
+
+function resolverPastaChatAtiva() {
+  const cand =
+    state.pastaAtual ||
+    window.__DG_PASTA_ATUAL__ ||
+    (Array.isArray(state.pastasRecentes) && state.pastasRecentes[0]) ||
+    ''
+  return typeof cand === 'string' ? cand.trim() : ''
+}
+
+async function sincronizarContextoPasta(p, opts = {}) {
+  if (!p) return
+  const mudou = state.pastaAtual !== p
+  if (mudou) {
     delete $('analysis-content')?.dataset.jaAnalisou
   }
   state.pastaAtual = p
+  try {
+    window.__DG_PASTA_ATUAL__ = p
+  } catch {
+    /* */
+  }
+  try {
+    await window.api.invoke('workspace:definir-raiz', p)
+  } catch {
+    /* main ainda sem canal em builds antigos */
+  }
+  agendarSalvarWorkspace()
   void carregarOpcoesAgenteChat(p)
-  $('chat-title').textContent = nomeArquivo(p)
-  $('chat-send').disabled = false
+  void atualizarStatusBar(p)
+  const titulo = $('chat-title')
+  if (titulo) titulo.textContent = nomePastaUi(p)
+  const send = $('chat-send')
+  if (send) send.disabled = false
   habilitarBotoesAnalise(true)
+  $('empty-state')?.remove()
+  // Restaura cartão / botão Stop se este repo tem Agent em andamento
+  const jobAtivo = jobDaPasta(p)
+  if (jobAtivo) {
+    setChatSendMode('stop')
+    atualizarCartaoTrabalho($('chat-messages'), {
+      titulo: jobAtivo.tituloCard || 'Trabalhando…',
+      passo: jobAtivo.passo || 'Agent em andamento…',
+      elapsedSec: (Date.now() - (jobAtivo.iniciadoEm || Date.now())) / 1000
+    })
+    if (jobAtivo.stats) pintarStatsNoCartao($('chat-messages'), jobAtivo.stats)
+    setChatLiveStatus(jobAtivo.passo || 'Trabalhando…')
+  } else if (!algumJobAtivo() || !pastaTemJob(p)) {
+    setChatSendMode('send')
+  }
+  pintarSidebarJobs(() => state.pastaAtual)
+
+  document.querySelectorAll('.tree-root.selected').forEach((el) => el.classList.remove('selected'))
+  const raizEl = document.querySelector('.tree-root[data-path="' + CSS.escape(p) + '"]')
+  if (raizEl) raizEl.classList.add('selected')
+
+  if (opts.chatId) {
+    try {
+      localStorage.setItem('dg-chat-ativo', opts.chatId)
+    } catch {
+      /* */
+    }
+  }
+
+  const tarefas = [ligarHistoricoChat(p)]
+  if (mudou || opts.forceAnalise) {
+    tarefas.push(
+      window.api
+        .invoke('analysis:cached', p)
+        .then((cached) => {
+          const box = $('analysis-content')
+          if (!box) return
+          if (cached && typeof cached === 'object') {
+            const rep = cached.report && typeof cached.report === 'object' ? cached.report : cached
+            renderizarAnalise(rep, !!cached.fromCache)
+          } else if (mudou) {
+            box.innerHTML =
+              '<p class="muted">Pasta ativa: <strong>' +
+              nomeArquivo(p) +
+              '</strong>. Análise rápida ou completa quando quiser.</p>'
+          }
+        })
+        .catch(() => {})
+    )
+  }
+  await Promise.all(tarefas)
+  void histChat?.refrescarLista?.()
 }
 
 function raizWorkspaceDe(caminho) {
@@ -716,6 +935,8 @@ function treeDeps() {
     renderizarPastas,
     carregarFilhos,
     selecionarPasta,
+    definirContextoPasta,
+    raizWorkspaceDe,
     criarBotaoRemoverPasta,
     nomeArquivo,
   }
@@ -732,7 +953,32 @@ function abaFilesVisivel() {
 async function renderizarPastas() {
   console.time('renderizarPastas')
   try {
-    await renderizarArvoreEm($('folder-list'))
+    // Sidebar Repositórios = Cursor (pasta + chats). Sem árvore de arquivos.
+    if (histChat && typeof histChat.refrescarLista === 'function') {
+      await histChat.refrescarLista()
+    } else if ($('folder-list')) {
+      // Boot antes do hist: cabeçalhos das pastas
+      const el = $('folder-list')
+      el.innerHTML = ''
+      for (const p of state.pastasRecentes || []) {
+        const g = document.createElement('div')
+        g.className = 'agent-chat-group' + (p === state.pastaAtual ? ' active' : '')
+        g.innerHTML =
+          '<div class="agent-chat-group-head-row"><button type="button" class="agent-chat-group-head" data-raiz="' +
+          String(p).replace(/"/g, '') +
+          '"><span class="agent-chat-folder-ico" aria-hidden="true">📁</span><span class="agent-chat-group-name"></span></button></div>' +
+          '<div class="agent-chat-group-body"><p class="agent-chats-empty agent-chats-empty-sm">Sem conversas</p></div>'
+        g.querySelector('.agent-chat-group-name').textContent = nomeArquivo(p)
+        g.querySelector('.agent-chat-group-head')?.addEventListener('click', () => {
+          void sincronizarContextoPasta(p, { forceAnalise: true })
+        })
+        el.appendChild(g)
+      }
+      if (!(state.pastasRecentes || []).length) {
+        el.innerHTML = '<p class="agent-chats-empty">Nenhum repositório. Clique em + para adicionar.</p>'
+      }
+    }
+    // Árvore de pastas/arquivos só no Bloco 3 → Arquivos
     if (abaFilesVisivel()) {
       await renderizarArvoreEm($('files-list'))
       filesListaSuja = false
@@ -824,6 +1070,7 @@ function fecharPainelDiff() {
     bar.innerHTML = ''
   }
   if (editor && editor.limparDiff) editor.limparDiff()
+  ocultarEditorDiffBar()
 }
 
 /** Preview side-by-side no CodeMirror via propostas:preview (sem gravar disco). */
@@ -855,6 +1102,11 @@ async function previewDiffNoEditor(pendente) {
     depois: r.depois,
     caminho: abs
   })
+  mostrarEditorDiffBar(
+    { id: pendente.id, path: pendente.path || abs, absPath: abs },
+    { linhasDel: r.linhasDel || [], linhasAdd: r.linhasAdd || [] }
+  )
+  ativarAbaCentro('editor')
 }
 
 async function carregarHunksDiff(pendenteId) {
@@ -907,6 +1159,7 @@ function mostrarDiffOpenClaw(pendente) {
   if (acoes) acoes.hidden = false
   panel.classList.remove('hidden')
   panel.setAttribute('aria-hidden', 'false')
+  void previewDiffNoEditor(pendente)
   const lista = $('oc-pendentes-lista')
   if (lista) {
     for (const btn of lista.querySelectorAll('button')) {
@@ -973,8 +1226,33 @@ async function pedirOpenClawUi() {
   mostrarDiffOpenClaw(ocPendentes[0])
 }
 
+async function oferecerCommitAposApply(arquivos) {
+  const raiz = (pastasPermitidas() || [])[0] || (state.pastasRecentes || [])[0] || ''
+  if (!raiz) return
+  const lista = (arquivos || []).filter(Boolean)
+  const msgPadrao = lista.length === 1
+    ? 'Aplicar diff: ' + lista[0]
+    : 'Aplicar diffs do agente (' + lista.length + ' arquivo(s))'
+  if (!(await dgConfirm('Diff aplicado. Criar commit local agora?', 'Commit'))) return
+  const mensagem = window.prompt('Mensagem do commit:', msgPadrao)
+  if (!mensagem || !String(mensagem).trim()) return
+  const r = await window.api.invoke('git:commit', {
+    raiz,
+    mensagem: String(mensagem).trim(),
+    arquivos: lista
+  })
+  if (r?.ok) {
+    if (window.dgToast) window.dgToast('Commit ' + (r.hash || 'ok'), 'ok')
+    else alert('Commit ' + (r.hash || 'ok'))
+  } else if (r?.erro && r.erro !== 'cancelado') {
+    if (window.dgToast) window.dgToast('Commit: ' + r.erro, 'erro')
+    else alert('Commit: ' + r.erro)
+  }
+}
+
 async function finalizarApplyPendente(r, id) {
   const viaAgente = !!window.__dgApplyViaAgente
+  const pathAplicado = r?.path || r?.absPath || ''
   ocPendentes = ocPendentes.filter((p) => p.id !== id)
   agentPropostas = agentPropostas.filter((p) => p.id !== id)
   mostrarPropostasAgent(agentPropostas)
@@ -998,13 +1276,17 @@ async function finalizarApplyPendente(r, id) {
     mostrarDiffOpenClaw(ocPendentes[0])
   } else {
     fecharPainelDiff()
-    alert(viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.')
+    const base = viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.'
+    if (window.dgToast) window.dgToast(base, 'ok')
+    else alert(base)
+    mostrarChatRestoreAposApply(pathAplicado ? [pathAplicado] : [])
+    await oferecerCommitAposApply(pathAplicado ? [pathAplicado] : [])
   }
 }
 
 async function aplicarPendenteOc() {
   if (!ocPendenteAtivoId) return
-  if (!window.confirm('Aplicar este arquivo no disco?')) return
+  if (!(await dgConfirm('Aplicar este arquivo no disco?', 'Aplicar'))) return
   const viaAgente = !!window.__dgApplyViaAgente
   const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
   const id = ocPendenteAtivoId
@@ -1023,7 +1305,7 @@ async function aplicarHunksSelecionadosOc() {
     alert('Nenhum hunk selecionado.')
     return
   }
-  if (!window.confirm('Aplicar ' + indices.length + ' hunk(s) selecionado(s)?')) return
+  if (!(await dgConfirm('Aplicar ' + indices.length + ' hunk(s) selecionado(s)?', 'Aplicar hunks'))) return
   const def = await window.api.invoke('propostas:definir-hunks', ocPendenteAtivoId, indices)
   if (!def?.ok) {
     alert('Falha ao filtrar hunks: ' + (def?.erro || ''))
@@ -1066,7 +1348,10 @@ async function rejeitarPendenteOc() {
 
 async function carregarConfigOpenClawUi() {
   const cfg = await window.api.invoke('openclaw:config-get')
-  const st = await window.api.invoke('openclaw:token-status')
+  let st = await window.api.invoke('openclaw:token-ensure')
+  if (!st?.ok || !st?.configurado) {
+    st = await window.api.invoke('openclaw:token-status')
+  }
   if (cfg?.config) {
     const ep = $('oc-endpoint')
     const md = $('oc-model')
@@ -1077,9 +1362,13 @@ async function carregarConfigOpenClawUi() {
   if (tok) tok.value = ''
   const status = $('oc-token-status')
   if (status) {
-    status.textContent = st?.configurado
-      ? 'Token gravado no cofre do SO (safeStorage).'
-      : 'Nenhum token configurado.'
+    if (st?.configurado || st?.ok) {
+      status.textContent = st?.criado
+        ? 'Token OpenClaw criado automaticamente (prefixo ' + (st.prefixo || 'oc_') + '…).'
+        : 'Token gravado no cofre do SO (safeStorage).'
+    } else {
+      status.textContent = 'Nenhum token configurado.' + (st?.erro ? ' ' + st.erro : '')
+    }
   }
 }
 
@@ -1139,6 +1428,7 @@ async function atualizarGitStatusArvore() {
 function criarNoFile(ent, nivel) {
   return _criarNoFile(ent, nivel, {
     extIcon,
+    nomeAmigavelArquivo,
     raizWorkspaceDe,
     definirContextoPasta,
     abrirArquivoNaAba,
@@ -1220,7 +1510,7 @@ async function atualizarStatusBar(pasta) {
           pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '/'))
     )
   if (hit && hit.repo) {
-    elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' â—' : '')
+    elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' \u25CF' : '')
     elPasta.textContent = hit.repo
   } else {
     elBranch.textContent = '—'
@@ -1300,6 +1590,25 @@ async function renderizarProjects(force) {
 $('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
 $('sidebar-mode-explorer')?.addEventListener('click', () => setSidebarMode('explorer'))
 $('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
+$('editor-diff-bar-apply')?.addEventListener('click', async () => {
+  const id = $('editor-diff-bar')?.dataset?.propostaId
+  if (!id) return
+  await aplicarUmaPropostaAgent(id)
+  if (editor && editor.limparDiff) editor.limparDiff()
+  ocultarEditorDiffBar()
+})
+$('editor-diff-bar-reject')?.addEventListener('click', async () => {
+  const id = $('editor-diff-bar')?.dataset?.propostaId
+  if (!id) return
+  window.__dgApplyViaAgente = true
+  await window.api.invoke('agente:rejeitar-proposta', id)
+  const rest = await window.api.invoke('agente:propostas')
+  mostrarPropostasAgent(rest?.pendentes || [])
+  if (editor && editor.limparDiff) editor.limparDiff()
+  ocultarEditorDiffBar()
+  fecharPainelDiff()
+  if (window.dgToast) window.dgToast('Proposta rejeitada', 'aviso')
+})
 setInterval(() => {
   if (document.hidden || !state.pastaAtual) return
   void atualizarGitStatusArvore()
@@ -1318,7 +1627,7 @@ async function restaurarAbas() {
     const raw = localStorage.getItem('dg-state.abas')
     if (!raw) return
     const data = JSON.parse(raw)
-    const lista = data.state.abas || []
+    const lista = Array.isArray(data.abas) ? data.abas : []
     for (const c of lista) {
       const existe = await window.api.invoke('arquivo:existe', c, pastasPermitidas())
       if (existe.ok && existe.existe) {
@@ -1458,7 +1767,8 @@ function atualizarToolbarPreview(caminho) {
   if (!bar) return
   const md = ehMarkdown(caminho)
   const img = ehImagemExt(caminho)
-  bar.classList.toggle('hidden', !md && !img)
+  const temArquivo = !!caminho
+  bar.classList.toggle('hidden', !temArquivo)
   if (btn) btn.classList.toggle('hidden', !md)
   if (!md) {
     mdPreviewOn = false
@@ -1491,21 +1801,133 @@ function toggleMdPreview() {
   }
 }
 
+/** @type {{ src: string, caminho: string } | null} */
+let imgEditEstado = null
+
+function imgEditInfo(msg) {
+  const el = $('img-edit-info')
+  if (el) el.textContent = msg || ''
+}
+
+function imgEditCanvas() {
+  return /** @type {HTMLCanvasElement|null} */ ($('img-edit-canvas'))
+}
+
+function imgEditMostrarCanvas(show) {
+  const canvas = imgEditCanvas()
+  const img = $('image-preview-img')
+  if (!canvas || !img) return
+  canvas.hidden = !show
+  img.style.display = show ? 'none' : ''
+}
+
+function imgEditSyncInputs() {
+  const canvas = imgEditCanvas()
+  const w = $('img-edit-w')
+  const h = $('img-edit-h')
+  if (!canvas || !w || !h) return
+  w.value = String(canvas.width || '')
+  h.value = String(canvas.height || '')
+  imgEditInfo(canvas.width + '×' + canvas.height + ' px')
+}
+
+function imgEditCarregarDataUrl(dataUrl) {
+  const canvas = imgEditCanvas()
+  const img = $('image-preview-img')
+  if (!canvas || !img) return
+  const im = new Image()
+  im.onload = () => {
+    canvas.width = im.naturalWidth
+    canvas.height = im.naturalHeight
+    const ctx = canvas.getContext('2d')
+    ctx?.clearRect(0, 0, canvas.width, canvas.height)
+    ctx?.drawImage(im, 0, 0)
+    img.src = dataUrl
+    imgEditMostrarCanvas(true)
+    imgEditSyncInputs()
+  }
+  im.src = dataUrl
+}
+
+function imgEditResize() {
+  const canvas = imgEditCanvas()
+  if (!canvas) return
+  const nw = Math.max(16, Math.min(8192, parseInt(String($('img-edit-w')?.value || '0'), 10) || 0))
+  const nh = Math.max(16, Math.min(8192, parseInt(String($('img-edit-h')?.value || '0'), 10) || 0))
+  if (!nw || !nh) {
+    mostrarToast('Informe largura e altura', 'aviso')
+    return
+  }
+  const tmp = document.createElement('canvas')
+  tmp.width = nw
+  tmp.height = nh
+  tmp.getContext('2d')?.drawImage(canvas, 0, 0, nw, nh)
+  canvas.width = nw
+  canvas.height = nh
+  canvas.getContext('2d')?.drawImage(tmp, 0, 0)
+  imgEditSyncInputs()
+  mostrarToast('Redimensionado para ' + nw + '×' + nh, 'ok')
+}
+
+function imgEditCropCentro() {
+  const canvas = imgEditCanvas()
+  if (!canvas) return
+  const fator = 0.8
+  const cw = Math.max(16, Math.floor(canvas.width * fator))
+  const ch = Math.max(16, Math.floor(canvas.height * fator))
+  const sx = Math.floor((canvas.width - cw) / 2)
+  const sy = Math.floor((canvas.height - ch) / 2)
+  const tmp = document.createElement('canvas')
+  tmp.width = cw
+  tmp.height = ch
+  tmp.getContext('2d')?.drawImage(canvas, sx, sy, cw, ch, 0, 0, cw, ch)
+  canvas.width = cw
+  canvas.height = ch
+  canvas.getContext('2d')?.drawImage(tmp, 0, 0)
+  imgEditSyncInputs()
+  mostrarToast('Recorte central aplicado', 'ok')
+}
+
+function imgEditReset() {
+  if (!imgEditEstado?.src) return
+  imgEditCarregarDataUrl(imgEditEstado.src)
+  mostrarToast('Imagem original restaurada', 'ok')
+}
+
+function imgEditDownload() {
+  const canvas = imgEditCanvas()
+  if (!canvas) return
+  const a = document.createElement('a')
+  const base = (imgEditEstado?.caminho || 'imagem').split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') || 'imagem'
+  a.download = base + '-edit.png'
+  a.href = canvas.toDataURL('image/png')
+  a.click()
+  mostrarToast('PNG baixado', 'ok')
+}
+
+function initEditorImagem() {
+  if (document.body.dataset.imgEditWired === '1') return
+  document.body.dataset.imgEditWired = '1'
+  $('img-edit-resize')?.addEventListener('click', () => imgEditResize())
+  $('img-edit-crop')?.addEventListener('click', () => imgEditCropCentro())
+  $('img-edit-reset')?.addEventListener('click', () => imgEditReset())
+  $('img-edit-download')?.addEventListener('click', () => imgEditDownload())
+}
+
 async function mostrarImagem(caminho) {
   const host = $('editor-host')
   const box = $('image-preview')
   const img = $('image-preview-img')
   const mount = $('editor-mount')
   if (!box || !img) return
+  initEditorImagem()
   const r = await window.api.invoke('arquivo:ler-base64', caminho, pastasPermitidas())
   if (!r?.ok || !r.dataUrl) {
     alert('Não foi possível abrir imagem: ' + (r?.erro || 'erro'))
     return
   }
-  img.src = r.dataUrl
-  img.style.maxWidth = '100%'
-  img.style.maxHeight = '100%'
-  img.style.objectFit = 'contain'
+  imgEditEstado = { src: r.dataUrl, caminho: String(caminho || '') }
+  imgEditCarregarDataUrl(r.dataUrl)
   box.classList.remove('hidden')
   box.setAttribute('aria-hidden', 'false')
   mount?.classList.add('hidden')
@@ -1520,6 +1942,8 @@ function esconderImagem() {
   box?.setAttribute('aria-hidden', 'true')
   mount?.classList.remove('hidden')
   $('editor-host')?.classList.remove('modo-imagem')
+  imgEditEstado = null
+  imgEditMostrarCanvas(false)
 }
 
 $('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
@@ -1579,6 +2003,7 @@ async function irHistAbas(delta) {
 }
 
 async function abrirArquivoNaAba(caminho) {
+  // exportada para ferramentas-ui
   ativarAbaCentro('editor')
   const existente = state.abas.find((a) => a.caminho === caminho)
   if (existente) {
@@ -1662,6 +2087,55 @@ async function ativarAba(caminho, conteudoPrevio) {
   editor.focar()
   persistirAbas()
   void atualizarPainelVault(caminho)
+  void sincronizarOverviewGit(caminho)
+}
+
+/** Extrai linhas +/- do unified diff para a overview ruler. */
+function parseDiffLinhasOverview(diffText) {
+  const add = []
+  const del = []
+  let newLine = 0
+  let oldLine = 0
+  for (const ln of String(diffText || '').split(/\n/)) {
+    const h = ln.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (h) {
+      oldLine = Number(h[1])
+      newLine = Number(h[2])
+      continue
+    }
+    if (ln.startsWith('+') && !ln.startsWith('+++')) {
+      add.push(newLine)
+      newLine++
+      continue
+    }
+    if (ln.startsWith('-') && !ln.startsWith('---')) {
+      del.push(Math.max(1, newLine))
+      oldLine++
+      continue
+    }
+    if (ln.startsWith('\\')) continue
+    oldLine++
+    newLine++
+  }
+  return { add, del }
+}
+
+async function sincronizarOverviewGit(caminho) {
+  if (!editor?.overviewDiff || !caminho) return
+  try {
+    const raiz = raizWorkspaceDe(caminho) || state.pastaAtual
+    if (!raiz) {
+      editor.overviewDiff({ del: [], add: [], ia: [] })
+      return
+    }
+    const rel = relPosix(caminho, raiz)
+    const r = await window.api.invoke('git:diff', raiz, rel)
+    const { add, del } = parseDiffLinhasOverview(r?.diff || '')
+    editor.overviewDiff({ del, add, ia: [] })
+    editor.overviewRefresh?.()
+  } catch {
+    editor.overviewDiff({ del: [], add: [], ia: [] })
+  }
 }
 
 function perguntarDirty(caminho) {
@@ -1738,14 +2212,16 @@ async function salvarArquivoAtivo() {
   } else {
     r = await window.api.invoke('arquivo:salvar', state.abaAtiva, conteudo, pastasPermitidas())
   }
-  if (!r.ok) {
-    alert('Erro ao salvar: ' + (r.erro || 'erro'))
+  if (!r || !r.ok) {
+    const msg = 'Erro ao salvar: ' + ((r && r.erro) || 'erro')
+    mostrarToast(msg, 'erro')
     return false
   }
   editor.marcarSalvo()
   const a = state.abas.find((x) => x.caminho === state.abaAtiva)
   if (a) a.dirty = false
   renderizarAbas()
+  mostrarToast('Salvo: ' + nomeArquivo(state.abaAtiva), 'ok')
   return true
 }
 
@@ -1760,6 +2236,7 @@ function initEditor() {
         a.dirty = dirty
         renderizarAbas()
       }
+      editor.overviewRefresh?.()
     },
     onSave: () => {
       salvarArquivoAtivo()
@@ -1899,40 +2376,282 @@ async function buscarOndeEsta() {
 function renderizarChat(msgs) {
   const area = $('chat-messages')
   area.innerHTML = ''
-  for (const m of normalizarMensagensChat(msgs)) adicionarBolha(m.role, m.content, m.provider)
+  const lista = normalizarMensagensChat(msgs)
+  if (!lista.length) {
+    area.classList.remove('has-msgs')
+    area.innerHTML =
+      '<div class="empty-state" id="empty-state">' +
+      '<h2>Agent</h2>' +
+      '<p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>' +
+      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>' +
+      '</div>'
+    $('btn-empty-open')?.addEventListener('click', abrirPasta)
+    return
+  }
+  for (const m of lista) adicionarBolha(m.role, m.content, m.provider)
+  marcarChatComMsgs()
   area.scrollTop = area.scrollHeight
+}
+
+function marcarChatComMsgs() {
+  const area = $('chat-messages')
+  if (!area) return
+  const tem = !!area.querySelector('.msg, .bolha, .message, .chat-tool-trace, .dg-loading-bubble, .chat-work-card')
+  area.classList.toggle('has-msgs', tem)
+  if (tem) $('empty-state')?.classList.add('hidden')
+}
+
+function setChatLiveStatus(texto) {
+  const el = $('chat-live-status')
+  if (!el) return
+  if (!texto) {
+    el.hidden = true
+    el.textContent = ''
+    return
+  }
+  el.hidden = false
+  el.innerHTML = '<span class="cls-dot" aria-hidden="true"></span><span>' + String(texto) + '</span>'
+}
+
+function ctxReeditarChat() {
+  return {
+    getArea: () => $('chat-messages'),
+    getInput: () => /** @type {HTMLTextAreaElement|null} */ ($('chat-input')),
+    emAndamento: () => !!chatEmAndamento,
+    parar: () => pararChatOuAgente(),
+    hist: histChat,
+    limparUi: (opts) => limparUiAgenteChat(opts),
+    ativarChat: () => ativarPainelCentro('chat'),
+    marcarMsgs: () => marcarChatComMsgs(),
+    toast: (msg, tipo) => mostrarToast(msg, tipo)
+  }
+}
+
+function ligarAcoesBolha(div, role, content) {
+  _ligarAcoesBolha(div, role, content, ctxReeditarChat())
+}
+
+async function reeditarMensagemUsuario(div) {
+  await _reeditarMensagemUsuario(div, ctxReeditarChat())
 }
 
 function adicionarBolha(role, content, provider) {
   const area = $('chat-messages')
   const div = document.createElement('div')
-  const b = bolhaHtml(role, content, provider)
+  const texto =
+    role === 'assistant' ? organizarRespostaCursor(content) : String(content ?? '')
+  const b = bolhaHtml(role, texto, provider)
   div.className = b.cls
   div.innerHTML = b.html
+  ligarAcoesBolha(div, role, content)
   area.appendChild(div)
+  marcarChatComMsgs()
   animarEntradaMsg(div, role)
   area.scrollTop = area.scrollHeight
   return div
 }
 
+let chatEmAndamento = false
+
+function setChatSendMode(mode) {
+  const btn = $('chat-send')
+  if (!btn) return
+  const stop = mode === 'stop'
+  chatEmAndamento = stop
+  btn.classList.toggle('is-stop', stop)
+  btn.dataset.mode = stop ? 'stop' : 'send'
+  btn.title = stop ? 'Parar' : 'Enviar'
+  btn.setAttribute('aria-label', stop ? 'Parar' : 'Enviar')
+  const sendIcon = btn.querySelector('.chat-send-icon')
+  const stopIcon = btn.querySelector('.chat-stop-icon')
+  if (sendIcon) sendIcon.hidden = stop
+  if (stopIcon) stopIcon.hidden = !stop
+  if (stop) btn.disabled = false
+  else if (!state.pastaAtual) btn.disabled = true
+}
+
+function limparUiAgenteChat(opts = {}) {
+  const area = $('chat-messages')
+  setChatSendMode('send')
+  setChatLiveStatus('')
+  fecharCartaoTrabalho(area, opts.tituloFinal || 'Parado')
+  ocultarBannerAgentMode(area)
+  const strip = area && area.querySelector ? area.querySelector('.chat-work-stats') : null
+  if (strip) {
+    strip.textContent = ''
+    strip.hidden = true
+  }
+  const live = document.getElementById('agent-stats-live')
+  if (live) {
+    live.textContent = ''
+    live.hidden = true
+  }
+  if (opts.limparCards) limparChatParityCards(area)
+  void removerLoadingChat({ imediato: true })
+  if (state.pastaAtual && $('chat-send')) $('chat-send').disabled = false
+}
+
+async function pararChatOuAgente() {
+  try {
+    const r = await window.api.invoke('agente:cancelar')
+    limparUiAgenteChat({ tituloFinal: 'Parado a seu pedido' })
+    appendChatToolTrace('■ parado (' + (r?.cancelados || 0) + ')', {
+      humano: 'Parado a seu pedido',
+      titulo: 'Parado',
+      ok: true
+    })
+    mostrarToast('Geração interrompida', 'aviso')
+  } catch (e) {
+    limparUiAgenteChat({ tituloFinal: 'Parado' })
+    mostrarToast('Falha ao parar: ' + String(e), 'erro')
+  }
+}
+
+/** Barra Apply/Rejeitar no editor (estilo Cursor inline diff). */
+function mostrarEditorDiffBar(pendente, meta) {
+  const bar = $('editor-diff-bar')
+  if (!bar || !pendente?.id) return
+  const pathEl = $('editor-diff-bar-path')
+  const metaEl = $('editor-diff-bar-meta')
+  if (pathEl) pathEl.textContent = pendente.path || pendente.absPath || 'proposta'
+  if (metaEl) {
+    const del = Array.isArray(meta?.linhasDel) ? meta.linhasDel.length : 0
+    const add = Array.isArray(meta?.linhasAdd) ? meta.linhasAdd.length : 0
+    metaEl.textContent = (del || add) ? ('−' + del + ' / +' + add) : ''
+  }
+  bar.dataset.propostaId = pendente.id
+  bar.hidden = false
+  window.__dgApplyViaAgente = true
+}
+
+function ocultarEditorDiffBar() {
+  const bar = $('editor-diff-bar')
+  if (!bar) return
+  bar.hidden = true
+  delete bar.dataset.propostaId
+}
+
 /** @type {Awaited<ReturnType<typeof iniciarHistoricoChat>> | null} */
 let histChat = null
 
+
+function appendChatToolTrace(line, opts = {}) {
+  const area = $('chat-messages')
+  if (!area) return
+  $('empty-state')?.classList.add('hidden')
+  const bruto = String(line || '')
+  const humano = opts.humano || humanizarStatus(bruto)
+  const titulo = opts.titulo || (opts.erro ? 'Algo não deu certo' : 'Trabalhando no seu pedido…')
+  atualizarCartaoTrabalho(area, {
+    titulo,
+    passo: humano,
+    ok: !!opts.ok,
+    erro: !!opts.erro
+  })
+  marcarChatComMsgs()
+  area.scrollTop = area.scrollHeight
+  appendAgentTraceLive(humano)
+  setChatLiveStatus(humano)
+}
+
+function skillAtivaChat() {
+  try { return localStorage.getItem('dg-chat-skill') || '' } catch { return '' }
+}
+
+function definirSkillChat(id, titulo) {
+  try {
+    if (id) localStorage.setItem('dg-chat-skill', id)
+    else localStorage.removeItem('dg-chat-skill')
+    if (titulo) localStorage.setItem('dg-chat-skill-titulo', titulo)
+    else localStorage.removeItem('dg-chat-skill-titulo')
+  } catch {}
+  atualizarChipSkillChat()
+  if (id) {
+    focarPainelIa('chat')
+    mostrarToast('Skill ativa: ' + (titulo || id), 'ok')
+  }
+}
+
+function atualizarChipSkillChat() {
+  const meta = $('chat-header-meta')
+  if (!meta) return
+  let chip = document.getElementById('chat-skill-chip')
+  const id = skillAtivaChat()
+  let titulo = ''
+  try { titulo = localStorage.getItem('dg-chat-skill-titulo') || id } catch { titulo = id }
+  if (!id) {
+    if (chip) chip.remove()
+    return
+  }
+  if (!chip) {
+    chip = document.createElement('button')
+    chip.type = 'button'
+    chip.id = 'chat-skill-chip'
+    chip.className = 'chat-skill-chip'
+    chip.title = 'Clique para remover a skill do proximo turno'
+    chip.addEventListener('click', () => definirSkillChat('', ''))
+    meta.appendChild(chip)
+  }
+  chip.textContent = 'Skill: ' + titulo + ' ×'
+}
+
+window.dgChatUsarSkill = definirSkillChat
+
 async function enviarMensagem() {
-  if (!state.pastaAtual) return
+  let pastaChat = resolverPastaChatAtiva()
+  if (!pastaChat) {
+    mostrarToast('Selecione um repositório no Bloco 1 para o chat analisar a pasta.', 'aviso')
+    return
+  }
+  // Stop só se ESTE repositório já está rodando; outros repos podem seguir em paralelo
+  if (chatEmAndamento && pastaTemJob(pastaChat)) {
+    await pararChatOuAgente()
+    return
+  }
+  if (pastaChat !== state.pastaAtual) {
+    await sincronizarContextoPasta(pastaChat, { forceAnalise: true })
+    pastaChat = state.pastaAtual || pastaChat
+  } else {
+    try {
+      await window.api.invoke('workspace:definir-raiz', pastaChat)
+    } catch {
+      /* */
+    }
+  }
   const input = $('chat-input')
   const texto = input.value.trim()
   if (!texto) return
+  ativarPainelCentro('chat')
   input.value = ''
   adicionarBolha('user', texto)
-  histChat?.registrarMensagem('user', texto)
-  $('chat-send').disabled = true
+  const chatIdJob = histChat?.obterId?.() || 'default'
+  const histDoJob = histChat
+  histDoJob?.registrarMensagem('user', texto)
+  setChatSendMode('stop')
+  setChatLiveStatus('Analisando o repositório…')
   mostrarLoadingChat()
   let falhou = false
   let streamTexto = ''
   let streamBolha = null
   let streamSpan = null
+  let offProg = null
+  const jobInicio = Date.now()
+  const agentStats = criarStatsVazios()
+  registrarJob({
+    pasta: pastaChat,
+    chatId: chatIdJob,
+    titulo: texto.slice(0, 48),
+    iniciadoEm: jobInicio,
+    passo: 'Iniciando…',
+    tituloCard: 'Trabalhando…',
+    stats: agentStats
+  })
+  pintarSidebarJobs(() => state.pastaAtual)
+  const pastaDesteJob = pastaChat
+  const visivelNesteJob = () =>
+    String(state.pastaAtual || '').toLowerCase() === String(pastaDesteJob || '').toLowerCase()
   const offDelta = window.api.on('chat:delta', (_evt, payload) => {
+    if (!visivelNesteJob()) return
     const p = payload || {}
     if (p.reset) {
       streamTexto = ''
@@ -1953,57 +2672,284 @@ async function enviarMensagem() {
   try {
     const agenteSel = document.getElementById('chat-agent-select')
     const modoSel = document.getElementById('chat-mode-select')
+    const planToggle = document.getElementById('agent-plan-mode')
+    let modo = modoSel?.value || 'auto'
+    const forcarAgent = pedidoExigeAgentMode(texto) && modo !== 'ask' && modo !== 'plan'
+    if (forcarAgent) {
+      // UI: option "Agent" = value "code"; main tambem aceita "agent"
+      modo = 'code'
+      if (modoSel) modoSel.value = 'code'
+      if (visivelNesteJob()) {
+        mostrarBannerAgentMode(
+          $('chat-messages'),
+          'Pedido de aplicar/implementar/auditar — sair do Plan/Ask e executar sozinho'
+        )
+      }
+    }
+    if (planToggle?.checked && modo !== 'ask' && !forcarAgent) modo = 'plan'
+    if (modo === 'plan' && planToggle) planToggle.checked = true
+    if (modo === 'plan' && visivelNesteJob()) {
+      toggleRight(true)
+      ativarAbaDireita('agent')
+      setChatLiveStatus('Modo Plan — abrindo o bloco 3 para o plano…')
+      appendChatToolTrace('… Planejando os passos no painel Execução')
+    }
     const agente = agenteSel?.value || 'auto'
-    const modo = modoSel?.value || 'auto'
+    sincronizarAgenteSelects('chat')
     const autoAprovar = (() => {
       try {
+        if (forcarAgent) return true
         return localStorage.getItem('dg-chat-autoapprove') === '1'
       } catch {
-        return false
+        return !!forcarAgent
       }
     })()
-    const r = await window.api.invoke('chat:send', state.pastaAtual, texto, { agente, modo, autoAprovar, anexos: chatAnexos, arquivo: state.abaAtiva || '' })
+    const skill = skillAtivaChat()
+    const patchUiProgresso = (passo, titulo, extra) => {
+      atualizarJob(pastaDesteJob, chatIdJob, {
+        passo,
+        tituloCard: titulo,
+        stats: { ...agentStats },
+        log: extra?.log
+      })
+      pintarSidebarJobs(() => state.pastaAtual)
+      if (!visivelNesteJob()) return
+      atualizarCartaoTrabalho($('chat-messages'), {
+        titulo: titulo || (forcarAgent ? 'Modo Agent…' : 'Trabalhando no seu pedido…'),
+        passo,
+        elapsedSec: (Date.now() - jobInicio) / 1000,
+        modelo: extra?.modelo,
+        log: extra?.log,
+        ok: extra?.ok,
+        erro: extra?.erro
+      })
+      pintarStatsNoCartao($('chat-messages'), agentStats)
+    }
+    offProg = window.api.on?.('agente:progresso', (_e, ev) => {
+      if (!ev || typeof ev !== 'object') return
+      if (ev.raiz && String(ev.raiz).toLowerCase() !== String(pastaDesteJob).toLowerCase()) return
+      aplicarEventoStats(agentStats, ev)
+      if (ev.tipo === 'heartbeat') {
+        const h =
+          'Passo ' +
+          ev.passo +
+          ' de ' +
+          ev.max +
+          ' — aguardando modelo (' +
+          (ev.modelo || '') +
+          ')…'
+        patchUiProgresso(h, forcarAgent ? 'Modo Agent…' : 'Trabalhando…', {
+          modelo: ev.modelo
+        })
+        if (visivelNesteJob()) setChatLiveStatus(humanizarStatus(h))
+        return
+      }
+      if (ev.tipo === 'stats' || ev.tipo === 'tool' || ev.tipo === 'proposta') {
+        if (visivelNesteJob()) pintarStatsNoCartao($('chat-messages'), agentStats)
+        atualizarJob(pastaDesteJob, chatIdJob, { stats: { ...agentStats } })
+        pintarSidebarJobs(() => state.pastaAtual)
+      }
+      if (ev.tipo === 'status') {
+        const h = humanizarStatus(ev.texto)
+        patchUiProgresso(h, forcarAgent ? 'Modo Agent…' : 'Trabalhando no seu pedido…', {
+          modelo: ev.modelo,
+          log: h
+        })
+        if (visivelNesteJob()) {
+          appendChatToolTrace(ev.texto, {
+            humano: h,
+            titulo: forcarAgent ? 'Modo Agent…' : 'Trabalhando no seu pedido…'
+          })
+        }
+      } else if (ev.tipo === 'tool' && ev.fase === 'inicio') {
+        const h = humanizarToolInicio(ev.nome) + '…'
+        patchUiProgresso(h, forcarAgent ? 'Modo Agent — explorando…' : 'Explorando o projeto…', {
+          log: h
+        })
+        if (visivelNesteJob()) {
+          appendChatToolTrace(String(ev.nome), {
+            humano: h,
+            titulo: forcarAgent ? 'Modo Agent — explorando…' : 'Explorando o projeto…'
+          })
+        }
+      } else if (ev.tipo === 'tool' && ev.fase === 'fim') {
+        const h = humanizarToolFim(ev.nome, ev.detalhe)
+        const erro = /falt|erro|falha|não encont|nao encont/i.test(String(ev.detalhe || ''))
+        patchUiProgresso(h, erro ? 'Ajuste no caminho…' : 'Trabalhando no seu pedido…', {
+          log: h,
+          ok: !erro,
+          erro
+        })
+        if (visivelNesteJob()) {
+          appendChatToolTrace(String(ev.nome), {
+            humano: h,
+            ok: !erro,
+            erro,
+            titulo: erro ? 'Ajuste no caminho…' : 'Trabalhando no seu pedido…'
+          })
+        }
+      } else if (ev.tipo === 'proposta') {
+        if (visivelNesteJob()) {
+          appendChatToolTrace('proposta', {
+            humano: 'Sugestão de mudança pronta — veja no Bloco 3 (Execução)',
+            titulo: 'Revisão necessária',
+            ok: true
+          })
+          toggleRight(true)
+          ativarAbaDireita('agent')
+          if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path })
+        }
+      }
+    })
+    if (visivelNesteJob()) {
+      setChatLiveStatus(
+        modo === 'plan'
+          ? 'Montando o plano…'
+          : forcarAgent
+            ? 'Modo Agent — explorando, editando e validando…'
+            : 'Pesquisando no repositório…'
+      )
+      atualizarCartaoTrabalho($('chat-messages'), {
+        titulo: modo === 'plan' ? 'Montando o plano…' : forcarAgent ? 'Modo Agent' : 'Trabalhando no repositório…',
+        passo:
+          modo === 'plan'
+            ? 'Vou listar o que podemos fazer'
+            : 'Analisando a pasta ' + nomePastaUi(pastaChat) + '…',
+        elapsedSec: 0
+      })
+    }
+    const r = await window.api.invoke('chat:send', pastaChat, texto, {
+      agente,
+      modo,
+      autoAprovar,
+      anexos: chatAnexos,
+      arquivo: state.abaAtiva || '',
+      skill,
+      verificarApos:
+        modo !== 'plan' &&
+        modo !== 'ask' &&
+        (document.getElementById('agent-verify-loop')?.checked !== false)
+    })
     chatAnexos = []
     renderizarAnexosChat()
     const ok = r && r.ok !== false && r.message && r.message.content
-    const conteudo = ok
-      ? r.message.content
-      : r?.message?.content || 'Não consegui responder.'
+    let conteudo = organizarRespostaCursor(
+      ok ? r.message.content : r?.message?.content || 'Não consegui responder.'
+    )
     falhou = !ok || (r.message && r.message.provider === 'erro')
-    if (!streamBolha) await removerLoadingChat({ erro: falhou })
-    else await removerLoadingChat({ imediato: true })
-    let bolha = streamBolha
-    if (bolha && streamSpan) {
-      streamSpan.textContent = conteudo
-      if (r?.message?.provider && !bolha.querySelector('.msg-provider')) {
-        const tag = document.createElement('span')
-        tag.className = 'msg-provider'
-        tag.textContent = r.message.provider
-        bolha.appendChild(tag)
-      }
-    } else {
-      bolha = adicionarBolha('assistant', conteudo, r?.message?.provider)
+    if (visivelNesteJob()) {
+      if (!streamBolha) await removerLoadingChat({ erro: falhou })
+      else await removerLoadingChat({ imediato: true })
+      fecharCartaoTrabalho($('chat-messages'), falhou ? 'Não concluído' : 'Pronto')
+      pintarStatsNoCartao($('chat-messages'), agentStats)
+      if (!falhou) ocultarBannerAgentMode($('chat-messages'))
     }
+    let bolha = streamBolha
+    const prov = r?.message?.provider
+    const provLimpo = prov && !/:free\b/i.test(prov) ? prov : (prov && /ollama/i.test(prov) ? prov : '')
+    if (visivelNesteJob()) {
+      if (bolha && streamSpan) {
+        const b = bolhaHtml('assistant', conteudo, provLimpo || undefined)
+        bolha.innerHTML = b.html
+        bolha.className = b.cls
+        ligarAcoesBolha(bolha, 'assistant', conteudo)
+      } else {
+        bolha = adicionarBolha('assistant', conteudo, provLimpo || undefined)
+      }
+      const areaChat = $('chat-messages')
+      if (areaChat) areaChat.scrollTop = areaChat.scrollHeight
+    }
+    // Sempre persiste no histórico do job (mesmo se o usuário mudou de repo)
     if (!falhou) {
-      histChat?.registrarMensagem('assistant', conteudo, r.message.provider)
-      if (r.message.provider) atualizarBadgeProvedor(r.message.provider)
+      histDoJob?.registrarMensagem('assistant', conteudo, r.message.provider)
+      if (visivelNesteJob() && r.message.provider) atualizarBadgeProvedor(r.message.provider)
+      if (visivelNesteJob() && (r.plano || modo === 'plan')) {
+        const plano = r.plano || (await window.api.invoke('agente:plano-ler'))?.plano
+        if (plano?.passos?.length) {
+          renderPlanoChecklist(plano)
+          atualizarChatPlanoCard(plano)
+        }
+      }
+      if (visivelNesteJob() && Array.isArray(r.propostas) && r.propostas.length) {
+        mostrarPropostasAgent(r.propostas)
+        atualizarChatApplyCard(r.propostas)
+        appendChatToolTrace(r.propostas.length + ' proposta(s) — Apply no chat ou na aba Agente')
+      }
+      if (visivelNesteJob() && r.autoAprovacao?.aplicada) {
+        appendChatToolTrace('aprovação automática: ' + (r.autoAprovacao.motivo || 'ok'))
+        mostrarChatRestoreAposApply([])
+      }
+      if (visivelNesteJob()) {
+        atualizarStatusAgent(
+          r.message?.provider || r.modelo || null,
+          r.duracaoMs ?? r.ms ?? null,
+          r.fila || null
+        )
+      }
     }
     void bolha
   } catch (err) {
     falhou = true
-    await removerLoadingChat({ erro: !streamBolha, imediato: !!streamBolha })
-    if (!streamBolha) adicionarBolha('assistant', 'Não consegui responder.')
-    else if (streamSpan && !streamTexto) streamSpan.textContent = 'Não consegui responder.'
+    if (visivelNesteJob()) {
+      await removerLoadingChat({ erro: !streamBolha, imediato: !!streamBolha })
+      if (!streamBolha) adicionarBolha('assistant', 'Não consegui responder.')
+      else if (streamSpan && !streamTexto) streamSpan.textContent = 'Não consegui responder.'
+    }
     console.info('[chat] erro invoke:', err)
   } finally {
     if (typeof offDelta === 'function') offDelta()
-    $('chat-send').disabled = false
-    input.focus()
+    if (typeof offProg === 'function') offProg()
+    removerJob(pastaDesteJob, chatIdJob)
+    pintarSidebarJobs(() => state.pastaAtual)
+    if (visivelNesteJob()) {
+      if (falhou) {
+        limparUiAgenteChat({ tituloFinal: 'Não concluí — veja a mensagem acima' })
+      } else {
+        setChatSendMode('send')
+        fecharCartaoTrabalho($('chat-messages'), 'Pronto')
+        setChatLiveStatus('Pronto')
+        setTimeout(() => setChatLiveStatus(''), 1800)
+        ocultarBannerAgentMode($('chat-messages'))
+      }
+      if (state.pastaAtual) $('chat-send').disabled = false
+      marcarChatComMsgs()
+      input.focus()
+    } else {
+      // Outro repo na tela: só ajusta o botão se o repo atual não tem job
+      if (!pastaTemJob(state.pastaAtual)) setChatSendMode('send')
+    }
+    void histDoJob?.flushSalvar?.()
+    agendarSalvarWorkspace()
   }
 }
 
 async function ligarHistoricoChat(raiz) {
+  let preferido = ''
+  try {
+    preferido = localStorage.getItem('dg-chat-ativo') || ''
+  } catch {
+    preferido = ''
+  }
   histChat = await iniciarHistoricoChat(raiz, {
+    chatIdPreferido: preferido,
+    listarPastas: () => (state.pastasRecentes || []).slice(),
+    nomePasta: (p) => nomePastaUi(p),
+    onRemoverPasta: (pasta) => removerPasta(pasta),
+    onTrocarPasta: async (pasta, chatId) => {
+      if (chatId) {
+        try {
+          localStorage.setItem('dg-chat-ativo', chatId)
+        } catch {
+          /* */
+        }
+      }
+      if (pasta && pasta !== state.pastaAtual) {
+        await sincronizarContextoPasta(pasta, { chatId, forceAnalise: true })
+        ativarAbaCentro('chat')
+        return
+      }
+      if (chatId && histChat?.carregar) await histChat.carregar(chatId)
+    },
     onRender: (msgs) => {
       const empty = $('empty-state')
       if (empty) empty.classList.add('hidden')
@@ -2013,12 +2959,15 @@ async function ligarHistoricoChat(raiz) {
       const empty = $('empty-state')
       if (empty) empty.classList.add('hidden')
       renderizarChat([])
+      agendarSalvarWorkspace()
     }
   })
+  agendarSalvarWorkspace()
 }
 
 /** Nova conversa: limpa UI e reseta estado do histórico (chat.js). */
 function novaConversaUi() {
+  ativarPainelCentro('chat')
   if (histChat && typeof histChat.nova === 'function') {
     histChat.nova()
     return
@@ -2119,17 +3068,211 @@ async function copiarPromptOrientador() {
   mostrarToast(copiado ? 'Prompt copiado.' : 'Não foi possível copiar o prompt.', copiado ? 'ok' : 'erro')
 }
 
-$('btn-chat-nova')?.addEventListener('click', () => novaConversaUi())
 function enviarMensagemUi() { void enviarMensagem() }
 $('chat-send')?.addEventListener('click', enviarMensagemUi)
 iniciarComposer($('chat-input'), { onEnviar: enviarMensagemUi })
-$('btn-prompt-orientador')?.addEventListener('click', () => abrirOrientadorPrompt())
 $('btn-prompt-fechar')?.addEventListener('click', () => fecharOrientadorPrompt())
 $('btn-prompt-melhorar')?.addEventListener('click', () => void melhorarPromptLocal())
 $('btn-prompt-usar')?.addEventListener('click', () => usarPromptNoChat())
 $('btn-prompt-copiar')?.addEventListener('click', () => void copiarPromptOrientador())
 
-// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------let dgFloatZ = 20000
+/** Popover de contexto dos ícones do chat (clique → contexto → ação). */
+function initChatIconContext() {
+  const pop = document.getElementById('chat-ctx-popover')
+  if (!pop || pop.dataset.wired === '1') return
+  pop.dataset.wired = '1'
+  let ativo = null
+
+  const fechar = () => {
+    pop.hidden = true
+    pop.replaceChildren()
+    if (ativo) {
+      ativo.setAttribute('aria-expanded', 'false')
+      ativo = null
+    }
+  }
+
+  const posicionar = (btn) => {
+    const host = btn.closest('#chat-panel') || document.body
+    if (pop.parentElement !== host) host.appendChild(pop)
+    pop.hidden = false
+    pop.style.maxHeight = ''
+    pop.classList.remove('chat-ctx-popover--up', 'chat-ctx-popover--down')
+    const br = btn.getBoundingClientRect()
+    const hr = host.getBoundingClientRect()
+    const gap = 6
+    const pw = Math.min(pop.offsetWidth || 240, hr.width - 16)
+    const ph = pop.offsetHeight || 160
+    const spaceAbove = br.top - hr.top
+    const spaceBelow = hr.bottom - br.bottom
+    // Preferir abrir para cima (composer fica na base)
+    const abrirCima = spaceAbove >= Math.min(ph + gap, 120) || spaceAbove >= spaceBelow
+    pop.classList.add(abrirCima ? 'chat-ctx-popover--up' : 'chat-ctx-popover--down')
+    const maxH = Math.max(120, (abrirCima ? spaceAbove : spaceBelow) - gap - 8)
+    pop.style.maxHeight = maxH + 'px'
+    let top
+    if (abrirCima) {
+      top = br.top - hr.top - Math.min(ph, maxH) - gap
+      if (top < 8) top = 8
+    } else {
+      top = br.bottom - hr.top + gap
+    }
+    let left = br.left - hr.left
+    const maxLeft = Math.max(8, hr.width - pw - 8)
+    if (left > maxLeft) left = maxLeft
+    if (left < 8) left = 8
+    pop.style.top = top + 'px'
+    pop.style.left = left + 'px'
+    pop.style.width = pw + 'px'
+  }
+
+  const mkBtn = (label, primary, onClick) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = primary ? 'btn-small btn-primary' : 'btn-small'
+    b.textContent = label
+    b.addEventListener('click', (e) => {
+      e.stopPropagation()
+      fechar()
+      onClick()
+    })
+    return b
+  }
+
+  const mkOption = (label, selected, onClick) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'chat-ctx-option chat-ctx-option--row'
+    b.textContent = label
+    if (selected) b.setAttribute('aria-selected', 'true')
+    b.addEventListener('click', (e) => {
+      e.stopPropagation()
+      fechar()
+      onClick()
+    })
+    return b
+  }
+
+  const abrir = (btn) => {
+    const id = btn.getAttribute('data-chat-ctx')
+    if (!id) return
+    if (ativo === btn && !pop.hidden) {
+      fechar()
+      return
+    }
+    // "Mais" já tem menu próprio
+    if (id === 'mais') return
+
+    fechar()
+    ativo = btn
+    btn.setAttribute('aria-expanded', 'true')
+
+    const title = document.createElement('p')
+    title.className = 'chat-ctx-popover-title'
+    const desc = document.createElement('p')
+    desc.className = 'chat-ctx-popover-desc'
+    const meta = document.createElement('p')
+    meta.className = 'chat-ctx-popover-meta'
+    const actions = document.createElement('div')
+    actions.className = 'chat-ctx-popover-actions'
+
+    if (id === 'nova') {
+      title.textContent = 'Nova conversa'
+      desc.textContent = 'Limpa o chat atual e começa outra sessão.'
+      actions.appendChild(mkBtn('Criar nova', true, () => novaConversaUi()))
+    } else if (id === 'anexar') {
+      title.textContent = 'Anexar arquivos'
+      desc.textContent = 'Os anexos entram no próximo envio do composer.'
+      actions.appendChild(mkBtn('Escolher arquivos', true, () => {
+        document.getElementById('chat-anexos-input')?.click()
+      }))
+    } else if (id === 'prompt') {
+      title.textContent = 'Melhorar prompt'
+      desc.textContent = 'Abre o assistente para refinar o texto do composer com o modelo local.'
+      meta.innerHTML = 'Atalho <kbd>Ctrl+Alt+P</kbd>'
+      actions.appendChild(mkBtn('Abrir assistente', true, () => abrirOrientadorPrompt()))
+    } else if (id === 'mode') {
+      const sel = document.getElementById('chat-mode-select')
+      title.textContent = 'Modo'
+      desc.textContent = 'Define como o Agent interpreta o pedido.'
+      const modos = [
+        ['auto', 'Auto'],
+        ['code', 'Agent'],
+        ['plan', 'Plan'],
+        ['ask', 'Ask'],
+        ['debug', 'Debug']
+      ]
+      actions.classList.add('chat-ctx-popover-actions--list')
+      for (const [val, label] of modos) {
+        actions.appendChild(mkOption(label, sel?.value === val, () => {
+          if (!sel) return
+          sel.value = val
+          sel.dispatchEvent(new Event('change', { bubbles: true }))
+          const modeBtn = document.getElementById('btn-chat-mode')
+          if (modeBtn) modeBtn.title = 'Modo: ' + label
+        }))
+      }
+    } else if (id === 'agent') {
+      const sel = document.getElementById('chat-agent-select')
+      title.textContent = 'Agente'
+      desc.textContent = 'Escolha um agente (lista). Auto escolhe sozinho.'
+      actions.classList.add('chat-ctx-popover-actions--list')
+      const opts = sel ? Array.from(sel.options) : []
+      const vistos = new Set()
+      for (const o of opts) {
+        if (!o.value) continue
+        const key = String(o.value).toLowerCase()
+        if (vistos.has(key)) continue
+        vistos.add(key)
+        actions.appendChild(mkOption(o.textContent || o.value, sel.value === o.value, () => {
+          sel.value = o.value
+          sel.dispatchEvent(new Event('change', { bubbles: true }))
+          const agentBtn = document.getElementById('btn-chat-agent')
+          if (agentBtn) agentBtn.title = 'Agente: ' + (o.textContent || o.value)
+        }))
+      }
+    } else {
+      return
+    }
+
+    pop.replaceChildren(title, desc)
+    if (meta.innerHTML) pop.appendChild(meta)
+    pop.appendChild(actions)
+    posicionar(btn)
+  }
+
+  document.querySelectorAll('.chat-ctx-btn[data-chat-ctx]').forEach((btn) => {
+    if (btn.dataset.ctxWired === '1') return
+    btn.dataset.ctxWired = '1'
+    btn.setAttribute('aria-expanded', 'false')
+    btn.addEventListener('click', (e) => {
+      const id = btn.getAttribute('data-chat-ctx')
+      if (id === 'mais') return
+      e.preventDefault()
+      e.stopPropagation()
+      abrir(btn)
+    })
+  })
+
+  document.addEventListener('click', (ev) => {
+    if (pop.hidden) return
+    const t = ev.target
+    if (pop.contains(t) || (ativo && ativo.contains(t))) return
+    fechar()
+  })
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !pop.hidden) {
+      fechar()
+      ativo?.focus()
+    }
+  })
+  window.dgFecharChatCtx = fechar
+}
+
+initChatIconContext()
+
+// ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------
+let dgFloatZ = 20000
 
 function trazerJanelaFrente(modalEl) {
   if (!modalEl) return
@@ -2189,7 +3332,8 @@ function ligarJanelaFlutuante(modalEl) {
     if (e.target.closest('button, a, input, select, textarea')) return
     trazerJanelaFrente(modalEl)
     const rect = box.getBoundingClientRect()
-    // fixa posição absoluta a partir do layout atual    box.style.left = rect.left + 'px'
+    // Fixa posição absoluta a partir do layout atual
+    box.style.left = rect.left + 'px'
     box.style.top = rect.top + 'px'
     ox = e.clientX - rect.left
     oy = e.clientY - rect.top
@@ -2206,26 +3350,54 @@ ligarJanelaFlutuante($('modal-config'))
 ligarJanelaFlutuante($('modal-contas'))
 
 // ---------- Config / Contas ----------
-async function abrirConfig() {
-  abrirJanelaFlutuante($('modal-config'))
-  const p = await window.api.invoke('system:get-profile')
-  const forca = await window.api.invoke('system:profile-strength')
-  const gb = (b) => (b / 1024 / 1024 / 1024).toFixed(1) + ' GB'
-  $('config-profile').innerHTML =
-    '<h4>Maquina</h4>' +
-    escapar(p.hostname) +
+function formatarForcaPerfil(v) {
+  if (v == null) return '—'
+  if (typeof v === 'string') {
+    if (v === 'strong') return 'forte'
+    if (v === 'medium') return 'média'
+    if (v === 'light') return 'leve'
+    return v
+  }
+  if (typeof v === 'object') {
+    if (typeof v.label === 'string') return v.label
+    if (typeof v.forca === 'string') return formatarForcaPerfil(v.forca)
+  }
+  return String(v)
+}
+
+function htmlMaquinaDeProfile(p, forcaRaw) {
+  const cores = Array.isArray(p?.cpus) ? p.cpus.length : Number(p?.cpus)
+  const total = Number(p?.totalMemory)
+  const ram =
+    Number.isFinite(total) && total > 0 ? (total / 1024 / 1024 / 1024).toFixed(1) + ' GB' : '? GB'
+  return (
+    '<h4>Máquina</h4>' +
+    escapar(p?.hostname || '—') +
     ' — ' +
-    escapar(p.platform) +
+    escapar(p?.platform || '') +
     ' ' +
-    escapar(p.arch) +
+    escapar(p?.arch || '') +
     '<br>' +
-    (p.cpus ? p.cpus.length : '?') +
-    ' nucleos — ' +
-    gb(p.totalMemory) +
+    (Number.isFinite(cores) && cores > 0 ? cores : '?') +
+    ' núcleos — ' +
+    ram +
     ' RAM<br>' +
-    'Forca: <strong>' +
-    escapar(forca) +
+    'Força: <strong>' +
+    escapar(formatarForcaPerfil(forcaRaw)) +
     '</strong>'
+  )
+}
+
+async function abrirConfig() {
+  $('modal-contas')?.classList.add('hidden')
+  abrirJanelaFlutuante($('modal-config'))
+  try {
+    const p = await window.api.invoke('system:get-profile')
+    const forca = await window.api.invoke('system:profile-strength')
+    $('config-profile').innerHTML = htmlMaquinaDeProfile(p && p.ok === false ? {} : p, forca)
+  } catch (e) {
+    $('config-profile').innerHTML = '<h4>Máquina</h4>' + escapar(String(e))
+  }
   const o = await window.api.invoke('brain:ollama-status')
   $('config-ollama').innerHTML =
     '<h4>Ollama (IA local)</h4>' +
@@ -2236,7 +3408,7 @@ async function abrirConfig() {
           ' modelo(s): ' +
           escapar(o.models.map((m) => m.name).join(', ') || '—')
         : 'Instalado, mas parado. Rode: ollama serve'
-      : 'Nao instalado. Baixe em ollama.com')
+      : 'Não instalado. Baixe em ollama.com')
   await carregarConfigOpenClawUi()
   await atualizarPainelAdapta('adapta-status-cfg')
 }
@@ -2309,60 +3481,194 @@ async function copiarMcpAdapta() {
   }
 }
 
+async function pintarConectoresContas() {
+  // Contas OAuth (Google/MS/Apple/GitHub) pintadas por contas-ui.js em #contas-conectores
+  if (typeof window.dgPintarContasVinculadas === 'function') {
+    try { await window.dgPintarContasVinculadas() } catch {}
+  }
+}
+
+async function pintarFtpDeploy() {
+  const el = $('contas-ftp')
+  if (!el) return
+  el.innerHTML = '<h4>Deploy FTP</h4>Carregando...'
+  try {
+    const r = await window.api.invoke('deploy:ftp-listar')
+    const sites = (r && r.sites) || []
+    let html =
+      '<h4>Deploy FTP</h4>' +
+      '<p class="muted">Senha fica no cofre local. Use Dry-run antes do deploy.</p>' +
+      '<div class="ftp-form-grid">' +
+      '<input id="ftp-id" class="whereis-input" placeholder="id (ex: producao)" />' +
+      '<input id="ftp-nome" class="whereis-input" placeholder="nome" />' +
+      '<input id="ftp-host" class="whereis-input" placeholder="host" />' +
+      '<input id="ftp-user" class="whereis-input" placeholder="usuário" />' +
+      '<input id="ftp-pass" class="whereis-input ftp-span-2" type="password" placeholder="senha" />' +
+      '<input id="ftp-remote" class="whereis-input" placeholder="remotePath (/public_html)" />' +
+      '<input id="ftp-local" class="whereis-input" placeholder="localPath (pasta do projeto)" />' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+      '<button type="button" class="btn-small" id="btn-ftp-salvar">Salvar</button>' +
+      '<button type="button" class="btn-small" id="btn-ftp-testar">Testar</button>' +
+      '<button type="button" class="btn-small" id="btn-ftp-dry">Dry-run</button>' +
+      '<button type="button" class="btn-small btn-primary" id="btn-ftp-deploy">Deploy</button>' +
+      '</div>'
+    if (sites.length) {
+      html += '<div class="muted" style="font-size:12px;margin-bottom:6px">Sites salvos</div><div class="ftp-sites">'
+      for (const s of sites) {
+        html +=
+          '<button type="button" class="ftp-chip btn-ftp-pick" data-id="' + escapar(s.id) + '" title="' + escapar(s.host || '') + '">' +
+          escapar(s.nome || s.id) + (s.temSenha ? ' · ✓' : '') +
+          '</button>'
+      }
+      html += '</div>'
+    }
+    el.innerHTML = html
+    const val = (id) => /** @type {HTMLInputElement|null} */ (document.getElementById(id))?.value?.trim() || ''
+    el.querySelector('#btn-ftp-salvar')?.addEventListener('click', async () => {
+      const id = val('ftp-id') || 'site-1'
+      const r2 = await window.api.invoke('deploy:ftp-salvar', {
+        id,
+        nome: val('ftp-nome') || id,
+        host: val('ftp-host'),
+        user: val('ftp-user'),
+        password: val('ftp-pass'),
+        remotePath: val('ftp-remote') || '/',
+        localPath: val('ftp-local') || state.pastaAtual || ''
+      })
+      if (window.dgToast) window.dgToast(r2?.ok ? 'Site FTP salvo' : (r2?.erro || 'Falha'), r2?.ok ? 'ok' : 'erro')
+      void pintarFtpDeploy()
+    })
+    el.querySelector('#btn-ftp-testar')?.addEventListener('click', async () => {
+      const id = val('ftp-id')
+      if (!id) { if (window.dgToast) window.dgToast('Informe o id do site', 'erro'); return }
+      const r2 = await window.api.invoke('deploy:ftp-testar', id)
+      if (window.dgToast) window.dgToast(r2?.ok ? ('FTP OK · ' + (r2.pwd || '')) : (r2?.erro || 'Falha'), r2?.ok ? 'ok' : 'erro')
+    })
+    el.querySelector('#btn-ftp-dry')?.addEventListener('click', async () => {
+      const id = val('ftp-id')
+      if (!id) { if (window.dgToast) window.dgToast('Informe o id do site', 'erro'); return }
+      const localPath = val('ftp-local') || state.pastaAtual || ''
+      const r2 = await window.api.invoke('deploy:ftp-deploy', { id, localPath, remotePath: val('ftp-remote') || undefined, dryRun: true })
+      if (window.dgToast) window.dgToast(r2?.ok ? ('Dry-run: ' + (r2.previstos || 0) + ' arquivos') : (r2?.erro || 'Falha'), r2?.ok ? 'ok' : 'erro')
+    })
+    el.querySelector('#btn-ftp-deploy')?.addEventListener('click', async () => {
+      const id = val('ftp-id')
+      if (!id) { if (window.dgToast) window.dgToast('Informe o id do site', 'erro'); return }
+      const localPath = val('ftp-local') || state.pastaAtual || ''
+      const r2 = await window.api.invoke('deploy:ftp-deploy', { id, localPath, remotePath: val('ftp-remote') || undefined })
+      if (window.dgToast) {
+        window.dgToast(
+          r2?.ok ? ('Deploy OK · ' + (r2.enviados || 0) + ' arquivos') : (r2?.erro || 'Deploy falhou'),
+          r2?.ok ? 'ok' : 'erro'
+        )
+      }
+    })
+    el.querySelectorAll('.btn-ftp-pick').forEach((b) => {
+      b.addEventListener('click', () => {
+        const id = b.getAttribute('data-id')
+        const s = sites.find((x) => x.id === id)
+        if (!s) return
+        const set = (i, v) => { const eln = document.getElementById(i); if (eln) eln.value = v || '' }
+        set('ftp-id', s.id)
+        set('ftp-nome', s.nome)
+        set('ftp-host', s.host)
+        set('ftp-user', s.user)
+        set('ftp-remote', s.remotePath || '/')
+        set('ftp-local', s.localPath || state.pastaAtual || '')
+      })
+    })
+  } catch (err) {
+    el.innerHTML = '<h4>Deploy FTP</h4><span style="color:#f85149">' + escapar(String(err)) + '</span>'
+  }
+}
+
+function ativarAbaContas(tab) {
+  const id = tab === 'ftp' || tab === 'saude' ? tab : 'contas'
+  document.querySelectorAll('#modal-contas [data-contas-tab]').forEach((btn) => {
+    const on = btn.getAttribute('data-contas-tab') === id
+    btn.setAttribute('aria-selected', on ? 'true' : 'false')
+  })
+  document.querySelectorAll('#modal-contas [data-contas-panel]').forEach((panel) => {
+    const on = panel.getAttribute('data-contas-panel') === id
+    panel.hidden = !on
+  })
+}
+
+function initContasTabs() {
+  const modal = $('modal-contas')
+  if (!modal || modal.dataset.tabsWired === '1') return
+  modal.dataset.tabsWired = '1'
+  modal.querySelectorAll('[data-contas-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => ativarAbaContas(btn.getAttribute('data-contas-tab')))
+  })
+}
+
 async function abrirContas() {
+  $('modal-config')?.classList.add('hidden')
+  initContasTabs()
+  ativarAbaContas('contas')
   abrirJanelaFlutuante($('modal-contas'))
   $('contas-identidade').innerHTML = '<h4>Identidade</h4>Carregando...'
-  $('contas-maquina').innerHTML = '<h4>Maquina</h4>Carregando...'
+  $('contas-maquina').innerHTML = '<h4>Máquina</h4>Carregando...'
   $('contas-ia').innerHTML = '<h4>IA</h4>Carregando...'
-  $('contas-guardian').innerHTML = '<h4>Guardiao de recursos</h4>Carregando...'
+  $('contas-guardian').innerHTML = '<h4>Guardião de recursos</h4>Carregando...'
   void atualizarPainelAdapta('adapta-status')
+  void pintarConectoresContas()
+  try {
+    if (typeof window.dgPintarContasVinculadas === 'function') void window.dgPintarContasVinculadas()
+  } catch {}
+  void pintarFtpDeploy()
   try {
     const s = await window.api.invoke('accounts:get-state')
+    const id = (s && s.identidade) || {}
+    const maq = (s && s.maquina) || {}
+    const ia = (s && s.ia) || {}
     $('contas-identidade').innerHTML =
       '<h4>Identidade</h4>' +
-      'Usuario: <strong>' +
-      escapar(s.identidade.username || 'digo85cs') +
-      '</strong> (device-token)<br>' +
-      'E-mail: <strong>' +
-      escapar(s.identidade.email || 'digo85cs@gmail.com') +
+      'Usuário: <strong>' +
+      escapar(id.username || 'digo85cs') +
       '</strong><br>' +
-      'Token: <code>' +
-      escapar(s.identidade.tokenPrefix) +
-      '...</code><br>' +
+      'E-mail: <strong>' +
+      escapar(id.email || 'digo85cs@gmail.com') +
+      '</strong><br>' +
+      (id.tokenPrefix ? 'Token: <code>' + escapar(id.tokenPrefix) + '...</code><br>' : '') +
       'Desde: ' +
-      (s.identidade.criadoEm ? new Date(s.identidade.criadoEm).toLocaleDateString('pt-BR') : '—')
+      (id.criadoEm ? new Date(id.criadoEm).toLocaleDateString('pt-BR') : '—')
+    const coresM = Number(maq.cpus)
+    const ramM = maq.ramGB && String(maq.ramGB) !== 'NaN' ? String(maq.ramGB) : '?'
     $('contas-maquina').innerHTML =
-      '<h4>Maquina</h4>' +
-      escapar(s.maquina.hostname) +
+      '<h4>Máquina</h4>' +
+      escapar(maq.hostname || '—') +
       ' — ' +
-      escapar(s.maquina.plataforma) +
+      escapar(maq.plataforma || '') +
       '<br>' +
-      s.maquina.cpus +
-      ' nucleos — ' +
-      escapar(s.maquina.ramGB) +
+      (Number.isFinite(coresM) && coresM > 0 ? coresM : '?') +
+      ' núcleos — ' +
+      escapar(ramM) +
       ' GB RAM<br>' +
-      'Forca: <strong>' +
-      escapar(s.maquina.forca) +
+      'Força: <strong>' +
+      escapar(formatarForcaPerfil(maq.forca)) +
       '</strong>'
-    const provs = s.ia.provedores
-      .map((p) => p.name + ': ' + (p.available ? 'OK (' + p.models + ')' : 'off'))
-      .join('<br>')
+    const provs = Array.isArray(ia.provedores)
+      ? ia.provedores.map((p) => escapar(p.name) + ': ' + (p.available ? 'OK (' + escapar(String(p.models)) + ')' : 'off')).join('<br>')
+      : '—'
     $('contas-ia').innerHTML =
       '<h4>IA</h4>' +
       'Ollama: ' +
-      (s.ia.ollamaInstalado ? (s.ia.ollamaRodando ? 'rodando' : 'instalado, parado') : 'nao instalado') +
+      (ia.ollamaInstalado ? (ia.ollamaRodando ? 'rodando' : 'instalado, parado') : 'não instalado') +
       '<br>' +
       'Modelos: ' +
-      escapar(s.ia.modelos.join(', ') || 'nenhum') +
+      escapar((ia.modelos || []).join(', ') || 'nenhum') +
       '<br>' +
-      'Provedores: <br>' +
+      'Provedores:<br>' +
       provs
-    const g = s.guardian || {}
+    const g = (s && s.guardian) || {}
     const usedMem = (g.totalMemory || 0) - (g.freeMemory || 0)
     const usedMB = Math.round(usedMem / 1048576)
     const usedPct = g.totalMemory > 0 ? Math.round((usedMem / g.totalMemory) * 100) : 0
     $('contas-guardian').innerHTML =
-      '<h4>Guardiao de recursos</h4>' +
+      '<h4>Guardião de recursos</h4>' +
       'RAM: ' +
       usedMB +
       ' MB usados (' +
@@ -2373,26 +3679,62 @@ async function abrirContas() {
       'CPU: ' +
       (Number.isFinite(g.cpuPercent) ? g.cpuPercent : 0) +
       '%<br>' +
-      'Operacoes pesadas: ' +
-      (g.ramOk ? 'LIBERADAS' : 'PAUSADAS (RAM baixa)')
+      'Operações pesadas: ' +
+      (g.ramOk ? 'liberadas' : 'pausadas (RAM baixa)')
   } catch (err) {
     $('contas-ia').innerHTML = '<h4>Erro</h4>' + escapar(String(err))
   }
 }
 
+async function rodarBackupOneDrive() {
+  const st = $('backup-onedrive-status')
+  const btn = $('btn-backup-onedrive')
+  if (btn) btn.disabled = true
+  if (st) st.textContent = 'Backup OneDrive em andamento…'
+  try {
+    const r = await window.api.invoke('backup:onedrive')
+    if (st) {
+      st.textContent = r?.ok
+        ? 'Backup OK — OneDrive\\BACKUP_DG_EDITOR (espelho + ZIP ATUAL).'
+        : 'Falha: ' + (r?.erro || 'desconhecida')
+    }
+    mostrarToast?.(r?.ok ? 'Backup OneDrive OK' : 'Backup OneDrive falhou', r?.ok ? 'ok' : 'erro')
+  } catch (e) {
+    if (st) st.textContent = 'Erro: ' + String(e)
+  } finally {
+    if (btn) btn.disabled = false
+  }
+}
+
 async function rodarDiagnostico() {
   const alvo = $('contas-diagnostico')
-  alvo.innerHTML = '<h4>Diagnostico ao vivo</h4>Rodando 8 testes...'
+  if (!alvo) return
+  alvo.innerHTML =
+    '<h4>Diagnóstico</h4><p class="muted">Rodando checagens...</p>' +
+    '<button type="button" id="btn-diag" class="btn-small">Rodar diagnóstico</button>' +
+    '<button type="button" id="btn-backup-onedrive" class="btn-small" style="margin-left:8px">Backup OneDrive</button>' +
+    '<p id="backup-onedrive-status" class="muted" style="margin:8px 0 0;font-size:12px"></p>'
+  $('btn-diag')?.addEventListener('click', () => { void rodarDiagnostico() })
+  $('btn-backup-onedrive')?.addEventListener('click', () => { void rodarBackupOneDrive() })
   const t0 = Date.now()
   try {
     const r = await window.api.invoke('diagnostico:rodar', state.pastaAtual || null)
     const total = Date.now() - t0
-    let html = '<h4>Diagnostico ao vivo - ' + r.ok + '/' + r.total + ' OK (' + total + ' ms)</h4>'
-    for (const m of r.modulos) {
+    let html =
+      '<h4>Diagnóstico — ' +
+      (r?.ok ?? 0) +
+      '/' +
+      (r?.total ?? 0) +
+      ' OK (' +
+      total +
+      ' ms)</h4><button type="button" id="btn-diag" class="btn-small">Rodar de novo</button>' +
+      '<button type="button" id="btn-backup-onedrive" class="btn-small" style="margin-left:8px">Backup OneDrive</button>' +
+      '<p id="backup-onedrive-status" class="muted" style="margin:8px 0 0;font-size:12px"></p>'
+    for (const m of r?.modulos || []) {
       const icone = m.ok ? '\u2713' : '\u2717'
       const cor = m.ok ? '#3fb950' : '#f85149'
       html +=
-        '<div style="margin:4px 0"><span style="color:' +
+        '<div style="margin:8px 0 0"><span style="color:' +
         cor +
         ';font-weight:bold">' +
         icone +
@@ -2407,44 +3749,66 @@ async function rodarDiagnostico() {
         '</span></div>'
     }
     alvo.innerHTML = html
+    $('btn-diag')?.addEventListener('click', () => { void rodarDiagnostico() })
+    $('btn-backup-onedrive')?.addEventListener('click', () => { void rodarBackupOneDrive() })
   } catch (err) {
-    alvo.innerHTML = '<h4>Diagnostico</h4><span style="color:#f85149">' + escapar(String(err)) + '</span>'
+    alvo.innerHTML =
+      '<h4>Diagnóstico</h4><span style="color:#f85149">' +
+      escapar(String(err)) +
+      '</span><div style="margin-top:8px"><button type="button" id="btn-diag" class="btn-small">Tentar de novo</button>' +
+      '<button type="button" id="btn-backup-onedrive" class="btn-small" style="margin-left:8px">Backup OneDrive</button></div>'
+    $('btn-diag')?.addEventListener('click', () => { void rodarDiagnostico() })
+    $('btn-backup-onedrive')?.addEventListener('click', () => { void rodarBackupOneDrive() })
   }
 }
 
-// ---------- Tema ----------
-async function alternarTema() {
-  const atual = document.body.classList.contains('tema-escuro') ? 'escuro' : 'claro'
-  const novo = atual === 'claro' ? 'escuro' : 'claro'
+/** Valida UI crítica e recarrega o app (passo self-loop). */
+async function verificarEReiniciarDg() {
+  mostrarToast('Verificando Bloco 3 e chat…', 'aviso')
+  toggleRight(true)
+  ativarAbaDireita('agent')
+  sincronizarBotoesPainelDireito()
+  const okToggle = !!$('btn-right-toggle')
+  const okPanel = !!$('exec-panel') && !$('app').classList.contains('right-collapsed')
+  const okRail = !!$('right-rail') && !!$('rail-collapse')
+  const okEdge = !!$('bloco3-edge')
+  const okChats = !!$('agent-chats-list')
+  // ciclo recolher/expandir garante botão de retorno
+  toggleRight(false)
+  sincronizarBotoesPainelDireito()
+  const okCollapsed = $('app').classList.contains('right-collapsed') &&
+    !!$('right-rail') &&
+    $('bloco3-edge') &&
+    !$('bloco3-edge').hidden
+  toggleRight(true)
+  sincronizarBotoesPainelDireito()
+  if (!okToggle || !okPanel || !okRail || !okEdge || !okChats || !okCollapsed) {
+    mostrarToast('Checagem parcial — use “Abrir Bloco 3” / aba ‹ na borda', 'erro')
+  } else {
+    mostrarToast('Bloco 3 + chats OK — recarregando', 'ok')
+  }
   try {
-    await window.api.invoke('tema:set', novo)
-  } catch (e) {
-    console.warn('[tema] set:', e)
+    await window.api.invoke('janela:recarregar', true)
+  } catch {
+    location.reload()
   }
-  aplicarTema(novo)
 }
 
-/** CodeMirror: escuro → oneDark; claro → tema padrão (themeCompartment). Body já deve ter a classe. */
+// ---------- Tema (módulo features/ui/tema.js) ----------
+async function alternarTema() {
+  return _alternarTema(editor)
+}
+
 function trocarTemaEditor(_tema) {
   editor?.aplicarTema()
 }
 
-function aplicarTema(tema) {
-  document.body.classList.toggle('tema-escuro', tema === 'escuro')
-  document.body.classList.toggle('tema-claro', tema !== 'escuro')
-  try {
-    localStorage.setItem('dg-tema', tema)
-  } catch {}
-  trocarTemaEditor(tema)
+function aplicarTemaLocal(tema) {
+  return aplicarTema(tema, editor)
 }
 
 async function carregarTema() {
-  try {
-    const tema = await window.api.invoke('tema:get')
-    aplicarTema(tema)
-  } catch {
-    aplicarTema(localStorage.getItem('dg-tema') === 'claro' ? 'claro' : 'escuro')
-  }
+  return _carregarTema(editor)
 }
 
 // ---------- Paleta / Quick Open / Busca ----------
@@ -2471,6 +3835,9 @@ function bootstrapComandos() {
     { id: 'contas', titulo: 'Contas e saude', fn: () => abrirContas() },
     { id: 'config', titulo: 'Configuracoes', fn: () => abrirConfig() },
     { id: 'tema', titulo: 'Alternar tema', fn: () => alternarTema() },
+    { id: 'tema-escuro', titulo: 'Tema escuro', fn: () => { void window.api.invoke('tema:set', 'escuro').catch(() => {}); aplicarTemaLocal('escuro') } },
+    { id: 'tema-claro', titulo: 'Tema claro', fn: () => { void window.api.invoke('tema:set', 'claro').catch(() => {}); aplicarTemaLocal('claro') } },
+    { id: 'orientar-prompt', titulo: 'Assistente de prompt', atalho: 'Ctrl+Alt+P', fn: () => abrirOrientadorPrompt() },
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
     { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
@@ -2478,7 +3845,7 @@ function bootstrapComandos() {
       id: 'agent-panel',
       titulo: 'Painel Agent',
       fn: () => {
-        ativarAbaCentro('agent')
+        focarPainelIa('agent')
       }
     },
     {
@@ -2491,22 +3858,24 @@ function bootstrapComandos() {
     },
     { id: 'fechar-aba', titulo: 'Fechar aba', atalho: 'Ctrl+W', fn: () => state.abaAtiva && fecharAba(state.abaAtiva) },
     { id: 'toggle-sidebar', titulo: 'Alternar Explorer', atalho: 'Ctrl+B', fn: () => toggleSidebar() },
-    { id: 'toggle-right', titulo: 'Alternar painel direito', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
+    { id: 'toggle-right', titulo: 'Alternar Bloco 3', atalho: 'Ctrl+Alt+B', fn: () => toggleRight() },
+    { id: 'assistente-novo', titulo: 'Novo — o que criar?', atalho: 'Ctrl+N', fn: () => { toggleRight(true); abrirAssistenteNovo() } },
+    {
+      id: 'verificar-reiniciar',
+      titulo: 'Verificar instalação e reiniciar',
+      fn: () => void verificarEReiniciarDg()
+    },
     {
       id: 'toggle-terminal',
       titulo: 'Alternar terminal',
       atalho: 'Ctrl+`',
-      fn: () => document.getElementById('btn-terminal-toggle')?.click()
+      fn: () => abrirTerminalNoBloco3()
     },
     {
       id: 'navegador',
       titulo: 'Navegador embutido',
       atalho: 'Ctrl+Shift+N',
-      fn: () => {
-        toggleRight(true)
-        ativarAbaDireita('browser')
-        void abrirNavegadorUi()
-      }
+      fn: () => abrirNavegadorNoBloco3()
     },
     {
       id: 'adapta-copiar',
@@ -2584,13 +3953,7 @@ function bootstrapComandos() {
 }
 
 async function mostrarSobreDgEditor() {
-  let ver = ''
-  try {
-    ver = (await window.api.getVersion?.()) || (await window.api.invoke('app:get-version')) || ''
-  } catch {
-    ver = ''
-  }
-  alert('DG Editor' + (ver ? ' v' + ver : '') + '\nEditor de sistemas com IA local.')
+  await abrirSobreDgEditor()
 }
 
 function acaoEditar(cmd) {
@@ -2616,10 +3979,11 @@ function abrirPaletaArquivos() {
   fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Quick Open — nome do arquivo...'
+  $('palette-input').placeholder = 'Abrir arquivo — digite o nome…'
   renderizarPaleta('')
   $('palette-input').focus()
 }
+
 
 function fecharPaleta() {
   $('palette').classList.add('hidden')
@@ -2681,11 +4045,14 @@ async function renderizarPaleta(filtro) {
         const r = await window.api.invoke('busca:arquivos', raiz, f, 80)
         if (r?.ok && Array.isArray(r.itens)) {
           for (const e of r.itens) {
+            const nome = e.nome || ''
+            const rel = e.rel || nome
+            const pasta = String(rel).replace(/[\\/][^\\/]+$/, '') || '.'
             paletaItens.push({
               tipo: 'file',
               caminho: e.caminho,
-              label: e.rel || e.nome,
-              hint: e.nome
+              label: nomeAmigavelArquivo(nome, rel),
+              hint: pasta === '.' ? rel : pasta
             })
           }
         }
@@ -2723,7 +4090,10 @@ function executarItemPaleta(c) {
 
 function executarComando(id) {
   if (executarComandoLocal(id)) return
-  if (id === 'abrir-pasta') abrirPasta()
+  if (id === 'assistente-novo') {
+    toggleRight(true)
+    abrirAssistenteNovo()
+  } else if (id === 'abrir-pasta') abrirPasta()
   else if (id === 'analisar') {
     if (state.pastaAtual) void escolherEscopoAnalise(state.pastaAtual)
   } else if (id === 'analisar-completa') {
@@ -2735,12 +4105,20 @@ function executarComando(id) {
   } else if (id === 'contas') abrirContas()
   else if (id === 'config') abrirConfig()
   else if (id === 'tema') alternarTema()
+  else if (id === 'tema-escuro') {
+    void window.api.invoke('tema:set', 'escuro').catch(() => {})
+    aplicarTemaLocal('escuro')
+  } else if (id === 'tema-claro') {
+    void window.api.invoke('tema:set', 'claro').catch(() => {})
+    aplicarTemaLocal('claro')
+  } else if (id === 'agent-panel') focarPainelIa('agent')
   else if (id === 'guardian') abrirContas()
   else if (id === 'salvar') salvarArquivoAtivo()
   else if (id === 'fechar-aba') {
     if (state.abaAtiva) fecharAba(state.abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
   else if (id === 'toggle-right') toggleRight()
+  else if (id === 'verificar-reiniciar') void verificarEReiniciarDg()
   else if (id === 'orientar-prompt') abrirOrientadorPrompt()
   else if (id === 'navegador') {
     toggleRight(true)
@@ -2824,64 +4202,99 @@ let depStatusCache = null
 function atualizarIndicadorDeps(st) {
   depStatusCache = st || depStatusCache
   const d = depStatusCache
-  const alvo = document.getElementById('chat-provider')
   const btn = document.getElementById('btn-ollama-start')
   if (d && btn) {
     const mostrar = d.ollama === 'offline' && d.instalado && !d.llmApiKey
     btn.style.display = mostrar ? '' : 'none'
   }
-  if (!alvo || !d) return
-  const base = alvo.dataset.iaBase || alvo.textContent || 'IA: —'
-  alvo.dataset.iaBase = base
-  let dep = 'LLM: ?'
-  if (d.llmApiKey) dep = 'LLM: API key'
-  else if (d.ollama === 'ativo') dep = 'Ollama: ativo'
-  else if (d.ollama === 'offline') dep = 'Ollama: offline'
-  else dep = 'Ollama: não instalado'
-  alvo.textContent = base + ' · ' + dep
-  alvo.title = dep + (d.modelo && d.modelo !== 'desconhecido' ? ' · modelo: ' + d.modelo : '')
-}
-
-function atualizarBadgeProvedor(nome) {
+  const sb = document.getElementById('sb-ia')
+  if (!d) return
+  let dep = 'IA: —'
+  if (d.llmApiKey) dep = 'IA: API online'
+  else if (d.ollama === 'ativo') dep = 'IA: Ollama ativo'
+  else if (d.ollama === 'offline') dep = 'IA: Ollama offline'
+  else dep = 'IA: local indisponível'
+  if (sb) {
+    sb.textContent = dep
+    sb.title = dep + (d.modelo && d.modelo !== 'desconhecido' ? ' · ' + d.modelo : '')
+  }
   const alvo = document.getElementById('chat-provider')
   if (alvo) {
-    const txt = 'IA: ' + nome
-    alvo.dataset.iaBase = txt
-    alvo.textContent = txt
-    if (depStatusCache) atualizarIndicadorDeps(depStatusCache)
+    alvo.dataset.iaBase = dep
+    alvo.textContent = dep
   }
 }
 
-/** Toast DOM simples (canto inferior direito, auto-dismiss 5s). */
+function atualizarBadgeProvedor(nome) {
+  const sb = document.getElementById('sb-ia')
+  const curto = String(nome || '').split('/')[0] || nome
+  if (sb) {
+    sb.textContent = 'IA: ' + curto
+    sb.title = 'Provedor: ' + nome
+  }
+  const alvo = document.getElementById('chat-provider')
+  if (alvo) {
+    alvo.dataset.iaBase = 'IA: ' + nome
+    alvo.textContent = 'IA: ' + nome
+  }
+}
+
+/** Toast DOM simples (acima do composer, auto-dismiss 5s). */
 function mostrarToast(mensagem, tipo = 'aviso') {
   let host = document.getElementById('dg-toast-host')
   if (!host) {
     host = document.createElement('div')
     host.id = 'dg-toast-host'
     host.setAttribute('aria-live', 'polite')
-    host.style.cssText =
-      'position:fixed;right:16px;bottom:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none'
     document.body.appendChild(host)
   }
   const el = document.createElement('div')
-  const cor =
-    tipo === 'erro' ? '#8b1e1e' : tipo === 'ok' ? '#1e5a32' : '#5a4a1e'
+  el.className = 'dg-toast ' + (tipo === 'erro' ? 'erro' : tipo === 'ok' ? 'ok' : 'aviso')
   el.textContent = String(mensagem || '')
-  el.style.cssText =
-    'pointer-events:auto;padding:10px 14px;border-radius:6px;background:' +
-    cor +
-    ';color:#f5f5f0;font:13px/1.35 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.35);opacity:0;transition:opacity .2s'
   host.appendChild(el)
   requestAnimationFrame(() => {
-    el.style.opacity = '1'
+    el.classList.add('is-show')
   })
   setTimeout(() => {
-    el.style.opacity = '0'
+    el.classList.remove('is-show')
     setTimeout(() => el.remove(), 250)
   }, 5000)
   return el
 }
 window.dgToast = mostrarToast
+
+async function atualizarChipMemoria() {
+  try {
+    const raiz = (pastasPermitidas() || [])[0] || (state.pastasRecentes || [])[0]
+    if (!raiz) return
+    const fatos = await window.api.invoke('memoria:listar', raiz)
+    const itens = (fatos && fatos.itens) || []
+    const n = itens.filter((i) => i.status === 'aceita').length
+    let chip = document.getElementById('chat-memoria-chip')
+    const host = document.getElementById('chat-header') || document.getElementById('chat-provider')?.parentElement
+    if (!host) return
+    if (!chip) {
+      chip = document.createElement('span')
+      chip.id = 'chat-memoria-chip'
+      chip.className = 'provider-badge'
+      chip.style.marginLeft = '6px'
+      const prov = document.getElementById('chat-provider')
+      if (prov && prov.parentElement) prov.parentElement.appendChild(chip)
+      else host.appendChild(chip)
+    }
+    if (n > 0) {
+      chip.hidden = false
+      chip.textContent = 'Memória:' + n
+      chip.title = n + ' fato(s) aceito(s) no contexto automático'
+    } else {
+      chip.hidden = true
+      chip.textContent = ''
+    }
+  } catch {
+    /* opcional */
+  }
+}
+window.dgAtualizarChipMemoria = atualizarChipMemoria
 
 async function atualizarBadgeProvedorReal(modeloForcado) {
   try {
@@ -2894,14 +4307,37 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
       : '—'
     let modelo = modeloForcado || ''
     let flagUpdate = false
+    let motivoTarefa = ''
     if (!modelo) {
       try {
-        const r = await window.api.invoke('modelos:listar')
-        modelo = (r && r.catalogo && r.catalogo.ativo) || ''
-        const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
-        flagUpdate = !!(m && m.atualizadoDisponivel)
+        const tarefaSel = document.getElementById('chat-mode-select')?.value || 'codigo'
+        const tarefa =
+          tarefaSel === 'plan' || tarefaSel === 'ask' ? 'chat' : tarefaSel === 'agent' ? 'codigo' : 'codigo'
+        const mt = await window.api.invoke('modelos:para-tarefa', tarefa)
+        if (mt?.modelo) {
+          modelo = mt.modelo
+          motivoTarefa = mt.motivo || ''
+        }
       } catch {
-        /* ignora */
+        /* */
+      }
+      if (!modelo) {
+        try {
+          const r = await window.api.invoke('modelos:listar')
+          modelo = (r && r.catalogo && r.catalogo.ativo) || ''
+          const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+          flagUpdate = !!(m && m.atualizadoDisponivel)
+        } catch {
+          /* ignora */
+        }
+      } else {
+        try {
+          const r = await window.api.invoke('modelos:listar')
+          const m = (r?.catalogo?.modelos || []).find((x) => x.id === modelo)
+          flagUpdate = !!(m && m.atualizadoDisponivel)
+        } catch {
+          /* */
+        }
       }
     } else {
       try {
@@ -2914,8 +4350,30 @@ async function atualizarBadgeProvedorReal(modeloForcado) {
     }
     let texto = modelo ? 'IA: ' + nomeProv + ' — ' + modelo : 'IA: ' + nomeProv
     if (flagUpdate) texto += ' ⚠ atualização disponível'
+    let titleExtra = motivoTarefa || ''
+    try {
+      const cotas = await window.api.invoke('providers:cotas')
+      const lista = cotas?.cotas || cotas?.itens || []
+      const esgotados = Array.isArray(lista) ? lista.filter((c) => c.esgotado || c.remaining === 0).length : 0
+      if (esgotados) {
+        texto += ' · cota:' + esgotados + ' esgot.'
+        titleExtra = (titleExtra ? titleExtra + ' · ' : '') + esgotados + ' provedor(es) em cooldown/cota'
+      }
+    } catch { /* opcional */ }
+    try {
+      const conn = await window.api.invoke('conectores:listar')
+      const conectores = conn?.conectores || []
+      const off = conectores.filter((c) => !c.ativo).length
+      if (off) titleExtra = (titleExtra ? titleExtra + ' · ' : '') + off + ' conector(es) inativos'
+    } catch { /* opcional */ }
     const alvo = document.getElementById('chat-provider')
-    if (alvo) alvo.textContent = texto
+    if (alvo) {
+      alvo.dataset.iaBase = texto
+      alvo.textContent = texto
+      if (titleExtra) alvo.title = titleExtra
+      if (depStatusCache) atualizarIndicadorDeps(depStatusCache)
+    }
+    void atualizarChipMemoria()
   } catch {
     /* ignora */
   }
@@ -2968,7 +4426,13 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
 })
 
 // ---------- Eventos ----------
-$('btn-add-folder').addEventListener('click', abrirPasta)
+$('btn-add-folder')?.addEventListener('click', abrirPasta)
+$('btn-add-repo')?.addEventListener('click', abrirPasta)
+$('btn-sidebar-nova-chat')?.addEventListener('click', () => {
+  histChat?.nova?.()
+  focarPainelIa('chat')
+})
+$('btn-desktop-use')?.addEventListener('click', () => pedirPermissaoDesktop())
 $('btn-open-vault')?.addEventListener('click', () => void abrirVault())
 $('btn-close-vault')?.addEventListener('click', () => void fecharVault())
 $('md-preview')?.addEventListener('click', (ev) => {
@@ -3011,7 +4475,7 @@ $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 // Chat agent/mode selector - respects DG Editor agents and serial queue
 const chatModes = [
   { id: 'auto', label: 'Auto' },
-  { id: 'code', label: 'Code' },
+  { id: 'code', label: 'Agent' },
   { id: 'plan', label: 'Plan' },
   { id: 'ask', label: 'Ask' },
   { id: 'debug', label: 'Debug' }
@@ -3069,124 +4533,177 @@ async function carregarOpcoesAgenteChat(raiz = state.pastaAtual) {
   }
   if (grpLocal.children.length) agentSel.appendChild(grpLocal)
   agentSel.value = Array.from(agentSel.options).some((o) => o.value === preferido) ? preferido : 'auto'
+  const agentBtn = document.getElementById('btn-chat-agent')
+  if (agentBtn) {
+    agentBtn.title = 'Agente: ' + (agentSel.selectedOptions?.[0]?.textContent || agentSel.value)
+  }
 }
 
 function initChatAgentSelector() {
-  const bar = document.getElementById('chat-header-actions')
-  if (!bar) return
-  if (document.getElementById('chat-agent-select')) return
-  const wrap = document.createElement('div')
-  wrap.className = 'chat-header-selectors'
-  const agentSel = document.createElement('select')
-  agentSel.id = 'chat-agent-select'
-  agentSel.className = 'chat-control-select'
-  agentSel.setAttribute('aria-label', 'Agente')
-  const modeSel = document.createElement('select')
-  modeSel.id = 'chat-mode-select'
-  modeSel.className = 'chat-control-select'
-  modeSel.setAttribute('aria-label', 'Modo')
-  for (const m of chatModes) {
-    const o = document.createElement('option')
-    o.value = m.id
-    o.textContent = m.label
-    modeSel.appendChild(o)
+  const agentSel = document.getElementById('chat-agent-select')
+  const modeSel = document.getElementById('chat-mode-select')
+  const btnMais = document.getElementById('btn-chat-mais')
+  const menu = document.getElementById('chat-mais-menu')
+  const maisWrap = btnMais?.closest('.chat-more-wrap')
+  if (!agentSel || !modeSel) return
+  if (agentSel.dataset.wired === '1') {
+    void carregarOpcoesAgenteChat()
+    return
   }
-  wrap.appendChild(agentSel)
-  wrap.appendChild(modeSel)
-  // Botão Mais opções estilo Kilo
-  const maisWrap = document.createElement('div')
-  maisWrap.className = 'chat-more-wrap'
-  const btnMais = document.createElement('button')
-  btnMais.type = 'button'
-  btnMais.className = 'btn-small chat-more-toggle'
-  btnMais.id = 'btn-chat-mais'
-  btnMais.textContent = 'Mais opções'
-  btnMais.setAttribute('aria-haspopup', 'menu')
-  btnMais.setAttribute('aria-expanded', 'false')
-  btnMais.setAttribute('aria-controls', 'chat-mais-menu')
-  const menu = document.createElement('div')
-  menu.id = 'chat-mais-menu'
-  menu.className = 'chat-more-menu'
-  menu.setAttribute('role', 'menu')
-  menu.hidden = true
-  const setMenuOpen = (open) => {
-    menu.hidden = !open
-    btnMais.setAttribute('aria-expanded', open ? 'true' : 'false')
-  }
-  const itemAuto = document.createElement('button')
-  itemAuto.type = 'button'
-  itemAuto.className = 'chat-more-item'
-  itemAuto.setAttribute('role', 'menuitemcheckbox')
-  function atualizarItemAuto() {
-    try {
-      const v = localStorage.getItem('dg-chat-autoapprove') === '1'
-      itemAuto.textContent = v ? 'Desativar aprovação automática' : 'Ativar aprovação automática'
-      itemAuto.setAttribute('aria-checked', v ? 'true' : 'false')
-    } catch {
-      itemAuto.textContent = 'Ativar aprovação automática'
-      itemAuto.setAttribute('aria-checked', 'false')
+  agentSel.dataset.wired = '1'
+  if (!modeSel.options.length) {
+    for (const m of chatModes) {
+      const o = document.createElement('option')
+      o.value = m.id
+      o.textContent = m.label
+      modeSel.appendChild(o)
     }
   }
-  atualizarItemAuto()
-  itemAuto.addEventListener('click', (e) => {
-    e.stopPropagation()
-    try {
-      const v = localStorage.getItem('dg-chat-autoapprove') === '1'
-      if (v) localStorage.removeItem('dg-chat-autoapprove')
-      else localStorage.setItem('dg-chat-autoapprove', '1')
-    } catch {}
+  if (btnMais && menu && maisWrap && menu.dataset.wired !== '1') {
+    menu.dataset.wired = '1'
+    const setMenuOpen = (open) => {
+      menu.hidden = !open
+      btnMais.setAttribute('aria-expanded', open ? 'true' : 'false')
+    }
+    const itemAuto = document.createElement('button')
+    itemAuto.type = 'button'
+    itemAuto.className = 'chat-more-item'
+    itemAuto.setAttribute('role', 'menuitemcheckbox')
+    function atualizarItemAuto() {
+      try {
+        const v = localStorage.getItem('dg-chat-autoapprove') === '1'
+        itemAuto.textContent = v ? 'Desativar aprovação automática' : 'Ativar aprovação automática'
+        itemAuto.setAttribute('aria-checked', v ? 'true' : 'false')
+      } catch {
+        itemAuto.textContent = 'Ativar aprovação automática'
+        itemAuto.setAttribute('aria-checked', 'false')
+      }
+    }
     atualizarItemAuto()
-    setMenuOpen(false)
-    btnMais.focus()
-  })
-  const itemPrompt = document.createElement('button')
-  itemPrompt.type = 'button'
-  itemPrompt.className = 'chat-more-item'
-  itemPrompt.setAttribute('role', 'menuitem')
-  itemPrompt.textContent = 'Melhorar prompt'
-  itemPrompt.addEventListener('click', (e) => {
-    e.stopPropagation()
-    setMenuOpen(false)
-    try {
-      if (typeof abrirOrientadorPrompt === 'function') abrirOrientadorPrompt()
-      else document.getElementById('btn-prompt-orientador')?.click()
-    } catch {}
-  })
-  menu.appendChild(itemAuto)
-  menu.appendChild(itemPrompt)
-  btnMais.addEventListener('click', (e) => {
-    e.stopPropagation()
-    const open = btnMais.getAttribute('aria-expanded') !== 'true'
-    setMenuOpen(open)
-    if (open) itemAuto.focus()
-  })
-  document.addEventListener('click', (ev) => {
-    if (!maisWrap.contains(ev.target)) setMenuOpen(false)
-  })
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Escape' || menu.hidden) return
-    setMenuOpen(false)
-    btnMais.focus()
-    ev.stopPropagation()
-  })
-  maisWrap.appendChild(btnMais)
-  maisWrap.appendChild(menu)
-  wrap.appendChild(maisWrap)
-  bar.insertBefore(wrap, bar.firstChild)
+    itemAuto.addEventListener('click', (e) => {
+      e.stopPropagation()
+      try {
+        const v = localStorage.getItem('dg-chat-autoapprove') === '1'
+        if (v) localStorage.removeItem('dg-chat-autoapprove')
+        else localStorage.setItem('dg-chat-autoapprove', '1')
+      } catch {}
+      atualizarItemAuto()
+      setMenuOpen(false)
+      btnMais.focus()
+    })
+    const itemAvaliar = document.createElement('button')
+    itemAvaliar.type = 'button'
+    itemAvaliar.className = 'chat-more-item'
+    itemAvaliar.setAttribute('role', 'menuitem')
+    itemAvaliar.textContent = 'Avaliar modelo'
+    itemAvaliar.addEventListener('click', (e) => {
+      e.stopPropagation()
+      setMenuOpen(false)
+      document.getElementById('btn-brain-avaliar')?.click()
+    })
+    const itemAuditar = document.createElement('button')
+    itemAuditar.type = 'button'
+    itemAuditar.className = 'chat-more-item'
+    itemAuditar.setAttribute('role', 'menuitem')
+    itemAuditar.textContent = 'Auto auditoria'
+    itemAuditar.addEventListener('click', (e) => {
+      e.stopPropagation()
+      setMenuOpen(false)
+      document.getElementById('btn-auditar')?.click()
+    })
+    const itemLimparSkill = document.createElement('button')
+    itemLimparSkill.type = 'button'
+    itemLimparSkill.className = 'chat-more-item'
+    itemLimparSkill.setAttribute('role', 'menuitem')
+    itemLimparSkill.textContent = 'Remover skill ativa'
+    itemLimparSkill.addEventListener('click', (e) => {
+      e.stopPropagation()
+      setMenuOpen(false)
+      definirSkillChat('', '')
+    })
+    // Sem Melhorar prompt / Parar (já têm ícone dedicado no composer)
+    menu.replaceChildren(itemAuto, itemAvaliar, itemAuditar, itemLimparSkill)
+    const mk = (label, fn) => {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'chat-more-item'
+      b.setAttribute('role', 'menuitem')
+      b.textContent = label
+      b.addEventListener('click', (e) => {
+        e.stopPropagation()
+        setMenuOpen(false)
+        fn()
+      })
+      return b
+    }
+    menu.appendChild(mk('Orquestrar', () => {
+      const ai = $('agent-input')
+      const ci = $('chat-input')
+      if (ai && ci && !ai.value.trim() && ci.value.trim()) ai.value = ci.value
+      focarPainelIa('agent')
+      void executarAgentUi(true)
+    }))
+    menu.appendChild(mk('Verificar após turno', () => {
+      const v = document.getElementById('agent-verify-loop')
+      if (v) {
+        v.checked = !v.checked
+        if (window.dgToast) window.dgToast(v.checked ? 'Verificar ligado' : 'Verificar desligado', 'ok')
+      }
+    }))
+    menu.appendChild(mk('Desfazer apply', () => document.getElementById('btn-agent-undo')?.click()))
+    btnMais.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const open = btnMais.getAttribute('aria-expanded') !== 'true'
+      setMenuOpen(open)
+      if (open) itemAuto.focus()
+    })
+    document.addEventListener('click', (ev) => {
+      if (!maisWrap.contains(ev.target)) setMenuOpen(false)
+    })
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape' || menu.hidden) return
+      setMenuOpen(false)
+      btnMais.focus()
+      ev.stopPropagation()
+    })
+  }
   void carregarOpcoesAgenteChat()
   try {
     const vm = localStorage.getItem('dg-chat-mode')
-    if (vm) modeSel.value = vm
+    if (vm && Array.from(modeSel.options).some((o) => o.value === vm)) modeSel.value = vm
   } catch {}
+  const planToggle = document.getElementById('agent-plan-mode')
+  const syncPlanFromMode = () => {
+    if (!planToggle) return
+    planToggle.checked = modeSel.value === 'plan'
+  }
+  syncPlanFromMode()
+  const syncCtxTitles = () => {
+    const modeBtn = document.getElementById('btn-chat-mode')
+    const agentBtn = document.getElementById('btn-chat-agent')
+    if (modeBtn) modeBtn.title = 'Modo: ' + (modeSel.selectedOptions?.[0]?.textContent || modeSel.value)
+    if (agentBtn) agentBtn.title = 'Agente: ' + (agentSel.selectedOptions?.[0]?.textContent || agentSel.value)
+  }
   agentSel.addEventListener('change', () => {
-    try {
-      localStorage.setItem('dg-chat-agent', agentSel.value)
-    } catch {}
+    try { localStorage.setItem('dg-chat-agent', agentSel.value) } catch {}
+    sincronizarAgenteSelects('chat')
+    syncCtxTitles()
   })
   modeSel.addEventListener('change', () => {
-    try {
-      localStorage.setItem('dg-chat-mode', modeSel.value)
-    } catch {}
+    try { localStorage.setItem('dg-chat-mode', modeSel.value) } catch {}
+    syncPlanFromMode()
+    syncCtxTitles()
+    agendarSalvarWorkspace()
+  })
+  syncCtxTitles()
+  planToggle?.addEventListener('change', () => {
+    if (planToggle.checked) {
+      modeSel.value = 'plan'
+      try { localStorage.setItem('dg-chat-mode', 'plan') } catch {}
+    } else if (modeSel.value === 'plan') {
+      modeSel.value = 'code'
+      try { localStorage.setItem('dg-chat-mode', 'code') } catch {}
+    }
   })
 }
 function atualizarStatusAgent(modelo, ms, fila) {
@@ -3196,7 +4713,7 @@ function atualizarStatusAgent(modelo, ms, fila) {
   if (modelo) partes.push(modelo)
   if (ms != null) partes.push(ms + 'ms')
   if (fila) {
-    if (fila.ocupado) partes.push('filaâ—')
+    if (fila.ocupado) partes.push('fila\u25CF')
     else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
   }
   el.textContent = partes.length ? 'Agent: ' + partes.join(' · ') : 'Agent: —'
@@ -3206,7 +4723,7 @@ async function carregarAgentesUi() {
   const sel = $('agent-select')
   if (!sel || !state.pastaAtual) return
   const r = await window.api.invoke('agente:listar', state.pastaAtual)
-  const cur = sel.value
+  const cur = sel.value || document.getElementById('chat-agent-select')?.value
   sel.innerHTML = ''
   for (const a of r?.agentes || []) {
     const o = document.createElement('option')
@@ -3214,7 +4731,9 @@ async function carregarAgentesUi() {
     o.textContent = a.nome || a.id
     sel.appendChild(o)
   }
-  if (cur) sel.value = cur
+  if (cur && Array.from(sel.options).some((o) => o.value === cur)) sel.value = cur
+  sincronizarAgenteSelects('agent')
+  void carregarOpcoesAgenteChat()
   const st = await window.api.invoke('agente:fila-status')
   const fs = $('agent-fila-status')
   if (fs && st) {
@@ -3262,8 +4781,134 @@ function appendAgentTraceLive(line) {
   box.scrollTop = box.scrollHeight
 }
 
+function atualizarChatPlanoCard(plano) {
+  const area = $('chat-messages')
+  renderChatPlanoCard(area, plano, {
+    onImplementar: (soProximo) => void executarPlanoDoChat(!!soProximo),
+    onMarcar: async (id, feito) => {
+      await window.api.invoke('agente:plano-marcar-passo', id, feito)
+      const r = await window.api.invoke('agente:plano-ler')
+      renderPlanoChecklist(r?.plano)
+      atualizarChatPlanoCard(r?.plano)
+    }
+  })
+}
+
+function atualizarChatApplyCard(propostas) {
+  const area = $('chat-messages')
+  renderChatApplyCard(area, propostas || agentPropostas, {
+    onAplicarTodas: () => void aplicarTodasPropostasAgent(),
+    onRevisar: () => {
+      toggleRight(true)
+      ativarAbaDireita('agent')
+      abrirFilaPropostasAgent()
+    },
+    onAplicarUma: (id) => void aplicarUmaPropostaAgent(id)
+  })
+}
+
+function mostrarChatRestoreAposApply(arquivos) {
+  renderChatRestoreStrip($('chat-messages'), {
+    arquivos: arquivos || [],
+    onDesfazer: () => void desfazerCheckpointDoChat()
+  })
+  atualizarChatApplyCard(agentPropostas)
+}
+
+async function desfazerCheckpointDoChat() {
+  const r = await window.api.invoke('agente:checkpoint-desfazer')
+  if (r?.ok) {
+    if (window.dgToast) window.dgToast('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).', 'ok')
+    else alert('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).')
+    ocultarChatRestoreStrip($('chat-messages'))
+  } else {
+    if (window.dgToast) window.dgToast('Falha: ' + (r?.erro || 'restore'), 'erro')
+    else alert('Falha: ' + (r?.erro || 'restore'))
+  }
+}
+
+async function aplicarUmaPropostaAgent(id) {
+  if (!id) return
+  if (!(await dgConfirm('Aplicar este arquivo no disco?', 'Aplicar'))) return
+  window.__dgApplyViaAgente = true
+  const r = await window.api.invoke('agente:aplicar-proposta', id, pastasPermitidas())
+  if (!r?.ok) {
+    alert('Falha em apply: ' + (r?.erro || ''))
+    return
+  }
+  agentPropostas = agentPropostas.filter((p) => p.id !== id)
+  const rest = await window.api.invoke('agente:propostas')
+  mostrarPropostasAgent(rest?.pendentes || [])
+  atualizarChatApplyCard(rest?.pendentes || [])
+  mostrarChatRestoreAposApply([r.path || r.absPath].filter(Boolean))
+  await oferecerCommitAposApply([r.path || r.absPath].filter(Boolean))
+}
+
+async function executarPlanoDoChat(soProximo) {
+  if (!state.pastaAtual) {
+    alert('Abra uma pasta primeiro.')
+    return
+  }
+  const area = $('chat-messages')
+  const modoSel = document.getElementById('chat-mode-select')
+  if (modoSel) modoSel.value = 'code'
+  const planToggle = document.getElementById('agent-plan-mode')
+  if (planToggle) planToggle.checked = false
+  mostrarBannerAgentMode(
+    area,
+    soProximo
+      ? 'Proximo passo do plano — Modo Agent'
+      : 'Implementar plano — sair do Plan e executar'
+  )
+  ligarProgressoAgent()
+  atualizarCartaoTrabalho(area, {
+    titulo: 'Modo Agent',
+    passo: soProximo ? 'Executando proximo passo…' : 'Implementando o plano…'
+  })
+  setChatLiveStatus('Modo Agent — executando plano…')
+  setChatSendMode('stop')
+  const agentStats = criarStatsVazios()
+  const offProg = window.api.on?.('agente:progresso', (_e, ev) => {
+    if (!ev || typeof ev !== 'object') return
+    aplicarEventoStats(agentStats, ev)
+    if (ev.tipo === 'stats' || ev.tipo === 'tool' || ev.tipo === 'proposta') {
+      pintarStatsNoCartao(area, agentStats)
+    }
+    if (ev.tipo === 'status') {
+      atualizarCartaoTrabalho(area, { titulo: 'Modo Agent', passo: humanizarStatus(ev.texto) })
+    }
+  })
+  try {
+    const r = await window.api.invoke('agente:executar-plano', {
+      raiz: state.pastaAtual,
+      pastas: pastasPermitidas(),
+      soProximo: !!soProximo
+    })
+    if (!r?.ok) {
+      alert(r?.erro || 'Falha ao executar plano')
+      return
+    }
+    if (r.texto) adicionarBolha('assistant', organizarRespostaCursor(r.texto), r.modelo || 'agente')
+    renderAgentTrace(r.passos || [])
+    mostrarPropostasAgent(r.propostas || [])
+    atualizarChatApplyCard(r.propostas || [])
+    renderPlanoChecklist(r.plano)
+    atualizarChatPlanoCard(r.plano)
+    atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
+    toggleRight(true)
+    ativarAbaDireita('agent')
+  } finally {
+    if (typeof offProg === 'function') offProg()
+    fecharCartaoTrabalho(area, 'Pronto')
+    setChatSendMode('send')
+    setChatLiveStatus('')
+    ocultarBannerAgentMode(area)
+  }
+}
+
 function mostrarPropostasAgent(propostas) {
   agentPropostas = propostas || []
+  atualizarChatApplyCard(agentPropostas)
   const box = $('agent-propostas-resumo')
   if (!box) return
   if (!agentPropostas.length) {
@@ -3329,29 +4974,68 @@ function abrirFilaPropostasAgent() {
 
 async function aplicarTodasPropostasAgent() {
   if (!agentPropostas.length) return
-  if (!window.confirm('Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.'))
+  if (
+    !(await dgConfirm(
+      'Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.',
+      'Aplicar propostas'
+    ))
+  )
     return
+  const aplicados = []
+  window.__dgApplyViaAgente = true
   for (const p of [...agentPropostas]) {
     const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
     if (!r?.ok) {
       alert('Falha em ' + p.path + ': ' + (r?.erro || ''))
       break
     }
+    aplicados.push(p.path || r.path)
   }
   const rest = await window.api.invoke('agente:propostas')
   mostrarPropostasAgent(rest?.pendentes || [])
-  alert('Apply concluído.')
+  atualizarChatApplyCard(rest?.pendentes || [])
+  if (window.dgToast) window.dgToast('Apply concluído.', 'ok')
+  else alert('Apply concluído.')
+  if (aplicados.length) {
+    mostrarChatRestoreAposApply(aplicados)
+    await oferecerCommitAposApply(aplicados)
+  }
 }
 
 function ligarProgressoAgent() {
   if (agentProgressUnsub) agentProgressUnsub()
+  const painelStats = criarStatsVazios()
   agentProgressUnsub = window.api.on('agente:progresso', (_e, ev) => {
     if (!ev || typeof ev !== 'object') return
-    if (ev.tipo === 'status') appendAgentTraceLive('… ' + ev.texto)
-    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive('⚙️ ' + ev.nome + '…')
+    aplicarEventoStats(painelStats, ev)
+    if (ev.tipo === 'stats' || ev.tipo === 'tool' || ev.tipo === 'proposta') {
+      let strip = document.getElementById('agent-stats-live')
+      if (!strip) {
+        const out = $('agent-output')
+        if (out && out.parentElement) {
+          strip = document.createElement('p')
+          strip.id = 'agent-stats-live'
+          strip.className = 'chat-work-stats agent-stats-live'
+          out.parentElement.insertBefore(strip, out)
+        }
+      }
+      if (strip) {
+        const parts = []
+        if (painelStats.edits) parts.push('Editing ' + painelStats.edits)
+        if (painelStats.explored) parts.push('explored ' + painelStats.explored)
+        if (painelStats.searches) parts.push(painelStats.searches + ' searches')
+        if (painelStats.tools) parts.push(painelStats.tools + ' tools')
+        if (painelStats.commands) parts.push('ran ' + painelStats.commands + ' commands')
+        strip.textContent = parts.join(' · ')
+        strip.hidden = !parts.length
+      }
+      pintarStatsNoCartao($('chat-messages'), painelStats)
+    }
+    if (ev.tipo === 'status') appendAgentTraceLive(humanizarStatus(ev.texto))
+    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive(humanizarToolInicio(ev.nome) + '…')
     else if (ev.tipo === 'tool' && ev.fase === 'fim')
-      appendAgentTraceLive('ok ' + ev.nome + (ev.detalhe ? ' -> ' + String(ev.detalhe).slice(0, 80) : ''))
-    else if (ev.tipo === 'proposta') { appendAgentTraceLive('proposta ' + ev.path); if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path }) }
+      appendAgentTraceLive(humanizarToolFim(ev.nome, ev.detalhe))
+    else if (ev.tipo === 'proposta') { appendAgentTraceLive('Sugestão: ' + (ev.path || 'arquivo')); if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path }) }
     else if (ev.tipo === 'texto-delta') {
       const out = $('agent-output')
       if (out) {
@@ -3431,6 +5115,7 @@ function renderPlanoChecklist(plano) {
       await window.api.invoke('agente:plano-marcar-passo', p.id, cb.checked)
       const r = await window.api.invoke('agente:plano-ler')
       renderPlanoChecklist(r?.plano)
+      atualizarChatPlanoCard(r?.plano)
     })
     const span = document.createElement('span')
     span.textContent = p.texto
@@ -3438,11 +5123,31 @@ function renderPlanoChecklist(plano) {
     lab.appendChild(span)
     box.appendChild(lab)
   }
+  // Espelho vivo no transcript do chat
+  atualizarChatPlanoCard(plano)
 }
 
 async function refrescarPlanoUi() {
   const r = await window.api.invoke('agente:plano-ler')
   renderPlanoChecklist(r?.plano)
+}
+
+function agenteSelecionadoUi() {
+  const chat = document.getElementById('chat-agent-select')?.value
+  const adv = document.getElementById('agent-select')?.value
+  const v = chat && chat !== 'auto' ? chat : adv
+  return v && v !== 'auto' ? v : undefined
+}
+
+function sincronizarAgenteSelects(origem) {
+  const chat = document.getElementById('chat-agent-select')
+  const adv = document.getElementById('agent-select')
+  if (!chat || !adv) return
+  if (origem === 'chat' && chat.value) {
+    if (Array.from(adv.options).some((o) => o.value === chat.value)) adv.value = chat.value
+  } else if (origem === 'agent' && adv.value) {
+    if (Array.from(chat.options).some((o) => o.value === adv.value)) chat.value = adv.value
+  }
 }
 
 async function executarAgentUi(orquestrar) {
@@ -3453,9 +5158,11 @@ async function executarAgentUi(orquestrar) {
   const input = $('agent-input')
   const texto = input?.value?.trim()
   if (!texto) return
-  const plan = $('agent-plan-mode')?.checked
+  const plan =
+    $('agent-plan-mode')?.checked ||
+    document.getElementById('chat-mode-select')?.value === 'plan'
   const verify = $('agent-verify-loop')?.checked
-  const agente = $('agent-select')?.value || undefined
+  const agente = agenteSelecionadoUi()
   const out = $('agent-output')
   const send = $('agent-send')
   if (send) send.disabled = true
@@ -3527,9 +5234,41 @@ $('agent-send')?.addEventListener('click', () => void executarAgentUi(false))
 $('btn-agent-orquestrar')?.addEventListener('click', () => void executarAgentUi(true))
 $('btn-agent-stop')?.addEventListener('click', async () => {
   const r = await window.api.invoke('agente:cancelar')
-  appendAgentTraceLive('â–  cancelado (' + (r?.cancelados || 0) + ')')
+  appendAgentTraceLive('■ cancelado (' + (r?.cancelados || 0) + ')')
+  limparUiAgenteChat({ tituloFinal: 'Parado a seu pedido' })
   await carregarAgentesUi()
 })
+;(function initAgentMoreMenu() {
+  const btn = $('btn-agent-mais')
+  const menu = $('agent-mais-menu')
+  const header = $('agent-header')
+  if (!btn || !menu) return
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    const open = menu.hidden
+    menu.hidden = !open
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false')
+    header?.classList.toggle('is-expanded', open)
+  })
+  menu.querySelectorAll('[data-agent-more]').forEach((item) => {
+    item.addEventListener('click', () => {
+      const a = item.getAttribute('data-agent-more')
+      menu.hidden = true
+      btn.setAttribute('aria-expanded', 'false')
+      header?.classList.remove('is-expanded')
+      if (a === 'passo') $('btn-agent-exec-passo')?.click()
+      else if (a === 'verificar') $('btn-agent-verificar')?.click()
+      else if (a === 'undo') $('btn-agent-undo')?.click()
+    })
+  })
+  document.addEventListener('click', () => {
+    if (!menu.hidden) {
+      menu.hidden = true
+      btn.setAttribute('aria-expanded', 'false')
+      header?.classList.remove('is-expanded')
+    }
+  })
+})()
 $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   if (!state.pastaAtual) return
   ligarProgressoAgent()
@@ -3547,8 +5286,10 @@ $('btn-agent-exec-plano')?.addEventListener('click', async () => {
   if (out) out.textContent = r.texto || ''
   renderAgentTrace(r.passos || [])
   mostrarPropostasAgent(r.propostas || [])
+  atualizarChatApplyCard(r.propostas || [])
   atualizarStatusAgent(r.modelo, r.duracaoMs, null)
   renderPlanoChecklist(r.plano)
+  mostrarBannerAgentMode($('chat-messages'), 'Plano executado pelo painel Agente')
 })
 $('btn-agent-exec-passo')?.addEventListener('click', async () => {
   if (!state.pastaAtual) return
@@ -3570,6 +5311,7 @@ $('btn-agent-exec-passo')?.addEventListener('click', async () => {
   }
   renderAgentTrace(r.passos || [])
   mostrarPropostasAgent(r.propostas || [])
+  atualizarChatApplyCard(r.propostas || [])
   renderPlanoChecklist(r.plano)
 })
 $('btn-agent-verificar')?.addEventListener('click', async () => {
@@ -3598,7 +5340,10 @@ $('agent-input')?.addEventListener('keydown', (e) => {
 void refrescarPlanoUi()
 
 $('btn-contas').addEventListener('click', abrirContas)
+$('btn-contas-fechar')?.addEventListener('click', () => $('modal-contas').classList.add('hidden'))
+$('btn-editor-salvar')?.addEventListener('click', () => { void salvarArquivoAtivo() })
 $('btn-diag').addEventListener('click', rodarDiagnostico)
+$('btn-backup-onedrive')?.addEventListener('click', () => { void rodarBackupOneDrive() })
 $('btn-contas-close').addEventListener('click', () => $('modal-contas').classList.add('hidden'))
 $('btn-adapta-copiar')?.addEventListener('click', () => void copiarContinuidadeAdapta(false))
 $('btn-adapta-gerar')?.addEventListener('click', async () => {
@@ -3651,9 +5396,7 @@ function renderizarAnexosChat() {
     bar.appendChild(el)
   }
 }
-document.getElementById('btn-chat-anexar')?.addEventListener('click', () => {
-  document.getElementById('chat-anexos-input')?.click()
-})
+// Anexar: abre via popover de contexto (initChatIconContext)
 document.getElementById('chat-anexos-input')?.addEventListener('change', async (e) => {
   const input = e.target
   const files = Array.from(input.files || [])
@@ -4042,6 +5785,7 @@ async function atualizarIconeMax() {
 // ---------- Menubar (titlebar frameless) ----------
 const MENUS_BARRA = {
   arquivo: [
+    { id: 'assistente-novo', label: 'Novo…', accel: 'Ctrl+N' },
     { id: 'abrir-pasta', label: 'Abrir pasta de trabalho…', accel: 'Ctrl+O' },
     { id: 'abrir-vault', label: 'Abrir vault Markdown…' },
     { sep: true },
@@ -4073,8 +5817,13 @@ const MENUS_BARRA = {
     { id: 'toggle-right', label: 'Alternar painel direito', accel: 'Ctrl+Alt+B' },
     { id: 'toggle-terminal', label: 'Alternar terminal', accel: 'Ctrl+`' },
     { id: 'tema', label: 'Alternar tema' },
+    { id: 'tema-escuro', label: 'Tema escuro' },
+    { id: 'tema-claro', label: 'Tema claro' },
     { sep: true },
-    { id: 'tela-cheia', label: 'Tela cheia', accel: 'F11' }
+    { id: 'tela-cheia', label: 'Tela cheia', accel: 'F11' },
+    { sep: true },
+    { id: 'orientar-prompt', label: 'Assistente de prompt', accel: 'Ctrl+Alt+P' },
+    { id: 'agent-panel', label: 'Painel Agente' }
   ],
   sistemas: [
     { id: 'paleta-comandos', label: 'Paleta de comandos', accel: 'Ctrl+Shift+P' },
@@ -4210,14 +5959,68 @@ function initMenubar() {
 // ---------- Boot ----------
 carregarLayout()
 sincronizarBotoesPainelDireito()
-$('btn-right-collapse')?.addEventListener('click', () => toggleRight(false))
+$('btn-right-collapse')?.addEventListener('click', () => toggleRight())
+$('bloco3-edge')?.addEventListener('click', () => toggleRight(true))
 $('btn-right-expand')?.addEventListener('click', () => toggleRight(true))
+$('btn-right-toggle')?.addEventListener('click', () => toggleRight())
+document.querySelectorAll('[data-right-close]').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const pane = btn.getAttribute('data-right-close')
+    if (pane === 'terminal') {
+      try { window.dgTerminal?.fechar?.() } catch {}
+    }
+    if (pane === 'browser') {
+      try { window.api.invoke('navegador:fechar') } catch {}
+      setBrowserVisivel(false)
+      setBrowserStatus(false)
+    }
+    toggleRight(false)
+  })
+})
 carregarPastas()
 initResizers()
 initActivityBar()
 bootstrapComandos()
 initMenubar()
 carregarTema()
+initChatAgentSelector()
+ligarExtrasUi()
+ligarDialogosDoMain()
+ligarAutomacaoAprovacao({ toast: (m, t) => mostrarToast(m, t) })
+window.dgAlert = dgAlert
+window.dgConfirm = dgConfirm
+window.alert = (msg) => {
+  void dgAlert(String(msg ?? ''), 'DG Editor')
+}
+window.addEventListener('dg:workspace-sujo', () => agendarSalvarWorkspace())
+;(() => {
+  const el = $('sb-workspace')
+  const mark = (t) => {
+    if (el) el.textContent = 'Workspace: ' + t
+  }
+  const _flush = flushWorkspace
+  window.__dgFlushWorkspace = async () => {
+    mark('salvando…')
+    const r = await _flush()
+    mark(r?.ok ? 'salvo' : 'local')
+    setTimeout(() => mark('auto'), 2500)
+  }
+  const _agendar = agendarSalvarWorkspace
+  // reexport visual: wrap via event after flush
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) mark('salvo')
+  })
+  mark('auto')
+  void window.api.invoke('app:is-safe-mode').then((r) => {
+    const s = $('sb-safe')
+    if (s && (r === true || r?.safeMode || r?.ok && r.safeMode)) {
+      s.classList.remove('hidden')
+      s.textContent = 'Safe'
+    }
+  }).catch(() => {})
+})()
 // Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
 let terminalIniciado = false
 function garantirTerminal() {
@@ -4225,15 +6028,25 @@ function garantirTerminal() {
   terminalIniciado = true
   initTerminalPanel()
 }
-document.getElementById('btn-terminal-toggle')?.addEventListener(
-  'click',
-  () => garantirTerminal(),
-  { once: true, capture: true }
-)
 document.addEventListener(
   'keydown',
   (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') garantirTerminal()
+    if ((e.ctrlKey || e.metaKey) && e.key === '`') {
+      e.preventDefault()
+      abrirTerminalNoBloco3()
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+      e.preventDefault()
+      if (!desktopPermitido()) {
+        pedirPermissaoDesktop()
+        return
+      }
+      abrirNavegadorNoBloco3()
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault()
+      focarPainelIa('chat')
+    }
   },
   true
 )
@@ -4244,13 +6057,90 @@ if (termPanel && !termPanel.dataset.lazyReady) {
 }
 initMenuCtxArvore()
 setSidebarMode('explorer')
-// Centro: Chat se já houver mensagens; senão Editor
+// Área de trabalho: autosave + restauração (layout, chats, panes, draft)
+ligarWorkspaceAutosave({
+  coletar: () => {
+    const doc = coletarWorkspacePadrao(() => state)
+    if (histChat?.obterId) doc.chat = { ...(doc.chat || {}), ativoId: histChat.obterId() || doc.chat?.ativoId }
+    return doc
+  },
+  aplicar: async (doc) => {
+    if (!doc) return
+    if (doc.layout) {
+      const app = $('app')
+      if (doc.layout.sidebarWidth) {
+        app.style.setProperty('--dg-sidebar-w', doc.layout.sidebarWidth + 'px')
+        app.style.setProperty('--dg-sidebar-width', doc.layout.sidebarWidth + 'px')
+      }
+      if (doc.layout.rightWidth) {
+        app.style.setProperty('--dg-panel-w', doc.layout.rightWidth + 'px')
+        app.style.setProperty('--dg-right-panel-width', doc.layout.rightWidth + 'px')
+      }
+      app.classList.toggle('sidebar-collapsed', !!doc.layout.sidebarCollapsed)
+      app.classList.toggle('right-collapsed', !!doc.layout.rightCollapsed)
+    }
+    if (doc.tema) aplicarTemaLocal(doc.tema)
+    if (doc.ui?.centerPane) ativarPainelCentro(doc.ui.centerPane)
+    else ativarPainelCentro('chat')
+    if (doc.ui?.rightPane) ativarAbaDireita(doc.ui.rightPane)
+    else ativarAbaDireita('agent')
+    if (doc.ui?.sidebarMode) setSidebarMode(doc.ui.sidebarMode)
+    if (doc.ui?.browserUrl && $('browser-url')) $('browser-url').value = doc.ui.browserUrl
+    if (doc.chat?.draft && $('chat-input') && !$('chat-input').value) {
+      $('chat-input').value = doc.chat.draft
+    }
+    sincronizarBotoesPainelDireito()
+  }
+})
 {
-  const temConversa = !!document.querySelector(
-    '#chat-messages .msg, #chat-messages .chat-msg, #chat-messages .bolha, #chat-messages .message'
-  )
-  ativarAbaCentro(temConversa ? 'chat' : 'editor')
+  void (async () => {
+    const doc = await restaurarWorkspaceNoBoot()
+    if (!doc) {
+      ativarPainelCentro('chat')
+      ativarAbaDireita('agent')
+      if (window.innerWidth >= 900) toggleRight(true)
+      else toggleRight(false)
+    }
+    sincronizarBotoesPainelDireito()
+    // P1 responsivo: janela estreita recolhe Bloco 3
+    const syncResp = () => {
+      if (window.innerWidth < 900 && !$('app').classList.contains('right-collapsed')) {
+        toggleRight(false)
+      }
+    }
+    window.addEventListener('resize', () => {
+      clearTimeout(window.__dgRespT)
+      window.__dgRespT = setTimeout(syncResp, 200)
+    })
+    syncResp()
+  })()
+  if (desktopPermitido()) $('btn-desktop-use')?.classList.add('active')
+  ligarRightRail({
+    toggleRight,
+    ativarAba: ativarAbaDireita,
+    abrirBrowser: () => void abrirNavegadorUi(),
+    garantirTerminal: () => {
+      try { garantirTerminal() } catch { /* */ }
+    }
+  })
+  ligarAssistenteNovo({
+    focarChat: () => focarPainelIa('chat'),
+    setChatText: (t) => {
+      const input = $('chat-input')
+      if (input) input.value = t || ''
+    },
+    enviarChat: () => enviarMensagemUi(),
+    toggleRight,
+    ativarAba: ativarAbaDireita,
+    abrirFerramentas: (id) => {
+      try {
+        document.querySelector('.tool-nav-btn[data-tool="' + id + '"]')?.click()
+      } catch { /* */ }
+    },
+    toast: (m, t) => mostrarToast(m, t || 'ok')
+  })
 }
+ligarContextMenuDg()
 renderizarPastas()
   .then(() => garantirPastaRaizProjeto())
   .then(() => restaurarAbas())
@@ -4271,6 +6161,100 @@ void (async () => {
     }
   } catch { /* ignora */ }
 })()
+
+/** Tooltips ricos (balão) para ícones e botões com title/data-tip. */
+function initTooltipsRicos() {
+  if (document.body.dataset.tipsWired === '1') return
+  document.body.dataset.tipsWired = '1'
+  let tip = document.getElementById('dg-rich-tip')
+  if (!tip) {
+    tip = document.createElement('div')
+    tip.id = 'dg-rich-tip'
+    tip.className = 'dg-tip'
+    tip.setAttribute('role', 'tooltip')
+    document.body.appendChild(tip)
+  }
+  let timer = 0
+  const esconder = () => {
+    tip.classList.remove('is-show')
+  }
+  const mostrar = (el, texto) => {
+    if (!texto) return
+    const r = el.getBoundingClientRect()
+    tip.textContent = texto
+    tip.classList.add('is-show')
+    const naRail = !!el.closest('#activity-bar')
+    requestAnimationFrame(() => {
+      const h = tip.offsetHeight || 28
+      const w = tip.offsetWidth || 120
+      if (naRail) {
+        tip.style.left = Math.min(window.innerWidth - w - 8, r.right + 10) + 'px'
+        tip.style.top = Math.max(8, r.top + (r.height - h) / 2) + 'px'
+      } else {
+        tip.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, r.left)) + 'px'
+        let top = r.top - 8 - h
+        if (top < 8) top = r.bottom + 8
+        tip.style.top = top + 'px'
+      }
+    })
+  }
+  document.addEventListener(
+    'mouseover',
+    (e) => {
+      const t = e.target
+      if (!(t instanceof Element)) return
+      const el = t.closest(
+        'button[title], .btn-icon[title], .ab-btn[data-tip], .tool-nav-btn[title], .chat-ctx-btn[title], .mb-btn[title], .right-tab[title]'
+      )
+      if (!el) return
+      const texto = el.getAttribute('data-tip') || el.getAttribute('title') || ''
+      if (!texto) return
+      clearTimeout(timer)
+      timer = window.setTimeout(() => mostrar(el, texto), 380)
+    },
+    true
+  )
+  document.addEventListener('mouseout', (e) => {
+    const t = e.target
+    if (!(t instanceof Element)) return
+    if (t.closest('button[title], .btn-icon[title], .ab-btn[data-tip], .tool-nav-btn[title], .chat-ctx-btn[title]')) {
+      clearTimeout(timer)
+      esconder()
+    }
+  }, true)
+  document.addEventListener('scroll', esconder, true)
+}
+
+initTooltipsRicos()
+
+/** Boot: OpenClaw token + OpenRouter (env/cofre) + status. */
+void (async () => {
+  try {
+    const oc = await window.api.invoke('openclaw:token-ensure')
+    if (oc?.criado) mostrarToast('Token OpenClaw criado automaticamente', 'ok')
+  } catch { /* */ }
+  try {
+    await window.api.invoke('providers:sincronizar-env')
+    let r = await window.api.invoke('providers:testar', { id: 'openrouter-north' })
+    if (!r || r.ok === false) {
+      r = await window.api.invoke('providers:testar', { id: 'openrouter-inkling' })
+    }
+    if (r && r.ok) {
+      mostrarToast('OpenRouter OK (' + (r.latenciaMs || '?') + ' ms)', 'ok')
+      const sb = document.getElementById('sb-ia')
+      if (sb) {
+        sb.textContent = 'IA: OpenRouter'
+        sb.title = 'OpenRouter online'
+      }
+    } else {
+      const motivo = (r && r.erro) || 'chave inválida ou ausente'
+      mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
+    }
+  } catch (e) {
+    /* silencioso se canal indisponível */
+  }
+})()
+
 document.getElementById('btn-ollama-start')?.addEventListener('click', async (e) => {
   const btn = e.currentTarget
   if (btn) { btn.disabled = true; btn.textContent = 'Iniciando…' }

@@ -46,12 +46,50 @@ vi.mock('electron', () => {
 })
 
 vi.mock('../../analyzer', () => ({ runAnalysis, getCachedAnalysis, invalidarCacheAnalise }))
-vi.mock('../../ollama-keeper', () => ({ checkOllama, ollamaAlive, ollamaInstalado, startOllama }))
+vi.mock('../../ollama-keeper', () => ({
+  checkOllama,
+  ollamaAlive,
+  ollamaInstalado,
+  startOllama,
+  ensureOllama: async () => {
+    const st = await checkOllama()
+    return !!(st && (st as { ativo?: boolean }).ativo)
+  }
+}))
 vi.mock('../../whereis', () => ({ whereIs, formatWhereIs }))
 vi.mock('../../dgrules', () => ({ readRules, rulesExist, createRulesTemplate, writeRules }))
 vi.mock('../../regras-gerais', () => ({ listarRegrasGerais, salvarRegrasGerais, obterRegrasAtivas }))
 vi.mock('../../dglog', () => ({ dglog: vi.fn() }))
-vi.mock('../../brain/ollama', () => ({ OLLAMA_URL: 'http://127.0.0.1:11434' }))
+vi.mock('../../brain/ollama', () => ({
+  OLLAMA_URL: 'http://127.0.0.1:11434',
+  askOllama: vi.fn(async () => ({ text: '', provider: 'ollama', model: 'mock' }))
+}))
+vi.mock('../../brain/modelos-catalogo', () => ({
+  detectarModelosLocais: vi.fn(async () => [])
+}))
+vi.mock('../../deps-manutencao', () => ({
+  obterEstadoManutencao: vi.fn(async () => ({
+    ativo: true,
+    intervaloHoras: 24,
+    itens: [],
+    winget: true,
+    emCurso: false
+  })),
+  rodarManutencaoDeps: vi.fn(async () => ({
+    ok: true,
+    mensagem: 'OK',
+    itens: [],
+    atualizados: [],
+    instalados: [],
+    falhas: []
+  })),
+  configurarManutencao: vi.fn((o: { ativo?: boolean }) => ({
+    ativo: o.ativo !== false,
+    intervaloHoras: 24,
+    itens: []
+  })),
+  agendarManutencaoNoBoot: vi.fn()
+}))
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v)
@@ -222,6 +260,25 @@ describe('IPC contratos (shapes)', () => {
     hasBool(out, 'ativo')
   })
 
+  it('deps:manutencao-status/rodar/config registrados', async () => {
+    const handlers = await handlersOf('../deps')
+    expect(typeof handlers.get('deps:manutencao-status')).toBe('function')
+    expect(typeof handlers.get('deps:manutencao-rodar')).toBe('function')
+    expect(typeof handlers.get('deps:manutencao-config')).toBe('function')
+    const st = (await handlers.get('deps:manutencao-status')!({} as never)) as Record<string, unknown>
+    expect(st.ok).toBe(true)
+    const run = (await handlers.get('deps:manutencao-rodar')!({} as never, { forcar: true })) as Record<
+      string,
+      unknown
+    >
+    expect(run.ok).toBe(true)
+    const cfg = (await handlers.get('deps:manutencao-config')!({} as never, { ativo: true })) as Record<
+      string,
+      unknown
+    >
+    expect(cfg.ok).toBe(true)
+  })
+
   it('whereis:ask retorna shape {ok,result,formatted} com matches', async () => {
     whereIs.mockReturnValue({ query: 'foo', matches: [{ file: 'C:/proj/a.ts', line: 3, snippet: 'foo()' }], scannedFiles: 2, durationMs: 5 })
     formatWhereIs.mockReturnValue('ok')
@@ -299,7 +356,10 @@ describe('IPC providers (shapes)', () => {
     const handlers = await providersHandlers()
     const fn = handlers.get('providers:configurar')
     expect(typeof fn).toBe('function')
-    const out = (await fn!({} as never, { id: 'openrouter-inkling', chave: 'sk-nova-abc' })) as Record<string, unknown>
+    const out = (await fn!({} as never, {
+      id: 'openrouter-inkling',
+      chave: 'sk-or-v1-' + 'a'.repeat(40)
+    })) as Record<string, unknown>
     expect(out.ok).toBe(true)
   })
 

@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Cline Agent
 especialidade: loop autônomo controlado estilo Cline
 skills: leitor-codigo, editar-seguro, debugger, testador

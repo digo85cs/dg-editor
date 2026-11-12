@@ -152,23 +152,39 @@ export async function rodarSmokeESair(): Promise<void> {
     // 9: screenshot da view (página estável)
     await req('POST', '/abrir', { url: 'https://example.com' }, token)
     await new Promise((r) => setTimeout(r, 2000))
-    // Embed: pai oculto não pinta — showInactive breve p/ capturePage.
+    // Embed/oculto: pai precisa pintar — show breve p/ capturePage (showInactive falha sem surface).
     let embedParentShown = false
-    if (process.env.DG_NAV_SMOKE_EMBED === '1') {
+    const revelarPais = async (modo: 'inactive' | 'show') => {
       try {
         const { BrowserWindow } = await import('electron')
         for (const w of BrowserWindow.getAllWindows()) {
-          if (!w.isDestroyed() && !w.isVisible()) {
+          if (w.isDestroyed()) continue
+          if (modo === 'show') {
+            w.show()
+            try {
+              w.focus()
+            } catch {
+              /* */
+            }
+          } else if (!w.isVisible()) {
             w.showInactive()
-            embedParentShown = true
           }
+          embedParentShown = true
         }
-        if (embedParentShown) await new Promise((r) => setTimeout(r, 400))
       } catch {
         /* */
       }
     }
+    if (process.env.DG_NAV_SMOKE_EMBED === '1' || process.env.DG_NAV_SMOKE === '1') {
+      await revelarPais('inactive')
+      if (embedParentShown) await new Promise((r) => setTimeout(r, 500))
+    }
     let shot = await req('POST', '/screenshot', {}, token)
+    if (!(shot.status === 200 && Number(shot.json.bytes || 0) > 100)) {
+      await revelarPais('show')
+      await new Promise((r) => setTimeout(r, 1200))
+      shot = await req('POST', '/screenshot', {}, token)
+    }
     if (!(shot.status === 200 && Number(shot.json.bytes || 0) > 100)) {
       await new Promise((r) => setTimeout(r, 1500))
       shot = await req('POST', '/screenshot', {}, token)

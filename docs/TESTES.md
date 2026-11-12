@@ -33,8 +33,8 @@ Entre rodadas: matar processos `electron` residuais e esperar alguns segundos.
 3. `npm test`
 4. `npm run qa:ipc`
 5. `npm run qa:e2e` (inclui Agent Plan/Parar/Undo + Browser embed-status)
-6. Smoke clássico (**3×, ISOLADO**) → `SMOKE=22/22`
-7. Smoke embed (**1×, ISOLADO**) → `SMOKE=22/22`
+6. Smoke **embed** (oficial, **3×, ISOLADO**) → `SMOKE=22/22`
+7. Smoke clássico BaseWindow (**opcional, 1×**) → `SMOKE=22/22`
 8. `npx electron out/main/index.js` → `[auditoria:boot] ok=52 warn=0 erro=0`
 
 Não há script no `package.json` que dispare smoke em paralelo com a suíte; manter assim.

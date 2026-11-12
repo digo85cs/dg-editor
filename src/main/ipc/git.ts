@@ -3,8 +3,8 @@
  * Extraido de src/main/index.ts
  */
 
-import { ipcMain, dialog } from 'electron';
-import { gitStatus, gitDiff, gitRepos } from '../git';
+import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { gitStatus, gitDiff, gitRepos, gitCommit } from '../git';
 import { caminhoSeguro, exigirString, exigirArrayStrings, isErroPayload } from '../ipc-seguro';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
@@ -91,6 +91,54 @@ export async function handleGitRepos(
   }
 }
 
+/**
+ * Commit local — UI deve confirmar antes de chamar.
+ */
+export async function handleGitCommit(
+  _event: Electron.IpcMainInvokeEvent,
+  payload: unknown
+): Promise<IpcResult & { ok: boolean; hash?: string; erro?: string }> {
+  try {
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, erro: 'payload invalido' };
+    }
+    const o = payload as Record<string, unknown>;
+    const raiz = exigirString(o.raiz, 'raiz');
+    if (isErroPayload(raiz)) return { ok: false, erro: raiz.erro };
+    const mensagem = exigirString(o.mensagem, 'mensagem');
+    if (isErroPayload(mensagem)) return { ok: false, erro: mensagem.erro };
+
+    const seg = caminhoSeguro(raiz, raiz);
+    if (!seg.ok) return { ok: false, erro: seg.erro };
+
+    let arquivos: string[] = [];
+    if (Array.isArray(o.arquivos)) {
+      const arr = exigirArrayStrings(o.arquivos, 'arquivos');
+      if (!isErroPayload(arr)) arquivos = arr;
+    }
+
+    // Confirmação nativa (segunda trava além do confirm da UI)
+    const win = BrowserWindow.getFocusedWindow();
+    const escolha = await dialog.showMessageBox(win!, {
+      type: 'question',
+      buttons: ['Cancelar', 'Commitar'],
+      defaultId: 1,
+      cancelId: 0,
+      title: 'Commit local',
+      message: 'Criar commit local?',
+      detail: mensagem.slice(0, 400) + (arquivos.length ? '\n\nArquivos: ' + arquivos.slice(0, 8).join(', ') : '')
+    });
+    if (escolha.response !== 1) return { ok: false, erro: 'cancelado' };
+
+    const r = await gitCommit(seg.abs, mensagem, arquivos);
+    return r;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    dglog(`[git:commit] erro: ${msg}`);
+    return { ok: false, erro: msg };
+  }
+}
+
 // ============================================================================
 // FUNCAO DE REGISTRO
 // ============================================================================
@@ -104,6 +152,7 @@ export function registrarHandlersGit(): void {
   ipcMain.handle('git:status', handleGitStatus);
   ipcMain.handle('git:diff', handleGitDiff);
   ipcMain.handle('git:repos', handleGitRepos);
+  ipcMain.handle('git:commit', handleGitCommit);
 
   dglog('[ipc:git] handlers registrados com sucesso');
 }

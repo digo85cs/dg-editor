@@ -1,4 +1,4 @@
-﻿---
+---
 nome: Kilo Code
 especialidade: implementacao segura
 skills: leitor-codigo, editar-seguro, arvore-projeto, testador
