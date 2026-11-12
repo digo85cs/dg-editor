@@ -115,3 +115,9 @@ Reler o pedido e conferir item por item; item nao atendido e declarado.
 ## ESCOPO
 Tudo: backend, IPC, preload, renderer, layout, botoes, icones, imagens, videos, textos, erros, acessibilidade, performance, testes e documentacao.
 
+# === RADAR DIÁRIO ===
+- O radar roda no boot quando passaram 24h. Ele NUNCA escreve codigo, NUNCA instala nada.
+- O radar produz docs/RADAR.md com gaps e propostas de superacao.
+- Toda proposta do radar entra em modo plan e exige aprovacao do usuario antes de qualquer implementacao.
+- O radar usa um unico provider, o melhor disponivel no momento, e registra o custo.
+
