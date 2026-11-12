@@ -1255,6 +1255,26 @@ export async function executarAgente(
       if (saltos >= MAX_SALTOS) break
     }
 
+    // ULTIMO RECURSO: Ollama local com modelo leve quando todos os provedores falham.
+    // Garante que o agente nunca fique sem resposta por falta de provedor.
+    try {
+      const { askOllama } = await import('./ollama')
+      const ultimo = await askOllama(pergunta, '', tarefa, {}, { model: 'qwen2.5-coder:1.5b', numPredict: 400, timeoutMs: 90_000 })
+      if (ultimo?.text?.trim()) {
+        dglog('[agent] ultimo-recurso ollama 1.5b obteve resposta')
+        return {
+          texto: ultimo.text,
+          modelo: ultimo.model || 'qwen2.5-coder:1.5b',
+          passos: [],
+          tentativas: tentativasOut,
+          ok: true,
+          duracaoMs: Date.now() - tInicio
+        }
+      }
+    } catch (e) {
+      dglog('[agent] ultimo-recurso ollama 1.5b tambem falhou: ' + String(e))
+    }
+
     const lista = tentativasOut.map((t) => t.provider + ' (' + t.resultado + ')').join('; ')
     throw new Error(
       'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')

@@ -76,15 +76,12 @@ export async function orquestrarAgentes(
     dglog('[orquestrador] agente=' + id)
     const t0 = Date.now()
 
-    // AbortController próprio deste agente: quando o timeout dispara,
-    // o signal cancela o executarAgente em vez de deixar órfão no background.
     const tarefa = opts?.tarefa || 'auto'
     const timeoutMs = AGENT_TIMEOUT_MS[tarefa] || AGENT_TIMEOUT_MS.auto
 
-    // AbortController próprio deste agente: quando o timeout dispara,
-    // o signal cancela o executarAgente em vez de deixar órfão no background.
     const controller = new AbortController()
     let raceTimer: ReturnType<typeof setTimeout> | undefined
+    let promise: Promise<RespostaAgente> | undefined
 
     try {
       const prompt =
@@ -98,7 +95,7 @@ export async function orquestrarAgentes(
             ultimoTexto +
             '\n\nContinue a partir daqui conforme sua especialidade.'
 
-      const promise = executarAgente(raiz, prompt, {
+      promise = executarAgente(raiz, prompt, {
         agente: id,
         modo: 'agent',
         contextoExtra,
@@ -106,6 +103,8 @@ export async function orquestrarAgentes(
       })
 
       // Promise.race: quem vencer (resposta ou timeout) resolve primeiro.
+      // Quando timeout vence, aborta o signal para o executarAgente encerrar
+      // rapidamente e o finally dele decremente a profundidade antes do proximo agente.
       const r: RespostaAgente = await Promise.race([
         promise,
         new Promise<never>((_, reject) => {
@@ -117,7 +116,7 @@ export async function orquestrarAgentes(
         })
       ])
 
-      clearTimeout(raceTimer)
+      if (raceTimer) clearTimeout(raceTimer)
 
       ultimoTexto = r.texto || ''
       out.push({
@@ -134,7 +133,9 @@ export async function orquestrarAgentes(
         break
       }
     } catch (e) {
-      clearTimeout(raceTimer)
+      if (raceTimer) clearTimeout(raceTimer)
+      // Aguarda o executarAgente abortado finalizar completamente (decrementa profundidadeAgente).
+      if (promise) { try { await promise } catch { /* ja capturado */ } }
       const msg = String((e as Error).message || e)
       const foiTimeout = /timeout/i.test(msg)
       const foiCancelado = /cancelado|abort/i.test(msg)
