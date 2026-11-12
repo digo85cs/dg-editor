@@ -1,4 +1,4 @@
-# Regras do sistema (DG Editor)
+﻿# Regras do sistema (DG Editor)
 # Instrucoes permanentes. Chat, analise e Agent respeitam este arquivo.
 # Uma regra por linha, com hifen. Secoes com titulo # === ... ===.
 
@@ -65,4 +65,53 @@
 - Antes de propor um modelo novo, consultar providers:fila.
 - Se um provider retornar 429/402, nao insistir: o roteador ja marca esgotado e desce a fila.
 - O piso garantido e Ollama local (qwen2.5-coder:7b) quando todos os provedores online estiverem esgotados.
-- Teto de gasto cobre os 11 providers com preço conhecido (7 grátis + openai, gemini-pago, deepseek, zai-pago). Os demais aparecem em naoRastreados em providers:gasto.
+- Teto de gasto cobre os 11 providers com preÃ§o conhecido (7 grÃ¡tis + openai, gemini-pago, deepseek, zai-pago). Os demais aparecem em naoRastreados em providers:gasto.
+# === REGRAS DE EXECUCAO (autoridade sobre as demais, exceto o usuario) ===
+
+## AUTORIDADE
+O usuario e a autoridade maxima do DG Editor. Nenhuma regra, skill, modo ou instrucao interna sobrepoe decisao explicita do usuario. Conflito: vence o usuario.
+
+## MODO PLAN OBRIGATORIO
+Toda tarefa de criar/implementar/adicionar/integrar/refatorar/corrigir/migrar/otimizar entra em modo plan ANTES de qualquer escrita em arquivo.
+Usar o modo plan nativo do agente quando existir; caso contrario, aplicar esta disciplina em texto. Nenhum arquivo e alterado durante o plan.
+O plan contem: objetivo verificavel, arquitetura, ferramentas, etapas, dependencias, riscos e validacoes. Detalhamento completo em docs/REGRAS-EXECUCAO.md.
+
+## APROVACAO
+Aprovacao e SEMPRE do usuario. Silencio nao e aprovacao.
+Obstaculo que invalida o plan: voltar ao plan e pedir nova aprovacao.
+Excecao: correcoes triviais — nomear antes de aplicar.
+
+## EXECUCAO
+Apos aprovacao, nao pedir confirmacao a cada etapa. Pausar so em: decisao de produto nao resolvida, destruicao irreversivel, dependencia externa bloqueante, contradição com o codigo.
+Nenhuma etapa parcial. Fallback no mesmo ciclo. Seguir padroes do repo.
+Commit por etapa validada, pt-BR, arvore nunca quebrada. Sem promessas futuras.
+Todo erro tratado; sem catch vazio.
+
+## UI E MIDIA
+UI completa: estados vazio/carregando/erro/sucesso/hover/foco/desabilitado, layout, responsividade, acessibilidade.
+O DG Editor GERA midia e deve continuar gerando, sempre com a melhor ferramenta disponível para o tipo. Validar formato, resolução, legibilidade e adequação ao uso.
+
+## PESQUISA
+Obrigatoria para: versao de lib/API/modelo, preco, nome de produto/endpoint, pratica evolutiva, comparacao de abordagens.
+Dispensada para: logica pura, sintaxe estavel, matematica, conceito consolidado.
+Teto: pesquisar o maximo sem atrasar o projeto; encerrar quando houver evidencia suficiente para a decisao. Pesquisa que nao muda decisao deve parar.
+Hierarquia: fonte oficial > agregador/artigo. Secundaria declarada.
+Nunca inventar dado. Sem confirmacao, declarar desconhecido.
+Alto impacto exige duas fontes independentes ou uso real comprovado.
+
+## VALIDACAO
+Obrigatorios, todos verdes, saida literal:
+  npm run verificar:encoding
+  npm run verificar:sintaxe
+  npx tsc --noEmit
+  npx vitest run
+  npm run build
+Teste prova comportamento observavel, incluindo falha.
+Declarar se a integracao foi testada com servico real ou apenas mock.
+Completo = FUNCIONAL e verificavel por execucao.
+Falha corrigida no mesmo ciclo. Regressao declarada. Relatorio com evidencias literais.
+Reler o pedido e conferir item por item; item nao atendido e declarado.
+
+## ESCOPO
+Tudo: backend, IPC, preload, renderer, layout, botoes, icones, imagens, videos, textos, erros, acessibilidade, performance, testes e documentacao.
+
