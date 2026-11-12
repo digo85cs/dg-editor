@@ -12,6 +12,7 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { resolverRaizProjeto } from './paths';
 import { dglog } from './dglog';
 import { aplicarIdentidadeDg, resolverIconeApp, DG_APP_NAME } from './branding';
 import { getAuthStore } from './auth';
@@ -395,6 +396,12 @@ app.whenReady().then(() => {
     if (!SAFE_MODE && !qaE2e) agendarManutencaoNoBoot()
   } catch (e) {
     dglog('[boot] deps-manutencao: ' + String(e))
+  }
+  try {
+    const { dispararRadarNoBoot } = require('./radar/radar-boot')
+    dispararRadarNoBoot(resolverRaizProjeto())
+  } catch (e) {
+    dglog('[boot] radar: ' + String(e))
   }
   try {
     const { garantirHardwareProfile } = require('./hardware-profile') as {
