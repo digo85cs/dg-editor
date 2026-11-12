@@ -119,13 +119,21 @@ function sampleReport(): AnalysisReport {
   }
 }
 
+function garantirHandlersMap(electron: any): Map<string, (...args: unknown[]) => unknown> {
+  if (!electron.ipcMain.__handlers) {
+    electron.ipcMain.__handlers = new Map()
+  }
+  return electron.ipcMain.__handlers
+}
+
 async function handlersOf(modulePath: string): Promise<Map<string, (...args: unknown[]) => unknown>> {
   const mod = await import(modulePath)
   const electron = (await import('electron')) as unknown as { ipcMain: { __handlers: Map<string, (...a: unknown[]) => unknown> } }
-  electron.ipcMain.__handlers.clear()
+  const handlers = garantirHandlersMap(electron)
+  handlers.clear()
   if (typeof mod.registrarHandlersDeps === 'function') mod.registrarHandlersDeps()
   if (typeof mod.registrarHandlersRegrasGerais === 'function') mod.registrarHandlersRegrasGerais()
-  return electron.ipcMain.__handlers
+  return handlers
 }
 
 describe('IPC contratos (shapes)', () => {
@@ -325,9 +333,10 @@ describe('IPC providers (shapes)', () => {
   async function providersHandlers() {
     const mod = await import('../providers')
     const electron = (await import('electron')) as unknown as { ipcMain: { __handlers: Map<string, (...a: unknown[]) => unknown> } }
-    electron.ipcMain.__handlers.clear()
+    const handlers = garantirHandlersMap(electron)
+    handlers.clear()
     if (typeof mod.registrarHandlersProviders === 'function') mod.registrarHandlersProviders()
-    return electron.ipcMain.__handlers
+    return handlers
   }
 
   it('providers:listar retorna shape e NAO expoe valor da chave', async () => {

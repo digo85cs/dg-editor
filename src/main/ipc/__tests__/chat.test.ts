@@ -16,7 +16,8 @@ vi.mock('../../ipc-seguro', () => ({
 }))
 
 vi.mock('../../ollama-keeper', () => ({
-  ollamaAlive: vi.fn((): Promise<boolean> => Promise.resolve(false))
+  ollamaAlive: vi.fn((): Promise<boolean> => Promise.resolve(false)),
+  ensureOllama: vi.fn(async (): Promise<boolean> => false)
 }))
 
 vi.mock('../../brain/segredos-providers', () => ({
@@ -24,7 +25,8 @@ vi.mock('../../brain/segredos-providers', () => ({
 }))
 
 vi.mock('../../brain/registry', () => ({
-  filaPronta: vi.fn((): any => [])
+  filaPronta: vi.fn((): any => []),
+  limitesPorTarefa: vi.fn((): any => ({ num_predict: 128, timeoutMs: 30000 }))
 }))
 
 vi.mock('../../dossie', () => ({
@@ -36,10 +38,96 @@ vi.mock('../../brain/agent', () => ({
 }))
 
 vi.mock('../../brain/hibrido', () => ({
-  executarHibrido: vi.fn((): Promise<any> => Promise.resolve({ ok: true, texto: 'resposta hibrido', modelo: 'hibrido-core' }))
+  executarHibrido: vi.fn((): Promise<any> => Promise.resolve({ ok: true, texto: 'resposta hibrido', modelo: 'hibrido-core', briefing: '' }))
 }))
 
 vi.mock('../../dglog', () => ({ dglog: vi.fn() }))
+
+vi.mock('../../agent/fila', () => ({
+  enfileirarAgente: vi.fn(async (fn: any) => fn())
+}))
+
+vi.mock('../../agent/orquestrador', () => ({
+  orquestrarAgentes: vi.fn(async (): Promise<any> => ({
+    textoFinal: 'resposta orquestrador',
+    passos: [{ texto: 'passo 1', modelo: 'test-model' }],
+    modeloUsado: 'test-model'
+  }))
+}))
+
+vi.mock('../../brain/agentes', () => ({
+  listarAgentes: vi.fn((): any => [{ id: 'test-agent' }])
+}))
+
+vi.mock('../../mapa-projeto', () => ({
+  mapaCompacto: vi.fn((): string => 'mapa do projeto')
+}))
+
+vi.mock('../../autonomia-tools', () => ({
+  blocoMemoriaProjeto: vi.fn((): string => '')
+}))
+
+vi.mock('../../memorias', () => ({
+  proporMemoria: vi.fn(),
+  textoMemoriasAceitas: vi.fn((): string | null => null)
+}))
+
+vi.mock('../../brain/stream-chat', () => ({
+  streamOpenAIChat: vi.fn(async (): Promise<string> => 'resposta stream'),
+  streamOllamaChat: vi.fn(async (): Promise<string> => 'resposta stream ollama')
+}))
+
+vi.mock('../../brain/ollama', () => ({
+  askOllama: vi.fn(async (): Promise<any> => ({ text: 'resposta ollama', provider: 'ollama', model: 'qwen2.5-coder:7b' }))
+}))
+
+vi.mock('../../agent-router', () => ({
+  resolverRotaChat: vi.fn((): any => ({ kind: 'chat', dica: 'chat', agente: undefined })),
+  decidirAutoAprovacao: vi.fn((): any => ({ ok: false, motivo: 'desligado' }))
+}))
+
+vi.mock('../../agent/plano', () => ({
+  salvarPlano: vi.fn(),
+  lerPlano: vi.fn((): any => null)
+}))
+
+vi.mock('../../agent/propostas', () => ({
+  aplicarPropostaComCheckpoint: vi.fn(async () => {})
+}))
+
+vi.mock('../../guardian', () => ({
+  guardianPodeOperar: vi.fn((): boolean => true)
+}))
+
+vi.mock('../../brain/modelos-catalogo', () => ({
+  modeloParaTarefa: vi.fn((): string => 'qwen2.5-coder:7b'),
+  detectarModelosLocais: vi.fn(async (): Promise<any> => [])
+}))
+
+vi.mock('../../mcp/client', () => ({
+  garantirMcpNaRaiz: vi.fn(async (): Promise<void> => {})
+}))
+
+vi.mock('../../anexos-chat', () => ({
+  blocoAnexos: vi.fn((): string => '')
+}))
+
+vi.mock('../../regras-escopo', () => ({
+  regrasParaContexto: vi.fn((): string => '')
+}))
+
+vi.mock('../../analyzer', () => ({
+  getCachedAnalysis: vi.fn((): any => null)
+}))
+
+vi.mock('../../dgrules', () => ({
+  readRules: vi.fn((): string => '')
+}))
+
+vi.mock('../../workspace-raiz', () => ({
+  resolverRaizChat: vi.fn((root: string) => ({ ok: true, abs: root, rel: '.' })),
+  definirRaizWorkspace: vi.fn()
+}))
 
 import { handleChatSend } from '../chat'
 import * as chatstore from '../../chatstore'
@@ -49,12 +137,15 @@ import * as registry from '../../brain/registry'
 import * as brainAgent from '../../brain/agent'
 import * as hibrido from '../../brain/hibrido'
 
+import * as orquestrador from '../../agent/orquestrador'
+
 const mockAppendChat = vi.mocked(chatstore.appendChat)
 const mockOllamaAlive = vi.mocked(ollamaKeeper.ollamaAlive)
 const mockLerChave = vi.mocked(segredosProviders.lerChave)
 const mockFilaPronta = vi.mocked(registry.filaPronta)
 const mockExecutarAgente = vi.mocked(brainAgent.executarAgente)
 const mockExecutarHibrido = vi.mocked(hibrido.executarHibrido)
+const mockOrquestrarAgentes = vi.mocked(orquestrador.orquestrarAgentes)
 
 const eventoFalso: any = {
   sender: { isDestroyed: () => false, send: vi.fn() }
@@ -69,6 +160,7 @@ describe('handleChatSend - degradacao graciosa', () => {
     mockFilaPronta.mockReset()
     mockExecutarAgente.mockReset()
     mockExecutarHibrido.mockReset()
+    mockOrquestrarAgentes.mockReset()
   })
 
   afterEach(() => {
@@ -91,34 +183,32 @@ describe('handleChatSend - degradacao graciosa', () => {
 
   it('segue fluxo normal quando Ollama esta vivo', async () => {
     mockOllamaAlive.mockResolvedValue(true)
-    mockExecutarAgente.mockResolvedValue({
-      ok: true,
-      texto: 'resposta do agente',
-      modelo: 'test-model',
-      propostas: []
+    mockOrquestrarAgentes.mockResolvedValue({
+      textoFinal: 'resposta do agente',
+      passos: [{ texto: 'passo 1', modelo: 'test-model' }],
+      modeloUsado: 'test-model'
     })
 
     const resultado = await handleChatSend(eventoFalso, 'C:/dev/DGEditor', 'refatorar codigo', {})
 
     expect(resultado.ok).toBe(true)
-    expect(mockExecutarAgente).toHaveBeenCalled()
+    expect(mockOrquestrarAgentes).toHaveBeenCalled()
   })
 
   it('segue fluxo normal quando ha chave API online configurada', async () => {
     mockOllamaAlive.mockResolvedValue(false)
     mockFilaPronta.mockReturnValue([{ id: 'openrouter', tipo: 'online', formato: 'openai', apiKeyRef: 'openrouter' }])
     mockLerChave.mockReturnValue('sk-or-v1-teste-com-mais-de-quarenta-caracteres-aqui')
-    mockExecutarAgente.mockResolvedValue({
-      ok: true,
-      texto: 'resposta com chave',
-      modelo: 'openrouter',
-      propostas: []
+    mockOrquestrarAgentes.mockResolvedValue({
+      textoFinal: 'resposta com chave',
+      passos: [{ texto: 'passo 1', modelo: 'openrouter' }],
+      modeloUsado: 'openrouter'
     })
 
     const resultado = await handleChatSend(eventoFalso, 'C:/dev/DGEditor', 'ola mundo', {})
 
     expect(resultado.ok).toBe(true)
-    expect(mockExecutarAgente).toHaveBeenCalled()
+    expect(mockOrquestrarAgentes).toHaveBeenCalled()
   })
 
   it('rejeita vazio de texto', async () => {
@@ -141,7 +231,21 @@ describe('handleChatSend - fallback orquestrador', () => {
     vi.clearAllMocks()
   })
 
-  it('chama executarAgente quando Ollama esta disponível', async () => {
+  it('chama orquestrador quando Ollama esta disponível e agente auto', async () => {
+    mockOllamaAlive.mockResolvedValue(true)
+    mockOrquestrarAgentes.mockResolvedValue({
+      textoFinal: 'resposta do agente',
+      passos: [{ texto: 'passo 1', modelo: 'test-model' }],
+      modeloUsado: 'test-model'
+    })
+
+    const resultado = await handleChatSend(eventoFalso, 'C:/dev/DGEditor', 'fazer algo', { agente: 'auto', modo: 'agent' })
+
+    expect(resultado.ok).toBe(true)
+    expect(mockOrquestrarAgentes).toHaveBeenCalled()
+  })
+
+  it('chama executarAgente quando agente especifico eh informado', async () => {
     mockOllamaAlive.mockResolvedValue(true)
     mockExecutarAgente.mockResolvedValue({
       ok: true,
@@ -150,7 +254,7 @@ describe('handleChatSend - fallback orquestrador', () => {
       propostas: []
     })
 
-    const resultado = await handleChatSend(eventoFalso, 'C:/dev/DGEditor', 'fazer algo', { agente: 'auto', modo: 'agent' })
+    const resultado = await handleChatSend(eventoFalso, 'C:/dev/DGEditor', 'fazer algo', { agente: 'dg-engenheiro', modo: 'agent' })
 
     expect(resultado.ok).toBe(true)
     expect(mockExecutarAgente).toHaveBeenCalled()
