@@ -44,7 +44,7 @@ vi.mock('../../brain/hibrido', () => ({
 vi.mock('../../dglog', () => ({ dglog: vi.fn() }))
 
 vi.mock('../../agent/fila', () => ({
-  enfileirarAgente: vi.fn(async (fn: any) => fn())
+  enfileirarAgente: vi.fn(async (_raiz: any, fn: any) => fn())
 }))
 
 vi.mock('../../agent/orquestrador', () => ({

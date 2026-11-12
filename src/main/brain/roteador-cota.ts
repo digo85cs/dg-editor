@@ -297,8 +297,6 @@ export function proximoDisponivel(
 
   for (const p of filaGlobal()) {
     if (ignorar.has(p.id)) continue
-    const modelo = p.modelos[0]?.id || ''
-    if (!modelo) continue
     // Guardrail de custo: tier 2 (pago) so e usado se permitirPago estiver ligado
     if (p.tier === 2 && !permitirPagoAtivo()) continue
     // compatibilidade de tarefa por capacidades
@@ -307,8 +305,13 @@ export function proximoDisponivel(
     if (!compatComTarefa(tarefa, [...caps])) continue
     // ollama-local e' o piso: nao exige chave
     if (p.id !== 'ollama-local' && !chaveConfigurada(p.id)) continue
-    if (estaEsgotado(p.id, modelo, agora)) continue
-    return configParaProvider(p, modelo)
+    // Tenta cada modelo do provider ate encontrar um disponivel (nao esgotado).
+    for (const m of p.modelos) {
+      const modelo = m.id || ''
+      if (!modelo) continue
+      if (estaEsgotado(p.id, modelo, agora)) continue
+      return configParaProvider(p, modelo)
+    }
   }
 
   // Piso garantido: ollama-local.

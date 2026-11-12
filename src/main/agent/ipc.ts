@@ -147,7 +147,7 @@ export function registerAgentExtrasIpc(): void {
       if (isErroPayload(p)) return p
       const fila = Array.isArray(filaIds) ? filaIds.filter((x): x is string => typeof x === 'string') : undefined
       const exp = await expandirMencoes({ raiz: r, pergunta: p })
-      return enfileirarAgente(async (signal) => {
+      return enfileirarAgente(r, async (signal) => {
         if (signal.aborted) throw new Error('cancelado pelo usuario')
         return orquestrarAgentes(r, exp.perguntaLimpa, fila, exp.contextoExtra || undefined)
       }).catch((err: any) => ({ ok: false, erro: String((err as Error).message || err) }))
@@ -227,7 +227,7 @@ export function registerAgentExtrasIpc(): void {
     const contextoExtra = [expansao.contextoExtra, contextoImplicito].filter(Boolean).join('\n\n')
     const agente = typeof o.agente === 'string' && o.agente.trim() ? o.agente.trim() : undefined
 
-    return enfileirarAgente(async (signal) => {
+    return enfileirarAgente(escopo.raiz, async (signal) => {
       const onEvent = (ev: unknown) => emitirProgresso(event, ev)
       let resposta = await executarAgente(escopo.raiz, expansao.perguntaLimpa, {
         modo,
@@ -266,7 +266,7 @@ export function registerAgentExtrasIpc(): void {
       return {
         ...resposta,
         ok: resposta.ok !== false,
-        fila: statusFilaAgente(),
+        fila: statusFilaAgente(escopo.raiz),
         diagnostico,
         plano: modo === 'plan' ? lerPlano() : undefined
       }
@@ -340,7 +340,7 @@ export function registerAgentExtrasIpc(): void {
     if (!selecionados.length) return { ok: false, erro: 'nao ha passos pendentes' }
     const contextoExtra = await montarContextoImplicito({ raiz: escopo.raiz, incluirGit: true })
 
-    return enfileirarAgente(async (signal) => {
+    return enfileirarAgente(escopo.raiz, async (signal) => {
       const inicio = Date.now()
       const rastros: Awaited<ReturnType<typeof executarAgente>>['passos'] = []
       const propostas: NonNullable<Awaited<ReturnType<typeof executarAgente>>['propostas']> = []
@@ -386,7 +386,7 @@ export function registerAgentExtrasIpc(): void {
         propostas,
         passoExecutado: soProximo ? passoExecutado : undefined,
         plano: lerPlano(),
-        fila: statusFilaAgente()
+        fila: statusFilaAgente(escopo.raiz)
       }
     }).catch((err: unknown) => ({ ok: false, erro: String((err as Error)?.message || err) }))
   })

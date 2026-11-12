@@ -121,31 +121,13 @@ export function resolverRotaChat(agenteSel: string, pedido: string, raiz?: strin
     }
   }
 
-  if (sel && sel !== 'auto') {
-    return {
-      kind: 'agente',
-      agente: sel,
-      tarefa: intencao === 'codigo' || intencao === 'geral' ? 'codigo' : 'chat',
-      intencao,
-      dica: 'agente escolhido: ' + sel
-    }
-  }
-
-  if (intencao === 'codigo') {
-    return {
-      kind: 'agente',
-      agente: 'dg-engenheiro',
-      tarefa: 'codigo',
-      intencao,
-      dica: 'acao/codigo -> dg-engenheiro com tools (qualidade online primeiro)'
-    }
-  }
+  // Agente explicitamente escolhido pelo usuario.
   return {
     kind: 'agente',
-    agente: 'hibrido-core',
-    tarefa: 'codigo',
+    agente: sel,
+    tarefa: intencao === 'codigo' || intencao === 'geral' ? 'codigo' : 'chat',
     intencao,
-    dica: 'pedido geral -> hibrido-core com tools (estilo Cursor, online primeiro)'
+    dica: 'agente escolhido: ' + sel
   }
 }
 

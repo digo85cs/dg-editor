@@ -3,7 +3,7 @@ import { join } from 'path'
 import { appDataDir, dossieDir } from './paths'
 import { guardianSnapshot } from './guardian'
 import { rulesExist } from './dgrules'
-import { loadCache } from './cache'
+import { getCachedAnalysis } from './analyzer'
 import { ollamaAlive } from './ollama-keeper'
 import { getBrain } from './brain/module'
 import type { DiagnosticoModulo, DiagnosticoResultado } from '@shared/types'
@@ -86,7 +86,7 @@ export async function diagnosticoCompleto(root: string | null): Promise<Diagnost
       id: 'cache', nome: 'Cache de analise',
       fn: async () => {
         if (!root) return 'n/a (sem projeto aberto)'
-        const c = loadCache(root)
+        const c = getCachedAnalysis(root, 'rapida')
         if (!c) return 'sem cache (primeira analise)'
         return 'cache valido'
       }

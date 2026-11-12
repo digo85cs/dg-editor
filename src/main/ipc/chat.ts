@@ -485,7 +485,7 @@ export async function handleChatSend(
     } catch {
       /* */
     }
-    const resultado = await enfileirarAgente(async () => {
+    const resultado = await enfileirarAgente(rootOk, async () => {
       if (agenteSel && agenteSel !== 'auto' && modoValido !== 'ask') {
         try {
           const { lerAgente } = await import('../brain/agentes');
