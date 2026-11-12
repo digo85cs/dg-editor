@@ -212,7 +212,7 @@ export async function handleChatSend(
     const pedidoHibrido = forceHibrido
       ? textoPedido.replace(/^\/hibrido\b/i, '').trim() || textoPedido
       : textoPedido;
-    const rota = resolverRotaChat(agenteSel, textoPedido);
+    const rota = resolverRotaChat(agenteSel, textoPedido, rootOk);
     // Estilo Cursor: ask = so texto; cumprimento curto = chat leve; resto = agente com tools.
     const chatLeve =
       modoValido === 'ask' ||
@@ -473,6 +473,8 @@ export async function handleChatSend(
       }
 
       // Estilo Cursor: qualquer pedido acionavel usa agente + tools.
+      // Quando agenteSel === 'auto', usa o MELHOR agente para a tarefa com fallback
+      // automatico para o proximo se o primeiro travar/demorar (orquestrador).
       if (
         modoValido !== 'ask' &&
         (modoValido === 'plan' ||
@@ -491,6 +493,30 @@ export async function handleChatSend(
                 ? 'kilo-debug'
                 : 'dg-engenheiro';
         const tarefa = modoValido === 'ask' ? 'chat' : 'codigo';
+
+        // Selecao automatica: fila com o melhor agente primeiro + fallback automatico.
+        if (agenteSel === 'auto' && rootOk) {
+          const { listarAgentes } = await import('../brain/agentes');
+          const { orquestrarAgentes } = await import('../agent/orquestrador');
+          const todos = listarAgentes(rootOk).map((a) => a.id);
+          // Ordena: o idAgente selecionado primeiro, depois o resto
+          const fila = [idAgente, ...todos.filter((id) => id !== idAgente)];
+          try {
+            const orc = await orquestrarAgentes(rootOk, textoPedido, fila);
+            const ultimo = orc.passos[orc.passos.length - 1];
+            const respostaTexto = orc.textoFinal || (ultimo ? ultimo.texto : '');
+            const modeloUsado = orc.passos.map((p) => p.modelo).filter(Boolean).pop() || 'agente-auto';
+            return publicar(respostaTexto || 'Sem resposta do agente.', 'agente-auto:' + modeloUsado, {
+              propostas: [],
+              autoAprovacao: { ok: false, motivo: 'sem propostas via orquestrador' },
+              modo: modoValido,
+              diagnostico: { orquestrador: true, passos: orc.passos.length },
+            });
+          } catch (error) {
+            dglog('[chat] orquestrador falhou; fallback chat: ' + String(error));
+          }
+        }
+
         try {
           return await rodarAgente(idAgente, tarefa);
         } catch (error) {

@@ -1,3 +1,5 @@
+import { listarAgentes } from './brain/agentes'
+
 export type Intencao = 'video' | 'imagem' | 'planilha' | 'pdf' | 'codigo' | 'geral'
 
 /** Pedido curto de conversa — sem tools. Tudo o mais age como o Cursor Agent. */
@@ -35,12 +37,90 @@ export type RotaChat = {
 }
 
 /**
+ * Seleciona o MELHOR agente disponível para a intenção/tarefa dada.
+ * Pontua cada agente pelas skills correspondentes à intenção.
+ * Se houver empate, retorna o primeiro da lista (ordem do disco).
+ * Útil para "primeiro o melhor agente para a tarefa".
+ */
+export function selecionarMelhorAgente(raiz: string, intencao: Intencao, tarefa: 'chat' | 'codigo'): string {
+  const agentes = listarAgentes(raiz)
+  if (!agentes.length) return 'dg-engenheiro'
+
+  const skillsPorIntencao: Record<Intencao, string[]> = {
+    codigo: ['refatorador', 'editar-seguro', 'debugger', 'testador', 'leitor-codigo', 'arvore-projeto'],
+    video: [],
+    imagem: [],
+    planilha: ['analisador', 'leitor-codigo'],
+    pdf: ['documentador', 'leitor-codigo'],
+    geral: ['leitor-codigo', 'documentador', 'analisador', 'refatorador'],
+  }
+
+  const skillsPreferidas = skillsPorIntencao[intencao] || []
+  const tarefaCodigo = tarefa === 'codigo'
+
+  let melhor = agentes[0]
+  let melhorScore = -1
+
+  for (const a of agentes) {
+    let score = 0
+    for (const s of skillsPreferidas) {
+      if (a.skills.includes(s)) score++
+    }
+    // Preferência direta por tarefa
+    if (tarefaCodigo && a.id === 'dg-engenheiro') score += 12
+    if (!tarefaCodigo && a.id === 'hibrido-core') score += 12
+    // Qoder/Trae são bons para código geral autônomo
+    if (tarefaCodigo && (a.id === 'qoder' || a.id === 'trae')) score += 6
+    // free-* são fallback (úteis mas não primeira escolha)
+    if (a.id.startsWith('free-')) score -= 4
+
+    if (score > melhorScore) {
+      melhorScore = score
+      melhor = a
+    }
+  }
+
+  return melhor.id
+}
+
+/**
  * Comportamento base = Cursor Agent: pedido → tools → resultado no mesmo turno.
  * Chat sem tools só em cumprimento curto (ou quando o UI força modo ask).
  */
-export function resolverRotaChat(agenteSel: string, pedido: string): RotaChat {
+export function resolverRotaChat(agenteSel: string, pedido: string, raiz?: string): RotaChat {
   const intencao = detectarIntencao(pedido)
   const sel = (agenteSel || 'auto').trim()
+
+  // Quando não há agente escolhido pelo usuário e temos raiz, escolhe o melhor agente automaticamente.
+  if (!sel || sel === 'auto') {
+    if (pedidoSoConversacional(pedido)) {
+      return {
+        kind: 'chat',
+        tarefa: 'chat',
+        intencao,
+        dica: 'cumprimento curto — chat sem tools'
+      }
+    }
+    if (raiz) {
+      const melhor = selecionarMelhorAgente(raiz, intencao, intencao === 'codigo' ? 'codigo' : 'chat')
+      return {
+        kind: 'agente',
+        agente: melhor,
+        tarefa: intencao === 'codigo' || intencao === 'geral' ? 'codigo' : 'chat',
+        intencao,
+        dica: 'melhor agente automatico para ' + intencao + ': ' + melhor
+      }
+    }
+    // Sem raiz: fallback para dg-engenheiro / hibrido-core
+    return {
+      kind: 'agente',
+      agente: intencao === 'codigo' ? 'dg-engenheiro' : 'hibrido-core',
+      tarefa: intencao === 'codigo' || intencao === 'geral' ? 'codigo' : 'chat',
+      intencao,
+      dica: 'fallback sem raiz: ' + intencao
+    }
+  }
+
   if (sel && sel !== 'auto') {
     return {
       kind: 'agente',
@@ -50,14 +130,7 @@ export function resolverRotaChat(agenteSel: string, pedido: string): RotaChat {
       dica: 'agente escolhido: ' + sel
     }
   }
-  if (pedidoSoConversacional(pedido)) {
-    return {
-      kind: 'chat',
-      tarefa: 'chat',
-      intencao,
-      dica: 'cumprimento curto — chat sem tools'
-    }
-  }
+
   if (intencao === 'codigo') {
     return {
       kind: 'agente',
