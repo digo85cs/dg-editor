@@ -424,16 +424,22 @@ export async function askOllama(
     }
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e)
+    const erroVisao = /image|vision|multimodal|does not support/i.test(msg)
     const podeRetry =
       leve &&
       model !== 'qwen2.5-coder:1.5b' &&
-      /timeout|abort|ECONNREFUSED|fetch failed|socket/i.test(msg)
+      (erroVisao || /timeout|abort|ECONNREFUSED|fetch failed|socket/i.test(msg))
     if (!podeRetry) throw e
-    dglog('[ollama] ask falhou (' + msg.slice(0, 80) + ') — retry 1.5b')
+    dglog(
+      '[ollama] ask falhou (' +
+        msg.slice(0, 80) +
+        ') — retry ' +
+        (erroVisao ? 'modelo sem visao' : '1.5b')
+    )
     const corpo2 = {
       ...corpo,
-      model: 'qwen2.5-coder:1.5b',
-      options: { ...corpo.options, num_predict: Math.min(numPredict, 400) }
+      model: erroVisao ? 'qwen2.5-coder:1.5b' : model,
+      options: { ...corpo.options, num_predict: Math.min(numPredict, erroVisao ? 600 : 400) }
     }
     const r2 = (await ollamaHttpJson(
       OLLAMA_URL + '/api/chat',
@@ -444,7 +450,7 @@ export async function askOllama(
     return {
       text: r2.message?.content || '',
       provider: 'ollama',
-      model: 'qwen2.5-coder:1.5b',
+      model: erroVisao ? 'qwen2.5-coder:1.5b' : model,
       ...(typeof r2.eval_count === 'number' ? { evalCount: r2.eval_count } : {})
     }
   }

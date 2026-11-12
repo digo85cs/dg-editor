@@ -675,10 +675,19 @@ export async function handleChatSend(
     return resultado as ChatSendResult;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    const friendly = /Nenhum modelo de chat/.test(errMsg)
-      ? 'Nenhum modelo de chat instalado'
-      : 'Nao consegui responder agora: ' + errMsg;
-    const message = { role: 'assistant' as const, content: friendly, at: Date.now(), provider: 'erro' };
+    // Ultimo recurso absoluto: askOllama com modelo leve e sem contexto, para nunca ficar sem resposta.
+    let textoUltimoRecurso: string | null = null
+    try {
+      const { askOllama } = await import('../brain/ollama')
+      const r = await askOllama(textoPedido, '', 'chat', {}, { model: 'qwen2.5-coder:1.5b', numPredict: 300, timeoutMs: 60_000 })
+      if (r?.text?.trim()) textoUltimoRecurso = r.text
+    } catch { /* ultimo recurso também falhou */ }
+    const conteudo = textoUltimoRecurso
+      ? textoUltimoRecurso
+      : (/Nenhum modelo de chat/.test(errMsg)
+        ? 'Nenhum modelo de chat instalado'
+        : 'Nao consegui responder agora: ' + errMsg)
+    const message = { role: 'assistant' as const, content: conteudo, at: Date.now(), provider: 'erro' };
     appendChat(rootOk, message);
     try {
       const { gravarDossie } = await import('../dossie');
