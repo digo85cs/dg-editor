@@ -7,7 +7,7 @@ import { ipcMain } from 'electron';
 import { loadChat, appendChat, clearChat } from '../chatstore';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import { dglog } from '../dglog';
-import type { IpcResult } from './types';
+import type { IpcResult, ChatSendResult } from './types';
 
 // ============================================================================
 // HANDLERS DE CHAT
@@ -104,7 +104,7 @@ export async function handleChatSend(
   root: unknown,
   content: unknown,
   opts: unknown
-): Promise<IpcResult & { message?: unknown }> {
+): Promise<ChatSendResult> {
   const r = exigirString(root, 'root');
   if (isErroPayload(r)) {
     return {
@@ -155,6 +155,44 @@ export async function handleChatSend(
   if (!textoPedido) {
     assistantMsg.content = 'Digite uma mensagem antes de enviar.';
     return { ok: false, message: assistantMsg };
+  }
+
+  // === DEGRADACAO GRACIOSA: verifica se ha pelo menos um provedor disponível ===
+  try {
+    const { ollamaAlive } = await import('../ollama-keeper');
+    const { lerChave } = await import('../brain/segredos-providers');
+    const { filaPronta } = await import('../brain/registry');
+
+    const ollamaVivo = await ollamaAlive().catch(() => false);
+    let chaveOnline = false;
+    try {
+      const fila = filaPronta('chat');
+      for (const p of fila) {
+        if (p.tipo === 'online' && p.formato === 'openai') {
+          let key = '';
+          if (p.apiKeyRef) key = String(lerChave(p.id) || '').trim();
+          if (!key && p.apiKeyEnv) key = String(process.env[p.apiKeyEnv] || '').trim();
+          if (key) { chaveOnline = true; break; }
+        }
+      }
+    } catch { /* fila vazia ou erro nao bloqueia */ }
+
+    if (!ollamaVivo && !chaveOnline) {
+      const msgNaoDisponivel = {
+        role: 'assistant' as const,
+        content: 'Nenhum provedor de IA disponível no momento. Configure uma chave API (OpenRouter/OpenAI) ou inicie o Ollama local, depois tente novamente.',
+        at: Date.now(),
+        provider: 'erro'
+      };
+      appendChat(rootOk, msgNaoDisponivel);
+      try {
+        const { gravarDossie } = await import('../dossie');
+        await gravarDossie(loadChat(rootOk), { root: rootOk });
+      } catch { /* */ }
+      return { ok: false, message: msgNaoDisponivel, diagnostico: { provedores: 'indisponiveis', ollama: false, chaveOnline: false } };
+    }
+  } catch {
+    /* segue se nao conseguir verificar — deixa o fluxo normal tentar */
   }
 
   const options = opts && typeof opts === 'object' && !Array.isArray(opts)
@@ -634,7 +672,7 @@ export async function handleChatSend(
       const resposta = await askOllama(textoPedido, context, 'chat');
       return publicar(resposta.text, resposta.provider + ':' + (resposta.model || modeloChat));
     });
-    return resultado as IpcResult & { message?: unknown };
+    return resultado as ChatSendResult;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const friendly = /Nenhum modelo de chat/.test(errMsg)

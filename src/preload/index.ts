@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 
+/** Canais permitidos para ipcRenderer.invoke (request-response). */
 const invokeChannels = [
   'auth:get-state', 'auth:ensure-identity', 'auth:logout',
   'auth:adapta:conectar', 'auth:adapta:desconectar', 'auth:adapta:status',
@@ -85,6 +86,7 @@ const invokeChannels = [
   'automation:listar', 'automation:executar', 'automation:aprovacao-resolver'
 ]
 
+/** Canais de evento (ipcRenderer.on) permitidos. */
 const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
 const eventOnChannels = [
   'terminal:data',
@@ -101,11 +103,52 @@ const eventOnChannels = [
   'automation:aprovacao-pendente'
 ] as const
 
+/** Canais de send (fire-and-forget) permitidos. */
 const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']
+
+/** Canais que manipulam caminhos de arquivo — exige sanitizacao. */
+const caminhoChannels = new Set([
+  'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'dossie:ler', 'dossie:gravar',
+  'vault:nota', 'vault:salvar',
+  'propostas:preview',
+  'analise:run'
+])
+
+const MAX_ARGS = 8
+const MAX_ARG_LEN = 200000
+
+function ehCaminhoSeguro(caminho: unknown): boolean {
+  if (typeof caminho !== 'string') return false
+  if (!caminho || caminho.length > 1000) return false
+  // Bloqueia travessia de diretorio e caminhos absolutos fora do espaco do usuario
+  if (caminho.includes('..')) return false
+  if (caminho.startsWith('/') && !caminho.startsWith('/home/') && !caminho.startsWith('/Users/')) return false
+  if (/^[A-Za-z]:[\\/]/.test(caminho)) return false // C:\, D:\ etc. sem raiz conhecida
+  return true
+}
+
+function sanitizarArgs(args: unknown[]): unknown[] {
+  if (args.length > MAX_ARGS) throw new Error('Demais argumentos para o canal')
+  return args.map((a) => {
+    if (typeof a === 'string' && a.length > MAX_ARG_LEN) {
+      throw new Error('Argumento excede tamanho maximo permitido')
+    }
+    return a
+  })
+}
 
 contextBridge.exposeInMainWorld('api', {
   invoke: (channel: string, ...args: unknown[]) => {
     if (!invokeChannels.includes(channel)) return Promise.reject(new Error(`Unknown channel: ${channel}`))
+    // Sanitiza argumentos de canais de caminho
+    if (caminhoChannels.has(channel)) {
+      const primeiro = args[0]
+      if (!ehCaminhoSeguro(primeiro)) {
+        return Promise.reject(new Error(`Caminho invalido para o canal ${channel}`))
+      }
+    }
+    sanitizarArgs(args)
     return ipcRenderer.invoke(channel, ...args)
   },
   analysisRun: (root: string, force: boolean, escopo: 'rapida' | 'completa') =>

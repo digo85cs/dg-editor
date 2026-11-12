@@ -221,6 +221,38 @@ const TOOLS = [
     }
   },
   {
+    name: 'qoder_executar',
+    description: 'Executa o agente Qoder com fallback automatico para proximo agente se travar/demorar',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mensagem: { type: 'string', description: 'Pedido em linguagem natural' },
+        tarefa: {
+          type: 'string',
+          description: "chat | codigo | plano | debug (padrao 'codigo')",
+          enum: ['chat', 'codigo', 'plano', 'debug']
+        }
+      },
+      required: ['mensagem']
+    }
+  },
+  {
+    name: 'trae_executar',
+    description: 'Executa o agente Trae com fallback automatico para proximo agente se travar/demorar',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mensagem: { type: 'string', description: 'Pedido em linguagem natural' },
+        tarefa: {
+          type: 'string',
+          description: "chat | codigo | plano | debug (padrao 'codigo')",
+          enum: ['chat', 'codigo', 'plano', 'debug']
+        }
+      },
+      required: ['mensagem']
+    }
+  },
+  {
     name: 'navegador_abrir',
     description:
       'Abre/navega URL no navegador embutido (persist:dgnav). Opcional: esperarSeletor para SPAs.',
@@ -641,6 +673,41 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         }
         return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: true }
       }
+    }
+
+    if (name === 'qoder_executar' || name === 'trae_executar') {
+      const agenteId = name === 'qoder_executar' ? 'qoder' : 'trae'
+      const parsed = z.object({
+        mensagem: z.string(),
+        tarefa: z.enum(['chat', 'codigo', 'plano', 'debug']).optional()
+      }).parse(args)
+
+      const { orquestrarAgentes } = await import('../agent/orquestrador')
+      const { listarAgentes } = await import('../brain/agentes')
+
+      const todos = listarAgentes(RAIZ).map((a) => a.id)
+      const fila = [agenteId, ...todos.filter((id) => id !== agenteId)]
+
+      const orc = await orquestrarAgentes(RAIZ, parsed.mensagem, fila, undefined, {
+        pararNoPrimeiroSucesso: true,
+        tarefa: parsed.tarefa || 'codigo'
+      })
+
+      const ultimo = orc.passos[orc.passos.length - 1]
+      const out = {
+        ok: !!orc.textoFinal || orc.passos.some((p) => p.ok),
+        agenteUsado: ultimo?.agente || agenteId,
+        texto: orc.textoFinal || (ultimo?.texto || ''),
+        passos: orc.passos.map((p) => ({
+          agente: p.agente,
+          ok: p.ok,
+          erro: p.erro,
+          duracaoMs: p.duracaoMs
+        })),
+        modeloUsado: orc.passos.map((p) => p.modelo).filter(Boolean).pop(),
+        duracaoMsTotal: orc.passos.reduce((acc, p) => acc + (p.duracaoMs || 0), 0)
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: !out.ok }
     }
 
     if (name === 'navegador_abrir') {

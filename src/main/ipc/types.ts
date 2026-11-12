@@ -333,6 +333,7 @@ export interface ChatSendResult extends IpcResult {
   hibrido?: unknown;
   propostas?: unknown[];
   autoAprovacao?: { aplicada: boolean; motivo: string };
+  diagnostico?: Record<string, unknown>;
 }
 
 /** Payload para carregar chat */
