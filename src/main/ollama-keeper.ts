@@ -1,4 +1,4 @@
-import { spawn, execSync } from 'child_process'
+import { spawn, execSync, execFileSync } from 'child_process'
 import { request } from 'http'
 import { dglog } from './dglog'
 import { OLLAMA_URL } from './brain/ollama'
@@ -24,6 +24,40 @@ export function ollamaInstalado(): boolean {
     else execSync('which ollama', { stdio: 'ignore' })
     return true
   } catch {
+    return false
+  }
+}
+
+/** Verifica se o modelo esta presente localmente via `ollama list`. */
+export function modeloOllamaLocal(modelo: string): boolean {
+  try {
+    const saida = execFileSync(ollamaBin(), ['list'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const linhas = saida.split('\n').filter((l) => l.trim())
+    // primeira linha e cabeçalho 'NAME ...'
+    for (const l of linhas.slice(1)) {
+      const nome = l.split(/\s+/)[0]
+      if (nome === modelo || nome === modelo + ':latest') return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/** Garante que o modelo esteja baixado; se nao estiver, faz `ollama pull`. */
+export async function garantirModelo(modelo: string): Promise<boolean> {
+  if (modeloOllamaLocal(modelo)) return true
+  if (!ollamaInstalado()) return false
+  dglog('[keeper] modelo ausente, fazendo ollama pull ' + modelo)
+  try {
+    execFileSync(ollamaBin(), ['pull', modelo], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 600_000,
+    })
+    return modeloOllamaLocal(modelo)
+  } catch (e) {
+    dglog('[keeper] ollama pull falhou para ' + modelo + ': ' + String((e as Error)?.message || e))
     return false
   }
 }
@@ -75,15 +109,21 @@ export async function startOllama(): Promise<OllamaCheck> {
   return { ativo: false, instalado: true }
 }
 
-/** Garante Ollama no ar: se parado e instalado, sobe `ollama serve` automaticamente. */
-export async function ensureOllama(): Promise<boolean> {
+/** Garante Ollama no ar e o modelo default disponível; se parado e instalado, sobe `ollama serve` automaticamente. */
+export async function ensureOllama(modeloDefault = 'qwen2.5-coder:7b'): Promise<boolean> {
   const st = await checkOllama()
-  if (st.ativo) return true
-  if (!st.instalado) {
-    dglog('[keeper] Ollama nao instalado no PATH')
-    return false
+  if (!st.ativo) {
+    if (!st.instalado) {
+      dglog('[keeper] Ollama nao instalado no PATH')
+      return false
+    }
+    dglog('[keeper] Ollama parado — auto-start')
+    const up = await startOllama()
+    if (!up.ativo) return false
   }
-  dglog('[keeper] Ollama parado — auto-start')
-  const up = await startOllama()
-  return up.ativo
+  // Garante o modelo default baixado no piso Ollama
+  try {
+    await garantirModelo(modeloDefault)
+  } catch { /* nao bloqueia o boot por pull de modelo */ }
+  return true
 }

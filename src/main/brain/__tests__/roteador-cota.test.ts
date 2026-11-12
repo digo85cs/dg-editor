@@ -18,6 +18,7 @@ import {
   statusCotas,
 } from '../roteador-cota'
 import { chamarComCascata } from '../chamar-com-cascata'
+import { __resetarCacheParaTestes } from '../resposta-cache'
 import { ErroProvider } from '../providers'
 import type { ProviderDescriptor } from '../providers-registry'
 
@@ -101,6 +102,7 @@ const mensagens = [{ role: 'user', content: 'oi' }]
 
 beforeEach(() => {
   __resetarEstadoParaTestes()
+  __resetarCacheParaTestes()
   vi.clearAllMocks()
   mFilaGlobal.mockReturnValue([pA, pB, pC, pD])
   mChaveConfigurada.mockReturnValue(true)

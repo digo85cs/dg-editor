@@ -158,5 +158,6 @@ export async function orquestrarAgentes(
     }
   }
 
-  return { ok: true, passos: out, textoFinal: ultimoTexto }
+  const algumOk = out.some((p) => p.ok)
+  return { ok: algumOk, passos: out, textoFinal: ultimoTexto }
 }

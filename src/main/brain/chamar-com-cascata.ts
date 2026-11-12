@@ -13,7 +13,8 @@ import {
   type ToolDef,
 } from './providers'
 import { normalizarTarefa, type Tarefa } from './registry'
-import { marcarEsgotado, proximoDisponivel } from './roteador-cota'
+import { marcarEsgotado, proximoDisponivel, registrarCusto } from './roteador-cota'
+import { lerRespostaCache, gravarRespostaCache } from './resposta-cache'
 
 const MAX_TENTATIVAS = 8
 
@@ -41,8 +42,27 @@ export async function chamarComCascata(
 
     tentativas.push(`${cfg.id}/${cfg.modelo}`)
 
+    // Cache: devolve resposta ja gravada para o mesmo (modelo+mensagens+tools)
+    const cacheHit = lerRespostaCache(cfg.modelo, mensagens, tools)
+    if (cacheHit) {
+      return {
+        content: cacheHit.texto,
+        tool_calls: [],
+        modeloUsado: cfg.modelo,
+        providerId: cfg.id,
+        providerFinal: cfg.id + '(cache)',
+        tentativas,
+      }
+    }
+
     try {
       const r = await chamarProvider(cfg, mensagens, tools, signal)
+      // Grava no cache para reuso futuro
+      gravarRespostaCache(cfg.modelo, mensagens, r.content, tools)
+      // Rastreia custo para teto diario
+      if (r.usage) {
+        registrarCusto(cfg.id, r.usage.prompt_tokens || 0, r.usage.completion_tokens || 0)
+      }
       return { ...r, providerFinal: cfg.id, tentativas }
     } catch (e) {
       if (signal?.aborted) {

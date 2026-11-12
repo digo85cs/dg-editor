@@ -68,9 +68,11 @@ export function listarAgentes(raiz: string): AgenteDef[] {
       const v = validarAgente(a)
       if (!v.ok) {
         dglog('[agentes] aviso: ' + a.id + ' invalido — ' + v.erros.join(', '))
+        return null
       }
       return a
     })
+    .filter((a): a is AgenteDef => a !== null)
 }
 
 export function lerAgente(raiz: string, id: string): AgenteDef | null {
@@ -141,7 +143,7 @@ export function garantirAgentesPadrao(raiz: string): void {
       nome: 'revisor.md',
       conteudo: `---
 nome: Revisor
-especialidade: revisÃ£o de mudanÃ§a antes de merge
+especialidade: revisão de mudança antes de merge
 skills: leitor-codigo, refatorador, testador
 ---
 Voce e o agente Revisor do DG Editor. Revise codigo com foco em bugs, tipos e clareza.
@@ -151,7 +153,7 @@ Responda em portugues do Brasil, curto e tecnico.`
       nome: 'arquiteto.md',
       conteudo: `---
 nome: Arquiteto
-especialidade: decisÃ£o estrutural
+especialidade: decisão estrutural
 skills: leitor-codigo, refatorador, documentador
 ---
 Voce e o agente Arquiteto do DG Editor. Pense em estrutura, fronteiras de modulo e riscos.
@@ -161,7 +163,7 @@ Responda em portugues do Brasil.`
       nome: 'seguranca.md',
       conteudo: `---
 nome: Seguranca
-especialidade: auditoria de seguranÃ§a
+especialidade: auditoria de segurança
 skills: revisor-seguranca, leitor-codigo, documentador
 ---
 Assume input hostil. Classifique por severidade. Nunca aprove sem evidencia no codigo.`
@@ -170,7 +172,7 @@ Assume input hostil. Classifique por severidade. Nunca aprove sem evidencia no c
       nome: 'testador.md',
       conteudo: `---
 nome: Testador
-especialidade: estratÃ©gia de teste
+especialidade: estratégia de teste
 skills: testador, leitor-codigo, debugger
 ---
 Priorize teste que falha quando o codigo quebra. Rejeite teste que sempre passa.`
@@ -179,7 +181,7 @@ Priorize teste que falha quando o codigo quebra. Rejeite teste que sempre passa.
       nome: 'dg-engenheiro.md',
       conteudo: `---
 nome: DG Engenheiro
-especialidade: orquestraÃ§Ã£o interna
+especialidade: orquestração interna
 skills: leitor-codigo, refatorador, testador, debugger, revisor-seguranca, documentador, arvore-projeto, editar-seguro
 ---
 Voce e o engenheiro interno do DG Editor. Trabalha so com tools e skills locais. Antes de editar, le. Antes de pronto, typecheck.`
@@ -188,7 +190,7 @@ Voce e o engenheiro interno do DG Editor. Trabalha so com tools e skills locais.
       nome: 'hibrido-core.md',
       conteudo: `---
 nome: Hibrido Core
-especialidade: prediÃ§Ã£o tÃ©cnica + geraÃ§Ã£o segura no DG Editor
+especialidade: predição técnica + geração segura no DG Editor
 skills: leitor-codigo, arvore-projeto, editar-seguro, debugger, testador, documentador
 ---
 Voce e o Agente Hibrido Core do DG Editor.
