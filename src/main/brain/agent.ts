@@ -981,12 +981,13 @@ export async function executarAgente(
       ? { modeloForcado: modeloForcadoOuOpcoes }
       : modeloForcadoOuOpcoes || {}
 
-  // Se o caller passou um signal (ex.: orquestrador com timeout próprio), respeita-o.
-  // Caso contrário, cria um AbortController interno com timeout de 120s.
+  // Se o caller passou um signal (ex.: orquestrador com timeout próprio), respeita-o
+  // SEM criar timeout interno próprio (evita conflito com o do orquestrador).
+  // Caso contrário, cria um AbortController interno com timeout de 30s.
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   if (!opcoes.signal) {
     const controller = new AbortController()
-    timeoutId = setTimeout(() => controller.abort(), 120_000)
+    timeoutId = setTimeout(() => controller.abort(), 30_000)
     opcoes.signal = controller.signal
   }
 

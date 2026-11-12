@@ -27,8 +27,8 @@ export type ResultadoOrquestracao = {
 const FILA_PADRAO = ['dg-engenheiro', 'revisor']
 
 // Tempo máximo que cada agente tem para responder antes de ser descartado.
-// 60s: sem demoras — se travar, salta imediatamente para o próximo.
-const AGENT_TIMEOUT_MS = 60_000
+// 30s: resposta rápida — se travar ou não responder, salta imediatamente para o próximo.
+const AGENT_TIMEOUT_MS = 30_000
 
 export async function orquestrarAgentes(
   raiz: string,
