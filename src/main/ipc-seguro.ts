@@ -5,7 +5,7 @@
 import { resolve, relative, isAbsolute, normalize } from 'path'
 
 export type ResultadoCaminho =
-  | { ok: true; abs: string; rel: string }
+  | { ok: true; abs: string; rel: string; erro?: string }
   | { ok: false; erro: string }
 
 /** Resolve e garante que o caminho esta dentro de uma das raizes abertas. */

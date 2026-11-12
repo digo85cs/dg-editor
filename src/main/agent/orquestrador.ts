@@ -7,6 +7,19 @@
 import { executarAgente, type RespostaAgente, type PassoAgente } from '../brain/agent'
 import { listarAgentes } from '../brain/agentes'
 import { dglog } from '../dglog'
+import {
+  registrarMetricaAgente,
+  logResumoMetricas,
+  resetarMetricas,
+  obterMetricasAgente
+} from '../metrics'
+
+export {
+  registrarMetricaAgente,
+  logResumoMetricas,
+  resetarMetricas,
+  obterMetricasAgente
+}
 
 export type PassoOrquestracao = {
   agente: string
@@ -34,7 +47,8 @@ export async function orquestrarAgentes(
   raiz: string,
   pedido: string,
   fila?: string[],
-  contextoExtra?: string
+  contextoExtra?: string,
+  opts?: { pararNoPrimeiroSucesso?: boolean }
 ): Promise<ResultadoOrquestracao> {
   const disponiveis = listarAgentes(raiz).map((a) => a.id)
   let ids = (fila && fila.length ? fila : FILA_PADRAO).filter(Boolean)
@@ -99,6 +113,11 @@ export async function orquestrarAgentes(
         passos: r.passos,
         duracaoMs: r.duracaoMs || Date.now() - t0
       })
+      registrarMetricaAgente(id, { ok: r.ok !== false, duracaoMs: Date.now() - t0, foiTimeout: false })
+
+      if (opts?.pararNoPrimeiroSucesso && r.ok !== false) {
+        break
+      }
     } catch (e) {
       clearTimeout(raceTimer)
       const msg = String((e as Error).message || e)
@@ -118,6 +137,7 @@ export async function orquestrarAgentes(
         erro: msg,
         duracaoMs: Date.now() - t0
       })
+      registrarMetricaAgente(id, { ok: false, duracaoMs: Date.now() - t0, foiTimeout: foiTimeout })
       // Nunca encerra o fluxo: segue imediatamente para o próximo agente da fila.
       continue
     }

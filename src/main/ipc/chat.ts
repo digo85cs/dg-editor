@@ -502,7 +502,9 @@ export async function handleChatSend(
           // Ordena: o idAgente selecionado primeiro, depois o resto
           const fila = [idAgente, ...todos.filter((id) => id !== idAgente)];
           try {
-            const orc = await orquestrarAgentes(rootOk, textoPedido, fila);
+            const orc = await orquestrarAgentes(rootOk, textoPedido, fila, undefined, {
+              pararNoPrimeiroSucesso: true
+            });
             const ultimo = orc.passos[orc.passos.length - 1];
             const respostaTexto = orc.textoFinal || (ultimo ? ultimo.texto : '');
             const modeloUsado = orc.passos.map((p) => p.modelo).filter(Boolean).pop() || 'agente-auto';
