@@ -981,11 +981,14 @@ export async function executarAgente(
       ? { modeloForcado: modeloForcadoOuOpcoes }
       : modeloForcadoOuOpcoes || {}
 
-  // Timeout global de 120 segundos para evitar que o agente trave o chat para sempre.
-  const controller = new AbortController()
-  let timeoutId: ReturnType<typeof setTimeout>
-  timeoutId = setTimeout(() => controller.abort(), 120_000)
-  opcoes.signal = controller.signal
+  // Se o caller passou um signal (ex.: orquestrador com timeout próprio), respeita-o.
+  // Caso contrário, cria um AbortController interno com timeout de 120s.
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+  if (!opcoes.signal) {
+    const controller = new AbortController()
+    timeoutId = setTimeout(() => controller.abort(), 120_000)
+    opcoes.signal = controller.signal
+  }
 
   if (profundidadeAgente > 0) {
     throw new Error(
@@ -1256,7 +1259,7 @@ export async function executarAgente(
       'Fila esgotada para tarefa=' + tarefa + '. Tentados: ' + (lista || '(nenhum)')
     )
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     profundidadeAgente--
   }
 }

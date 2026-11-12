@@ -1,6 +1,8 @@
 /**
  * Orquestra agentes em sequência (ex.: engenheiro → revisor).
  * Sem paralelismo destrutivo; cada passo espera o anterior.
+ * Se um agente não responder ou demorar, é abortado e o fluxo salta
+ * automaticamente para o próximo agente disponível, sem demoras.
  */
 import { executarAgente, type RespostaAgente, type PassoAgente } from '../brain/agent'
 import { listarAgentes } from '../brain/agentes'
@@ -24,6 +26,10 @@ export type ResultadoOrquestracao = {
 
 const FILA_PADRAO = ['dg-engenheiro', 'revisor']
 
+// Tempo máximo que cada agente tem para responder antes de ser descartado.
+// 60s: sem demoras — se travar, salta imediatamente para o próximo.
+const AGENT_TIMEOUT_MS = 60_000
+
 export async function orquestrarAgentes(
   raiz: string,
   pedido: string,
@@ -42,12 +48,15 @@ export async function orquestrarAgentes(
   let acumulado = pedido
   let ultimoTexto = ''
 
-  // Tempo máximo que cada agente tem para responder antes de ser descartado.
-  const AGENT_TIMEOUT_MS = 90_000
-
   for (const id of ids) {
     dglog('[orquestrador] agente=' + id)
     const t0 = Date.now()
+
+    // AbortController próprio deste agente: quando o timeout dispara,
+    // o signal cancela o executarAgente em vez de deixar órfão no background.
+    const controller = new AbortController()
+    let raceTimer: ReturnType<typeof setTimeout> | undefined
+
     try {
       const prompt =
         out.length === 0
@@ -63,16 +72,23 @@ export async function orquestrarAgentes(
       const promise = executarAgente(raiz, prompt, {
         agente: id,
         modo: 'agent',
-        contextoExtra
+        contextoExtra,
+        signal: controller.signal
       })
 
-      // Promise.race garante que um agente travado nao bloqueia o chat para sempre.
+      // Promise.race: quem vencer (resposta ou timeout) resolve primeiro.
       const r: RespostaAgente = await Promise.race([
         promise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout: ' + AGENT_TIMEOUT_MS / 1000 + 's')), AGENT_TIMEOUT_MS)
-        )
+        new Promise<never>((_, reject) => {
+          raceTimer = setTimeout(() => {
+            dglog('[orquestrador] timeout agente=' + id + ' (' + AGENT_TIMEOUT_MS / 1000 + 's) — abortando e pulando')
+            controller.abort()
+            reject(new Error('timeout: ' + AGENT_TIMEOUT_MS / 1000 + 's'))
+          }, AGENT_TIMEOUT_MS)
+        })
       ])
+
+      clearTimeout(raceTimer)
 
       ultimoTexto = r.texto || ''
       out.push({
@@ -84,14 +100,25 @@ export async function orquestrarAgentes(
         duracaoMs: r.duracaoMs || Date.now() - t0
       })
     } catch (e) {
+      clearTimeout(raceTimer)
+      const msg = String((e as Error).message || e)
+      const foiTimeout = /timeout/i.test(msg)
+      const foiCancelado = /cancelado|abort/i.test(msg)
+
+      dglog(
+        '[orquestrador] agente=' + id +
+        ' resultado=' + (foiTimeout ? 'TIMEOUT' : foiCancelado ? 'CANCELADO' : 'ERRO') +
+        ' msg=' + msg.slice(0, 200)
+      )
+
       out.push({
         agente: id,
         ok: false,
         texto: '',
-        erro: String((e as Error).message || e),
+        erro: msg,
         duracaoMs: Date.now() - t0
       })
-      // Nao encerra o fluxo: segue para o proximo agente da fila.
+      // Nunca encerra o fluxo: segue imediatamente para o próximo agente da fila.
       continue
     }
   }
