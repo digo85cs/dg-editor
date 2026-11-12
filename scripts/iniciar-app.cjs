@@ -62,13 +62,16 @@ if (!fs.existsSync(electronExe)) {
 
 if (!garantirBuild(raiz)) process.exit(1)
 
-const child = spawn(electronExe, ['.', '--no-sandbox'], {
-  cwd: raiz,
-  env: { ...process.env, DG_ROOT: raiz },
-  stdio: 'ignore',
-  windowsHide: true,
-  detached: true
-})
+const childEnv = { ...process.env };
+  delete childEnv.ELECTRON_RUN_AS_NODE;
+  delete childEnv.ELECTRON_EXTRA_LAUNCH_ARGS;
+  const child = spawn(electronExe, ['.', '--no-sandbox'], {
+    cwd: raiz,
+    env: childEnv,
+    stdio: 'ignore',
+    windowsHide: true,
+    detached: true
+  })
 child.on('error', () => process.exit(1))
 child.unref()
 process.exit(0)
