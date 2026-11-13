@@ -115,6 +115,8 @@ function copiarArtefatos(origem, v) {
 function build() {
   const v = versaoAtual();
   const saida = join('tmp', 'dist-release-' + v);
+  console.log('[versao] garantindo ferramentas embutidas (ffmpeg + Python)...');
+  rodar('npm', ['run', 'ferramentas'], { cwd: RAIZ });
   console.log('[versao] compilando aplicação...');
   rodar('npm', ['run', 'build'], { cwd: RAIZ });
   console.log('[versao] empacotando instalador Windows...');

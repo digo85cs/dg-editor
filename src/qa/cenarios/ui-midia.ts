@@ -469,5 +469,79 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
     }
   }
 
+  {
+    const t0 = Date.now()
+    try {
+      const r = await page.evaluate(async () => {
+        // @ts-expect-error api bridge
+        return await window.api.invoke('diag:portabilidade')
+      })
+      const itens: { id: string; ok: boolean; obrigatorio: boolean }[] = r?.itens || []
+      const ids = itens.map((i) => i.id)
+      const obrigatorios = itens.filter((i) => i.obrigatorio)
+      const ok =
+        itens.length >= 8 &&
+        ids.includes('ffmpeg') &&
+        ids.includes('ffprobe') &&
+        ids.includes('python') &&
+        ids.includes('terminal') &&
+        typeof r?.resumo?.total === 'number'
+      out.push({
+        id: 'ui.portabilidade.diagnostico',
+        area: 'ui',
+        titulo: 'Diagnóstico de portabilidade cobre ffmpeg/Python/terminal',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: ok
+          ? (r.resumo.ok || 0) + '/' + r.resumo.total + ' OK · ' + obrigatorios.filter((i) => i.ok).length + '/' + obrigatorios.length + ' obrigatórios'
+          : 'itens: ' + ids.join(', ')
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.portabilidade.diagnostico',
+        area: 'ui',
+        titulo: 'diagnóstico de portabilidade',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
+      const r = await page.evaluate(async () => {
+        // @ts-expect-error api bridge
+        return await window.api.invoke('agente:externos')
+      })
+      const ids: string[] = (r?.agentes || []).map((a: { id: string }) => a.id)
+      const ok =
+        ids.includes('qcoder') &&
+        ids.includes('openhands') &&
+        ids.includes('trae') &&
+        (r?.agentes || []).every((a: { custo: string }) => a.custo === 'gratuito')
+      out.push({
+        id: 'ui.agentes.externos',
+        area: 'ui',
+        titulo: 'Agentes externos gratuitos detectados (QCoder/OpenHands/Trae)',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: ok
+          ? (r.agentes as { pronto: boolean }[]).filter((a) => a.pronto).length + ' pronto(s) de ' + ids.length
+          : 'ids: ' + ids.join(', ')
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.agentes.externos',
+        area: 'ui',
+        titulo: 'agentes externos',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
   return out
 }

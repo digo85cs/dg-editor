@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 19:26:06** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.1** · branch `integra-13-11` · último commit: 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
-> Alterações locais não commitadas: 14 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 19:58:40** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.2** · branch `integra-13-11` · último commit: d076e20 2026-11-13 release: v0.3.1
+> Alterações locais não commitadas: 21 arquivo(s).
 
 ## 1. O que é
 
@@ -28,8 +28,8 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 
 ## 4. IPC
 
-- Canais registrados no main: **306**.
-- Canais expostos pelo preload: **284**.
+- Canais registrados no main: **308**.
+- Canais expostos pelo preload: **286**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -101,6 +101,14 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Análise de vídeo: resolução, fps, duração, codec, bitrate, áudio e dicas automáticas de ajuste.
 - Canais: `midia:video-analisar`, `midia:video-melhorar`, `midia:imagem-qualidade`; MCP: `midia_video_qualidade`, `midia_imagem_qualidade`.
 
+### Portabilidade (instalar em PC novo)
+
+- O instalador embute `ffmpeg.exe`/`ffprobe.exe` (GPL, com vidstab/loudnorm/rubberband) em `resources/bin/win32-x64` via `extraResources`.
+- Python portátil (CPython 3.12) com edge-tts, faster-whisper, kokoro-onnx, piper-tts e supertonic em `resources/python` — vozes e transcrição funcionam sem instalar Python no PC.
+- `npm run ferramentas` baixa/verifica tudo antes do build; `dist:win`, `dist:all` e `publish:github` já chamam esse passo.
+- Diagnóstico em Execução → Ferramentas → "Portabilidade do PC" (canal `diag:portabilidade`, MCP `portabilidade_status`) lista o que está pronto e o que é opcional (Ollama, SDK Android, ComfyUI).
+- Agentes externos gratuitos: `agente:externos` / MCP `agentes_externos_status` detectam QCoder (qwen2.5-coder + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent, com o comando de instalação quando faltam.
+
 ### Demais recursos
 
 - Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).
@@ -120,19 +128,19 @@ Artefatos locais em `dist-apps/`:
 
 ## 7. MCP
 
-- **68** ferramentas registradas em `src/main/mcp/server.ts`.
+- **70** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `projeto_arvore`, `projeto_smoke`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
 ## 8. Skills e agentes
 
 - Skills embutidas: **23** — editar-seguro.md, arvore-projeto.md, navegador-embutido.md, free-mode.md, prompt-melhorar.md, anexos.md, leitor-codigo.md, refatorador.md, testador.md, debugger.md, revisor-seguranca.md, documentador.md, analisador.md, terminal-local.md, inventario-disco.md, estilo-cursor.md, roteiro-shorts.md, thumbnail-design.md, legenda-automatica.md, publicacao-social.md, pacote-memes.md, dublagem-parodia.md, capa-video.md.
-- Agentes: **16** — Revisor, Arquiteto, Seguranca, Testador, DG Engenheiro, Hibrido Core, Auto Free, Coder Free, Assist Free, Architect Free, Debugger Free, Reviewer Free, Roteirista, Thumbnail, Legendas, Publicador.
+- Agentes: **19** — Revisor, Arquiteto, Seguranca, Testador, DG Engenheiro, Hibrido Core, Auto Free, Coder Free, Assist Free, Architect Free, Debugger Free, Reviewer Free, Qoder, Devin (OpenHands), Trae, Roteirista, Thumbnail, Legendas, Publicador.
 
 ## 9. Comandos npm
 
@@ -152,12 +160,13 @@ Artefatos locais em `dist-apps/`:
 - `npm run certificar` — `node scripts/certificar.cjs`
 - `npm run deploy` — `npm run dist:win:installer`
 - `npm run dev` — `electron-vite dev`
-- `npm run dist:all` — `npm run build && electron-builder --win nsis portable --linux AppImage deb --x64`
+- `npm run dist:all` — `npm run ferramentas && npm run build && electron-builder --win nsis portable --linux AppImage deb --x64`
 - `npm run dist:linux` — `npm run build && electron-builder --linux AppImage deb --x64`
 - `npm run dist:linux:wsl` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-linux.ps1`
-- `npm run dist:win` — `npm run build && electron-builder --win --x64 --dir`
-- `npm run dist:win:installer` — `npm run build && electron-builder --win nsis portable --x64`
+- `npm run dist:win` — `npm run ferramentas && npm run build && electron-builder --win --x64 --dir -c.directories.output=tmp/dist-win`
+- `npm run dist:win:installer` — `npm run ferramentas && npm run build && electron-builder --win nsis portable --x64`
 - `npm run dossie` — `node scripts/dossie.cjs`
+- `npm run ferramentas` — `node scripts/baixar-ferramentas.cjs && node scripts/baixar-python.cjs`
 - `npm run indice` — `node scripts/gerar-indice.cjs`
 - `npm run installer:assets` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/gerar-installer-assets.ps1`
 - `npm run limpar` — `node -e "require('fs').rmSync('out',{recursive:true,force:true});require('fs').rmSync('node_modules/.vite',{recursive:true,force:true});console.log('ok')"`
@@ -174,8 +183,9 @@ Artefatos locais em `dist-apps/`:
 - `npm run prestart` — `node scripts/garantir-launchers.cjs`
 - `npm run preview` — `electron-vite preview`
 - `npm run publicar` — `node scripts/versao-publicar.cjs --build`
-- `npm run publish:github` — `npm run build && electron-builder --win nsis portable --linux AppImage deb --x64 --publish always`
+- `npm run publish:github` — `npm run ferramentas && npm run build && electron-builder --win nsis portable --linux AppImage deb --x64 --publish always`
 - `npm run publish:release` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar-release.ps1`
+- `npm run python-portatil` — `node scripts/baixar-python.cjs`
 - `npm run qa` — `node scripts/run-qa.cjs`
 - `npm run qa:baseline` — `node scripts/run-qa.cjs --suite=perf --atualizar-baseline`
 - `npm run qa:e2e` — `node scripts/run-qa.cjs --suite=e2e`
@@ -205,7 +215,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 10. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **143 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **147 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
@@ -218,6 +228,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 12. Histórico recente
 
+- d076e20 2026-11-13 release: v0.3.1
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
 - b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
 - e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
@@ -227,7 +238,6 @@ Artefatos locais em `dist-apps/`:
 - 5b8cf9d 2026-11-12 feat: cache de respostas LLM, pull auto Ollama, filtro agentes invalidos e custo rastreado
 - c8354ca 2026-11-12 fix: corrige testes flaky pre-existing (chat.test.ts e contratos.test.ts)
 - 81fa3bd 2026-11-12 docs(radar): documenta radar diario e adiciona secao ao .dgrules
-- 35765f2 2026-11-12 feat(radar): implementa radar diario com gatilho de 24h no boot
 
 ## 13. Como atualizar este dossiê
 

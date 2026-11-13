@@ -1069,6 +1069,9 @@ export async function executarAgente(
       'sem analisar re-renderiza com estabilizacao vidstab 2 passadas, denoise, nitidez, brilho/contraste/saturacao/gamma, ' +
       'escala Lanczos, fps, CRF/preset e normalizacao de audio em MP4 faststart. midia_imagem_qualidade aplica os ' +
       'mesmos ajustes de cor/ruido e escala em imagens. Prefira CRF 18-20 e evite upscale de material ja Full HD. ' +
+      '\nAGENTES EXTERNOS: agentes_externos_status lista QCoder (qwen2.5-coder local), OpenDevin/OpenHands e Trae Agent, ' +
+      'todos gratuitos, com o comando de instalacao quando faltarem. As personas QCoder, Devin e Trae seguem o estilo ' +
+      'desses agentes sem depender de nada pago. ' +
       '\nAPPS: apps_status mostra SDK Android/artefatos; apps_setup instala o toolchain; apps_build gera APK ' +
       'Android e/ou instalador Windows e copia para OneDrive/APP. Rode apps_status antes e depois do build.'
     const blocoPropose = proposeWrites

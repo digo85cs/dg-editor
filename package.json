@@ -1,7 +1,7 @@
 {
   "name": "dg-editor",
   "productName": "DG Editor",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "DG Editor — editor de sistemas com IA local",
   "author": {
     "name": "Rodrigo Soares",
@@ -40,11 +40,13 @@
     "limpeza:leve": "node scripts/limpeza-workspace.cjs --leve",
     "limpeza:organica": "node scripts/limpeza-workspace.cjs --organica",
     "certificar": "node scripts/certificar.cjs",
-    "dist:win": "npm run build && electron-builder --win --x64 --dir",
-    "dist:win:installer": "npm run build && electron-builder --win nsis portable --x64",
+    "ferramentas": "node scripts/baixar-ferramentas.cjs && node scripts/baixar-python.cjs",
+    "python-portatil": "node scripts/baixar-python.cjs",
+    "dist:win": "npm run ferramentas && npm run build && electron-builder --win --x64 --dir -c.directories.output=tmp/dist-win",
+    "dist:win:installer": "npm run ferramentas && npm run build && electron-builder --win nsis portable --x64",
     "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64",
-    "dist:all": "npm run build && electron-builder --win nsis portable --linux AppImage deb --x64",
-    "publish:github": "npm run build && electron-builder --win nsis portable --linux AppImage deb --x64 --publish always",
+    "dist:all": "npm run ferramentas && npm run build && electron-builder --win nsis portable --linux AppImage deb --x64",
+    "publish:github": "npm run ferramentas && npm run build && electron-builder --win nsis portable --linux AppImage deb --x64 --publish always",
     "publish:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar-release.ps1",
     "dist:linux:wsl": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-linux.ps1",
     "smoke:disco": "node scripts/smoke-disco.cjs",
@@ -83,7 +85,25 @@
     "files": [
       "out/**/*",
       "resources/**/*",
+      "!resources/bin/**",
+      "!resources/python/**",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "extraMetadata": {
       "name": "dg-editor",

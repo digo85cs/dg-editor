@@ -4,6 +4,8 @@ dist-app/
 dg-config.json
 .vs/
 # Marca visual do DG Editor fica em resources/ (versionada)
+resources/bin/
+resources/python/
 *.local
 .env
 dist/

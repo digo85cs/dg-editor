@@ -466,6 +466,18 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
+    name: 'portabilidade_status',
+    description:
+      'Diagnostico para PC novo: ferramentas embutidas (ffmpeg, ffprobe, Python, edge-tts, faster-whisper), modelos Ollama e o que falta instalar. Ferramentas embutidas nao dependem do PC.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'agentes_externos_status',
+    description:
+      'Verifica os agentes externos gratuitos integrados: QCoder (qwen2.5-coder local + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent. Retorna o que esta pronto e como instalar o resto.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
     name: 'midia_imagem_gerar',
     description:
       'Gera imagem gratuita via Pollinations (sem chave; 1 imagem a cada ~45s por IP). Para ilimitado use ComfyUI local.',
@@ -1485,6 +1497,33 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       }
 
       if (name === 'midia_status') return await responder(await midia.statusMidia(RAIZ))
+      if (name === 'portabilidade_status') {
+        const s = await midia.statusMidia(RAIZ)
+        let ollama: { ok: boolean; modelos: string[]; erro?: string } = { ok: false, modelos: [] }
+        try {
+          const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2500) })
+          if (res.ok) {
+            const j = (await res.json()) as { models?: { name?: string }[] }
+            ollama = { ok: true, modelos: (j.models || []).map((m) => String(m.name || '')).filter(Boolean) }
+          } else {
+            ollama.erro = 'HTTP ' + res.status
+          }
+        } catch (e) {
+          ollama.erro = e instanceof Error ? e.message : String(e)
+        }
+        const obrigatorios = [s.ferramentas.ffmpeg, s.ferramentas.ffprobe]
+        return await responder({
+          ok: s.ok && obrigatorios.every((f) => f.ok),
+          ferramentas: s.ferramentas,
+          ollama,
+          aviso: 'ffmpeg/ffprobe e Python portatil vao embutidos no instalador; Ollama e SDK Android sao opcionais.'
+        })
+      }
+
+      if (name === 'agentes_externos_status') {
+        const ext = await import('../brain/agentesExternos')
+        return await responder(await ext.statusAgentesExternos())
+      }
 
       if (name === 'midia_comfyui_status') {
         const comfy = await import('../midia/comfyui')

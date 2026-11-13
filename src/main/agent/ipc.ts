@@ -16,6 +16,7 @@ import { cancelarFilaAgente, enfileirarAgente, statusFilaAgente } from './fila'
 import { executarAgente } from '../brain/agent'
 import { emSafeMode } from '../safe-mode'
 import { criarAgente, listarAgentes } from '../brain/agentes'
+import { statusAgentesExternos } from '../brain/agentesExternos'
 import { getRaizVault } from '../vault/indice'
 import { listarModos, salvarModos } from '../modes'
 import { obterPermissoes, salvarPermissoes } from '../permissoes'
@@ -428,6 +429,14 @@ export function registerAgentExtrasIpc(): void {
   })
 
   ipcMain.handle('agente:fila-status', () => ({ ok: true, ...statusFilaAgente() }))
+
+  ipcMain.handle('agente:externos', async () => {
+    try {
+      return await statusAgentesExternos()
+    } catch (e) {
+      return { ok: false, agentes: [], ollama: { ok: false, modelos: [] }, erro: String((e as Error).message || e) }
+    }
+  })
 
   ipcMain.handle('agente:cancelar', () => cancelarFilaAgente())
 

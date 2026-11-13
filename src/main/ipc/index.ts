@@ -51,6 +51,7 @@ import { registrarHandlersPerfil } from './perfil';
 import { registrarHandlersAutomation } from './automation';
 import { registrarHandlersMidia } from './midia';
 import { registrarHandlersApps } from './apps';
+import { registrarHandlersPortabilidade } from './portabilidade';
 import { registrarComfyUIIpc } from '../comfyui-mcp';
 
 // ============================================================================
@@ -130,6 +131,7 @@ export function registrarTodosHandlers(): void {
     registrarHandlersAutomation();
     registrarHandlersMidia();
     registrarHandlersApps();
+    registrarHandlersPortabilidade();
     registrarComfyUIIpc();
     registrarHubExtras();
     registrarHandlersPerfil();

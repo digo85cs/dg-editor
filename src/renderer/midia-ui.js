@@ -1332,6 +1332,44 @@ export async function pintarMidia(corpo, raiz) {
     )
   )
 
+  // ------------------------------------------------------------ portabilidade
+  const diagPort = el('div', { style: 'font-size:12px;line-height:1.6' })
+  corpo.appendChild(
+    caixa(
+      'Portabilidade do PC',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Confere as ferramentas embutidas no instalador (ffmpeg, Python, terminal) e o que é opcional neste PC.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Verificar agora', async () => {
+          diagPort.textContent = 'Verificando…'
+          const r = await seguro('diag:portabilidade')
+          diagPort.textContent = ''
+          if (!r || (r.erro && !r.itens)) {
+            diagPort.textContent = 'Erro: ' + (r?.erro || 'falha no diagnóstico')
+            return
+          }
+          for (const it of r.itens || []) {
+            const marca = it.ok ? '[OK] ' : it.obrigatorio ? '[FALTA] ' : '[!] '
+            const cor = it.ok ? 'var(--dg-ok, #3fb950)' : it.obrigatorio ? 'var(--dg-erro, #f85149)' : 'var(--dg-aviso, #d29922)'
+            diagPort.appendChild(
+              el('div', { style: 'margin:2px 0' },
+                el('strong', { style: 'color:' + cor, text: marca + it.titulo }),
+                el('span', { className: 'muted', text: ' — ' + it.detalhe + (it.dica ? ' · ' + it.dica : '') })
+              )
+            )
+          }
+          diagPort.appendChild(
+            el('div', {
+              style: 'margin-top:6px',
+              className: 'muted',
+              text: (r.resumo?.ok ?? 0) + '/' + (r.resumo?.total ?? 0) + ' itens OK' + (r.embutido ? ' · ferramentas embutidas detectadas' : '')
+            })
+          )
+        }, true)
+      ),
+      diagPort
+    )
+  )
+
   // ------------------------------------------------------------ galeria
   const galeria = el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px' })
   const secaoGaleria = caixa(

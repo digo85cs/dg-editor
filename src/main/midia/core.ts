@@ -46,7 +46,7 @@ export type RespostaMidia = {
 
 export type StatusMidia = {
   ok: boolean
-  ferramentas: Record<string, { ok: boolean; versao?: string; erro?: string }>
+  ferramentas: Record<string, { ok: boolean; versao?: string; erro?: string; origem?: string }>
   vozes?: DiagnosticoVozes
   online: Record<string, string>
   pasta?: string
@@ -59,9 +59,26 @@ const EXTS_IMAGEM = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'])
 const EXTS_VIDEO = new Set(['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'])
 const EXTS_AUDIO = new Set(['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'])
 
-function bin(nome: string, env: string): string {
+/** Pastas onde o instalador embute ferramentas (ffmpeg, python portátil). */
+export function pastasEmbutidas(): string[] {
+  const dirs: string[] = []
+  if (process.env.DG_FERRAMENTAS) dirs.push(process.env.DG_FERRAMENTAS)
+  const rp = (process as unknown as { resourcesPath?: string }).resourcesPath
+  if (typeof rp === 'string' && rp) dirs.push(join(rp, 'bin', 'win32-x64'))
+  dirs.push(join(process.cwd(), 'resources', 'bin', 'win32-x64'))
+  dirs.push(join(__dirname, '..', '..', 'resources', 'bin', 'win32-x64'))
+  dirs.push(join(__dirname, '..', '..', '..', '..', 'resources', 'bin', 'win32-x64'))
+  return dirs
+}
+
+function bin(nome: string, env: string, ext = process.platform === 'win32' ? '.exe' : ''): string {
   const custom = process.env[env]
-  return custom && custom.trim() ? custom.trim() : nome
+  if (custom && custom.trim()) return custom.trim()
+  for (const dir of pastasEmbutidas()) {
+    const p = join(dir, nome + ext)
+    if (existsSync(p)) return p
+  }
+  return nome
 }
 
 function ffmpegBin(): string {
@@ -73,11 +90,33 @@ function ffprobeBin(): string {
 }
 
 function pythonBin(): string {
-  return bin('python', 'DG_PYTHON')
+  const custom = process.env.DG_PYTHON
+  if (custom && custom.trim()) return custom.trim()
+  const rp = (process as unknown as { resourcesPath?: string }).resourcesPath
+  const candidatos = [
+    ...(typeof rp === 'string' && rp ? [join(rp, 'python', 'python.exe')] : []),
+    join(process.cwd(), 'resources', 'python', 'python.exe'),
+    join(__dirname, '..', '..', 'resources', 'python', 'python.exe')
+  ]
+  for (const p of candidatos) if (existsSync(p)) return p
+  return 'python'
 }
 
-function edgeTtsBin(): string {
-  return bin('edge-tts', 'DG_EDGE_TTS')
+/** edge-tts: binário próprio ou módulo dentro do Python embutido. */
+function comandoEdgeTts(): { bin: string; prefixo: string[] } {
+  const custom = process.env.DG_EDGE_TTS
+  if (custom && custom.trim()) return { bin: custom.trim(), prefixo: [] }
+  const py = pythonBin()
+  if (/[\\/]/.test(py)) return { bin: py, prefixo: ['-m', 'edge_tts'] }
+  return { bin: 'edge-tts', prefixo: [] }
+}
+
+/** Diz se a ferramenta está embutida no app, veio de variável ou do PATH. */
+export function origemFerramenta(caminho: string): 'embutida' | 'ambiente' | 'sistema' {
+  const p = caminho.replace(/\\/g, '/').toLowerCase()
+  if (/\/resources\/bin\//.test(p) || /\/resources\/python\//.test(p)) return 'embutida'
+  if (/[\\/]/.test(caminho)) return 'ambiente'
+  return 'sistema'
 }
 
 function clampNum(valor: unknown, min: number, max: number, padrao: number): number {
@@ -822,9 +861,10 @@ async function sintetizarEdge(texto: string, voz: Voz, taxa: string | undefined,
   try {
     const args = ['--voice', voz.estilo, '--file', txt, '--write-media', destino]
     if (taxa && /^[+-]\d+%$/.test(taxa)) args.push('--rate=' + taxa)
+    const ce = comandoEdgeTts()
     let ultimoErro = ''
     for (let tentativa = 0; tentativa < 2; tentativa++) {
-      const r = await rodar(edgeTtsBin(), args, 240_000)
+      const r = await rodar(ce.bin, [...ce.prefixo, ...args], 240_000)
       if (r.ok && existsSync(destino) && statSync(destino).size > 0) {
         return {
           ok: true,
@@ -1046,12 +1086,13 @@ export async function statusMidia(raiz?: string): Promise<StatusMidia> {
   const whisper = python.ok
     ? await versaoCmd(pythonBin(), ['-c', 'import faster_whisper,sys;print(faster_whisper.__version__)'], 20_000)
     : { ok: false, erro: 'python indisponível' }
-  const edge = await versaoCmd(edgeTtsBin(), ['--version'])
+  const ce = comandoEdgeTts()
+  const edge = await versaoCmd(ce.bin, [...ce.prefixo, '--version'])
   const comfy = await comfyStatus()
   const ferramentas = {
-    ffmpeg: { ok: ffmpeg.ok, versao: ffmpeg.versao, erro: ffmpeg.erro },
-    ffprobe: { ok: ffprobe.ok, versao: ffprobe.versao, erro: ffprobe.erro },
-    python: { ok: python.ok, versao: python.versao, erro: python.erro },
+    ffmpeg: { ok: ffmpeg.ok, versao: ffmpeg.versao, erro: ffmpeg.erro, origem: origemFerramenta(ffmpegBin()) },
+    ffprobe: { ok: ffprobe.ok, versao: ffprobe.versao, erro: ffprobe.erro, origem: origemFerramenta(ffprobeBin()) },
+    python: { ok: python.ok, versao: python.versao, erro: python.erro, origem: origemFerramenta(pythonBin()) },
     fasterWhisper: { ok: whisper.ok, versao: whisper.versao, erro: whisper.erro },
     edgeTts: { ok: edge.ok, versao: edge.versao, erro: edge.erro },
     comfyui: { ok: comfy.ok, versao: comfy.versao, erro: comfy.erro }

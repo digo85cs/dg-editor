@@ -172,6 +172,21 @@ export function ligarFerramentas(pastaFn) {
       'Agentes que podem rodar',
       agentes.map((a) => a.nome + (a.especialidade ? ' — ' + a.especialidade : ''))
     ))
+    const ext = await seguro('agente:externos')
+    const agentesExt = (ext && ext.agentes) || []
+    corpo.appendChild(bloco(
+      'Agentes externos gratuitos (QCoder / OpenHands / Trae)',
+      agentesExt.length
+        ? agentesExt.map(
+            (a) =>
+              (a.pronto ? '[OK] ' : '[—] ') +
+              a.nome +
+              ' — ' +
+              a.detalhe +
+              (a.pronto ? '' : ' · instalar: ' + a.instalar)
+          )
+        : ['Não foi possível verificar agora.']
+    ))
     const ir = document.createElement('button')
     ir.type = 'button'
     ir.className = 'tool-nav-btn'
