@@ -726,6 +726,60 @@ export async function pintarMidia(corpo, raiz) {
     )
   )
 
+  // ------------------------------------------------------------ imagem: qualidade
+  let imgQualidade = null
+  const lblQualidadeImg = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Nenhuma imagem escolhida.' })
+  const numDenoiseImg = el('input', { type: 'number', value: '0', min: '0', max: '1', step: '0.1', style: 'width:64px' })
+  const numNitidezImg = el('input', { type: 'number', value: '0.8', min: '0', max: '2', step: '0.1', style: 'width:64px' })
+  const numBrilhoImg = el('input', { type: 'number', value: '0', min: '-100', max: '100', step: '1', style: 'width:64px' })
+  const numContrasteImg = el('input', { type: 'number', value: '0', min: '-100', max: '100', step: '1', style: 'width:64px' })
+  const numSaturacaoImg = el('input', { type: 'number', value: '100', min: '0', max: '200', step: '5', style: 'width:64px' })
+  const numGammaImg = el('input', { type: 'number', value: '1', min: '0.1', max: '10', step: '0.1', style: 'width:64px' })
+  const escalaImg = select([['1', 'Original'], ['1.5', '1,5×'], ['2', '2×'], ['3', '3×'], ['4', '4×']], '1')
+  const formatoImg = select([['png', 'PNG'], ['jpg', 'JPG']], 'png')
+  const resQualidadeImg = el('div', { style: 'font-size:12px' })
+  corpo.appendChild(
+    caixa(
+      'Imagem: nitidez, cor e reescala',
+      botao('Escolher imagem', async () => {
+        const [p] = await escolher('imagem')
+        if (!p) return
+        imgQualidade = p
+        lblQualidadeImg.textContent = nomeCurto(p)
+      }),
+      lblQualidadeImg,
+      el('div', { style: 'display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:6px' },
+        campo('Denoise', numDenoiseImg),
+        campo('Nitidez', numNitidezImg),
+        campo('Brilho %', numBrilhoImg),
+        campo('Contraste %', numContrasteImg),
+        campo('Saturação %', numSaturacaoImg),
+        campo('Gamma', numGammaImg),
+        campo('Escala', escalaImg),
+        campo('Formato', formatoImg)
+      ),
+      botao('Aplicar ajustes', async () => {
+        if (!imgQualidade) return toast('Escolha uma imagem primeiro', 'aviso')
+        resQualidadeImg.textContent = 'Processando…'
+        const r = await seguro('midia:imagem-qualidade', {
+          raiz,
+          entrada: imgQualidade,
+          denoise: Number(numDenoiseImg.value),
+          nitidez: Number(numNitidezImg.value),
+          brilho: Number(numBrilhoImg.value),
+          contraste: Number(numContrasteImg.value),
+          saturacao: Number(numSaturacaoImg.value),
+          gamma: Number(numGammaImg.value),
+          escala: Number(escalaImg.value),
+          formato: formatoImg.value
+        })
+        mostrarResultado(resQualidadeImg, r)
+        toast(r?.ok ? 'Imagem ajustada' : r?.erro || 'Falha', r?.ok ? 'ok' : 'erro')
+      }, true),
+      resQualidadeImg
+    )
+  )
+
   // ------------------------------------------------------------ fotos → vídeo
   let fotos = []
   const listaFotos = el('div', { className: 'muted', style: 'font-size:11px;margin:4px 0;white-space:pre-wrap', text: 'Nenhuma foto escolhida.' })
@@ -867,6 +921,98 @@ export async function pintarMidia(corpo, raiz) {
         }, true)
       ),
       resCapa
+    )
+  )
+
+  // ------------------------------------------------------------ qualidade de vídeo
+  let videoQualidade = null
+  const lblQualidade = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Nenhum vídeo escolhido.' })
+  const analiseVideo = el('div', { style: 'font-size:12px;white-space:pre-wrap' })
+  const chkEstabilizar = el('input', { type: 'checkbox' })
+  const chkNormalizarVideo = el('input', { type: 'checkbox' })
+  chkNormalizarVideo.checked = true
+  const numDenoise = el('input', { type: 'number', value: '0', min: '0', max: '1', step: '0.1', style: 'width:64px' })
+  const numNitidezVideo = el('input', { type: 'number', value: '0.8', min: '0', max: '2', step: '0.1', style: 'width:64px' })
+  const numBrilhoVideo = el('input', { type: 'number', value: '0', min: '-100', max: '100', step: '1', style: 'width:64px' })
+  const numContrasteVideo = el('input', { type: 'number', value: '0', min: '-100', max: '100', step: '1', style: 'width:64px' })
+  const numSaturacaoVideo = el('input', { type: 'number', value: '100', min: '0', max: '200', step: '5', style: 'width:64px' })
+  const numGammaVideo = el('input', { type: 'number', value: '1', min: '0.1', max: '10', step: '0.1', style: 'width:64px' })
+  const escalaVideo = select([['1', 'Original'], ['1.5', '1,5×'], ['2', '2×']], '1')
+  const fpsVideo = select([['0', 'Manter'], ['24', '24 fps'], ['30', '30 fps'], ['60', '60 fps']], '0')
+  const crfVideo = select([['18', 'Alta (CRF 18)'], ['20', 'Equilibrada (CRF 20)'], ['23', 'Compacta (CRF 23)'], ['26', 'Leve (CRF 26)']], '20')
+  const presetVideo = select([['rapido', 'Rápido'], ['equilibrado', 'Equilibrado'], ['qualidade', 'Qualidade']], 'equilibrado')
+  const resQualidade = el('div', { style: 'font-size:12px' })
+  corpo.appendChild(
+    caixa(
+      'Vídeo: filtros, estabilização e re-render',
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Escolher vídeo', async () => {
+          const [p] = await escolher('video')
+          if (!p) return
+          videoQualidade = p
+          lblQualidade.textContent = nomeCurto(p)
+          analiseVideo.textContent = ''
+        }),
+        botao('Analisar vídeo', async () => {
+          if (!videoQualidade) return toast('Escolha um vídeo', 'aviso')
+          analiseVideo.textContent = 'Analisando…'
+          const r = await seguro('midia:video-analisar', { raiz, entrada: videoQualidade })
+          if (!r?.ok) {
+            analiseVideo.textContent = 'Erro: ' + (r?.erro || 'falha')
+            return
+          }
+          const linhas = [
+            (r.largura || '?') + '×' + (r.altura || '?') + ' · ' + (r.fps ?? '?') + ' fps · ' + (r.duracaoSeg ?? '?') + 's',
+            (r.codec || '?') + ' · ' + (r.bitrateKbps ?? '?') + ' kbps · áudio: ' + (r.temAudio ? r.codecAudio || 'sim' : 'não')
+          ]
+          for (const d of r.dicas || []) linhas.push('• ' + d)
+          analiseVideo.textContent = linhas.join('\n')
+        })
+      ),
+      lblQualidade,
+      analiseVideo,
+      el('div', { style: 'display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:8px' },
+        campo('Estabilizar', chkEstabilizar),
+        campo('Denoise', numDenoise),
+        campo('Nitidez', numNitidezVideo),
+        campo('Brilho %', numBrilhoVideo),
+        campo('Contraste %', numContrasteVideo),
+        campo('Saturação %', numSaturacaoVideo),
+        campo('Gamma', numGammaVideo)
+      ),
+      el('div', { style: 'display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:6px' },
+        campo('Escala', escalaVideo),
+        campo('FPS', fpsVideo),
+        campo('Qualidade', crfVideo),
+        campo('Preset', presetVideo),
+        campo('Normalizar áudio', chkNormalizarVideo)
+      ),
+      el('div', { style: 'display:flex;gap:6px;margin-top:8px' },
+        botao('Renderizar', async () => {
+          if (!videoQualidade) return toast('Escolha um vídeo', 'aviso')
+          resQualidade.textContent = 'Renderizando… isso pode levar alguns minutos.'
+          const r = await seguro('midia:video-melhorar', {
+            raiz,
+            entrada: videoQualidade,
+            estabilizar: chkEstabilizar.checked,
+            denoise: Number(numDenoise.value),
+            nitidez: Number(numNitidezVideo.value),
+            brilho: Number(numBrilhoVideo.value),
+            contraste: Number(numContrasteVideo.value),
+            saturacao: Number(numSaturacaoVideo.value),
+            gamma: Number(numGammaVideo.value),
+            escala: Number(escalaVideo.value),
+            fps: Number(fpsVideo.value),
+            crf: Number(crfVideo.value),
+            preset: presetVideo.value,
+            normalizarAudio: chkNormalizarVideo.checked
+          })
+          mostrarResultado(resQualidade, r, { semPreview: true })
+          toast(r?.ok ? 'Vídeo renderizado' : r?.erro || 'Falha', r?.ok ? 'ok' : 'erro')
+        }, true)
+      ),
+      el('p', { className: 'muted', style: 'font-size:11px;margin:6px 0 0', text: 'Estabilização usa 2 passadas (mais lenta). A saída é MP4 H.264 com faststart.' }),
+      resQualidade
     )
   )
 

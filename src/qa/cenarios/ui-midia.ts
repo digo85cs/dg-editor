@@ -37,7 +37,7 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
       )
       const titulo = ((await page.locator('#tool-titulo').textContent()) || '').trim()
       const corpo = (await page.locator('#tool-corpo').textContent()) || ''
-      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Apps (APK Android + instalador)', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever']
+      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Imagem: nitidez, cor e reescala', 'Vídeo: filtros, estabilização e re-render', 'Apps (APK Android + instalador)', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever']
       const faltando = secoes.filter((s) => !corpo.includes(s))
       out.push({
         id: 'ui.midia.painel',
@@ -315,6 +315,40 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         id: 'ui.midia.livres',
         area: 'ui',
         titulo: 'Catálogo livre / áudio (IPC)',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
+      const r = await page.evaluate(async () => {
+        // @ts-expect-error api bridge
+        const api = window.api
+        const raiz = await api.invoke('app:raiz-projeto')
+        return {
+          video: await api.invoke('midia:video-analisar', { raiz, entrada: 'nao-existe.mp4' }),
+          melhorar: await api.invoke('midia:video-melhorar', { raiz, entrada: 'nao-existe.mp4' }),
+          imagem: await api.invoke('midia:imagem-qualidade', { raiz, entrada: 'nao-existe.png' })
+        }
+      })
+      const recusou = r?.video?.ok === false && r?.melhorar?.ok === false && r?.imagem?.ok === false
+      out.push({
+        id: 'ui.midia.qualidade',
+        area: 'ui',
+        titulo: 'Qualidade de vídeo/imagem responde e recusa entrada inválida',
+        severidade: recusou ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: recusou ? '3 canais validados' : JSON.stringify(r).slice(0, 220)
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.midia.qualidade',
+        area: 'ui',
+        titulo: 'Qualidade de vídeo/imagem (IPC)',
         severidade: 'erro',
         duracaoMs: Date.now() - t0,
         erro: String(e)

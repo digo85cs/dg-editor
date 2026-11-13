@@ -39,6 +39,7 @@ import {
   type MotorVoz
 } from '../midia/vozes'
 import { listarMusicas, mixarMusica, pastaMusicas } from '../midia/musicas'
+import { analisarVideo, processarImagem, processarVideo } from '../midia/qualidade'
 import { baixarFaixas, catalogoLivres } from '../midia/musicas-livres'
 import { analisarAudio, processarAudio, type FormatoAudio } from '../midia/audio'
 import { gerarFotoVideoComfy } from '../midia/comfyui'
@@ -605,6 +606,79 @@ export function registrarHandlersMidia(): void {
       const bloqueio = entradaAutorizada(r.raiz, entrada)
       if (bloqueio) return { ok: false, erro: bloqueio }
       return await analisarAudio(entrada)
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:video-analisar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      return await analisarVideo(entrada)
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:video-melhorar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      const presets = ['rapido', 'equilibrado', 'qualidade'] as const
+      const preset = presets.includes(texto(o.preset, 20) as (typeof presets)[number])
+        ? (texto(o.preset, 20) as (typeof presets)[number])
+        : undefined
+      return await processarVideo(r.raiz, {
+        entrada,
+        estabilizar: o.estabilizar === true,
+        denoise: numero(o.denoise),
+        nitidez: numero(o.nitidez),
+        brilho: numero(o.brilho),
+        contraste: numero(o.contraste),
+        saturacao: numero(o.saturacao),
+        gamma: numero(o.gamma),
+        escala: numero(o.escala),
+        fps: numero(o.fps),
+        crf: numero(o.crf),
+        preset,
+        normalizarAudio: o.normalizarAudio === true,
+        saida: texto(o.saida, 1000) || undefined
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:imagem-qualidade', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      return await processarImagem(r.raiz, {
+        entrada,
+        denoise: numero(o.denoise),
+        nitidez: numero(o.nitidez),
+        brilho: numero(o.brilho),
+        contraste: numero(o.contraste),
+        saturacao: numero(o.saturacao),
+        gamma: numero(o.gamma),
+        escala: numero(o.escala),
+        formato: o.formato === 'jpg' ? 'jpg' : 'png',
+        qualidade: numero(o.qualidade),
+        saida: texto(o.saida, 1000) || undefined
+      })
     } catch (e) {
       return falha(e)
     }

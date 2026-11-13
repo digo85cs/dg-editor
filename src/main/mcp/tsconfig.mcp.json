@@ -35,6 +35,7 @@
       "../midia/musicas.ts",
       "../midia/musicas-livres.ts",
       "../midia/audio.ts",
+      "../midia/qualidade.ts",
       "../apps/index.ts",
       "../dossie.ts",
       "../paths.ts",

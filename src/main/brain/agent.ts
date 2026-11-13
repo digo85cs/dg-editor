@@ -1065,6 +1065,10 @@ export async function executarAgente(
       'midia_musica_baixar baixa faixas/estilo com creditos em CREDITOS.json. ' +
       '\nAUDIO: midia_audio analisa volume (media/pico), normaliza (EBU R128 -16 LUFS), equaliza graves/agudos, ' +
       'comprime, aplica fades, corta e converte mp3/wav/m4a/ogg. Sempre analise antes de normalizar. ' +
+      '\nQUALIDADE VIDEO/IMAGEM: midia_video_qualidade com analisar=true mostra resolucao/fps/bitrate e dicas; ' +
+      'sem analisar re-renderiza com estabilizacao vidstab 2 passadas, denoise, nitidez, brilho/contraste/saturacao/gamma, ' +
+      'escala Lanczos, fps, CRF/preset e normalizacao de audio em MP4 faststart. midia_imagem_qualidade aplica os ' +
+      'mesmos ajustes de cor/ruido e escala em imagens. Prefira CRF 18-20 e evite upscale de material ja Full HD. ' +
       '\nAPPS: apps_status mostra SDK Android/artefatos; apps_setup instala o toolchain; apps_build gera APK ' +
       'Android e/ou instalador Windows e copia para OneDrive/APP. Rode apps_status antes e depois do build.'
     const blocoPropose = proposeWrites

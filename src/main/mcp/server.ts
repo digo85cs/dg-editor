@@ -617,6 +617,54 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_video_qualidade',
+    description:
+      'Qualidade de video via ffmpeg: analise (analisar=true) ou re-render com estabilizacao (2 passadas), denoise, nitidez, brilho/contraste/saturacao/gamma, escala Lanczos, fps, CRF/preset e normalizacao de audio.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string' },
+        analisar: { type: 'boolean' },
+        estabilizar: { type: 'boolean' },
+        denoise: { type: 'number', description: '0 a 1' },
+        nitidez: { type: 'number', description: '0 a 2' },
+        brilho: { type: 'number', description: '-100 a 100 (%)' },
+        contraste: { type: 'number', description: '-100 a 100 (%)' },
+        saturacao: { type: 'number', description: '0 a 200 (%)' },
+        gamma: { type: 'number', description: '0.1 a 10' },
+        escala: { type: 'number', description: '1 a 2' },
+        fps: { type: 'number', description: '0 mantem; 24/30/60' },
+        crf: { type: 'number', description: '0 a 51 (menor = melhor)' },
+        preset: { type: 'string', enum: ['rapido', 'equilibrado', 'qualidade'] },
+        normalizarAudio: { type: 'boolean' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
+    name: 'midia_imagem_qualidade',
+    description:
+      'Ajustes de imagem via ffmpeg: denoise, nitidez, brilho/contraste/saturacao/gamma, escala Lanczos, formato e qualidade JPG.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string' },
+        denoise: { type: 'number' },
+        nitidez: { type: 'number' },
+        brilho: { type: 'number' },
+        contraste: { type: 'number' },
+        saturacao: { type: 'number' },
+        gamma: { type: 'number' },
+        escala: { type: 'number', description: '1 a 4' },
+        formato: { type: 'string', enum: ['png', 'jpg'] },
+        qualidade: { type: 'number', description: '2 a 31 (menor = melhor)' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
     name: 'midia_transcrever',
     description: 'Transcreve audio/video localmente com faster-whisper (CPU) e grava .srt. Retorna o texto.',
     inputSchema: {
@@ -1666,6 +1714,83 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             inicio: p.inicio,
             fim: p.fim,
             formato: p.formato,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_video_qualidade') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            analisar: z.boolean().optional(),
+            estabilizar: z.boolean().optional(),
+            denoise: z.number().optional(),
+            nitidez: z.number().optional(),
+            brilho: z.number().optional(),
+            contraste: z.number().optional(),
+            saturacao: z.number().optional(),
+            gamma: z.number().optional(),
+            escala: z.number().optional(),
+            fps: z.number().optional(),
+            crf: z.number().optional(),
+            preset: z.enum(['rapido', 'equilibrado', 'qualidade']).optional(),
+            normalizarAudio: z.boolean().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const q = await import('../midia/qualidade')
+        const entrada = caminho(p.entrada)
+        if (p.analisar === true) return await responder(await q.analisarVideo(entrada))
+        return await responder(
+          await q.processarVideo(RAIZ, {
+            entrada,
+            estabilizar: p.estabilizar,
+            denoise: p.denoise,
+            nitidez: p.nitidez,
+            brilho: p.brilho,
+            contraste: p.contraste,
+            saturacao: p.saturacao,
+            gamma: p.gamma,
+            escala: p.escala,
+            fps: p.fps,
+            crf: p.crf,
+            preset: p.preset,
+            normalizarAudio: p.normalizarAudio,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_imagem_qualidade') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            denoise: z.number().optional(),
+            nitidez: z.number().optional(),
+            brilho: z.number().optional(),
+            contraste: z.number().optional(),
+            saturacao: z.number().optional(),
+            gamma: z.number().optional(),
+            escala: z.number().optional(),
+            formato: z.enum(['png', 'jpg']).optional(),
+            qualidade: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const q = await import('../midia/qualidade')
+        return await responder(
+          await q.processarImagem(RAIZ, {
+            entrada: caminho(p.entrada),
+            denoise: p.denoise,
+            nitidez: p.nitidez,
+            brilho: p.brilho,
+            contraste: p.contraste,
+            saturacao: p.saturacao,
+            gamma: p.gamma,
+            escala: p.escala,
+            formato: p.formato,
+            qualidade: p.qualidade,
             saida: p.saida
           })
         )

@@ -151,6 +151,14 @@ add(
   '- Canais: `midia:audio-analisar`, `midia:audio-processar`; MCP: `midia_audio`.',
   ''
 )
+add('### Qualidade de vídeo e imagem (ffmpeg)', '')
+add(
+  '- Vídeo: estabilização em 2 passadas (`vidstabdetect`/`vidstabtransform`), denoise (`hqdn3d`), nitidez (`unsharp`), correção de cor (`eq`), escala Lanczos, fps, re-render H.264 com CRF/preset e áudio normalizado (EBU R128).',
+  '- Imagem: denoise, nitidez, brilho/contraste/saturação/gamma, reescala Lanczos 1–4× e conversão PNG/JPG.',
+  '- Análise de vídeo: resolução, fps, duração, codec, bitrate, áudio e dicas automáticas de ajuste.',
+  '- Canais: `midia:video-analisar`, `midia:video-melhorar`, `midia:imagem-qualidade`; MCP: `midia_video_qualidade`, `midia_imagem_qualidade`.',
+  ''
+)
 add('### Demais recursos', '')
 add(
   '- Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).',

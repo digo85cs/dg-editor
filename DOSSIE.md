@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 19:11:57** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.0** · branch `integra-13-11` · último commit: e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
-> Alterações locais não commitadas: 119 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 19:26:06** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.1** · branch `integra-13-11` · último commit: 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
+> Alterações locais não commitadas: 14 arquivo(s).
 
 ## 1. O que é
 
@@ -28,8 +28,8 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 
 ## 4. IPC
 
-- Canais registrados no main: **303**.
-- Canais expostos pelo preload: **281**.
+- Canais registrados no main: **306**.
+- Canais expostos pelo preload: **284**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -51,6 +51,7 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `midia:html-imagem`
 - `midia:imagem`
 - `midia:imagem-melhorar`
+- `midia:imagem-qualidade`
 - `midia:legendas`
 - `midia:listar`
 - `midia:meme`
@@ -65,9 +66,11 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `midia:narrar`
 - `midia:status`
 - `midia:transcrever`
+- `midia:video-analisar`
 - `midia:video-capa`
 - `midia:video-cortar`
 - `midia:video-juntar`
+- `midia:video-melhorar`
 - `midia:voz-padrao`
 - `midia:voz-previa`
 - `midia:vozes`
@@ -77,7 +80,7 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 
 ## 5. Estúdio de mídia
 
-Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `vozes.ts`.
+Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `vozes.ts`.
 
 ### Biblioteca de músicas livres (por estilo)
 
@@ -90,6 +93,13 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Normalização (`loudnorm I=-16 TP=-1.5 LRA=11`), EQ (graves/agudos), compressor, ganho, fade in/out, corte e conversão (mp3/wav/m4a/ogg).
 - Análise de volume via `volumedetect` (média/pico) com sugestão de ganho.
 - Canais: `midia:audio-analisar`, `midia:audio-processar`; MCP: `midia_audio`.
+
+### Qualidade de vídeo e imagem (ffmpeg)
+
+- Vídeo: estabilização em 2 passadas (`vidstabdetect`/`vidstabtransform`), denoise (`hqdn3d`), nitidez (`unsharp`), correção de cor (`eq`), escala Lanczos, fps, re-render H.264 com CRF/preset e áudio normalizado (EBU R128).
+- Imagem: denoise, nitidez, brilho/contraste/saturação/gamma, reescala Lanczos 1–4× e conversão PNG/JPG.
+- Análise de vídeo: resolução, fps, duração, codec, bitrate, áudio e dicas automáticas de ajuste.
+- Canais: `midia:video-analisar`, `midia:video-melhorar`, `midia:imagem-qualidade`; MCP: `midia_video_qualidade`, `midia_imagem_qualidade`.
 
 ### Demais recursos
 
@@ -110,12 +120,12 @@ Artefatos locais em `dist-apps/`:
 
 ## 7. MCP
 
-- **66** ferramentas registradas em `src/main/mcp/server.ts`.
+- **68** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_legendas`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `projeto_arvore`, `projeto_smoke`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `projeto_arvore`, `projeto_smoke`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
@@ -195,7 +205,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 10. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **141 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **143 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
@@ -208,6 +218,8 @@ Artefatos locais em `dist-apps/`:
 
 ## 12. Histórico recente
 
+- 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
+- b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
 - e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
 - 4f1ec4b 2026-11-12 fix: orquestrador e agente com fallback garantido
 - 85a5b9d 2026-11-12 fix: fallback de modelo leve quando Ollama rejeita imagem/visao
@@ -216,8 +228,6 @@ Artefatos locais em `dist-apps/`:
 - c8354ca 2026-11-12 fix: corrige testes flaky pre-existing (chat.test.ts e contratos.test.ts)
 - 81fa3bd 2026-11-12 docs(radar): documenta radar diario e adiciona secao ao .dgrules
 - 35765f2 2026-11-12 feat(radar): implementa radar diario com gatilho de 24h no boot
-- c6b4da9 2026-11-12 fix: remove ELECTRON_RUN_AS_NODE do child process para iniciar Electron como runtime nativo
-- 2de22d8 2026-11-12 feat: autosustentacao — loop de melhoria, auto-diagnostico, agent-factory, update-loop e agentes tipo Devin
 
 ## 13. Como atualizar este dossiê
 
