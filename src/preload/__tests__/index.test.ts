@@ -1,55 +1,36 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { caminhoArgumentoValido, sanitizarArgs, MAX_ARGS, MAX_ARG_LEN } from '../sanitize'
 
-describe('preload - sanitizacao de caminhos', () => {
-  beforeEach(() => {
-    vi.resetModules()
+describe('preload - sanitizacao de argumentos', () => {
+  it('aceita caminhos absolutos do Windows (explorer usa caminho absoluto)', () => {
+    expect(caminhoArgumentoValido('C:\\dev\\DGEditor')).toBe(true)
+    expect(caminhoArgumentoValido('D:\\CURSOR\\DG Editor\\src')).toBe(true)
+    expect(caminhoArgumentoValido('C:/dev/DGEditor/src/main/index.ts')).toBe(true)
   })
 
-  it('ehCaminhoSeguro bloqueia travessia ..', () => {
-    // Simula a logica de ehCaminhoSeguro do preload
-    function ehCaminhoSeguro(caminho: unknown): boolean {
-      if (typeof caminho !== 'string') return false
-      if (!caminho || caminho.length > 1000) return false
-      if (caminho.includes('..')) return false
-      if (caminho.startsWith('/') && !caminho.startsWith('/home/') && !caminho.startsWith('/Users/')) return false
-      if (/^[A-Za-z]:[\\/]/.test(caminho)) return false
-      return true
-    }
+  it('aceita caminhos absolutos POSIX e relativos', () => {
+    expect(caminhoArgumentoValido('/home/user/projeto')).toBe(true)
+    expect(caminhoArgumentoValido('/Users/user/projeto')).toBe(true)
+    expect(caminhoArgumentoValido('src/main/ipc/chat.ts')).toBe(true)
+  })
 
-    expect(ehCaminhoSeguro('src/main/ipc/chat.ts')).toBe(true)
-    expect(ehCaminhoSeguro('../secreto')).toBe(false)
-    expect(ehCaminhoSeguro('src/../../etc/passwd')).toBe(false)
-    expect(ehCaminhoSeguro('')).toBe(false)
-    expect(ehCaminhoSeguro(null as any)).toBe(false)
-    expect(ehCaminhoSeguro(123 as any)).toBe(false)
+  it('rejeita payload invalido sem derrubar o canal', () => {
+    expect(caminhoArgumentoValido('')).toBe(false)
+    expect(caminhoArgumentoValido(null as unknown)).toBe(false)
+    expect(caminhoArgumentoValido(123 as unknown)).toBe(false)
+    expect(caminhoArgumentoValido('x'.repeat(1001))).toBe(false)
+    expect(caminhoArgumentoValido('C:\\proj\0malicioso')).toBe(false)
   })
 
   it('sanitizarArgs limita numero de argumentos', () => {
-    function sanitizarArgs(args: unknown[]): unknown[] {
-      const MAX_ARGS = 8
-      if (args.length > MAX_ARGS) throw new Error('Demais argumentos para o canal')
-      return args
-    }
-
-    expect(() => sanitizarArgs([1, 2, 3, 4, 5, 6, 7, 8])).not.toThrow()
-    expect(() => sanitizarArgs([1, 2, 3, 4, 5, 6, 7, 8, 9])).toThrow('Demais argumentos')
+    expect(() => sanitizarArgs(Array.from({ length: MAX_ARGS }, (_, i) => i))).not.toThrow()
+    expect(() => sanitizarArgs(Array.from({ length: MAX_ARGS + 1 }, (_, i) => i))).toThrow(
+      'Demais argumentos'
+    )
   })
 
   it('sanitizarArgs limita tamanho de string', () => {
-    function sanitizarArgs(args: unknown[]): unknown[] {
-      const MAX_ARG_LEN = 200000
-      return args.map((a) => {
-        if (typeof a === 'string' && a.length > MAX_ARG_LEN) {
-          throw new Error('Argumento excede tamanho maximo permitido')
-        }
-        return a
-      })
-    }
-
-    const curta = 'x'.repeat(100)
-    const longa = 'x'.repeat(200001)
-
-    expect(() => sanitizarArgs([curta])).not.toThrow()
-    expect(() => sanitizarArgs([longa])).toThrow('Argumento excede tamanho maximo')
+    expect(() => sanitizarArgs(['x'.repeat(MAX_ARG_LEN)])).not.toThrow()
+    expect(() => sanitizarArgs(['x'.repeat(MAX_ARG_LEN + 1)])).toThrow('Argumento excede tamanho')
   })
 })

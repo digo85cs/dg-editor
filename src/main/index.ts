@@ -36,14 +36,23 @@ import { emSafeMode, detectarSafeModeArgv, ativarSafeMode } from './safe-mode';
 const SAFE_MODE = detectarSafeModeArgv(process.argv);
 if (SAFE_MODE) ativarSafeMode();
 
+// QA e2e/visual: userData isolado por execucao (sem vazar config entre runs).
+const QA_USERDATA = process.env.DG_QA_USERDATA;
+if (QA_USERDATA) {
+  try {
+    mkdirSync(QA_USERDATA, { recursive: true });
+    app.setPath('userData', QA_USERDATA);
+  } catch (e) {
+    console.warn('[main] DG_QA_USERDATA invalido:', e);
+  }
+}
+
 // ============================================================================
 // FUNCOES DE INSTANCIA UNICA
 // ============================================================================
 
 function caminhoTravaInstancia(): string | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { resolverRaizProjeto } = require('./paths') as { resolverRaizProjeto: () => string }
     const raiz = process.env.DG_ROOT || resolverRaizProjeto()
     if (!raiz) return null
     return join(raiz, '.dg-editor', 'instance.lock')
@@ -125,72 +134,19 @@ marcarInstanciaAberta();
 // IMPORTS DE BOOT (Adiado para nao bloquear o event loop)
 // ============================================================================
 
-// Importar funcoes de boot adiado
-import { getSystemProfile, formatBytes, profileStrength } from './profile';
-import { scanFolder, formatScanSummary } from './scanner';
-import { getBrain } from './brain/module';
-import { listarTools, desconectarMcp, mcpAtivo } from './mcp/client';
-import { carregarIndice, indexarTurno } from './memory/embeddings';
-import { ensureOllama } from './ollama-keeper';
-import { runAnalysis, getCachedAnalysis, invalidarCacheAnalise } from './analyzer';
-import type { EscopoAnalise } from '@shared/types';
-import { whereIs, formatWhereIs } from './whereis';
-import { readRules, rulesExist, createRulesTemplate, writeRules } from './dgrules';
-import { loadChat, appendChat, clearChat } from './chatstore';
-import { getAccountsState } from './accounts';
-import { guardianSnapshot, guardianResumo } from './guardian';
 import { bootSaudeIAs } from './boot-saude';
-import { gravarDossie, lerDossie, dossieSnapshot, caminhoDossie } from './dossie';
-import { dossieDirDoApp } from './bridge-adapta';
-import {
-  gerarContinuidade,
-  statusAdapta,
-  lerContinuidade,
-  urlAdaptaPermitida,
-  ADAPTA_URLS
-} from './bridge-adapta';
-import { diagnosticoCompleto } from './diagnostico';
-import { askOllama } from './brain/ollama';
-import { lerTema, salvarTema } from './tema';
 import {
   criarJanelaNavegador,
-  fecharJanelaNavegador,
   destruirJanelaNavegador,
   lerUltimaUrlNavegador,
   definirJanelaPrincipalNavegador,
-  layoutNavegador,
   mostrarNavegadorEmbutido,
-  onNavegadorEventos,
-  statusEmbedNavegador
+  onNavegadorEventos
 } from './navegador/janela';
 import { iniciarControleNavegador, pararControleNavegador } from './navegador/controle';
 import { garantirTokenSessao, removerTokenSessao } from './navegador/token';
-import {
-  lerArquivo,
-  lerArquivoBase64,
-  salvarArquivo,
-  listarDiretorio,
-  arquivoExiste
-} from './arquivos';
-import {
-  caminhoSeguro,
-  exigirString,
-  exigirBoolean,
-  exigirArrayStrings,
-  isErroPayload
-} from './ipc-seguro';
 import { installPtBrMenu } from './menu';
-import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from './busca';
-import { listarComandosMeta } from './comandos-meta';
-import {
-  createTerminal,
-  writeTerminal,
-  resizeTerminal,
-  killTerminal,
-  killAllTerminals,
-  shellAtivo
-} from './terminal';
-import { getShellCache, listarShells, lerShellPadrao, salvarShellPadrao } from './shell-detect';
+import { killAllTerminals } from './terminal';
 import { registerVaultIpc } from './vault/ipc';
 import { registerOpenClawIpc } from './openclaw/ipc';
 import { registerAgentExtrasIpc } from './agent/ipc';
@@ -359,6 +315,20 @@ app.whenReady().then(() => {
       } catch {
         /* ignore */
       }
+    },
+    onDownload: (info) => {
+      try {
+        mainWindow?.webContents?.send('navegador:download', info);
+      } catch {
+        /* ignore */
+      }
+    },
+    onDownloadProgress: (info) => {
+      try {
+        mainWindow?.webContents?.send('navegador:download-progresso', info);
+      } catch {
+        /* ignore */
+      }
     }
   });
 
@@ -384,9 +354,12 @@ app.whenReady().then(() => {
   // Criar janela principal
   createWindow();
 
-  // Registrar handlers IPC
+  // Registrar handlers IPC (precisa estar pronto antes do primeiro render)
   setMainWindow(mainWindow);
   registrarTodosHandlers();
+  registerVaultIpc();
+  registerOpenClawIpc();
+  registerAgentExtrasIpc();
   try {
     iniciarAutoUpdate(() => mainWindow)
   } catch (e) {
@@ -397,37 +370,44 @@ app.whenReady().then(() => {
   } catch (e) {
     dglog('[boot] deps-manutencao: ' + String(e))
   }
-  try {
-    const { dispararRadarNoBoot } = require('./radar/radar-boot')
-    dispararRadarNoBoot(resolverRaizProjeto())
-  } catch (e) {
-    dglog('[boot] radar: ' + String(e))
-  }
-  try {
-    const { garantirHardwareProfile } = require('./hardware-profile') as {
-      garantirHardwareProfile: (f?: boolean) => unknown
+
+  // Trabalho secundario sincrono (radar, hardware, secrets, providers) fora do
+  // caminho critico do primeiro frame. Roda no ready-to-show ou apos 4s.
+  let bootSecundarioFeito = false
+  const bootSecundario = async (): Promise<void> => {
+    if (bootSecundarioFeito) return
+    bootSecundarioFeito = true
+    try {
+      const { dispararRadarNoBoot } = await import('./radar/radar-boot')
+      dispararRadarNoBoot(resolverRaizProjeto())
+    } catch (e) {
+      dglog('[boot] radar: ' + String(e))
     }
-    garantirHardwareProfile(false)
-  } catch (e) {
-    dglog('[boot] hardware-profile: ' + String(e))
+    try {
+      const { garantirHardwareProfile } = await import('./hardware-profile')
+      garantirHardwareProfile(false)
+    } catch (e) {
+      dglog('[boot] hardware-profile: ' + String(e))
+    }
+    try {
+      const { garantirToken } = await import('./openclaw/secrets');
+      const tok = garantirToken();
+      if (tok?.ok) dglog('[openclaw] token ' + (tok.criado ? 'criado' : 'ok') + ' prefixo=' + (tok.prefixo || ''));
+    } catch (e) {
+      dglog('[openclaw] token-ensure falhou: ' + String(e));
+    }
+    try {
+      const { sincronizarChavesDoAmbiente } = await import('./brain/providers-sync-env');
+      const sync = sincronizarChavesDoAmbiente();
+      dglog('[providers-sync] boot gravadas=' + (sync?.gravadas || []).join(',') + ' semEnv=' + (sync?.semEnv || []).length);
+    } catch (e) {
+      dglog('[providers-sync] boot falhou: ' + String(e));
+    }
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.once('ready-to-show', () => setImmediate(() => void bootSecundario()));
   }
-  registerVaultIpc();
-  registerOpenClawIpc();
-  registerAgentExtrasIpc();
-  try {
-    const { garantirToken } = require('./openclaw/secrets');
-    const tok = garantirToken();
-    if (tok?.ok) dglog('[openclaw] token ' + (tok.criado ? 'criado' : 'ok') + ' prefixo=' + (tok.prefixo || ''));
-  } catch (e) {
-    dglog('[openclaw] token-ensure falhou: ' + String(e));
-  }
-  try {
-    const { sincronizarChavesDoAmbiente } = require('./brain/providers-sync-env');
-    const sync = sincronizarChavesDoAmbiente();
-    dglog('[providers-sync] boot gravadas=' + (sync?.gravadas || []).join(',') + ' semEnv=' + (sync?.semEnv || []).length);
-  } catch (e) {
-    dglog('[providers-sync] boot falhou: ' + String(e));
-  }
+  setTimeout(() => void bootSecundario(), 4000);
 
   if (!SAFE_MODE && !qaE2e) {
     // Detectacao de modelos NAO no boot - libera o event loop para terminal:create.
@@ -495,6 +475,21 @@ app.on('window-all-closed', () => {
 // ============================================================================
 // REGISTRO DE HANDLERS RESTRITOS (que nao puderam ser extraidos)
 // ============================================================================
+
+// ============================================================================
+// ATUALIZACOES OPCIONAIS (24h, em segundo plano)
+// ============================================================================
+
+if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
+  setTimeout(() => {
+    void import('./midia/atualizacoes')
+      .then(({ verificarEmSegundoPlano }) => verificarEmSegundoPlano())
+      .then((r) => {
+        if (r) console.log('[atualizacoes] novidades=' + r.novidades + ' componentes=' + r.componentes.length);
+      })
+      .catch((e) => console.warn('[atualizacoes] falhou:', String(e?.message || e)));
+  }, 45_000);
+}
 
 // ============================================================================
 // AUDITORIA PERIODICA NO BOOT

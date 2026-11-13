@@ -39,6 +39,10 @@ export async function renderizarArvoreEm(lista, deps) {
       escapar(deps.nomeArquivo(p)) +
       '</span>'
     header.title = p
+    header.tabIndex = -1
+    header.setAttribute('role', 'treeitem')
+    header.setAttribute('aria-level', '1')
+    header.setAttribute('aria-expanded', String(!!st.expandida))
     header.appendChild(deps.criarBotaoRemoverPasta(p))
     const chev = header.querySelector('.chevron')
     if (st.expandida) chev.classList.add('open')
@@ -54,6 +58,7 @@ export async function renderizarArvoreEm(lista, deps) {
         st.expandida = !st.expandida
         chev.classList.toggle('open', st.expandida)
         children.classList.toggle('open', st.expandida)
+        header.setAttribute('aria-expanded', String(st.expandida))
         if (!st.expandida) return
         if (children.childElementCount > 0) return
         state.carregandoNos.add(children)
@@ -96,6 +101,10 @@ export function criarNoDir(ent, nivel, deps) {
   row.title = ent.caminho
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'dir'
+  row.draggable = true
+  row.tabIndex = -1
+  row.setAttribute('role', 'treeitem')
+  row.setAttribute('aria-expanded', 'false')
   const kids = document.createElement('div')
   kids.className = 'tree-children'
   let aberto = false
@@ -108,6 +117,7 @@ export function criarNoDir(ent, nivel, deps) {
       aberto = !aberto
       row.querySelector('.chevron').classList.toggle('open', aberto)
       kids.classList.toggle('open', aberto)
+      row.setAttribute('aria-expanded', String(aberto))
       if (!aberto) return
       if (carregado || kids.childElementCount > 0) {
         carregado = kids.childElementCount > 0
@@ -161,6 +171,9 @@ export function criarNoFile(ent, nivel, deps) {
   row.title = ent.caminho + (amigavel && amigavel !== ent.nome ? ' · ' + ent.nome : '')
   row.dataset.path = ent.caminho
   row.dataset.tipo = 'file'
+  row.draggable = true
+  row.tabIndex = -1
+  row.setAttribute('role', 'treeitem')
   row.addEventListener('click', (e) => {
     e.stopPropagation()
     if (e.target?.closest?.('.git-badge')) {

@@ -13,6 +13,7 @@ import {
   type ToolDef,
 } from './providers'
 import { normalizarTarefa, type Tarefa } from './registry'
+import { dglog } from '../dglog'
 import { marcarEsgotado, proximoDisponivel, registrarCusto } from './roteador-cota'
 import { lerRespostaCache, gravarRespostaCache } from './resposta-cache'
 
@@ -123,8 +124,6 @@ export async function chamarComCascataSharp(
   signal?: AbortSignal
 ): Promise<RespostaProvider & { providerFinal: string; tentativas: string[] }> {
   const r = await chamarComCascata(tarefa, mensagens, tools, signal)
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { dglog } = require('../dglog')
   dglog('[cascata] sharp id=' + r.providerFinal + ' tentativas=' + r.tentativas.join(','))
   return r
 }

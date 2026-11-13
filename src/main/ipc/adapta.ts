@@ -7,6 +7,7 @@ import { ipcMain, shell } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { IpcResult } from './types';
+import { dossieDirDoApp, gerarContinuidade, lerContinuidade } from '../bridge-adapta';
 
 // ============================================================================
 // HANDLERS DE ADAPTA
@@ -39,7 +40,6 @@ export function handleAdaptaGerar(
   _event: Electron.IpcMainInvokeEvent
 ): IpcResult & { ok: boolean; erro?: string } {
   try {
-    const { dossieDirDoApp, gerarContinuidade } = require('../bridge-adapta');
     return gerarContinuidade(dossieDirDoApp());
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };
@@ -54,7 +54,6 @@ export function handleAdaptaLerContinuidade(
   regenerar: unknown
 ): IpcResult & { ok: boolean; erro?: string } {
   try {
-    const { dossieDirDoApp, gerarContinuidade, lerContinuidade } = require('../bridge-adapta');
     if (regenerar === true) {
       const g = gerarContinuidade(dossieDirDoApp());
       if (!g.ok) return { ok: false, erro: g.erro };

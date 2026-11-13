@@ -96,6 +96,32 @@ export function handleJanelaZoom(
 }
 
 /**
+ * Handler para aplicar um fator de zoom exato (preferência de acesso).
+ */
+export function handleJanelaZoomFator(
+  _event: Electron.IpcMainInvokeEvent,
+  fator: unknown
+): IpcResult & { ok: boolean; fator: number } {
+  const wc = mainWindowRef?.webContents;
+  if (!wc) return { ok: false, fator: 1 };
+  const n = Number(fator);
+  const prox = Number.isFinite(n)
+    ? Math.min(2, Math.max(0.5, Math.round(n * 100) / 100))
+    : 1;
+  wc.setZoomFactor(prox);
+  return { ok: true, fator: prox };
+}
+
+/**
+ * Handler para ler o fator de zoom atual.
+ */
+export function handleJanelaZoomEstado(): IpcResult & { ok: boolean; fator: number } {
+  const wc = mainWindowRef?.webContents;
+  if (!wc) return { ok: false, fator: 1 };
+  return { ok: true, fator: wc.getZoomFactor() };
+}
+
+/**
  * Handler para tela cheia
  */
 export function handleJanelaTelaCheia(
@@ -123,6 +149,8 @@ export function registrarHandlersJanela(): void {
   ipcMain.handle('janela:estado', handleJanelaEstado);
   ipcMain.handle('janela:recarregar', handleJanelaRecarregar);
   ipcMain.handle('janela:zoom', handleJanelaZoom);
+  ipcMain.handle('janela:zoom-fator', handleJanelaZoomFator);
+  ipcMain.handle('janela:zoom-estado', handleJanelaZoomEstado);
   ipcMain.handle('janela:tela-cheia', handleJanelaTelaCheia);
 
   dglog('[ipc:janela] handlers registrados!');

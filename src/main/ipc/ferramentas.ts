@@ -4,7 +4,7 @@
  */
 import { app, ipcMain } from 'electron'
 import { exigirObjeto, exigirString, isErroPayload } from '../ipc-seguro'
-import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo } from '../busca'
+import { buscaArquivos, buscaConteudo, cancelarBuscaConteudo, substituirConteudo } from '../busca'
 import { listarComandosMeta } from '../comandos-meta'
 import { emSafeMode } from '../safe-mode'
 import { resolverRotaChat } from '../agent-router'
@@ -12,6 +12,7 @@ import { dglog } from '../dglog'
 import { carregarChat, listarChats, apagarChat, salvarChat, type ChatMensagem } from '../chats'
 import { backupConfigs } from '../config-backup'
 import { carregarWorkspace, salvarWorkspace } from '../workspace-store'
+import { definirRaizWorkspace, obterRaizWorkspace } from '../workspace-raiz'
 import { caminhoSeguro } from '../ipc-seguro'
 import { askOllama } from '../brain/ollama'
 import { modeloParaTarefa } from '../brain/modelos-catalogo'
@@ -59,12 +60,12 @@ export function registrarHandlersFerramentas(): void {
     return buscaArquivos(r, q, lim)
   })
 
-  ipcMain.handle('busca:conteudo', (_event, raiz: unknown, query: unknown, opcoes?: unknown) => {
+  ipcMain.handle('busca:conteudo', async (_event, raiz: unknown, query: unknown, opcoes?: unknown) => {
     const r = validarRaiz(raiz, 'root')
     if (typeof r !== 'string') return r
     const q = exigirString(query, 'query')
     if (isErroPayload(q)) return q
-    let opts: { regex?: boolean; limite?: number; extensoes?: string[] } = {}
+    let opts: { regex?: boolean; limite?: number; extensoes?: string[]; id?: string } = {}
     if (opcoes !== undefined) {
       const o = exigirObjeto(opcoes, 'opcoes')
       if (isErroPayload(o)) return o
@@ -75,7 +76,8 @@ export function registrarHandlersFerramentas(): void {
       const extensoes = Array.isArray(o.extensoes)
         ? o.extensoes.filter((x): x is string => typeof x === 'string').slice(0, 50)
         : undefined
-      opts = { regex, ...(limite ? { limite } : {}), ...(extensoes ? { extensoes } : {}) }
+      const id = typeof o.id === 'string' && o.id.length <= 80 ? o.id : undefined
+      opts = { regex, ...(limite ? { limite } : {}), ...(extensoes ? { extensoes } : {}), ...(id ? { id } : {}) }
     }
     return buscaConteudo(r, q, opts)
   })
@@ -84,6 +86,31 @@ export function registrarHandlersFerramentas(): void {
     if (id !== undefined && typeof id !== 'string') return { ok: false, erro: 'payload invalido: id deve ser string' }
     return cancelarBuscaConteudo(id as string | undefined)
   })
+
+  ipcMain.handle(
+    'busca:substituir',
+    (_event, raiz: unknown, query: unknown, substituicao: unknown, opcoes?: unknown) => {
+      const r = validarRaiz(raiz, 'root')
+      if (typeof r !== 'string') return r
+      const q = exigirString(query, 'query')
+      if (isErroPayload(q)) return q
+      if (typeof substituicao !== 'string') return { ok: false, erro: 'substituicao invalida' }
+      let opts: { regex?: boolean; previa?: boolean; extensoes?: string[] } = {}
+      if (opcoes !== undefined) {
+        const o = exigirObjeto(opcoes, 'opcoes')
+        if (isErroPayload(o)) return o
+        const extensoes = Array.isArray(o.extensoes)
+          ? o.extensoes.filter((x): x is string => typeof x === 'string').slice(0, 50)
+          : undefined
+        opts = {
+          regex: o.regex === true,
+          previa: o.previa !== false,
+          ...(extensoes ? { extensoes } : {})
+        }
+      }
+      return substituirConteudo(r, q, substituicao, opts)
+    }
+  )
 
   ipcMain.handle('comandos:listar', () => ({ ok: true, comandos: listarComandosMeta() }))
 
@@ -212,9 +239,6 @@ export function registrarHandlersFerramentas(): void {
     try {
       const o = doc && typeof doc === 'object' ? (doc as { pastaAtual?: string }) : {}
       if (typeof o.pastaAtual === 'string' && o.pastaAtual.trim()) {
-        const { definirRaizWorkspace } = require('../workspace-raiz') as {
-          definirRaizWorkspace: (p: string) => string | null
-        }
         definirRaizWorkspace(o.pastaAtual)
       }
     } catch {
@@ -227,10 +251,6 @@ export function registrarHandlersFerramentas(): void {
     const p = typeof pasta === 'string' ? pasta.trim() : ''
     if (!p) return { ok: false, erro: 'pasta vazia' }
     try {
-      const { definirRaizWorkspace, obterRaizWorkspace } = require('../workspace-raiz') as {
-        definirRaizWorkspace: (p: string) => string | null
-        obterRaizWorkspace: () => string | null
-      }
       const abs = definirRaizWorkspace(p)
       return { ok: !!abs, raiz: obterRaizWorkspace() }
     } catch (e) {

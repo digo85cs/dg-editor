@@ -13,6 +13,7 @@ import {
   consultarVersoesRemotas
 } from './ollama'
 import { dglog } from '../dglog'
+import { modeloLocalSugerido } from '../hardware-profile'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo' | 'embedding'
 export type Porte = 'pequeno' | 'padrao' | 'grande' | 'longo'
@@ -612,9 +613,6 @@ export function modeloParaTarefaComMotivo(
   }
   // Preferencia pelo perfil de hardware (local so como fallback da fila online)
   try {
-    const { modeloLocalSugerido } = require('../hardware-profile') as {
-      modeloLocalSugerido: (tarefa: string) => string
-    }
     const sug = modeloLocalSugerido(tarefa)
     if (sug) {
       const hit = cat.modelos.find((m) => m.id === sug || m.id.startsWith(sug.split(':')[0]))

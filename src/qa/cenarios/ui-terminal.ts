@@ -4,6 +4,31 @@ import type { ResultadoCenario } from '../tipos'
 export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]> {
   const out: ResultadoCenario[] = []
 
+  // Hermeticidade: descarta layout restaurado de execucoes anteriores (split/abas antigas).
+  await page.evaluate(async () => {
+    const dg = (window as unknown as { dgTerminal?: { fechar?: () => Promise<void> } }).dgTerminal
+    try {
+      await dg?.fechar?.()
+    } catch {
+      /* painel ainda nao existe */
+    }
+    try {
+      localStorage.removeItem('dg.terminal.layout')
+    } catch {
+      /* */
+    }
+  })
+
+  /** Aba ativa do grupo ativo (evita pegar aba de outro grupo em split). */
+  const abaAtivaId = () =>
+    page.evaluate(() => {
+      const tab =
+        document.querySelector('.terminal-grupo.ativo .terminal-tab.ativa') ||
+        document.querySelector('.terminal-tab.ativa') ||
+        document.querySelector('.terminal-tab')
+      return (tab as HTMLElement | null)?.dataset?.termId || ''
+    })
+
   {
     const t0 = Date.now()
     try {
@@ -21,17 +46,22 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
       let st = await estado()
       if (!st.open) {
         await page.evaluate(() => {
-          const btn =
-            document.getElementById('btn-terminal-toggle') ||
-            (document.querySelector('[data-action="terminal"]') as HTMLElement | null)
-          btn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          document
+            .getElementById('rail-terminal')
+            ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         })
-        await page.waitForTimeout(800)
-        st = await estado()
+        for (let i = 0; i < 50; i++) {
+          st = await estado()
+          if (st.open) break
+          await page.waitForTimeout(200)
+        }
         if (!st.open) {
           await page.keyboard.press('Control+Backquote')
-          await page.waitForTimeout(800)
-          st = await estado()
+          for (let i = 0; i < 50; i++) {
+            st = await estado()
+            if (st.open) break
+            await page.waitForTimeout(200)
+          }
         }
       }
       if (!st.open) {
@@ -85,12 +115,7 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
           corrigivel: false
         })
       } else {
-        const abaId = await page.evaluate(() => {
-          const tab =
-            (document.querySelector('.terminal-tab.ativa') as HTMLElement | null) ||
-            (document.querySelector('.terminal-tab') as HTMLElement | null)
-          return tab?.dataset?.termId || ''
-        })
+        const abaId = await abaAtivaId()
         // CSP bloqueia Playwright waitForFunction (unsafe-eval). Equivalente: poll + evaluate + bufferTexto.
         const lerBuf = async () =>
           page.evaluate((id) => {
@@ -165,6 +190,181 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
         duracaoMs: Date.now() - t0,
         erro: msg,
         detalhe: semShell ? 'shell ausente no ambiente — warn' : undefined
+      })
+    }
+  }
+
+  {
+    // Perfis salvos: salvar aba atual, abrir por perfil e remover.
+    const t0 = Date.now()
+    try {
+      const antes = await page.evaluate(() => document.querySelectorAll('.terminal-tab').length)
+      const nome = 'Perfil QA ' + Date.now()
+      const salvo = await page.evaluate((nome) => {
+        const w = window as unknown as { prompt: unknown; confirm: unknown; __dgPromptOrig?: unknown }
+        w.__dgPromptOrig = w.prompt
+        w.prompt = () => nome
+        document.getElementById('terminal-btn-perfil-salvar')?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true })
+        )
+        const raw = localStorage.getItem('dg.terminal.perfis') || '[]'
+        let lista: Array<{ id: string; nome: string }> = []
+        try {
+          lista = JSON.parse(raw)
+        } catch {
+          lista = []
+        }
+        return { achou: lista.some((p) => p.nome === nome), perfil: lista.find((p) => p.nome === nome) || null }
+      }, nome)
+      if (!salvo.achou || !salvo.perfil) throw new Error('perfil nao persistiu')
+      await page.evaluate((id) => {
+        const sel = document.getElementById('terminal-perfil-select') as HTMLSelectElement | null
+        if (!sel) return
+        sel.value = id
+        sel.dispatchEvent(new Event('change'))
+      }, salvo.perfil.id)
+      await page.waitForTimeout(1200)
+      const depois = await page.evaluate(() => document.querySelectorAll('.terminal-tab').length)
+      const removido = await page.evaluate(() => {
+        const w = window as unknown as { confirm: unknown; __dgConfirmOrig?: unknown }
+        w.__dgConfirmOrig = w.confirm
+        w.confirm = () => true
+        document.getElementById('terminal-btn-perfil-remover')?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true })
+        )
+        const raw = localStorage.getItem('dg.terminal.perfis') || '[]'
+        try {
+          return !(JSON.parse(raw) as Array<{ nome: string }>).some((p) => p.nome.startsWith('Perfil QA '))
+        } catch {
+          return false
+        }
+      })
+      await page.evaluate(() => {
+        const w = window as unknown as {
+          prompt: unknown
+          confirm: unknown
+          __dgPromptOrig?: unknown
+          __dgConfirmOrig?: unknown
+        }
+        if (w.__dgPromptOrig !== undefined) w.prompt = w.__dgPromptOrig
+        if (w.__dgConfirmOrig !== undefined) w.confirm = w.__dgConfirmOrig
+      })
+      const ok = depois > antes && removido
+      out.push({
+        id: 'ui.terminal.perfis',
+        area: 'ui',
+        titulo: 'salvar perfil, abrir aba pelo perfil e remover',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'abas=' + antes + '→' + depois + ' removido=' + removido
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.terminal.perfis',
+        area: 'ui',
+        titulo: 'perfis de terminal',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  if (process.platform === 'win32') {
+    // OSC 9;9 emitido por um powershell aninhado deve atualizar o cwd da aba.
+    const t0 = Date.now()
+    try {
+      const cmd =
+        "powershell -NoProfile -Command \"Write-Host -NoNewline ([char]27 + ']9;9;C:\\Windows' + [char]27 + '\\')\"\r"
+      const alvo = await abaAtivaId()
+      await page.evaluate(async ({ cmd, id }) => {
+        const api = (window as unknown as { api?: { terminal?: { write: (id: string, s: string) => Promise<unknown> } } }).api
+        if (id && api?.terminal?.write) await api.terminal.write(id, cmd)
+      }, { cmd, id: alvo })
+      let cwd: string | null = null
+      for (let i = 0; i < 60; i++) {
+        cwd = await page.evaluate(() => {
+          const dg = (window as unknown as { dgTerminal?: { cwdAtual?: () => string | null } }).dgTerminal
+          return dg?.cwdAtual?.() ?? null
+        })
+        if (cwd && /^C:\/Windows$/i.test(cwd)) break
+        await page.waitForTimeout(250)
+      }
+      const ok = !!cwd && /^C:\/Windows$/i.test(cwd)
+      out.push({
+        id: 'ui.terminal.cwd-osc',
+        area: 'ui',
+        titulo: 'OSC 9;9 atualiza o diretorio atual da aba',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'cwd=' + String(cwd)
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.terminal.cwd-osc',
+        area: 'ui',
+        titulo: 'OSC 9;9 atualiza cwd',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    // Scrollback textual: fechar destrói as abas; reabrir restaura o histórico.
+    const t0 = Date.now()
+    try {
+      const marcador = 'DG_SCROLL_' + Date.now()
+      const id = await abaAtivaId()
+      await page.evaluate(async ({ id, marcador }) => {
+        const api = (window as unknown as { api?: { terminal?: { write: (i: string, s: string) => Promise<unknown> } } }).api
+        if (id && api?.terminal?.write) await api.terminal.write(id, 'echo ' + marcador + '\r')
+      }, { id, marcador })
+      let achouAntes = false
+      for (let i = 0; i < 40; i++) {
+        achouAntes = await page.evaluate((m) => {
+          const dg = (window as unknown as { dgTerminal?: { bufferTexto?: (a?: string) => string } }).dgTerminal
+          return !!dg?.bufferTexto && dg.bufferTexto()!.includes(m)
+        }, marcador)
+        if (achouAntes) break
+        await page.waitForTimeout(250)
+      }
+      if (!achouAntes) throw new Error('marcador nao apareceu no buffer antes de fechar')
+      await page.evaluate(async () => {
+        const dg = (window as unknown as { dgTerminal?: { fechar?: () => Promise<void>; abrir?: () => Promise<void> } }).dgTerminal
+        await dg?.fechar?.()
+        await dg?.abrir?.()
+      })
+      await page.waitForTimeout(2500)
+      let achouDepois = false
+      for (let i = 0; i < 40; i++) {
+        achouDepois = await page.evaluate((m) => {
+          const dg = (window as unknown as { dgTerminal?: { bufferTexto?: (a?: string) => string } }).dgTerminal
+          const bt = dg?.bufferTexto
+          if (!bt) return false
+          const tabs = [...document.querySelectorAll('.terminal-tab')] as HTMLElement[]
+          return tabs.some((t) => (bt(t.dataset.termId) || '').includes(m))
+        }, marcador)
+        if (achouDepois) break
+        await page.waitForTimeout(250)
+      }
+      out.push({
+        id: 'ui.terminal.scrollback',
+        area: 'ui',
+        titulo: 'scrollback textual sobrevive a fechar/reabrir',
+        severidade: achouDepois ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'antes=' + achouAntes + ' depois=' + achouDepois
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.terminal.scrollback',
+        area: 'ui',
+        titulo: 'scrollback textual',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
       })
     }
   }
@@ -255,16 +455,17 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
     const t0 = Date.now()
     try {
       await page.keyboard.press('Control+Backquote')
-      await page.waitForTimeout(400)
-      const aberto = await page.evaluate(
-        () => !!document.querySelector('#terminal-panel.open')
-      )
-      // fallback: botão toggle se atalho nao fechar
+      let aberto = true
+      for (let i = 0; i < 20; i++) {
+        aberto = await page.evaluate(() => !!document.querySelector('#terminal-panel.open'))
+        if (!aberto) break
+        await page.waitForTimeout(150)
+      }
+      // fallback: se atalho nao ocultou, usa a API do painel
       if (aberto) {
-        await page.evaluate(() => {
-          document.getElementById('btn-terminal-toggle')?.dispatchEvent(
-            new MouseEvent('click', { bubbles: true })
-          )
+        await page.evaluate(async () => {
+          await (window as unknown as { dgTerminal?: { ocultar?: () => Promise<void> } })
+            .dgTerminal?.ocultar?.()
         })
         await page.waitForTimeout(300)
       }
@@ -283,6 +484,53 @@ export async function cenariosUiTerminal(page: Page): Promise<ResultadoCenario[]
         id: 'ui.terminal.fechar',
         area: 'ui',
         titulo: 'fechar painel',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    // Persistência de abas: ocultar não destrói e reabrir restaura o mesmo conjunto.
+    const t0 = Date.now()
+    try {
+      const antes = await page.evaluate(() => {
+        const api = (window as unknown as { dgTerminal?: { ocultar?: () => Promise<void> } })
+          .dgTerminal
+        void api?.ocultar?.()
+        return document.querySelectorAll('.terminal-tab').length
+      })
+      await page.waitForTimeout(250)
+      const fechado = await page.evaluate(
+        () => !document.querySelector('#terminal-panel.open')
+      )
+      await page.evaluate(() => {
+        document
+          .getElementById('rail-terminal')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      let aberto = false
+      for (let i = 0; i < 40; i++) {
+        aberto = await page.evaluate(() => !!document.querySelector('#terminal-panel.open'))
+        if (aberto) break
+        await page.waitForTimeout(200)
+      }
+      const depois = await page.evaluate(() => document.querySelectorAll('.terminal-tab').length)
+      const ok = fechado && aberto && antes > 0 && depois === antes
+      out.push({
+        id: 'ui.terminal.persistencia',
+        area: 'ui',
+        titulo: 'ocultar preserva abas; reabrir restaura',
+        severidade: ok ? 'ok' : 'warn',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'fechado=' + fechado + ' aberto=' + aberto + ' abas=' + antes + '→' + depois
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.terminal.persistencia',
+        area: 'ui',
+        titulo: 'persistencia de abas',
         severidade: 'erro',
         duracaoMs: Date.now() - t0,
         erro: String(e)

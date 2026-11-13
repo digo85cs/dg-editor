@@ -1,0 +1,98 @@
+# CI do DG Editor — Windows (alvo principal do app).
+# Etapas: typecheck, encoding/sintaxe, testes unitários, build, QA IPC e QA E2E.
+# O QA E2E usa Playwright + Electron e um servidor HTTP local (download real);
+# não depende de Ollama nem de chaves de IA (DG_FAKE_LLM=1 isola o chat).
+name: CI
+
+on:
+  push:
+    branches: [main, integra-*]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: '1'
+  DG_QA_E2E: '1'
+
+jobs:
+  qualidade:
+    name: Typecheck, testes e build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Verificar encoding
+        run: npm run verificar:encoding
+
+      - name: Verificar sintaxe
+        run: npm run verificar:sintaxe
+
+      - name: Verificar contraste (WCAG AA)
+        run: npm run verificar:contraste
+
+      - name: Testes unitários (vitest)
+        run: npm test
+
+      - name: Build (electron-vite)
+        run: npx electron-vite build
+
+      - name: QA IPC
+        run: npm run qa:ipc
+
+      - name: Guardar relatório QA (IPC)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-ipc
+          path: qa-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: QA E2E (Electron + download real)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: qualidade
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build (electron-vite)
+        run: npx electron-vite build
+
+      - name: QA E2E
+        run: npm run qa:e2e
+
+      - name: Guardar relatório QA (E2E)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-e2e
+          path: |
+            qa-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14

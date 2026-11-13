@@ -1033,8 +1033,40 @@ export async function executarAgente(
       modo === 'plan'
         ? '\n\n### MODO PLAN\nVoce esta em modo PLAN. NAO chame tools. NAO edite arquivos. ' +
           'Responda APENAS com um plano em markdown: objetivo, passos numerados, ' +
-          'arquivos envolvidos, riscos. Aguarde aprovacao humana antes de executar.'
+          'arquivos envolvidos, riscos. Aguarde aprovacao humana antes de executar.' +
+          '\nSe o pedido envolver video com narracao, narracao de audio ou slideshow narrado, ' +
+          'inclua como PRIMEIRO passo perguntar qual voz o usuario quer (mulheres, homens, ' +
+          'meninas infantis, meninos infantis) e listar as vozes disponiveis ' +
+          '(Supertonic, Kokoro, Piper locais + edge-tts na nuvem).'
         : ''
+    const blocoMidia =
+      '\n\n### VOZES E MIDIA (obrigatorio)\n' +
+      'Quando o usuario pedir video com narracao ou narracao em audio, SEMPRE pergunte qual voz ele quer ' +
+      'antes de gerar, mostrando as categorias: mulheres, homens, meninas (infantil) e meninos (infantil). ' +
+      'Use a tool midia_vozes_listar para obter os ids e passe o campo "voz" em midia_narrar / midia_fotos_video. ' +
+      'Se o usuario nao escolher, use a voz padrao informada por midia_vozes_listar. ' +
+      'Vozes locais (Supertonic/Kokoro/Piper) sao gratuitas, naturais e nao precisam de internet; ' +
+      'edge-tts e apenas alternativa em nuvem. As vozes infantis sao derivadas de vozes naturais. ' +
+      'Para gerar imagem nao pergunte voz. ' +
+      'Para geracao ILIMITADA e gratuita de imagem ou video, use midia_comfyui_imagem / midia_comfyui_video ' +
+      '(ComfyUI local em CPU; inicia sozinho). Pollinations tem limite de 1 imagem/45s; o ComfyUI nao tem limite, ' +
+      'mas video na CPU demora varios minutos — avise o usuario e prefira 8 a 16 quadros em 512x512. ' +
+      '\nMEMES: use midia_memes_listar (sincroniza na primeira vez), escolha template por id/nome e chame ' +
+      'midia_meme_gerar com topo/baixo. Banco gratuito do Imgflip; templates ficam locais. ' +
+      '\nPARODIAS: as vozes da categoria "parodia" sao arquetipos (locutor, ancora, trailer etc.), NAO imitam ' +
+      'pessoas reais. Nunca prometa clonar a voz de alguem. ' +
+      '\nFOTO -> VIDEO: midia_foto_video gera um video ESTILIZADO de uma foto (AnimateDiff CPU), exige ' +
+      'consentimento=true e sai com marca visivel "gerado por IA". Deixe claro que nao e deepfake fotorrealista ' +
+      'e que so vale para fotos proprias ou autorizadas. ' +
+      '\nHARDWARE/ATUALIZACOES: use midia_hardware antes de prometer tempo/qualidade e midia_atualizacoes para ' +
+      'ver ou aplicar atualizacoes (nunca atualize codigo com o ComfyUI rodando). ' +
+      '\nMUSICAS: midia_musicas lista o banco local (pasta musicas do app); midia_musica_mixar adiciona uma ' +
+      'faixa ao video. midia_musicas_livres mostra o catalogo royalty-free por estilo (CC BY 4.0) e ' +
+      'midia_musica_baixar baixa faixas/estilo com creditos em CREDITOS.json. ' +
+      '\nAUDIO: midia_audio analisa volume (media/pico), normaliza (EBU R128 -16 LUFS), equaliza graves/agudos, ' +
+      'comprime, aplica fades, corta e converte mp3/wav/m4a/ogg. Sempre analise antes de normalizar. ' +
+      '\nAPPS: apps_status mostra SDK Android/artefatos; apps_setup instala o toolchain; apps_build gera APK ' +
+      'Android e/ou instalador Windows e copia para OneDrive/APP. Rode apps_status antes e depois do build.'
     const blocoPropose = proposeWrites
       ? '\n\n### MODO PROPOSTA\nEdicoes (codigo_editar/vault_write/dossie_write) NAO gravam no disco: ' +
         'viram propostas para o usuario aprovar. Voce pode chamar essas tools normalmente; ' +
@@ -1089,6 +1121,7 @@ export async function executarAgente(
       blocoFatos +
       blocoSkills +
       blocoPlan +
+      blocoMidia +
       blocoPropose +
       blocoMapa +
       (extra ? '\n\n' + extra : '')

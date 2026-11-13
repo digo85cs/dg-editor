@@ -27,6 +27,18 @@ export async function handleAppRaizProjeto(
 }
 
 /**
+ * Informa se a sessao roda em modo de QA (e2e/mock), para o renderer
+ * evitar avisos transitorios que poluem capturas e testes.
+ */
+export function handleAppQaMode(): { ok: boolean; e2e: boolean; fakeLlm: boolean } {
+  return {
+    ok: true,
+    e2e: process.env.DG_QA_E2E === '1',
+    fakeLlm: process.env.DG_FAKE_LLM === '1'
+  };
+}
+
+/**
  * Handler para fechar aplicacao
  */
 export function handleAppQuit(
@@ -47,6 +59,7 @@ export function registrarHandlersApp(): void {
   dglog('[ipc:app] registrando handlers...');
 
   ipcMain.handle('app:raiz-projeto', handleAppRaizProjeto);
+  ipcMain.handle('app:qa-mode', handleAppQaMode);
   ipcMain.on('app:quit', handleAppQuit);
 
   dglog('[ipc:app] handlers registrados!');

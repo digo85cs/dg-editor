@@ -7,6 +7,7 @@ import { ipcMain } from 'electron';
 import { loadChat, appendChat, clearChat } from '../chatstore';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import { dglog } from '../dglog';
+import { calcularUso } from '../brain/custo-sessao';
 import type { IpcResult, ChatSendResult } from './types';
 
 // ============================================================================
@@ -99,7 +100,7 @@ export async function handleChatAnexar(
  * Handler para enviar mensagem de chat
  * Extraido do index.ts principal
  */
-export async function handleChatSend(
+async function executarChatSend(
   event: Electron.IpcMainInvokeEvent,
   root: unknown,
   content: unknown,
@@ -191,6 +192,12 @@ export async function handleChatSend(
     /* nao bloqueia o fluxo por falha na detecao de anexos */
   }
 
+  // === MOCK DETERMINISTICO DE QA (DG_FAKE_LLM=1) ===
+  // Nao toca rede nem Ollama; exercita stream, proposta, apply e undo no e2e.
+  if (process.env.DG_FAKE_LLM === '1') {
+    return responderChatFake(event, rootOk, textoPedido);
+  }
+
   // === DEGRADACAO GRACIOSA: verifica se ha pelo menos um provedor disponível ===
   try {
     const { ollamaAlive } = await import('../ollama-keeper');
@@ -241,6 +248,8 @@ export async function handleChatSend(
       : options.verificarApos === true
         ? true
         : modoValido !== 'plan' && modoValido !== 'ask';
+  /** Prompt efetivo do turno (atualizado apos montar o contexto) — base do uso estimado. */
+  let contextoUso = textoPedido;
   const publicarDelta = (payload: { delta?: string; reset?: boolean }) => {
     if (event.sender.isDestroyed()) return;
     try { event.sender.send('chat:delta', payload); } catch { /* janela fechada */ }
@@ -251,7 +260,9 @@ export async function handleChatSend(
     extra: Record<string, unknown> = {},
     jaPersistido = false
   ) => {
-    const message = { role: 'assistant' as const, content: contentOut, at: Date.now(), provider };
+    // Streams deste app nao devolvem usage; estimativa ~4 chars/token (marcada como estimada).
+    const usage = calcularUso(provider, contextoUso, contentOut);
+    const message = { role: 'assistant' as const, content: contentOut, at: Date.now(), provider, usage };
     if (!jaPersistido) appendChat(rootOk, message);
     try {
       const { gravarDossie } = await import('../dossie');
@@ -261,7 +272,7 @@ export async function handleChatSend(
     } catch (error) {
       dglog('[chat] nao foi possivel atualizar o dossie: ' + String(error));
     }
-    return { ok: true, message, ...extra };
+    return { ok: true, message, ...extra, usage };
   };
   const persistirUsuario = () => {
     appendChat(rootOk, { role: 'user', content: textoPedido, at: Date.now() });
@@ -385,9 +396,11 @@ export async function handleChatSend(
         'Implementacao concreta, padroes e testes existentes. Pare so em risco alto.\n'
     }
     if (modoValido === 'ask') context += '\nMODO ASK: explique e responda sem propor alteracoes de arquivos.\n';
+    contextoUso = context + '\n' + textoPedido;
    
-    const rodarAgente = async (idAgente: string, tarefa: 'chat' | 'codigo') => {
+    const rodarAgente = async (idAgente: string, tarefa: 'chat' | 'codigo', signal?: AbortSignal) => {
       process.env.DG_ROOT = rootOk;
+      if (signal?.aborted) throw new Error('cancelado pelo usuario');
       try {
         const { garantirMcpNaRaiz } = await import('../mcp/client');
         await garantirMcpNaRaiz(rootOk);
@@ -428,13 +441,15 @@ export async function handleChatSend(
         proposeWrites: true,
         pastas: [rootOk],
         contextoExtra: contextoAgente,
-        onEvent
+        onEvent,
+        signal
       });
       let diagnostico: unknown;
       let contentOut = resposta?.texto || 'Sem resposta do agente.';
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
       if (
+        !signal?.aborted &&
         verificarAposOpt &&
         modoValido !== 'plan' &&
         modoValido !== 'ask' &&
@@ -447,6 +462,7 @@ export async function handleChatSend(
             pastas: [rootOk],
             agente: idAgente,
             contextoExtra: contextoAgente,
+            signal,
             onEvent: onEvent as (ev: unknown) => void,
             resposta
           });
@@ -516,7 +532,8 @@ export async function handleChatSend(
     } catch {
       /* */
     }
-    const resultado = await enfileirarAgente(rootOk, async () => {
+    const resultado = await enfileirarAgente(rootOk, async (signal) => {
+      if (signal?.aborted) throw new Error('cancelado pelo usuario');
       if (agenteSel && agenteSel !== 'auto' && modoValido !== 'ask') {
         try {
           const { lerAgente } = await import('../brain/agentes');
@@ -524,7 +541,7 @@ export async function handleChatSend(
           if (agente || agenteSel.startsWith('free-')) {
             const idAgente = agente ? agente.id : agenteSel;
             const tarefa = modoValido === 'ask' ? 'chat' : 'codigo';
-            return rodarAgente(idAgente, tarefa);
+            return rodarAgente(idAgente, tarefa, signal);
           }
         } catch (error) {
           dglog('[chat] agente selecionado falhou: ' + String(error));
@@ -533,6 +550,7 @@ export async function handleChatSend(
 
       if (forceHibrido) {
         persistirUsuario();
+        if (signal?.aborted) throw new Error('cancelado pelo usuario');
         const { executarHibrido } = await import('../brain/hibrido');
         const hibrido = await executarHibrido(rootOk, pedidoHibrido, {
           pastaAberta: analysis?.root || rootOk,
@@ -565,6 +583,7 @@ export async function handleChatSend(
 
         // Selecao automatica: fila com o melhor agente primeiro + fallback automatico.
         if (agenteSel === 'auto' && rootOk) {
+          if (signal?.aborted) throw new Error('cancelado pelo usuario');
           const { listarAgentes } = await import('../brain/agentes');
           const { orquestrarAgentes } = await import('../agent/orquestrador');
           const todos = listarAgentes(rootOk).map((a) => a.id);
@@ -590,8 +609,9 @@ export async function handleChatSend(
         }
 
         try {
-          return await rodarAgente(idAgente, tarefa);
+          return await rodarAgente(idAgente, tarefa, signal);
         } catch (error) {
+          if (signal?.aborted) throw error;
           dglog('[chat] rota agente falhou; usando chat: ' + String(error));
         }
       }
@@ -625,7 +645,9 @@ export async function handleChatSend(
       } catch (e) {
         dglog('[chat] filaPronta vazia: ' + String(e));
       }
+      const tentativasProvedor: string[] = [];
       for (const provider of filaChat) {
+        if (signal?.aborted) throw new Error('cancelado pelo usuario');
         if (provider.tipo === 'local' || provider.formato === 'ollama') continue;
         if (provider.formato !== 'openai') continue;
         if (/:free\b/i.test(provider.modelo)) continue;
@@ -637,6 +659,7 @@ export async function handleChatSend(
         }
         if (!key && provider.apiKeyEnv) key = String(process.env[provider.apiKeyEnv] || '').trim();
         if (!key) continue;
+        tentativasProvedor.push(provider.id + ':' + provider.modelo);
         try {
           const limites = limitesPorTarefa('chat');
           const resposta = (await streamOpenAIChat({
@@ -647,17 +670,29 @@ export async function handleChatSend(
             user,
             numPredict: Math.max(provider.numPredict || 1024, limites.num_predict, 1024),
             timeoutMs: Math.max(provider.timeoutMs || 45_000, 90_000),
-            onDelta: (delta) => publicarDelta({ delta })
+            onDelta: (delta) => publicarDelta({ delta }),
+            signal
           })).trim();
           if (resposta && resposta.length >= 8) {
-            return publicar(resposta, provider.id + ':' + provider.modelo);
+            return publicar(resposta, provider.id + ':' + provider.modelo, {
+              tentativas: [...tentativasProvedor]
+            });
           }
         } catch (error) {
           publicarDelta({ reset: true });
           dglog('[chat] provider online falhou ' + provider.id + ': ' + String(error));
+          if (!event.sender.isDestroyed()) {
+            try {
+              event.sender.send('chat:fallback', {
+                de: provider.id + ':' + provider.modelo,
+                motivo: String((error as Error)?.message || error).slice(0, 160)
+              });
+            } catch { /* janela fechada */ }
+          }
         }
       }
 
+      if (signal?.aborted) throw new Error('cancelado pelo usuario');
       const ollamaOk = await ensureOllama();
       if (!modeloLocal || !ollamaOk) {
         try {
@@ -679,10 +714,13 @@ export async function handleChatSend(
             user,
             numPredict: Math.max(limites.num_predict, 1024),
             timeoutMs: limites.timeoutMs,
-            onDelta: (delta) => publicarDelta({ delta })
+            onDelta: (delta) => publicarDelta({ delta }),
+            signal
           })).trim();
           if (resposta && resposta.length >= 8) {
-            return publicar(resposta, 'ollama:' + modeloLocal);
+            return publicar(resposta, 'ollama:' + modeloLocal, {
+              tentativas: [...tentativasProvedor, 'ollama:' + modeloLocal]
+            });
           }
         } catch (error) {
           publicarDelta({ reset: true });
@@ -690,22 +728,40 @@ export async function handleChatSend(
         }
         try {
           const { askOllama } = await import('../brain/ollama');
-          const resposta = await askOllama(textoPedido, context, 'chat');
+          const resposta = await askOllama(textoPedido, context, 'chat', {}, { signal });
           if (resposta?.text?.trim()) {
-            return publicar(resposta.text, resposta.provider + ':' + (resposta.model || modeloChat));
+            const idProv = resposta.provider + ':' + (resposta.model || modeloChat);
+            return publicar(resposta.text, idProv, {
+              tentativas: [...tentativasProvedor, idProv]
+            });
           }
         } catch (error) {
+          if (signal?.aborted) throw error;
           dglog('[chat] askOllama falhou: ' + String(error));
         }
       }
 
+      if (signal?.aborted) throw new Error('cancelado pelo usuario');
       const { askOllama } = await import('../brain/ollama');
-      const resposta = await askOllama(textoPedido, context, 'chat');
-      return publicar(resposta.text, resposta.provider + ':' + (resposta.model || modeloChat));
+      const resposta = await askOllama(textoPedido, context, 'chat', {}, { signal });
+      const idFinal = resposta.provider + ':' + (resposta.model || modeloChat);
+      return publicar(resposta.text, idFinal, {
+        tentativas: [...tentativasProvedor, idFinal]
+      });
     });
     return resultado as ChatSendResult;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
+    if (/cancelad/i.test(errMsg)) {
+      const message = {
+        role: 'assistant' as const,
+        content: 'Geracao interrompida a seu pedido.',
+        at: Date.now(),
+        provider: 'cancelado'
+      };
+      appendChat(rootOk, message);
+      return { ok: false, message };
+    }
     // Ultimo recurso absoluto: askOllama com modelo leve e sem contexto, para nunca ficar sem resposta.
     let textoUltimoRecurso: string | null = null
     try {
@@ -728,9 +784,152 @@ export async function handleChatSend(
   }
 }
 
+const MOCK_CHAT_REL = 'qa-artifacts/mock-chat/alvo.txt';
+const MOCK_CHAT_ANTES = 'linha original do mock QA\n';
+const MOCK_CHAT_DEPOIS = 'linha alterada pelo mock QA\n';
+
+/**
+ * LLM falso deterministico (DG_FAKE_LLM=1).
+ * Faz stream de deltas pelo canal real e, com [qa:proposta], cria uma proposta
+ * aplicavel em qa-artifacts/mock-chat/alvo.txt — sem rede, sem Ollama.
+ */
+async function responderChatFake(
+  event: Electron.IpcMainInvokeEvent,
+  rootOk: string,
+  textoPedido: string
+): Promise<ChatSendResult> {
+  const enviarDelta = (delta: string) => {
+    if (event.sender.isDestroyed()) return;
+    try { event.sender.send('chat:delta', { delta }); } catch { /* janela fechada */ }
+  };
+  const enviarStatus = (texto: string) => {
+    if (event.sender.isDestroyed()) return;
+    try { event.sender.send('agente:progresso', { tipo: 'status', texto }); } catch { /* janela fechada */ }
+  };
+  const { enfileirarAgente } = await import('../agent/fila');
+  appendChat(rootOk, { role: 'user', content: textoPedido, at: Date.now() });
+  try {
+    return await enfileirarAgente(rootOk, async (signal) => {
+      const pedacos = [
+        'Resposta simulada do DG Editor (DG_FAKE_LLM). ',
+        'Nenhum provedor externo foi chamado neste turno. ',
+        'Cenario deterministico de QA.'
+      ];
+      let texto = '';
+      enviarStatus('Planejando a resposta…');
+      for (const pedaco of pedacos) {
+        if (signal.aborted) break;
+        await new Promise<void>((res) => {
+          const t = setTimeout(fimEspera, 40);
+          function fimEspera() {
+            clearTimeout(t);
+            signal.removeEventListener('abort', fimEspera);
+            res();
+          }
+          signal.addEventListener('abort', fimEspera, { once: true });
+        });
+        if (signal.aborted) break;
+        texto += pedaco;
+        enviarDelta(pedaco);
+      }
+      if (signal.aborted) {
+        const msg = {
+          role: 'assistant' as const,
+          content: 'Geracao interrompida a seu pedido.',
+          at: Date.now(),
+          provider: 'cancelado'
+        };
+        appendChat(rootOk, msg);
+        return { ok: false, message: msg };
+      }
+      const propostas: Array<{ id: string; path: string; absPath: string; unifiedDiff: string }> = [];
+      enviarStatus('Verificando o resultado…');
+      if (/\[qa:proposta\]/i.test(textoPedido)) {
+        try {
+          const { mkdir, writeFile } = await import('fs/promises');
+          const { join } = await import('path');
+          const abs = join(rootOk, MOCK_CHAT_REL);
+          await mkdir(join(rootOk, 'qa-artifacts', 'mock-chat'), { recursive: true });
+          // Sempre volta ao original para o diff ser o mesmo a cada execucao.
+          await writeFile(abs, MOCK_CHAT_ANTES, 'utf8');
+          const { proporEscritaCompleta } = await import('../agent/propostas');
+          const r = proporEscritaCompleta(rootOk, MOCK_CHAT_REL, MOCK_CHAT_DEPOIS, [rootOk]);
+          if (r.ok && r.pendente) {
+            propostas.push({
+              id: r.pendente.id,
+              path: r.pendente.path,
+              absPath: r.pendente.absPath,
+              unifiedDiff: r.pendente.unifiedDiff
+            });
+            texto += ' Proposta pronta em ' + MOCK_CHAT_REL + '.';
+          } else {
+            texto += ' Proposta nao criada: ' + r.texto;
+          }
+        } catch (e) {
+          dglog('[chat:mock] proposta falhou: ' + String(e));
+        }
+      }
+      const message = {
+        role: 'assistant' as const,
+        content: texto,
+        at: Date.now(),
+        provider: 'mock',
+        usage: calcularUso('mock', textoPedido, texto)
+      };
+      appendChat(rootOk, message);
+      return {
+        ok: true,
+        message,
+        propostas,
+        modo: 'agent',
+        autoAprovacao: { aplicada: false, motivo: 'DG_FAKE_LLM' },
+        usage: message.usage
+      } as ChatSendResult;
+    });
+  } catch (e) {
+    const message = {
+      role: 'assistant' as const,
+      content: 'Mock interrompido: ' + String((e as Error)?.message || e),
+      at: Date.now(),
+      provider: 'erro'
+    };
+    appendChat(rootOk, message);
+    return { ok: false, message };
+  }
+}
+
 // ============================================================================
 // FUNCAO DE REGISTRO
 // ============================================================================
+
+/**
+ * Emite um evento de fim de turno para o renderer anunciar o resultado no
+ * leitor de tela — inclusive quando o turno é iniciado por IPC direto.
+ */
+function emitirFimDoTurno(event: Electron.IpcMainInvokeEvent, r: ChatSendResult): void {
+  if (event.sender.isDestroyed()) return;
+  try {
+    event.sender.send('agente:progresso', {
+      tipo: 'fim',
+      ok: r?.ok === true,
+      provider: r?.message?.provider || '',
+      cancelado: r?.message?.provider === 'cancelado'
+    });
+  } catch {
+    /* janela fechada */
+  }
+}
+
+export async function handleChatSend(
+  event: Electron.IpcMainInvokeEvent,
+  root: unknown,
+  content: unknown,
+  opts: unknown
+): Promise<ChatSendResult> {
+  const resultado = await executarChatSend(event, root, content, opts);
+  emitirFimDoTurno(event, resultado);
+  return resultado;
+}
 
 /**
  * Registra todos os handlers de chat
@@ -742,6 +941,10 @@ export function registrarHandlersChat(): void {
   ipcMain.handle('chat:clear', handleChatClear);
   ipcMain.handle('chat:anexar', handleChatAnexar);
   ipcMain.handle('chat:send', handleChatSend);
+  ipcMain.handle('chat:cancelar', async () => {
+    const { cancelarFilaAgente } = await import('../agent/fila');
+    return cancelarFilaAgente();
+  });
 
   dglog('[ipc:chat] handlers registrados com sucesso');
 }

@@ -1,6 +1,8 @@
 /**
  * Linha do tempo de checkpoints — restore em qualquer id (Parity v2).
  */
+import { pastasPermitidas } from './features/arquivos/index.js'
+
 export async function mostrarTimelineCheckpoint() {
   try {
     const r = await window.api.invoke('agente:checkpoint-listar', 20)
@@ -48,7 +50,7 @@ export async function mostrarTimelineCheckpoint() {
       btn.textContent = 'Restaurar'
       btn.dataset.restore = c.id
       btn.addEventListener('click', async () => {
-        const r2 = await window.api.invoke('agente:checkpoint-restaurar', btn.dataset.restore)
+        const r2 = await window.api.invoke('agente:checkpoint-restaurar', btn.dataset.restore, pastasPermitidas())
         alert(r2?.ok ? 'Restaurado (' + r2.restaurados + ')' : 'Falha')
         modal.remove()
       })

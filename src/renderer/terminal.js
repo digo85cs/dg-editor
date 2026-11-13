@@ -4,6 +4,7 @@
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { lerPreferenciasA11y } from './features/ui/acessibilidade.js'
 import '@xterm/xterm/css/xterm.css'
 
 const LS_HEIGHT = 'dg-terminal-height'
@@ -11,7 +12,36 @@ const LS_MODE = 'dg-terminal-mode'
 const LS_ORIENT = 'dg-terminal-orient'
 const LS_SPLIT_RATIO = 'dg-terminal-split-ratio'
 const LS_LAYOUT = 'dg.terminal.layout'
+const LS_PERFIS = 'dg.terminal.perfis'
 const MAX_ABAS_RESTORE = 4
+const MAX_SCROLLBACK_LINHAS = 80
+const MAX_SCROLLBACK_CHARS = 8000
+
+function lerPerfis() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_PERFIS) || '[]')
+    if (!Array.isArray(raw)) return []
+    return raw
+      .filter((p) => p && typeof p.id === 'string' && typeof p.nome === 'string')
+      .slice(0, 30)
+      .map((p) => ({
+        id: p.id,
+        nome: String(p.nome).slice(0, 60),
+        shellId: typeof p.shellId === 'string' && p.shellId ? p.shellId : null,
+        cwd: typeof p.cwd === 'string' && p.cwd ? p.cwd : null
+      }))
+  } catch {
+    return []
+  }
+}
+
+function gravarPerfis(lista) {
+  try {
+    localStorage.setItem(LS_PERFIS, JSON.stringify(lista.slice(0, 30)))
+  } catch {
+    /* quota cheia */
+  }
+}
 
 function cssVar(name, fallback) {
   const v = getComputedStyle(document.body).getPropertyValue(name).trim()
@@ -25,10 +55,22 @@ function temaXterm() {
     cursor: cssVar('--dg-accent', '#2dd4a0'),
     cursorAccent: cssVar('--dg-bg', '#1a1a1a'),
     selectionBackground: cssVar('--dg-selection', 'rgba(45,212,160,0.28)'),
-    black: cssVar('--dg-sidebar', '#151515'),
-    brightBlack: cssVar('--dg-text-muted', '#bdbdbd'),
-    white: cssVar('--dg-text', '#f2f2f2'),
-    brightWhite: cssVar('--dg-text', '#f2f2f2')
+    black: cssVar('--dg-term-black', '#4a4a4a'),
+    red: cssVar('--dg-term-red', '#f07178'),
+    green: cssVar('--dg-term-green', '#4fbf82'),
+    yellow: cssVar('--dg-term-yellow', '#e3c34a'),
+    blue: cssVar('--dg-term-blue', '#82aaff'),
+    magenta: cssVar('--dg-term-magenta', '#c792ea'),
+    cyan: cssVar('--dg-term-cyan', '#89ddff'),
+    brightBlack: cssVar('--dg-term-bright-black', '#a0a0a0'),
+    brightRed: cssVar('--dg-term-bright-red', '#f07178'),
+    brightGreen: cssVar('--dg-term-bright-green', '#4fbf82'),
+    brightYellow: cssVar('--dg-term-bright-yellow', '#e3c34a'),
+    brightBlue: cssVar('--dg-term-bright-blue', '#82aaff'),
+    brightMagenta: cssVar('--dg-term-bright-magenta', '#c792ea'),
+    brightCyan: cssVar('--dg-term-bright-cyan', '#89ddff'),
+    white: cssVar('--dg-term-white', '#f5f5f5'),
+    brightWhite: cssVar('--dg-term-bright-white', '#ffffff')
   }
 }
 
@@ -38,11 +80,22 @@ function apiTerm() {
 
 function formatShellLabel(shell) {
   if (!shell) return ''
+  if (typeof shell === 'string') return rotuloDoShellId(shell)
   if (shell.tipo === 'pwsh' || shell.tipo === 'pwsh-preview') {
     return `pwsh ${shell.versao || ''}`.trim()
   }
   if (shell.tipo === 'powershell') return 'Windows PowerShell'
   return shell.tipo || 'shell'
+}
+
+/** Traduz o id tecnico do shell (pwsh-7.5.4 / powershell-5.1 / cmd) para rotulo. */
+function rotuloDoShellId(id) {
+  if (typeof id !== 'string' || !id) return ''
+  if (id === 'cmd') return 'cmd'
+  if (id.startsWith('powershell-')) return 'Windows PowerShell ' + id.slice('powershell-'.length)
+  if (id.startsWith('pwsh-preview-')) return 'pwsh ' + id.slice('pwsh-preview-'.length) + ' (preview)'
+  if (id.startsWith('pwsh-')) return 'pwsh ' + id.slice('pwsh-'.length)
+  return id
 }
 
 function shellIdFromInfo(shell) {
@@ -54,7 +107,7 @@ function shellIdFromInfo(shell) {
 }
 
 /**
- * @typedef {{ id: string, titulo: string, shellId: string|null, xterm: any, fit: any, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (()=>void)|null, unsubExit: (()=>void)|null }} Aba
+ * @typedef {{ id: string, titulo: string, shellId: string|null, cwd: string|null, xterm: any, fit: any, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (()=>void)|null, unsubExit: (()=>void)|null }} Aba
  * @typedef {{ key: string, root: HTMLElement, bar: HTMLElement, tabsEl: HTMLElement, panesEl: HTMLElement, abas: Map<string, Aba>, ativoId: string|null }} Grupo
  */
 
@@ -71,6 +124,9 @@ export function initTerminalPanel() {
   const btnOrient = document.getElementById('terminal-btn-orient')
   const btnUnsplit = document.getElementById('terminal-btn-unsplit')
   const btnToggle = document.getElementById('btn-terminal-toggle')
+  const perfisEl = document.getElementById('terminal-perfil-select')
+  const btnPerfilSalvar = document.getElementById('terminal-btn-perfil-salvar')
+  const btnPerfilRemover = document.getElementById('terminal-btn-perfil-remover')
   if (!panel || !splitEl || !apiTerm()) return
 
   /** @type {Map<string, Grupo>} */
@@ -85,6 +141,28 @@ export function initTerminalPanel() {
   let shellPadraoId = null
   let observer = null
   let divisorEl = null
+  let perfis = lerPerfis()
+  let perfilSelecionado = null
+  let timerSnapshotCwd = null
+  let timerSnapshotOcioso = null
+
+  function agendarSnapshotOcioso() {
+    if (timerSnapshotOcioso) clearTimeout(timerSnapshotOcioso)
+    timerSnapshotOcioso = setTimeout(() => {
+      timerSnapshotOcioso = null
+      if (aberto) salvarSnapshot()
+    }, 2500)
+  }
+
+  function escreverScrollbackRestaurado(xterm, texto) {
+    const linhas = String(texto).replace(/\r/g, '').split('\n').slice(-MAX_SCROLLBACK_LINHAS)
+    if (!linhas.length) return
+    try {
+      xterm.write('\x1b[90m' + linhas.join('\r\n') + '\x1b[0m\r\n')
+    } catch {
+      /* xterm descartado */
+    }
+  }
   const ratioRef = {
     value: Math.min(0.8, Math.max(0.2, parseFloat(localStorage.getItem(LS_SPLIT_RATIO) || '0.5') || 0.5))
   }
@@ -109,6 +187,18 @@ export function initTerminalPanel() {
     localStorage.setItem(LS_ORIENT, orientacao)
   }
 
+  function resumoScrollback(a) {
+    try {
+      const txt = bufferTexto(a.id)
+      if (!txt) return ''
+      const linhas = txt.replace(/\r/g, '').split('\n')
+      while (linhas.length && !linhas[linhas.length - 1].trim()) linhas.pop()
+      return linhas.slice(-MAX_SCROLLBACK_LINHAS).join('\n').slice(-MAX_SCROLLBACK_CHARS)
+    } catch {
+      return ''
+    }
+  }
+
   function salvarSnapshot() {
     try {
       const keys = [...grupos.keys()].sort()
@@ -117,7 +207,10 @@ export function initTerminalPanel() {
         orientacao,
         grupos: keys.map((k) => ({
           abas: [...(grupos.get(k)?.abas.values() || [])].map((a) => ({
-            shellId: a.shellId || ''
+            shellId: a.shellId || '',
+            cwd: a.cwd || '',
+            perfilNome: a.perfilNome || '',
+            scrollback: resumoScrollback(a)
           }))
         })),
         grupoAtivo: Math.max(0, keys.indexOf(grupoAtivoKey))
@@ -169,6 +262,22 @@ export function initTerminalPanel() {
 
   function fitTodos() {
     for (const g of grupos.values()) fitEResize(g, g.ativoId)
+  }
+
+  /** Aplica o tamanho de fonte preferido em todas as abas abertas. */
+  function aplicarFonte(px) {
+    const n = Math.max(10, Math.min(18, Math.round(Number(px) || 13)))
+    for (const g of grupos.values()) {
+      for (const a of g.abas.values()) {
+        try {
+          a.xterm.options.fontSize = n
+        } catch {
+          /* xterm já descartado */
+        }
+      }
+      fitEResize(g, g.ativoId)
+    }
+    return n
   }
 
   function marcarGrupoAtivo(key) {
@@ -232,7 +341,8 @@ export function initTerminalPanel() {
     const ids = [...g.abas.keys()]
     for (const a of g.abas.values()) {
       const idx = ids.indexOf(a.id) + 1
-      a.titulo = `Terminal ${idx}`
+      a.titulo = a.perfilNome || `Terminal ${idx}`
+      a.tabBtn.title = a.cwd ? a.cwd : a.titulo
       a.tabBtn.textContent = ''
       const title = document.createElement('span')
       title.className = 'terminal-tab-title'
@@ -269,13 +379,16 @@ export function initTerminalPanel() {
 
   async function carregarShells() {
     try {
-      const lista = await apiTerm().shells()
-      shellsCache = Array.isArray(lista) ? lista : []
+      const r = await apiTerm().shells()
+      const lista = r && Array.isArray(r.shells) ? r.shells : Array.isArray(r) ? r : []
+      shellsCache = lista
     } catch {
       shellsCache = []
     }
     try {
-      shellPadraoId = await apiTerm().getShellPadrao()
+      const r = await apiTerm().getShellPadrao()
+      const id = r && typeof r === 'object' && 'shell' in r ? r.shell : r
+      shellPadraoId = typeof id === 'string' && id ? id : null
     } catch {
       shellPadraoId = null
     }
@@ -286,6 +399,7 @@ export function initTerminalPanel() {
     const g = grupoAtivo()
     const a = abaAtivaDoGrupo(g)
     const lista = shellsCache || []
+    syncPerfisUi()
     if (!selectEl || !label) return
 
     if (!lista.length) {
@@ -293,7 +407,7 @@ export function initTerminalPanel() {
       if (btnPadrao) btnPadrao.hidden = true
       if (btnPadraoClear) btnPadraoClear.hidden = true
       label.hidden = false
-      label.textContent = a ? formatShellLabel({ tipo: 'pwsh', versao: a.shellId }) : ''
+      label.textContent = a ? formatShellLabel(a.shellId || 'pwsh') : ''
       return
     }
 
@@ -319,7 +433,83 @@ export function initTerminalPanel() {
     }
   }
 
-  async function criarAba(g, shellIdHeranca, cwdOpt) {
+  function syncPerfisUi() {
+    if (!perfisEl) return
+    perfisEl.innerHTML = ''
+    const ph = document.createElement('option')
+    ph.value = ''
+    ph.textContent = perfis.length ? 'Perfis…' : 'Perfis (vazio)'
+    perfisEl.appendChild(ph)
+    for (const p of perfis) {
+      const opt = document.createElement('option')
+      opt.value = p.id
+      opt.textContent = p.nome + (p.shellId ? ' · ' + rotuloDoShellId(p.shellId) : '')
+      if (p.cwd) opt.title = p.cwd
+      perfisEl.appendChild(opt)
+    }
+    perfisEl.disabled = !aberto
+    perfisEl.value = ''
+    const a = abaAtivaDoGrupo(grupoAtivo())
+    if (btnPerfilSalvar) btnPerfilSalvar.hidden = !aberto || !a
+    if (btnPerfilRemover) btnPerfilRemover.hidden = !aberto || !perfis.length
+  }
+
+  perfisEl?.addEventListener('change', () => {
+    const pid = perfisEl.value
+    perfilSelecionado = pid || null
+    perfisEl.value = ''
+    const p = perfis.find((x) => x.id === pid)
+    if (!p || !aberto) return
+    const g = grupoAtivo()
+    if (!g) return
+    void criarAba(g, p.shellId || null, p.cwd || undefined, { perfilNome: p.nome })
+  })
+
+  btnPerfilSalvar?.addEventListener('click', () => {
+    const a = abaAtivaDoGrupo(grupoAtivo())
+    if (!a) return
+    const sugestao = (a.perfilNome || 'Perfil') + ' ' + (perfis.length + 1)
+    const nome = String(window.prompt('Nome do perfil:', sugestao) || '').trim()
+    if (!nome) return
+    perfis.push({
+      id: 'perfil-' + Date.now().toString(36),
+      nome: nome.slice(0, 60),
+      shellId: a.shellId || null,
+      cwd: a.cwd || null
+    })
+    gravarPerfis(perfis)
+    syncPerfisUi()
+  })
+
+  btnPerfilRemover?.addEventListener('click', () => {
+    const pid = perfisEl?.value || perfilSelecionado
+    const p = perfis.find((x) => x.id === pid)
+    if (!p) return
+    if (!window.confirm('Remover o perfil "' + p.nome + '"?')) return
+    perfis = perfis.filter((x) => x.id !== p.id)
+    perfilSelecionado = null
+    gravarPerfis(perfis)
+    syncPerfisUi()
+  })
+
+  apiTerm().onCwd?.(({ id, cwd }) => {
+    const a = acharAba(id)
+    if (!a || typeof cwd !== 'string' || !cwd) return
+    a.cwd = cwd
+    for (const g of grupos.values()) {
+      if (g.abas.has(id)) {
+        renderTabs(g)
+        break
+      }
+    }
+    if (timerSnapshotCwd) clearTimeout(timerSnapshotCwd)
+    timerSnapshotCwd = setTimeout(() => {
+      timerSnapshotCwd = null
+      salvarSnapshot()
+    }, 500)
+  })
+
+  async function criarAba(g, shellIdHeranca, cwdOpt, extra = {}) {
     tabSeq += 1
     const id = `term-${Date.now()}-${tabSeq}`
     const heranca =
@@ -349,7 +539,7 @@ export function initTerminalPanel() {
     const xterm = new Terminal({
       cursorBlink: true,
       fontFamily: 'Cascadia Code, Consolas, monospace',
-      fontSize: 13,
+      fontSize: lerPreferenciasA11y().tamanhoTerminal,
       scrollback: scrollbackCfg,
       theme: temaXterm(),
       allowProposedApi: true
@@ -362,8 +552,10 @@ export function initTerminalPanel() {
     /** @type {Aba} */
     const entry = {
       id,
-      titulo: `Terminal ${g.abas.size + 1}`,
+      titulo: extra.perfilNome || `Terminal ${g.abas.size + 1}`,
+      perfilNome: extra.perfilNome || null,
       shellId: heranca,
+      cwd: cwdOpt || null,
       xterm,
       fit,
       pane,
@@ -386,10 +578,32 @@ export function initTerminalPanel() {
     if (created?.shell) {
       entry.shellId = shellIdFromInfo(created.shell) || heranca
     }
+    if (created?.cwd) entry.cwd = created.cwd
     if (created?.erro) xterm.writeln('\r\n[erro] ' + created.erro)
 
+    // O shell limpa a tela ao iniciar; grava o historico quando a saida ficar ociosa.
+    let scrollPendente = extra.scrollback ? String(extra.scrollback) : ''
+    let timerScroll = null
+    const aplicarScroll = () => {
+      if (!scrollPendente) return
+      const txt = scrollPendente
+      scrollPendente = ''
+      if (timerScroll) clearTimeout(timerScroll)
+      timerScroll = null
+      escreverScrollbackRestaurado(xterm, txt)
+    }
+    if (scrollPendente) {
+      timerScroll = setTimeout(aplicarScroll, 2500)
+    }
+
     entry.unsubData = apiTerm().onData(({ id: sid, data }) => {
-      if (sid === id) xterm.write(data)
+      if (sid !== id) return
+      xterm.write(data)
+      if (scrollPendente) {
+        if (timerScroll) clearTimeout(timerScroll)
+        timerScroll = setTimeout(aplicarScroll, 300)
+      }
+      agendarSnapshotOcioso()
     })
     entry.unsubExit = apiTerm().onExit(({ id: sid, code }) => {
       if (sid === id) xterm.writeln(`\r\n[exit ${code}]`)
@@ -412,11 +626,14 @@ export function initTerminalPanel() {
     a.xterm.reset()
     a.xterm.clear()
     const opts = { cols: a.xterm.cols, rows: a.xterm.rows, shellId }
+    if (a.cwd) opts.cwd = a.cwd
     const created = await apiTerm().create(a.id, opts)
     if (created?.shell) a.shellId = shellIdFromInfo(created.shell) || shellId
     if (created?.erro) a.xterm.writeln('\r\n[erro] ' + created.erro)
     a.unsubData = apiTerm().onData(({ id: sid, data }) => {
-      if (sid === a.id) a.xterm.write(data)
+      if (sid !== a.id) return
+      a.xterm.write(data)
+      agendarSnapshotOcioso()
     })
     a.unsubExit = apiTerm().onExit(({ id: sid, code }) => {
       if (sid === a.id) a.xterm.writeln(`\r\n[exit ${code}]`)
@@ -762,7 +979,10 @@ export function initTerminalPanel() {
             meta?.shellId && shellsCache?.some((o) => o.id === meta.shellId)
               ? meta.shellId
               : shellPadraoId || shellsCache?.[0]?.id || null
-          await criarAba(g, sid)
+          await criarAba(g, sid, meta?.cwd || undefined, {
+            scrollback: typeof meta?.scrollback === 'string' ? meta.scrollback : '',
+            perfilNome: typeof meta?.perfilNome === 'string' && meta.perfilNome ? meta.perfilNome : null
+          })
         }
       }
 
@@ -825,6 +1045,7 @@ export function initTerminalPanel() {
 
   async function fecharPainel(destruir = true) {
     aberto = false
+    syncPerfisUi()
     panel.classList.remove('open')
     panel.setAttribute('aria-hidden', 'true')
     if (destruir) {
@@ -840,7 +1061,9 @@ export function initTerminalPanel() {
 
   function toggle() {
     if (aberto) {
-      void fecharPainel(true)
+      // Ocultar preserva as abas e os ptys vivos (Ctrl+` volta na mesma sessão).
+      salvarSnapshot()
+      void fecharPainel(false)
       return
     }
     // Docked: abrir painel direito na aba Terminal (Ctrl+` / icon-bar)
@@ -906,11 +1129,6 @@ export function initTerminalPanel() {
   btnToggle?.addEventListener('click', () => toggle())
 
   document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') {
-      e.preventDefault()
-      toggle()
-      return
-    }
     if (!aberto) return
 
     if (e.ctrlKey && e.altKey) {
@@ -990,11 +1208,20 @@ export function initTerminalPanel() {
   window.dgTerminal = {
     abrirEm,
     bufferTexto,
+    cwdAtual: () => abaAtivaDoGrupo(grupoAtivo())?.cwd || null,
     abrir: () =>
       abrirPainel().then(() => {
         requestAnimationFrame(() => fitTodos())
       }),
+    alternar: toggle,
+    ocultar: () => {
+      if (!aberto) return Promise.resolve()
+      salvarSnapshot()
+      return fecharPainel(false)
+    },
+    fechar: () => fecharPainel(true),
     fit: fitTodos,
+    aplicarFonte,
     isOpen: () => aberto
   }
 

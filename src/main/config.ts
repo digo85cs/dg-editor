@@ -343,33 +343,6 @@ export type Tema = 'escuro' | 'claro' | 'sistema';
  */
 export const DEFAULT_TEMA: Tema = 'escuro';
 
-/**
- * Obtem o tema atual (persistido em userData/tema.json via modulo tema).
- */
-export function getTema(): Tema {
-  try {
-    // require lazy: evita carregar electron.app antes do ready em imports cedo
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const t = require('./tema') as { lerTema: () => Tema }
-    return t.lerTema()
-  } catch {
-    return DEFAULT_TEMA
-  }
-}
-
-/**
- * Define o tema (grava em userData/tema.json).
- */
-export function setTema(tema: Tema): void {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const t = require('./tema') as { salvarTema: (x: Tema) => void }
-    t.salvarTema(tema === 'claro' ? 'claro' : 'escuro')
-  } catch (e) {
-    console.warn('[config] setTema:', e)
-  }
-}
-
 // ============================================================================
 // CONFIGURACOES DE BUILD
 // ============================================================================
@@ -534,8 +507,6 @@ export default {
   ALLOWED_ATTACHMENT_TYPES,
   
   // Tema
-  getTema,
-  setTema,
   DEFAULT_TEMA,
   
   // Build

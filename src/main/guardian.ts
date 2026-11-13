@@ -3,11 +3,20 @@ import { dglog } from './dglog'
 import type { GuardianSnapshot } from '@shared/types'
 
 const RAM_MINIMA_BYTES = 256 * 1024 * 1024
-const CPU_MAX_LIMITE = 75
+const CPU_MAX_LIMITE = 90
+// Picos curtos de CPU (build, screenshots) nao devem pausar o agente:
+// exige duas amostras consecutivas acima do limite.
+const CPU_AMOSTRAS_BLOQUEIO = 2
 
 let prevTimes = cpus().map((c) => c.times)
 let prevAt = Date.now()
 let bloqueado = false
+let ultimoCpuPercent = 0
+let cpuAltoSeguido = 0
+
+// Amostras em intervalos muito curtos (chamadas em sequencia no mesmo tick)
+// produzem picos falsos de CPU. So recalcula apos uma janela minima.
+const CPU_JANELA_MIN_MS = 300
 
 export function guardianSnapshot(): GuardianSnapshot {
   const free = freemem()
@@ -15,10 +24,10 @@ export function guardianSnapshot(): GuardianSnapshot {
   const freePct = total > 0 ? Math.round((free / total) * 100) : 0
 
   const now = Date.now()
-  const times = cpus().map((c) => c.times)
-  let cpuPercent = 0
   const dt = now - prevAt
-  if (dt > 0) {
+  let cpuPercent = ultimoCpuPercent
+  if (dt >= CPU_JANELA_MIN_MS) {
+    const times = cpus().map((c) => c.times)
     let idle = 0
     let totalT = 0
     for (let i = 0; i < times.length; i++) {
@@ -27,15 +36,21 @@ export function guardianSnapshot(): GuardianSnapshot {
       totalT += (times[i].user - p.user) + (times[i].nice - p.nice) + (times[i].sys - p.sys) + (times[i].idle - p.idle) + (times[i].irq - p.irq)
     }
     cpuPercent = totalT > 0 ? Math.max(0, Math.min(100, Math.round(100 - (idle / totalT) * 100))) : 0
+    ultimoCpuPercent = cpuPercent
+    prevTimes = times
+    prevAt = now
   }
-  prevTimes = times
-  prevAt = now
 
   const ramOk = free >= RAM_MINIMA_BYTES && cpuPercent < CPU_MAX_LIMITE
-  if (!ramOk && !bloqueado) {
-    bloqueado = true
-    dglog('[guardian] recursos limitados - modo econmico')
-  } else if (ramOk && bloqueado) {
+  if (cpuPercent >= CPU_MAX_LIMITE) cpuAltoSeguido++
+  else cpuAltoSeguido = 0
+  const bloqueioPorCpu = cpuAltoSeguido >= CPU_AMOSTRAS_BLOQUEIO
+  if ((!ramOk && free < RAM_MINIMA_BYTES) || bloqueioPorCpu) {
+    if (!bloqueado) {
+      bloqueado = true
+      dglog('[guardian] recursos limitados - modo economico')
+    }
+  } else if (bloqueado) {
     bloqueado = false
     dglog('[guardian] recursos liberados')
   }

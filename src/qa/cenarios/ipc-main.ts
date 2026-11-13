@@ -237,5 +237,33 @@ export async function rodarCenariosIpc(temTTY = true): Promise<{
     }
   }
 
+  // --- contraste dos tokens (WCAG AA) ---
+  {
+    const t0 = Date.now()
+    try {
+      const { execFileSync } = await import('child_process')
+      const saida = execFileSync(
+        process.execPath,
+        [join(process.cwd(), 'scripts', 'verificar-contraste.mjs'), '--json'],
+        { encoding: 'utf-8', timeout: 30000 }
+      )
+      const r = JSON.parse(saida)
+      if (Array.isArray(r.falhas) && r.falhas.length) {
+        resultados.push(
+          erro(
+            'ipc.contraste.tokens',
+            'tokens de tema com contraste abaixo de 4.5:1',
+            t0,
+            new Error(r.falhas.map((f: { fg: string; bg: string; razao: number }) => `${f.fg}×${f.bg}=${f.razao}`).join('; '))
+          )
+        )
+      } else {
+        resultados.push(ok('ipc.contraste.tokens', 'contraste dos tokens (WCAG AA)', t0, r.total + ' pares'))
+      }
+    } catch (e) {
+      resultados.push(erro('ipc.contraste.tokens', 'contraste dos tokens', t0, e))
+    }
+  }
+
   return { resultados, stubs }
 }

@@ -7,6 +7,7 @@ import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import type { IpcResult } from './types';
+import { carregarIndice } from '../memory/embeddings';
 
 // ============================================================================
 // HANDLERS DE MEMORIA
@@ -67,7 +68,6 @@ export function handleMemoriaStatus(
   root: string
 ): IpcResult & { ok: boolean; erro?: string; turnos?: number; modelo?: string } {
   try {
-    const { carregarIndice } = require('../memory/embeddings');
     const idx = carregarIndice(root);
     return { ok: true, turnos: idx.entradas.length, modelo: idx.modelo };
   } catch (e: unknown) {

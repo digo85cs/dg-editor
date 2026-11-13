@@ -458,6 +458,391 @@ const TOOLS = [
       },
       required: ['comandoId']
     }
+  },
+  {
+    name: 'midia_status',
+    description:
+      'Status das ferramentas gratuitas do Estudio de midia (ffmpeg, ffprobe, python, faster-whisper, edge-tts, ComfyUI local).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_imagem_gerar',
+    description:
+      'Gera imagem gratuita via Pollinations (sem chave; 1 imagem a cada ~45s por IP). Para ilimitado use ComfyUI local.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Descricao da imagem' },
+        largura: { type: 'number', description: 'Largura 64-1536 (padrao 1024)' },
+        altura: { type: 'number', description: 'Altura 64-1536 (padrao 1024)' },
+        seed: { type: 'number' },
+        saida: { type: 'string', description: 'Arquivo/pasta de saida (relativo ao projeto)' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_diagrama',
+    description: 'Gera diagrama Mermaid em PNG/SVG via mermaid.ink (gratuito).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        codigo: { type: 'string', description: 'Codigo Mermaid (ex.: flowchart LR ...)' },
+        formato: { type: 'string', enum: ['png', 'svg'] },
+        tema: { type: 'string', enum: ['light', 'dark'] },
+        saida: { type: 'string' }
+      },
+      required: ['codigo']
+    }
+  },
+  {
+    name: 'midia_imagem_melhorar',
+    description: 'Aumenta resolucao e nitidez de uma imagem local via ffmpeg (gratuito).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string', description: 'Imagem relativa ao projeto' },
+        fator: { type: 'number', description: 'Escala 1-4 (padrao 2)' },
+        nitidez: { type: 'number', description: '0-2 (padrao 0.8)' },
+        formato: { type: 'string', enum: ['png', 'jpg'] },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
+    name: 'midia_comfyui_status',
+    description:
+      'Verifica o ComfyUI local (CPU) e lista checkpoints/modos instalados. Use antes de gerar imagem ou video ilimitados gratuitos.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_comfyui_imagem',
+    description:
+      'Gera uma imagem ilimitada e gratuita no ComfyUI local (SD 1.5 + LCM, CPU), iniciando o servidor se preciso. Salva em .dg-editor/midia. Pode levar de 30s a 2 min.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        largura: { type: 'number', description: '256-1024, multiplo de 64 (padrao 512)' },
+        altura: { type: 'number', description: '256-1024, multiplo de 64 (padrao 512)' },
+        passos: { type: 'number', description: 'Padrao 6 com LCM' },
+        seed: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_comfyui_video',
+    description:
+      'Gera um video curto ilimitado e gratuito no ComfyUI local (AnimateDiff, CPU), iniciando o servidor se preciso. Pode levar varios minutos; prefira 8-16 quadros em 512x512.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        largura: { type: 'number', description: 'Padrao 512' },
+        altura: { type: 'number', description: 'Padrao 512' },
+        quadros: { type: 'number', description: '8-32 (padrao 16)' },
+        fps: { type: 'number', description: '4-16 (padrao 8)' },
+        passos: { type: 'number', description: 'Padrao 6' },
+        seed: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_vozes_listar',
+    description:
+      'Lista as vozes naturais pt-BR disponiveis (mulheres, homens, meninas e meninos) com id, motor e disponibilidade. Chame antes de narrar quando o usuario nao escolheu a voz.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_fotos_video',
+    description:
+      'Monta um video MP4 a partir de fotos (slideshow ffmpeg) com narracao natural opcional. A voz vem de midia_vozes_listar (ex.: st:f1, infantil:bia). Gratuito e local.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        imagens: { type: 'array', items: { type: 'string' }, description: 'Fotos relativas ao projeto' },
+        segundosPorFoto: { type: 'number' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        narracao: { type: 'string', description: 'Texto narrado (opcional)' },
+        voz: { type: 'string', description: 'Id da voz (ex.: st:f1, kokoro:dora, infantil:bia). Omitir usa a voz padrao do usuario.' },
+        saida: { type: 'string' }
+      },
+      required: ['imagens']
+    }
+  },
+  {
+    name: 'midia_video_cortar',
+    description: 'Corta um trecho de video com ffmpeg. Tempos aceitam 12, 1:30 ou 00:01:30.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string' },
+        inicio: { type: 'string' },
+        fim: { type: 'string' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada', 'inicio', 'fim']
+    }
+  },
+  {
+    name: 'midia_video_juntar',
+    description: 'Junta dois ou mais videos MP4 (mesma resolucao/codec) com ffmpeg.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        videos: { type: 'array', items: { type: 'string' } },
+        saida: { type: 'string' }
+      },
+      required: ['videos']
+    }
+  },
+  {
+    name: 'midia_video_capa',
+    description: 'Extrai um frame (thumbnail) de um video em JPG via ffmpeg.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string' },
+        tempo: { type: 'string', description: 'Tempo do frame (padrao 1s)' },
+        largura: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
+    name: 'midia_transcrever',
+    description: 'Transcreve audio/video localmente com faster-whisper (CPU) e grava .srt. Retorna o texto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string' },
+        idioma: { type: 'string', description: 'auto, pt, en, ...' },
+        modelo: { type: 'string', enum: ['tiny', 'base', 'small', 'medium'] },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
+    name: 'midia_narrar',
+    description:
+      'Gera narracao MP3 com voz natural pt-BR. Antes, liste as vozes com midia_vozes_listar e pergunte qual o usuario quer (mulher/homem/menina/menino). Sem voz informada usa a voz padrao do usuario.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        texto: { type: 'string' },
+        voz: { type: 'string', description: 'Id da voz (ex.: st:f1, kokoro:dora, piper:cadu, infantil:bia, edge:francisca)' },
+        taxa: { type: 'string', description: 'Ritmo: -10% a +10%' },
+        saida: { type: 'string' }
+      },
+      required: ['texto']
+    }
+  },
+  {
+    name: 'midia_legendas',
+    description: 'Grava um arquivo .srt permanentemente no video com ffmpeg.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video: { type: 'string' },
+        srt: { type: 'string' },
+        saida: { type: 'string' }
+      },
+      required: ['video', 'srt']
+    }
+  },
+  {
+    name: 'midia_memes_listar',
+    description:
+      'Lista o banco local de templates de meme (Imgflip, gratuito, sem chave). Use filtro para procurar por nome. Se ainda nao sincronizou, sincronize antes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filtro: { type: 'string', description: 'Trecho do nome do template' },
+        sincronizar: { type: 'boolean', description: 'Sincroniza o manifesto antes de listar' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_meme_gerar',
+    description:
+      'Gera um meme PNG com legendas de cima/baixo usando um template do banco local (ffmpeg + Impact). Gratuito e offline depois do template baixado.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        template: { type: 'string', description: 'Id ou nome exato do template (ver midia_memes_listar)' },
+        topo: { type: 'string' },
+        baixo: { type: 'string' },
+        saida: { type: 'string' }
+      },
+      required: ['template']
+    }
+  },
+  {
+    name: 'midia_memes_sincronizar',
+    description: 'Atualiza o manifesto de templates de meme a partir do Imgflip (gratuito, sem chave).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_foto_video',
+    description:
+      'Gera um video curto e ESTILIZADO a partir de UMA foto local (AnimateDiff no ComfyUI CPU). Nao e deepfake fotorrealista: rosto/pessoa vem estilizado. Exige consentimento=true (foto propria ou pessoa autorizada) e o MP4 sai com a marca visivel "gerado por IA".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string', description: 'Foto PNG/JPG/WEBP relativa ao projeto' },
+        prompt: { type: 'string', description: 'Estilo/movimento desejado' },
+        movimento: { type: 'number', description: '0.3-0.8 (padrao do hardware)' },
+        largura: { type: 'number', description: '256-768, multiplo de 64' },
+        altura: { type: 'number', description: '256-768, multiplo de 64' },
+        quadros: { type: 'number', description: '8-32 (padrao do hardware)' },
+        fps: { type: 'number', description: '4-16' },
+        passos: { type: 'number' },
+        seed: { type: 'number' },
+        consentimento: { type: 'boolean', description: 'Obrigatorio: true confirma direito de uso da imagem' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada', 'consentimento']
+    }
+  },
+  {
+    name: 'midia_hardware',
+    description:
+      'Perfil de hardware do PC (CPU/GPU/RAM), ajustes automaticos do ComfyUI e status da instalacao local. Use antes de prometer qualidade/tempo de geracao.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_atualizacoes',
+    description:
+      'Verifica atualizacoes do ComfyUI, no AnimateDiff, banco de memes e modelos de voz. Com aplicar=true executa o que for seguro (nao atualiza codigo com o ComfyUI rodando).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        aplicar: { type: 'boolean' },
+        componentes: {
+          type: 'array',
+          items: { type: 'string', enum: ['comfyui', 'animatediff', 'memes', 'vozes'] }
+        },
+        rede: { type: 'boolean', description: 'false usa apenas estado local' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_comfy_instalar',
+    description:
+      'Instala ou atualiza o ComfyUI portatil fora do repositorio (git + venv + PyTorch CPU/CUDA + modelos opcionais). Idempotente; pode demorar bastante e baixa GBs quando modelos sao pedidos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        modelos: { type: 'string', enum: ['nenhum', 'imagem', 'completo'], description: 'Padrao nenhum' },
+        video: { type: 'boolean', description: 'Inclui AnimateDiff (modelo + no customizado)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_musicas',
+    description:
+      'Lista o banco local de musicas livres (pasta do usuario). Use antes de mixar para saber os nomes disponiveis.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_musica_mixar',
+    description:
+      'Mixa uma musica do banco local como trilha de fundo de um video do projeto (volume baixo, video copiado sem reencode).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        video: { type: 'string', description: 'Video relativo ao projeto' },
+        musica: { type: 'string', description: 'Nome do arquivo retornado por midia_musicas' },
+        volume: { type: 'number', description: '0 a 1 (padrao 0.18)' },
+        saida: { type: 'string' }
+      },
+      required: ['video', 'musica']
+    }
+  },
+  {
+    name: 'midia_musicas_livres',
+    description:
+      'Catalogo de musicas livres por estilo (Kevin MacLeod/incompetech, CC BY 4.0) com estado de download. Use para escolher trilha por clima.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        estilo: { type: 'string', description: 'Filtra por estilo (alegre, epica, tensa, calma, misterio, infantil, jazz, eletronica, triste, corporativo)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_musica_baixar',
+    description:
+      'Baixa faixas livres do catalogo para o banco local (por estilo ou ids), grava os creditos CC BY 4.0 e devolve os caminhos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        estilo: { type: 'string' },
+        ids: { type: 'array', items: { type: 'string' } },
+        sobrescrever: { type: 'boolean' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_audio',
+    description:
+      'Analisa ou processa audio local via ffmpeg: normalizacao EBU R128, equalizacao (graves/agudos), compressao, fade, volume, corte e conversao (mp3/wav/m4a/ogg).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string', description: 'Audio relativo ao projeto' },
+        analisar: { type: 'boolean', description: 'So mede duracao e volume (nao grava)' },
+        normalizar: { type: 'boolean' },
+        ganhoDb: { type: 'number', description: '-30 a 30' },
+        gravesDb: { type: 'number', description: '-20 a 20' },
+        agudosDb: { type: 'number', description: '-20 a 20' },
+        compressao: { type: 'number', description: 'Razao 1 a 20' },
+        fadeInSeg: { type: 'number' },
+        fadeOutSeg: { type: 'number' },
+        inicio: { type: 'string', description: '12, 1:30 ou 00:01:30' },
+        fim: { type: 'string' },
+        formato: { type: 'string', enum: ['mp3', 'wav', 'm4a', 'ogg'] },
+        saida: { type: 'string' }
+      },
+      required: ['entrada']
+    }
+  },
+  {
+    name: 'apps_status',
+    description:
+      'Status do construtor Apps: SDK Android, Java, projeto mobile, APK/instalador gerados e arquivos publicados em OneDrive/APP.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'apps_build',
+    description:
+      'Gera o APK Android (DG Apps) e/ou o instalador Windows e publica uma copia em OneDrive/APP. Instala o SDK Android na primeira vez. Pode demorar varios minutos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tipo: { type: 'string', enum: ['apk', 'win', 'tudo'], description: 'Padrao tudo' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'apps_setup',
+    description:
+      'Instala/verifica o toolchain Android (cmdline-tools, platform-tools, platform 35 e build-tools 35) sem Android Studio.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
   }
 ]
 
@@ -1036,6 +1421,402 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       return {
         content: [{ type: 'text', text: JSON.stringify(r, null, 2) }],
         isError: !r.ok
+      }
+    }
+
+    if (name.startsWith('midia_')) {
+      const midia = await import('../midia/core')
+      const responder = async (r: { ok: boolean; erro?: string; [k: string]: unknown }) => ({
+        content: [{ type: 'text' as const, text: JSON.stringify(r, null, 2) }],
+        isError: !r.ok
+      })
+      const caminho = (v: string): string => {
+        const abs = resolve(RAIZ, v)
+        caminhoDentroDaRaiz(RAIZ, abs)
+        return abs
+      }
+
+      if (name === 'midia_status') return await responder(await midia.statusMidia(RAIZ))
+
+      if (name === 'midia_comfyui_status') {
+        const comfy = await import('../midia/comfyui')
+        return await responder(await comfy.statusComfy())
+      }
+
+      if (name === 'midia_comfyui_imagem') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            passos: z.number().optional(),
+            seed: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const comfy = await import('../midia/comfyui')
+        return await responder(await comfy.gerarImagemComfy(RAIZ, p))
+      }
+
+      if (name === 'midia_comfyui_video') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            quadros: z.number().optional(),
+            fps: z.number().optional(),
+            passos: z.number().optional(),
+            seed: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const comfy = await import('../midia/comfyui')
+        return await responder(await comfy.gerarVideoComfy(RAIZ, p))
+      }
+
+      if (name === 'midia_vozes_listar') {
+        const vozes = await import('../midia/vozes')
+        const lista = await vozes.listarVozes()
+        return await responder({
+          ok: true,
+          padrao: vozes.lerPreferencias().vozPadrao,
+          categorias: vozes.CATEGORIAS,
+          vozes: lista.map((v) => ({
+            id: v.id,
+            nome: v.rotulo,
+            categoria: v.categoria,
+            motor: v.motor,
+            descricao: v.descricao,
+            infantil_derivada: !!v.derivada,
+            internet: !!v.internet,
+            disponivel: v.disponivel,
+            motivo: v.motivo
+          }))
+        })
+      }
+
+      if (name === 'midia_memes_listar') {
+        const p = z.object({ filtro: z.string().optional(), sincronizar: z.boolean().optional() }).parse(args)
+        const memes = await import('../midia/memes')
+        if (p.sincronizar || !memes.lerManifesto()) await memes.sincronizarMemes()
+        return await responder({ ...memes.listarMemes(p.filtro), status: memes.statusMemes() })
+      }
+
+      if (name === 'midia_meme_gerar') {
+        const p = z
+          .object({
+            template: z.string().min(1),
+            topo: z.string().optional(),
+            baixo: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const memes = await import('../midia/memes')
+        return await responder(await memes.gerarMeme(RAIZ, p))
+      }
+
+      if (name === 'midia_memes_sincronizar') {
+        const memes = await import('../midia/memes')
+        return await responder(await memes.sincronizarMemes({ forcar: true }))
+      }
+
+      if (name === 'midia_foto_video') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            prompt: z.string().optional(),
+            movimento: z.number().optional(),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            quadros: z.number().optional(),
+            fps: z.number().optional(),
+            passos: z.number().optional(),
+            seed: z.number().optional(),
+            consentimento: z.boolean(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const abs = caminho(p.entrada)
+        const comfy = await import('../midia/comfyui')
+        return await responder(await comfy.gerarFotoVideoComfy(RAIZ, { ...p, entrada: abs }))
+      }
+
+      if (name === 'midia_hardware') {
+        const hw = await import('../midia/hardware')
+        const inst = await import('../midia/comfyui-install')
+        return await responder({
+          ok: true,
+          hardware: await hw.detectarHardware(true),
+          comfy: inst.statusInstalacao(),
+          espacoLivreGb: inst.espacoLivreGb()
+        })
+      }
+
+      if (name === 'midia_atualizacoes') {
+        const p = z
+          .object({
+            aplicar: z.boolean().optional(),
+            componentes: z.array(z.enum(['comfyui', 'animatediff', 'memes', 'vozes'])).optional(),
+            rede: z.boolean().optional()
+          })
+          .parse(args)
+        const at = await import('../midia/atualizacoes')
+        if (p.aplicar) return await responder(await at.aplicarAtualizacoes({ componentes: p.componentes }))
+        return await responder(await at.verificarAtualizacoes({ rede: p.rede !== false }))
+      }
+
+      if (name === 'midia_comfy_instalar') {
+        const p = z
+          .object({ modelos: z.enum(['nenhum', 'imagem', 'completo']).optional(), video: z.boolean().optional() })
+          .parse(args)
+        const inst = await import('../midia/comfyui-install')
+        return await responder(
+          await inst.instalarComfy({
+            modelos: p.modelos || 'nenhum',
+            video: p.video === true,
+            cuda: false
+          })
+        )
+      }
+
+      if (name === 'midia_musicas') {
+        const musicas = await import('../midia/musicas')
+        return await responder(musicas.listarMusicas())
+      }
+
+      if (name === 'midia_musica_mixar') {
+        const p = z
+          .object({
+            video: z.string().min(1),
+            musica: z.string().min(1),
+            volume: z.number().min(0).max(1).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const musicas = await import('../midia/musicas')
+        const banco = musicas.listarMusicas()
+        const faixa = banco.itens.find((m) => m.nome === p.musica)
+        if (!faixa) return await responder({ ok: false, erro: 'musica nao encontrada no banco: ' + p.musica })
+        return await responder(
+          await musicas.mixarMusica(RAIZ, {
+            video: caminho(p.video),
+            musica: faixa.caminho,
+            volume: p.volume,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_musicas_livres') {
+        const p = z.object({ estilo: z.string().optional() }).parse(args)
+        const livres = await import('../midia/musicas-livres')
+        const cat = livres.catalogoLivres()
+        const estilos = p.estilo ? cat.estilos.filter((e) => e.id === p.estilo) : cat.estilos
+        return await responder({ ...cat, estilos })
+      }
+
+      if (name === 'midia_musica_baixar') {
+        const p = z
+          .object({
+            estilo: z.string().optional(),
+            ids: z.array(z.string()).optional(),
+            sobrescrever: z.boolean().optional()
+          })
+          .parse(args)
+        const livres = await import('../midia/musicas-livres')
+        return await responder(
+          await livres.baixarFaixas({ estilo: p.estilo, ids: p.ids, sobrescrever: p.sobrescrever })
+        )
+      }
+
+      if (name === 'midia_audio') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            analisar: z.boolean().optional(),
+            normalizar: z.boolean().optional(),
+            ganhoDb: z.number().optional(),
+            gravesDb: z.number().optional(),
+            agudosDb: z.number().optional(),
+            compressao: z.number().optional(),
+            fadeInSeg: z.number().optional(),
+            fadeOutSeg: z.number().optional(),
+            inicio: z.string().optional(),
+            fim: z.string().optional(),
+            formato: z.enum(['mp3', 'wav', 'm4a', 'ogg']).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const audio = await import('../midia/audio')
+        const entrada = caminho(p.entrada)
+        if (p.analisar === true) {
+          return await responder(await audio.analisarAudio(entrada))
+        }
+        return await responder(
+          await audio.processarAudio(RAIZ, {
+            entrada,
+            normalizar: p.normalizar,
+            ganhoDb: p.ganhoDb,
+            gravesDb: p.gravesDb,
+            agudosDb: p.agudosDb,
+            compressao: p.compressao,
+            fadeInSeg: p.fadeInSeg,
+            fadeOutSeg: p.fadeOutSeg,
+            inicio: p.inicio,
+            fim: p.fim,
+            formato: p.formato,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'apps_status') {
+        const apps = await import('../apps')
+        return await responder(apps.statusApps())
+      }
+
+      if (name === 'apps_setup') {
+        const apps = await import('../apps')
+        return await responder(await apps.instalarToolchainApps())
+      }
+
+      if (name === 'apps_build') {
+        const p = z
+          .object({ tipo: z.enum(['apk', 'win', 'tudo']).optional() })
+          .parse(args)
+        const apps = await import('../apps')
+        return await responder(await apps.construirApps(p.tipo || 'tudo'))
+      }
+
+      if (name === 'midia_imagem_gerar') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            seed: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(
+          await midia.gerarImagem(RAIZ, {
+            prompt: p.prompt,
+            largura: p.largura,
+            altura: p.altura,
+            seed: p.seed,
+            saida: p.saida,
+            esperarLimite: false
+          })
+        )
+      }
+
+      if (name === 'midia_diagrama') {
+        const p = z
+          .object({
+            codigo: z.string().min(1),
+            formato: z.enum(['png', 'svg']).optional(),
+            tema: z.enum(['light', 'dark']).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.gerarDiagrama(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_melhorar') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            fator: z.number().optional(),
+            nitidez: z.number().optional(),
+            formato: z.enum(['png', 'jpg']).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.melhorarImagem(RAIZ, { ...p, entrada: caminho(p.entrada) }))
+      }
+
+      if (name === 'midia_fotos_video') {
+        const p = z
+          .object({
+            imagens: z.array(z.string().min(1)).min(1),
+            segundosPorFoto: z.number().optional(),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            narracao: z.string().optional(),
+            voz: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(
+          await midia.fotosParaVideo(RAIZ, { ...p, imagens: p.imagens.map(caminho) })
+        )
+      }
+
+      if (name === 'midia_video_cortar') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            inicio: z.string().min(1),
+            fim: z.string().min(1),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.cortarVideo(RAIZ, { ...p, entrada: caminho(p.entrada) }))
+      }
+
+      if (name === 'midia_video_juntar') {
+        const p = z
+          .object({ videos: z.array(z.string().min(1)).min(2), saida: z.string().optional() })
+          .parse(args)
+        return await responder(
+          await midia.juntarVideos(RAIZ, { ...p, videos: p.videos.map(caminho) })
+        )
+      }
+
+      if (name === 'midia_video_capa') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            tempo: z.string().optional(),
+            largura: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.extrairCapa(RAIZ, { ...p, entrada: caminho(p.entrada) }))
+      }
+
+      if (name === 'midia_transcrever') {
+        const p = z
+          .object({
+            entrada: z.string().min(1),
+            idioma: z.string().optional(),
+            modelo: z.enum(['tiny', 'base', 'small', 'medium']).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.transcrever(RAIZ, { ...p, entrada: caminho(p.entrada) }))
+      }
+
+      if (name === 'midia_narrar') {
+        const p = z
+          .object({
+            texto: z.string().min(1),
+            voz: z.string().optional(),
+            taxa: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        return await responder(await midia.narrar(RAIZ, p))
+      }
+
+      if (name === 'midia_legendas') {
+        const p = z
+          .object({ video: z.string().min(1), srt: z.string().min(1), saida: z.string().optional() })
+          .parse(args)
+        return await responder(
+          await midia.queimarLegendas(RAIZ, { ...p, video: caminho(p.video), srt: caminho(p.srt) })
+        )
       }
     }
 

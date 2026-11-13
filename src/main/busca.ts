@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join, relative, basename, extname } from 'path'
 import { caminhoSeguro } from './ipc-seguro'
 import { deveIgnorar } from './ignore'
@@ -88,11 +88,13 @@ export function buscaArquivos(
   return { ok: true, itens: pontuados }
 }
 
-export function buscaConteudo(
+const buscasAtivas = new Map<string, { cancelado: boolean }>()
+
+export async function buscaConteudo(
   raiz: string,
   query: string,
-  opcoes: { regex?: boolean; limite?: number; extensoes?: string[] } = {}
-): { ok: boolean; itens?: any[]; erro?: string } {
+  opcoes: { regex?: boolean; limite?: number; extensoes?: string[]; id?: string } = {}
+): Promise<{ ok: boolean; itens?: any[]; erro?: string; cancelado?: boolean }> {
   const seg = caminhoSeguro(raiz, raiz)
   if (!seg.ok) return { ok: false, erro: seg.erro }
   if (!existsSync(seg.abs)) return { ok: false, erro: 'raiz inexistente' }
@@ -100,6 +102,8 @@ export function buscaConteudo(
   walkArquivos(seg.abs, arquivos, 0)
   const q = query || ''
   if (!q.trim()) return { ok: true, itens: [] }
+  const sinal = opcoes.id ? { cancelado: false } : null
+  if (opcoes.id) buscasAtivas.set(opcoes.id, sinal as { cancelado: boolean })
   let re: RegExp | null = null
   if (opcoes.regex) {
     try {
@@ -110,37 +114,158 @@ export function buscaConteudo(
   }
   const itens: any[] = []
   const limite = opcoes.limite || 60
+  const MAX_POR_ARQUIVO = 3
+  try {
+    for (let idx = 0; idx < arquivos.length; idx++) {
+      if (itens.length >= limite) break
+      if (sinal?.cancelado) return { ok: true, itens, cancelado: true }
+      if (idx > 0 && idx % 25 === 0) {
+        await new Promise((resolve) => setImmediate(resolve))
+        if (sinal?.cancelado) return { ok: true, itens, cancelado: true }
+      }
+      const full = arquivos[idx]
+      if (opcoes.extensoes && opcoes.extensoes.length) {
+        const ext = extname(full).toLowerCase()
+        if (!opcoes.extensoes.includes(ext)) continue
+      }
+      try {
+        const st = statSync(full)
+        if (st.size > MAX_BYTES_LER) continue
+        const buf = readFileSync(full)
+        if (buf.includes(0)) continue
+        const txt = buf.toString('utf8')
+        const linhas = txt.split(/\r?\n/)
+        let achados = 0
+        for (let i = 0; i < linhas.length; i++) {
+          const linha = linhas[i]
+          const match = re ? re.test(linha) : linha.toLowerCase().includes(q.toLowerCase())
+          if (match) {
+            itens.push({
+              caminho: full,
+              rel: relative(seg.abs, full).replace(/\\/g, '/'),
+              linha: i + 1,
+              trecho: linha.slice(0, 280)
+            })
+            achados++
+            if (achados >= MAX_POR_ARQUIVO) break
+            if (itens.length >= limite) break
+          }
+        }
+      } catch {
+        /* arquivo ilegivel: segue */
+      }
+    }
+    return { ok: true, itens }
+  } finally {
+    if (opcoes.id) buscasAtivas.delete(opcoes.id)
+  }
+}
+
+export function cancelarBuscaConteudo(id?: string) {
+  if (!id) {
+    for (const s of buscasAtivas.values()) s.cancelado = true
+    return { ok: true, cancelados: buscasAtivas.size }
+  }
+  const s = buscasAtivas.get(id)
+  if (s) s.cancelado = true
+  return { ok: true, cancelado: !!s }
+}
+
+const MAX_SUBST_ARQUIVOS = 500
+const MAX_SUBST_OCORRENCIAS = 5000
+const MAX_BYTES_SUBST = 2 * 1024 * 1024
+
+/**
+ * Substitui texto em arquivos do projeto. Com `previa: true` apenas conta
+ * ocorrencias/arquivos, sem gravar nada.
+ */
+export function substituirConteudo(
+  raiz: string,
+  query: string,
+  substituicao: string,
+  opcoes: { regex?: boolean; previa?: boolean; extensoes?: string[] } = {}
+): {
+  ok: boolean
+  previa?: boolean
+  arquivos: number
+  ocorrencias: number
+  alterados?: number
+  itens?: { rel: string; ocorrencias: number }[]
+  erro?: string
+} {
+  const seg = caminhoSeguro(raiz, raiz)
+  if (!seg.ok) return { ok: false, arquivos: 0, ocorrencias: 0, erro: seg.erro }
+  if (!existsSync(seg.abs)) return { ok: false, arquivos: 0, ocorrencias: 0, erro: 'raiz inexistente' }
+  const q = query || ''
+  if (!q) return { ok: false, arquivos: 0, ocorrencias: 0, erro: 'consulta vazia' }
+
+  let re: RegExp | null = null
+  if (opcoes.regex) {
+    try {
+      re = new RegExp(q, 'gi')
+    } catch (e) {
+      return {
+        ok: false,
+        arquivos: 0,
+        ocorrencias: 0,
+        erro: 'regex invalida: ' + String((e as Error).message || e)
+      }
+    }
+  }
+
+  const arquivos: string[] = []
+  walkArquivos(seg.abs, arquivos, 0)
+
+  let totalArquivos = 0
+  let totalOcorrencias = 0
+  let alterados = 0
+  const itens: { rel: string; ocorrencias: number }[] = []
+
   for (const full of arquivos) {
-    if (itens.length >= limite) break
+    if (totalArquivos >= MAX_SUBST_ARQUIVOS) break
     if (opcoes.extensoes && opcoes.extensoes.length) {
       const ext = extname(full).toLowerCase()
       if (!opcoes.extensoes.includes(ext)) continue
     }
     try {
       const st = statSync(full)
-      if (st.size > MAX_BYTES_LER) continue
+      if (st.size > MAX_BYTES_SUBST) continue
       const buf = readFileSync(full)
+      if (buf.includes(0)) continue
       const txt = buf.toString('utf8')
-      const linhas = txt.split(/\r?\n/)
-      for (let i = 0; i < linhas.length; i++) {
-        const linha = linhas[i]
-        const match = re ? re.test(linha) : linha.toLowerCase().includes(q.toLowerCase())
-        if (match) {
-          itens.push({
-            caminho: full,
-            rel: relative(seg.abs, full).replace(/\\/g, '/'),
-            linha: i + 1,
-            trecho: linha.slice(0, 280)
-          })
-          break
-        }
+      let novo = txt
+      let n = 0
+      if (re) {
+        re.lastIndex = 0
+        const matches = txt.match(re)
+        n = matches ? matches.length : 0
+        if (n) novo = txt.replace(re, substituicao)
+      } else {
+        n = txt.split(q).length - 1
+        if (n) novo = txt.split(q).join(substituicao)
       }
+      if (!n) continue
+      totalArquivos++
+      totalOcorrencias += n
+      itens.push({ rel: relative(seg.abs, full).replace(/\\/g, '/'), ocorrencias: n })
+      if (!opcoes.previa) {
+        const guard = caminhoSeguro(full, seg.abs)
+        if (!guard.ok) continue
+        writeFileSync(guard.abs, novo, 'utf8')
+        alterados++
+      }
+      if (totalOcorrencias >= MAX_SUBST_OCORRENCIAS) break
     } catch {
+      /* arquivo ilegivel: segue */
     }
   }
-  return { ok: true, itens }
-}
 
-export function cancelarBuscaConteudo(_id?: string) {
-  return { ok: true }
+  return {
+    ok: true,
+    previa: !!opcoes.previa,
+    arquivos: totalArquivos,
+    ocorrencias: totalOcorrencias,
+    alterados: opcoes.previa ? undefined : alterados,
+    itens: itens.slice(0, 200)
+  }
 }

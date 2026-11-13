@@ -4,7 +4,7 @@
  * I/O assíncrono — não bloqueia o main process no painel.
  */
 import { promises as fsp } from 'fs'
-import { join, resolve, extname, basename, dirname } from 'path'
+import { join, resolve, relative, isAbsolute, extname, basename, dirname } from 'path'
 import { caminhoSeguro } from './ipc-seguro'
 
 const LIMITE_BYTES = 5 * 1024 * 1024
@@ -239,6 +239,105 @@ export async function listarDiretorio(
       return a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
     })
     return { ok: true, entradas }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+}
+
+function nomeSemSeparador(nome: string): boolean {
+  const n = String(nome || '').trim()
+  if (!n) return false
+  if (n === '.' || n === '..') return false
+  if (/[/\\0]/.test(n)) return false
+  if (/^[a-zA-Z]:/.test(n)) return false
+  return n.length <= 200
+}
+
+async function statEntrada(p: string): Promise<{ existe: boolean; tipo?: 'file' | 'dir' }> {
+  try {
+    const st = await fsp.lstat(p)
+    return { existe: true, tipo: st.isDirectory() ? 'dir' : 'file' }
+  } catch {
+    return { existe: false }
+  }
+}
+
+/** Cria arquivo vazio ou pasta. Nao sobrescreve. */
+export async function criarEntrada(
+  caminho: string,
+  tipo: 'file' | 'dir',
+  pastas: string[]
+): Promise<{ ok: boolean; erro?: string }> {
+  const seg = caminhoSeguro(caminho, pastas)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  if (seg.rel === '.') return { ok: false, erro: 'nao e possivel criar sobre a raiz' }
+  if (!nomeSemSeparador(basename(seg.abs))) return { ok: false, erro: 'nome invalido' }
+  const pai = dirname(seg.abs)
+  const stPai = await statEntrada(pai)
+  if (!stPai.existe || stPai.tipo !== 'dir') return { ok: false, erro: 'diretorio pai nao existe' }
+  const alvo = await statEntrada(seg.abs)
+  if (alvo.existe) return { ok: false, erro: 'já existe um item com esse nome' }
+  try {
+    if (tipo === 'dir') await fsp.mkdir(seg.abs)
+    else await fsp.writeFile(seg.abs, '', { encoding: 'utf8', flag: 'wx' })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+}
+
+/** Renomeia mantendo o mesmo diretorio pai. */
+export async function renomearEntrada(
+  caminho: string,
+  novoNome: string,
+  pastas: string[]
+): Promise<{ ok: boolean; caminho?: string; erro?: string }> {
+  const seg = caminhoSeguro(caminho, pastas)
+  if (!seg.ok) return { ok: false, erro: seg.erro }
+  if (seg.rel === '.') return { ok: false, erro: 'nao e possivel renomear a raiz' }
+  if (!nomeSemSeparador(novoNome)) return { ok: false, erro: 'nome invalido' }
+  const origem = await statEntrada(seg.abs)
+  if (!origem.existe) return { ok: false, erro: 'item nao encontrado' }
+  const destino = join(dirname(seg.abs), String(novoNome).trim())
+  if (destino === seg.abs) return { ok: true, caminho: seg.abs }
+  const segDestino = caminhoSeguro(destino, pastas)
+  if (!segDestino.ok) return { ok: false, erro: segDestino.erro }
+  if ((await statEntrada(destino)).existe) return { ok: false, erro: 'já existe um item com esse nome' }
+  try {
+    await fsp.rename(seg.abs, destino)
+    return { ok: true, caminho: destino }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+}
+
+/** Move para outra pasta dentro das raizes abertas. */
+export async function moverEntrada(
+  origem: string,
+  destinoPasta: string,
+  pastas: string[]
+): Promise<{ ok: boolean; caminho?: string; erro?: string }> {
+  const segO = caminhoSeguro(origem, pastas)
+  if (!segO.ok) return { ok: false, erro: segO.erro }
+  if (segO.rel === '.') return { ok: false, erro: 'nao e possivel mover a raiz' }
+  const segD = caminhoSeguro(destinoPasta, pastas)
+  if (!segD.ok) return { ok: false, erro: segD.erro }
+  const stO = await statEntrada(segO.abs)
+  if (!stO.existe) return { ok: false, erro: 'item de origem nao encontrado' }
+  const stD = await statEntrada(segD.abs)
+  if (!stD.existe || stD.tipo !== 'dir') return { ok: false, erro: 'destino nao e uma pasta existente' }
+  if (segD.abs === segO.abs) return { ok: false, erro: 'origem e destino sao a mesma pasta' }
+  if (stO.tipo === 'dir') {
+    const relDentro = relative(segO.abs, segD.abs)
+    if (relDentro && !relDentro.startsWith('..') && !isAbsolute(relDentro)) {
+      return { ok: false, erro: 'nao e possivel mover uma pasta para dentro dela mesma' }
+    }
+  }
+  const alvo = join(segD.abs, basename(segO.abs))
+  if ((await statEntrada(alvo)).existe) return { ok: false, erro: 'ja existe um item com esse nome no destino' }
+  try {
+    await fsp.rename(segO.abs, alvo)
+    return { ok: true, caminho: alvo }
   } catch (e) {
     return { ok: false, erro: String((e as Error).message || e) }
   }

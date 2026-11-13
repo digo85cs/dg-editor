@@ -12,10 +12,10 @@ export function relPosix(abs, raiz) {
 }
 
 export function corGit(st) {
-  if (st === 'M') return '#c9a227'
-  if (st === 'A') return '#2e7d4f'
-  if (st === 'D') return '#b33a3a'
-  return '#888'
+  if (st === 'M') return 'var(--dg-git-m)'
+  if (st === 'A') return 'var(--dg-git-a)'
+  if (st === 'D') return 'var(--dg-git-d)'
+  return 'var(--dg-git-outro)'
 }
 
 /** @param {string | null | undefined} st */

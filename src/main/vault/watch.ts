@@ -2,6 +2,7 @@ import { watch, type FSWatcher } from 'chokidar'
 import { resolve } from 'path'
 import { dglog } from '../dglog'
 import { ehWriteProprio, reindexarNota, removerNota } from './indice'
+import { emSafeMode } from '../safe-mode'
 
 let watcher: FSWatcher | null = null
 let debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -21,15 +22,9 @@ function schedule(path: string, fn: () => void): void {
 
 export function iniciarWatchVault(raiz: string): void {
   pararWatchVault()
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { emSafeMode } = require('../safe-mode') as typeof import('../safe-mode')
-    if (emSafeMode()) {
-      dglog('[vault] watch omitido (safe-mode)')
-      return
-    }
-  } catch {
-    /* ok */
+  if (emSafeMode()) {
+    dglog('[vault] watch omitido (safe-mode)')
+    return
   }
 
   watcher = watch(raiz, {

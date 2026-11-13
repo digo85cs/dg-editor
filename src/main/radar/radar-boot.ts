@@ -6,7 +6,7 @@
  * - chamarProvider: chamarProvider do providers.ts com provider do roteador
  * - caminhoSaida: docs/ (raiz do projeto)
  */
-import { executarRadar } from './radar'
+import { executarRadar, deveRodarRadar } from './radar'
 import { TEMAS_RADAR } from './temas-radar'
 import { buscaWebDuckDuckGo } from './busca-web'
 import { chamarProvider, type ProviderConfig, type Message, type RespostaProvider } from '../brain/providers'
@@ -57,7 +57,6 @@ export function dispararRadarNoBoot(raizProjeto: string): void {
 }
 
 function executarRadarDeveRodar(userDataPath: string): boolean {
-  const { deveRodarRadar } = require('./radar')
   return deveRodarRadar(userDataPath)
 }
 

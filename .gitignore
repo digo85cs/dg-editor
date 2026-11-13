@@ -40,6 +40,9 @@ dossie-tecnico.md
 .dg-editor/indice-codigo.json
 .dg-editor/memoria/
 .dg-editor/logs/
+# Skills/agentes locais são gerados no boot a partir dos padrões versionados
+.dg-editor/skills/
+.dg-editor/agentes/
 
 .dg-root
 .dg-editor/cursor-cli-status.json
@@ -50,6 +53,12 @@ dossie-tecnico.md
 
 # Build do servidor MCP (gerado por build:mcp)
 .dg-editor/bin/
+
+# Apps: artefatos e projeto Android gerado (regenerados por scripts/apps/build.cjs)
+dist-apps/
+apps/mobile/node_modules/
+apps/mobile/android/
+.tmp-midia/
 
 # telemetria de runtime (nao versionar)
 .dg-editor/modelos-stats.json
@@ -80,6 +89,9 @@ tmp/
 # Historico de chats (runtime)
 .dg-editor/chats/
 
+# Midia gerada pelo Estudio de midia (runtime)
+.dg-editor/midia/
+
 # Avaliacoes de modelo (runtime)
 .dg-editor/avaliacoes/
 .dg-editor/analise.json
@@ -98,6 +110,10 @@ tmp/
 .dg-editor/*.pid
 *.log
 .dg-editor/analise-completa.json
+.dg-editor/ciclos-melhoria/
+.dg-editor/metrics.json
+.dg-editor/projeto-memoria.json
+.dg-editor/skill-packs.json
 boot.log
 .dgrules.truncado.bak
 .dgrules*.bak

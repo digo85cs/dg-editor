@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { garantirAgentesPadrao, criarAgente, validarAgente, listarAgentes, type AgenteDef } from '../brain/agentes'
+import { garantirAgentesPadrao, criarAgente, validarAgente, listarAgentes, lerAgente, type AgenteDef } from '../brain/agentes'
 
 export type AgenteSugerido = {
   id: string
@@ -87,7 +87,6 @@ export function autoCriarAgentes(raiz: string): { criados: string[]; erros: stri
 }
 
 function lerAgenteValidado(raiz: string, id: string): { ok: boolean; erros: string[] } | null {
-  const { lerAgente } = require('../brain/agentes')
   const a = lerAgente(raiz, id)
   if (!a) return null
   return { ok: validarAgente(a).ok, erros: validarAgente(a).erros }

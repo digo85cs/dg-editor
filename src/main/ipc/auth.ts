@@ -10,10 +10,10 @@ import { conectarMicrosoft, desconectarMicrosoft, getMicrosoftStatus } from '../
 import { conectarGithub, desconectarGithub, getGithubStatus } from '../auth/github-oauth'
 import { conectarApple, desconectarApple, getAppleStatus } from '../auth/apple-oauth'
 import { lerOAuthClients, salvarOAuthClients } from '../auth/oauth-clients'
+import { getAuthStore } from '../auth'
 
 export function handleAuthGetState(_event: Electron.IpcMainInvokeEvent) {
   try {
-    const { getAuthStore } = require('../auth')
     return getAuthStore().getState()
   } catch (e: unknown) {
     return { ok: false, erro: String(e) }
@@ -22,7 +22,6 @@ export function handleAuthGetState(_event: Electron.IpcMainInvokeEvent) {
 
 export function handleAuthEnsureIdentity(_event: Electron.IpcMainInvokeEvent) {
   try {
-    const { getAuthStore } = require('../auth')
     return getAuthStore().ensureDeviceIdentity()
   } catch (e: unknown) {
     return { ok: false, erro: String(e) }
@@ -31,7 +30,6 @@ export function handleAuthEnsureIdentity(_event: Electron.IpcMainInvokeEvent) {
 
 export function handleAuthLogout(_event: Electron.IpcMainInvokeEvent): IpcResult {
   try {
-    const { getAuthStore } = require('../auth')
     getAuthStore().logout()
     return { ok: true }
   } catch (e: unknown) {

@@ -1,7 +1,17 @@
 // DG Editor - renderer (IDE Opção B)
 import { mostrarRegrasUI } from './regras-ui.js'
-import { criarEditor } from './editor-cm.js'
-import { initTerminalPanel } from './terminal.js'
+// Editor (CodeMirror) e terminal (xterm) carregam sob demanda: pesam no boot
+// e so sao necessarios quando o usuario abre um arquivo/painel.
+let moduloEditorPromise = null
+function carregarModuloEditor() {
+  moduloEditorPromise ??= import('./editor-cm.js')
+  return moduloEditorPromise
+}
+let moduloTerminalPromise = null
+function carregarModuloTerminal() {
+  moduloTerminalPromise ??= import('./terminal.js')
+  return moduloTerminalPromise
+}
 import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
 import {
   iniciarHistoricoChat,
@@ -13,10 +23,20 @@ import {
 import { ligarFerramentas } from './ferramentas-ui.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
+import { instalarTrapFocoModais } from './utils/focus-trap.js'
+import { anunciar } from './features/ui/live-region.js'
+import {
+  lerPreferenciasA11y,
+  salvarPreferenciasA11y,
+  aplicarPreferenciasA11y,
+  ajustarEscalaInterface,
+  ajustarTamanhoFonte
+} from './features/ui/acessibilidade.js'
 import { iniciarGuardian } from './features/guardian/index.js'
 import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivos/git-helpers.js'
 import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
+import { CHAVE_ABAS, CHAVE_SEM_PROJETO, normalizarMapaAbas, podarMapaAbas, podarProjetosInexistentes } from './features/editor/abas-mapa.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
@@ -82,7 +102,7 @@ ligarFerramentas(() => state.pastaAtual)
 /** @type {{ caminho: string, nome: string, dirty: boolean }[]} initialized in state */
 state.abas = state.abas || []
 state.abaAtiva = state.abaAtiva ?? null
-/** @type {ReturnType<typeof criarEditor> | null} */
+/** @type {any} */
 let editor = null
 let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
 let dirtyResolver = null
@@ -131,10 +151,52 @@ function extIcon(nome) {
 }
 
 // ---------- Layout persistido ----------
+const LAYOUT_MIN = { sidebar: 200, right: 320, center: 420 }
+const LAYOUT_MAX = { sidebar: 340, right: 460 }
+const LAYOUT_ICONBAR = 48
+const LAYOUT_TRILHOS = 8
+
+function larguraTotalApp() {
+  const app = $('app')
+  return app?.clientWidth || window.innerWidth
+}
+
+/** Larguras finais respeitando o minimo do centro (chat/composer legivel). */
+function largurasPermitidas() {
+  const app = $('app')
+  const total = larguraTotalApp()
+  let sidebar = parseInt(getComputedStyle(app).getPropertyValue('--dg-sidebar-w'), 10) || 260
+  let right = parseInt(getComputedStyle(app).getPropertyValue('--dg-panel-w'), 10) || 420
+  sidebar = Math.min(LAYOUT_MAX.sidebar, Math.max(LAYOUT_MIN.sidebar, sidebar))
+  const rightMax = Math.max(
+    LAYOUT_MIN.right,
+    Math.min(LAYOUT_MAX.right, total - LAYOUT_ICONBAR - LAYOUT_TRILHOS - sidebar - LAYOUT_MIN.center)
+  )
+  right = Math.min(rightMax, Math.max(LAYOUT_MIN.right, right))
+  const sobraSidebar = total - LAYOUT_ICONBAR - LAYOUT_TRILHOS - right - LAYOUT_MIN.center
+  if (sobraSidebar < sidebar) sidebar = Math.max(LAYOUT_MIN.sidebar, sobraSidebar)
+  return { sidebar, right }
+}
+
+function aplicarLarguras({ sidebar, right }) {
+  const app = $('app')
+  app.style.setProperty('--dg-sidebar-w', sidebar + 'px')
+  app.style.setProperty('--dg-sidebar-width', sidebar + 'px')
+  app.style.setProperty('--dg-panel-w', right + 'px')
+  app.style.setProperty('--dg-right-panel-width', right + 'px')
+}
+
+/** Reaplica limites em qualquer largura de janela. Retorna as larguras usadas. */
+function clamparLayout() {
+  const l = largurasPermitidas()
+  aplicarLarguras(l)
+  return l
+}
+
 function carregarLayout() {
   try {
     const raw = localStorage.getItem('dg-layout')
-    if (!raw) return
+    if (!raw) { clamparLayout(); return }
     const L = JSON.parse(raw)
     const app = $('app')
     // Inline sobrepoe tokens; nomes novos (--dg-sidebar-w / --dg-panel-w) + aliases legados
@@ -162,6 +224,7 @@ function carregarLayout() {
       app.classList.add('right-collapsed')
     }
   } catch { /* ignora */ }
+  clamparLayout()
 }
 
 function salvarLayout() {
@@ -187,12 +250,23 @@ function initResizers() {
     let startW = 0
     const onMove = (e) => {
       const dx = e.clientX - startX
+      const total = larguraTotalApp()
       if (kind === 'sidebar') {
-        const w = Math.min(500, Math.max(200, startW + dx))
+        const outra = parseInt(getComputedStyle($('app')).getPropertyValue('--dg-panel-w'), 10) || 420
+        const max = Math.min(
+          LAYOUT_MAX.sidebar,
+          Math.max(LAYOUT_MIN.sidebar, total - LAYOUT_ICONBAR - LAYOUT_TRILHOS - outra - LAYOUT_MIN.center)
+        )
+        const w = Math.min(max, Math.max(LAYOUT_MIN.sidebar, startW + dx))
         $('app').style.setProperty('--dg-sidebar-w', w + 'px')
         $('app').style.setProperty('--dg-sidebar-width', w + 'px')
       } else {
-        const w = Math.min(600, Math.max(320, startW - dx))
+        const outra = parseInt(getComputedStyle($('app')).getPropertyValue('--dg-sidebar-w'), 10) || 260
+        const max = Math.min(
+          LAYOUT_MAX.right,
+          Math.max(LAYOUT_MIN.right, total - LAYOUT_ICONBAR - LAYOUT_TRILHOS - outra - LAYOUT_MIN.center)
+        )
+        const w = Math.min(max, Math.max(LAYOUT_MIN.right, startW - dx))
         $('app').style.setProperty('--dg-panel-w', w + 'px')
         $('app').style.setProperty('--dg-right-panel-width', w + 'px')
         if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
@@ -203,6 +277,12 @@ function initResizers() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       salvarLayout()
+      // Larguras mudaram: remede o CodeMirror e reajuste o xterm.
+      editor?.requestMeasure?.()
+      requestAnimationFrame(() => {
+        editor?.requestMeasure?.()
+        window.dgTerminal?.fit?.()
+      })
       if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
     }
     el.addEventListener('mousedown', (e) => {
@@ -222,11 +302,22 @@ function initResizers() {
         $('app').style.setProperty('--dg-panel-w', '420px')
         $('app').style.setProperty('--dg-right-panel-width', '420px')
       }
+      clamparLayout()
       salvarLayout()
     })
   }
   bind($('resize-sidebar'), 'sidebar')
   bind($('resize-right'), 'right')
+
+  let timerJanela = 0
+  window.addEventListener('resize', () => {
+    clamparLayout()
+    clearTimeout(timerJanela)
+    timerJanela = setTimeout(() => {
+      salvarLayout()
+      if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
+    }, 250)
+  })
 }
 
 function toggleSidebar(forcar) {
@@ -289,9 +380,23 @@ function setActivityActive(action, on) {
 }
 
 function abrirTerminalNoBloco3() {
-  garantirTerminal?.()
   toggleRight(true)
+  // ativarAbaDireita aguarda o módulo lazy e chama dgTerminal.abrir()
   ativarAbaDireita('terminal')
+}
+
+/** Ctrl+`: abre; se já está visível na aba Terminal, apenas oculta (ptys continuam vivos). */
+function alternarTerminalNoBloco3() {
+  const dg = window.dgTerminal
+  const tabTerminalAtiva = document
+    .querySelector('.right-tab[data-pane="terminal"]')
+    ?.classList.contains('active')
+  const direitaVisivel = !$('app')?.classList.contains('right-collapsed')
+  if (dg?.isOpen?.() && tabTerminalAtiva && direitaVisivel) {
+    void dg.ocultar?.()
+    return
+  }
+  abrirTerminalNoBloco3()
 }
 
 /** Navegador Bloco 3 — módulo dedicado (bounds/status/IPC). */
@@ -359,6 +464,19 @@ function focarPainelIa(pane) {
   setTimeout(() => $('chat-input')?.focus(), 0)
 }
 
+/** Move o foco para um bloco (skip link e Alt+1/2/3). */
+function focarRegiao(id, rotulo) {
+  const el = $(id)
+  if (!el) return
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
+  try {
+    el.focus()
+  } catch {
+    /* */
+  }
+  if (rotulo) anunciar(rotulo)
+}
+
 function ativarAbaDireita(pane) {
   let p = pane
   if (p === 'chat') {
@@ -367,7 +485,9 @@ function ativarAbaDireita(pane) {
   }
   const eraBrowser = $('pane-browser')?.classList.contains('active')
   document.querySelectorAll('.right-tab').forEach((t) => {
-    t.classList.toggle('active', t.dataset.pane === p)
+    const on = t.dataset.pane === p
+    t.classList.toggle('active', on)
+    if (on) t.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
   document.querySelectorAll('.right-pane').forEach((el) => {
     el.classList.toggle('active', el.id === 'pane-' + p)
@@ -375,29 +495,34 @@ function ativarAbaDireita(pane) {
   if (p === 'agent') void carregarAgentesUi()
   if (p === 'browser') {
     if (browserBloco3.isAberto()) setBrowserVisivel(true)
-    else setBrowserVisivel(false)
+    else {
+      // Aba do navegador ativa = navegador pronto para uso (about:blank se nao houver URL).
+      const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
+      void abrirNavegadorUi(url || undefined)
+    }
   } else if (eraBrowser || p !== 'browser') {
     setBrowserVisivel(false)
   }
   if (p === 'terminal') {
-    garantirTerminal()
-    const fit = () => {
-      window.dgTerminal?.fit?.()
-    }
-    const open = window.dgTerminal?.abrir
-    if (typeof open === 'function') {
-      Promise.resolve(open()).then(() => {
+    void garantirTerminal().then(() => {
+      const fit = () => {
+        window.dgTerminal?.fit?.()
+      }
+      const open = window.dgTerminal?.abrir
+      if (typeof open === 'function') {
+        Promise.resolve(open()).then(() => {
+          requestAnimationFrame(() => {
+            fit()
+            requestAnimationFrame(fit)
+          })
+        })
+      } else {
         requestAnimationFrame(() => {
           fit()
           requestAnimationFrame(fit)
         })
-      })
-    } else {
-      requestAnimationFrame(() => {
-        fit()
-        requestAnimationFrame(fit)
-      })
-    }
+      }
+    })
   } else if (p === 'files' && filesListaSuja) {
     filesListaSuja = false
     void renderizarArvoreEm($('files-list'))
@@ -409,6 +534,10 @@ $('browser-abrir')?.addEventListener('click', () => {
   ativarAbaDireita('browser')
   const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
   void abrirNavegadorUi(url)
+})
+$('browser-abrir-inline')?.addEventListener('click', () => {
+  const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
+  void abrirNavegadorUi(url || undefined)
 })
 $('browser-url')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -442,9 +571,67 @@ try {
     setBrowserStatus(false)
     setBrowserVisivel(false)
   })
+  window.api.on?.('navegador:download', (_e, info) => {
+    const i = info && typeof info === 'object' ? info : {}
+    if (i.ok) mostrarToast('Download salvo: ' + (i.nomeSalvo || 'arquivo'), 'ok')
+    else mostrarToast('Download falhou: ' + (i.estado || 'erro'), 'erro')
+  })
+  window.api.on?.('navegador:download-progresso', (_e, p) => {
+    atualizarDownloadUi(p)
+  })
 } catch {
   /* preload antigo */
 }
+
+const dlBox = $('browser-download')
+const dlNome = $('browser-download-nome')
+const dlPct = $('browser-download-pct')
+let downloadAtivoId = ''
+let timerDownloadFinal = null
+
+function rotuloFinalDownload(estado) {
+  if (estado === 'cancelado') return 'cancelado'
+  if (estado === 'interrompido') return 'falhou'
+  return 'ok'
+}
+
+function atualizarDownloadUi(p) {
+  if (!dlBox || !p || typeof p !== 'object' || !p.id) return
+  const ativo = p.estado === 'iniciado' || p.estado === 'andamento'
+  if (ativo) {
+    if (timerDownloadFinal) {
+      clearTimeout(timerDownloadFinal)
+      timerDownloadFinal = null
+    }
+    downloadAtivoId = p.id
+    dlBox.hidden = false
+    if (dlNome) dlNome.textContent = p.nomeOriginal || 'download'
+    if (dlPct) {
+      dlPct.textContent =
+        p.total > 0 ? p.percentual + '%' : Math.max(0, Math.round(p.recebido / 1024)) + ' KB'
+    }
+    return
+  }
+  if (p.id !== downloadAtivoId) return
+  downloadAtivoId = ''
+  if (dlPct) dlPct.textContent = rotuloFinalDownload(p.estado)
+  timerDownloadFinal = setTimeout(() => {
+    timerDownloadFinal = null
+    if (!downloadAtivoId && dlBox) dlBox.hidden = true
+  }, 2500)
+}
+
+$('browser-download-cancelar')?.addEventListener('click', async () => {
+  if (!downloadAtivoId) return
+  try {
+    const r = await window.api.invoke('navegador:download-cancelar', downloadAtivoId)
+    if (r?.ok) mostrarToast('Download cancelado', 'ok')
+    else mostrarToast('Não foi possível cancelar: ' + (r?.erro || 'desconhecido'), 'erro')
+  } catch (e) {
+    console.warn('[navegador] cancelar download', e)
+    mostrarToast('Falha ao cancelar download', 'erro')
+  }
+})
 
 window.addEventListener('resize', () => {
   if ($('pane-browser')?.classList.contains('active') && browserBloco3.isAberto()) {
@@ -636,6 +823,64 @@ function criarBotaoRemoverPasta(path) {
   return btn
 }
 
+const SUGESTOES_CHAT = [
+  'Explique a arquitetura deste projeto',
+  'Onde fica o ponto de entrada?',
+  'Sugira melhorias de UI e UX',
+  'Liste riscos e pontos de atenção'
+]
+
+function markupEmptyStateChat() {
+  const raiz = resolverPastaChatAtiva()
+  if (!raiz) {
+    return (
+      '<div class="empty-state" id="empty-state">' +
+      '<h2>Vamos começar</h2>' +
+      '<p>Abra um repositório para o agente ler o código, analisar e executar tarefas.</p>' +
+      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>' +
+      '</div>'
+    )
+  }
+  const nome = nomeArquivo(raiz)
+  const chips = SUGESTOES_CHAT.map(
+    (s) =>
+      '<button type="button" class="empty-chip" data-sugestao="' +
+      escapar(s) +
+      '">' +
+      escapar(s) +
+      '</button>'
+  ).join('')
+  return (
+    '<div class="empty-state empty-state--chat" id="empty-state">' +
+    '<h2>Como posso ajudar com ' +
+    escapar(nome) +
+    '?</h2>' +
+    '<p>Pergunte sobre o código, peça uma alteração ou deixe o agente explorar o projeto.</p>' +
+    '<div class="empty-chips">' +
+    chips +
+    '</div>' +
+    '</div>'
+  )
+}
+
+function ligarEmptyStateChat() {
+  const empty = $('empty-state')
+  if (!empty) return
+  $('btn-empty-open')?.addEventListener('click', abrirPasta)
+  empty.querySelectorAll('[data-sugestao]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const texto = b.getAttribute('data-sugestao') || ''
+      const input = /** @type {HTMLTextAreaElement|null} */ ($('chat-input'))
+      if (input) {
+        input.value = texto
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      focarPainelIa('chat')
+      enviarMensagemUi()
+    })
+  })
+}
+
 function garantirEmptyStateChat() {
   const area = $('chat-messages')
   if (!area) return
@@ -644,18 +889,13 @@ function garantirEmptyStateChat() {
     empty = document.createElement('div')
     empty.className = 'empty-state'
     empty.id = 'empty-state'
-    empty.innerHTML =
-      '<h2>Agent</h2>' +
-      '<p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>' +
-      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>'
     area.innerHTML = ''
     area.classList.remove('has-msgs')
     area.appendChild(empty)
-    $('btn-empty-open')?.addEventListener('click', abrirPasta)
-  } else {
-    empty.classList.remove('hidden')
-    area.classList.remove('has-msgs')
   }
+  empty.outerHTML = markupEmptyStateChat()
+  area.classList.remove('has-msgs')
+  ligarEmptyStateChat()
 }
 
 /** Controle do PC: pede permissão explícita (sessão). */
@@ -902,14 +1142,21 @@ async function sincronizarContextoPasta(p, opts = {}) {
         .then((cached) => {
           const box = $('analysis-content')
           if (!box) return
-          if (cached && typeof cached === 'object') {
-            const rep = cached.report && typeof cached.report === 'object' ? cached.report : cached
-            renderizarAnalise(rep, !!cached.fromCache)
+          const payload = cached && cached.ok === false ? null : cached && cached.result !== undefined ? cached.result : cached
+          const rep =
+            payload && typeof payload === 'object'
+              ? payload.report && typeof payload.report === 'object'
+                ? payload.report
+                : payload
+              : null
+          const temRelatorio = !!(rep && (rep.oQueE || rep.stack || rep.estrutura || (rep.pontosAtencao && rep.pontosAtencao.length)))
+          if (temRelatorio) {
+            renderizarAnalise(rep, !!(payload && payload.fromCache))
           } else if (mudou) {
             box.innerHTML =
               '<p class="muted">Pasta ativa: <strong>' +
               nomeArquivo(p) +
-              '</strong>. Análise rápida ou completa quando quiser.</p>'
+              '</strong>. Nenhuma análise salva ainda — use <strong>Análise rápida</strong> ou <strong>Análise completa</strong> acima.</p>'
           }
         })
         .catch(() => {})
@@ -943,7 +1190,9 @@ function treeDeps() {
 }
 
 async function renderizarArvoreEm(lista) {
-  return _renderizarArvoreEm(lista, treeDeps())
+  const r = await _renderizarArvoreEm(lista, treeDeps())
+  garantirLinhaFocavel(lista)
+  return r
 }
 
 function abaFilesVisivel() {
@@ -991,12 +1240,14 @@ async function renderizarPastas() {
 }
 
 async function carregarFilhos(dir, container, nivel) {
-  return _carregarFilhos(dir, container, nivel, {
+  const r = await _carregarFilhos(dir, container, nivel, {
     removerPasta,
     escolherNovoCaminhoPasta,
     criarNoDir,
     criarNoFile,
   })
+  garantirLinhaFocavel($('files-list'))
+  return r
 }
 
 function criarNoDir(ent, nivel) {
@@ -1046,8 +1297,25 @@ let ocPendenteAtivoId = null
 /** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string, origem?: string }[]} */
 let agentPropostas = []
 let agentProgressUnsub = null
+let ultimoStatusAgente = ''
+let ultimoStatusAgenteEm = 0
 /** @type {Set<number>} */
 let ocHunksAceitos = new Set()
+
+/**
+ * Anuncia a etapa do agente no aria-live, sem repetir a mesma etapa em
+ * sequência (streaming), mas permitindo repetir em outro turno.
+ * @param {string} etapa
+ */
+function anunciarEtapaAgente(etapa) {
+  if (!etapa) return
+  const agora = Date.now()
+  if (etapa === ultimoStatusAgente && agora - ultimoStatusAgenteEm < 4000) return
+  if (lerPreferenciasA11y().anuncioStreaming === 'silencioso') return
+  ultimoStatusAgente = etapa
+  ultimoStatusAgenteEm = agora
+  anunciar('Agente: ' + etapa)
+}
 
 function fecharPainelDiff() {
   const panel = $('diff-panel')
@@ -1172,15 +1440,19 @@ function mostrarDiffOpenClaw(pendente) {
 function renderListaPendentesOc() {
   const lista = $('oc-pendentes-lista')
   if (!lista) return
+  const tinhaFoco = lista.contains(document.activeElement)
   lista.innerHTML = ''
   if (!ocPendentes.length) {
     lista.hidden = true
     return
   }
   lista.hidden = false
+  lista.setAttribute('role', 'menu')
+  lista.setAttribute('aria-label', 'Propostas pendentes')
   for (const p of ocPendentes) {
     const b = document.createElement('button')
     b.type = 'button'
+    b.setAttribute('role', 'menuitem')
     b.dataset.id = p.id
     b.textContent = nomeArquivo(p.path || p.absPath)
     b.title = p.absPath || p.path
@@ -1188,7 +1460,29 @@ function renderListaPendentesOc() {
     b.addEventListener('click', () => mostrarDiffOpenClaw(p))
     lista.appendChild(b)
   }
+  if (tinhaFoco) lista.querySelector('button')?.focus()
 }
+
+/** Setas/Home/End percorrem as propostas; Enter/Espaço abrem o diff. */
+function initTecladoPendentes() {
+  const lista = $('oc-pendentes-lista')
+  if (!lista || lista.dataset.teclado === '1') return
+  lista.dataset.teclado = '1'
+  lista.addEventListener('keydown', (e) => {
+    const botoes = [...lista.querySelectorAll('button')]
+    if (!botoes.length) return
+    const i = botoes.indexOf(document.activeElement)
+    let alvo = null
+    if (e.key === 'ArrowDown') alvo = (i + 1) % botoes.length
+    else if (e.key === 'ArrowUp') alvo = (i - 1 + botoes.length) % botoes.length
+    else if (e.key === 'Home') alvo = 0
+    else if (e.key === 'End') alvo = botoes.length - 1
+    else return
+    e.preventDefault()
+    botoes[alvo].focus()
+  })
+}
+initTecladoPendentes()
 
 async function pedirOpenClawUi() {
   const prompt = window.prompt('Pedido para o OpenClaw (edicoes voltam como diff para aprovacao):')
@@ -1615,18 +1909,43 @@ setInterval(() => {
 }, 5000)
 
 // ---------- Abas + editor ----------
+function chaveProjetoAbas() {
+  const p = String(state.pastaAtual || '').trim()
+  return p ? p.toLowerCase() : CHAVE_SEM_PROJETO
+}
+
+function lerMapaAbas() {
+  try {
+    return normalizarMapaAbas(JSON.parse(localStorage.getItem(CHAVE_ABAS) || '{}'), chaveProjetoAbas())
+  } catch {
+    return {}
+  }
+}
+
+function salvarMapaAbas(mapa) {
+  try {
+    localStorage.setItem(CHAVE_ABAS, JSON.stringify(mapa))
+  } catch {
+    /* armazenamento cheio */
+  }
+}
+
 function persistirAbas() {
-  localStorage.setItem(
-    'dg-state.abas',
-    JSON.stringify({ abas: state.abas.map((a) => a.caminho), ativa: state.abaAtiva })
-  )
+  const mapa = lerMapaAbas()
+  mapa[chaveProjetoAbas()] = {
+    abas: state.abas.map((a) => a.caminho),
+    ativa: state.abaAtiva,
+    raiz: String(state.pastaAtual || ''),
+    em: Date.now()
+  }
+  salvarMapaAbas(podarMapaAbas(mapa))
 }
 
 async function restaurarAbas() {
   try {
-    const raw = localStorage.getItem('dg-state.abas')
-    if (!raw) return
-    const data = JSON.parse(raw)
+    const mapa = await podarProjetosInexistentes(lerMapaAbas(), existeRaizProjeto)
+    salvarMapaAbas(mapa)
+    const data = mapa[chaveProjetoAbas()] || {}
     const lista = Array.isArray(data.abas) ? data.abas : []
     for (const c of lista) {
       const existe = await window.api.invoke('arquivo:existe', c, pastasPermitidas())
@@ -1648,14 +1967,24 @@ async function restaurarAbas() {
   }
 }
 
+async function existeRaizProjeto(raiz) {
+  const r = await window.api.invoke('arquivo:existe', raiz, [raiz])
+  return r?.ok === true && r.existe === true
+}
+
 function renderizarAbas() {
   const bar = $('editor-tabs')
   bar.innerHTML = ''
   for (const a of state.abas) {
     const btn = document.createElement('button')
     btn.type = 'button'
+    const ativa = a.caminho === state.abaAtiva
     btn.className =
-      'editor-tab' + (a.caminho === state.abaAtiva ? ' active' : '') + (a.dirty ? ' dirty' : '')
+      'editor-tab' + (ativa ? ' active' : '') + (a.dirty ? ' dirty' : '')
+    btn.dataset.caminho = a.caminho
+    btn.setAttribute('role', 'tab')
+    btn.setAttribute('aria-selected', String(ativa))
+    btn.tabIndex = ativa ? 0 : -1
     btn.innerHTML =
       extIcon(a.nome) +
       '<span class="tab-name">' +
@@ -1678,6 +2007,40 @@ function renderizarAbas() {
   if (tabbar) tabbar.style.display = state.abas.length ? 'flex' : 'none'
   atualizarEmpty()
 }
+
+/** Setas/Home/End navegam e ativam abas (padrão WAI-ARIA para tablist). */
+function initTecladoAbas() {
+  const bar = $('editor-tabs')
+  if (!bar || bar.dataset.teclado === '1') return
+  bar.dataset.teclado = '1'
+  bar.addEventListener('keydown', async (e) => {
+    const botoes = [...bar.querySelectorAll('.editor-tab')]
+    if (!botoes.length) return
+    const i = botoes.indexOf(document.activeElement)
+    let alvo = null
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') alvo = (i + 1) % botoes.length
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') alvo = (i - 1 + botoes.length) % botoes.length
+    else if (e.key === 'Home') alvo = 0
+    else if (e.key === 'End') alvo = botoes.length - 1
+    else return
+    e.preventDefault()
+    const b = botoes[alvo]
+    const caminho = b.dataset.caminho
+    if (!caminho) {
+      b.focus()
+      return
+    }
+    // ativarAba re-renderiza a lista: refoca o botão novo pelo caminho.
+    const ok = await ativarAba(caminho)
+    if (!ok) {
+      bar.querySelector('.editor-tab.active')?.focus()
+      return
+    }
+    const novo = [...bar.querySelectorAll('.editor-tab')].find((x) => x.dataset.caminho === caminho)
+    novo?.focus()
+  })
+}
+initTecladoAbas()
 
 function atualizarEmpty() {
   const empty = $('editor-empty')
@@ -1948,6 +2311,24 @@ function esconderImagem() {
 
 $('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
 
+async function formatarDocumentoAtivo() {
+  if (!state.abaAtiva || !editor) return false
+  const btn = $('btn-editor-formatar')
+  if (btn) btn.disabled = true
+  try {
+    const r = await editor.formatar?.()
+    if (!r || !r.ok) {
+      mostrarToast('Formatacao indisponivel: ' + ((r && r.erro) || 'tipo nao suportado'), 'aviso')
+      return false
+    }
+    mostrarToast(r.alterado ? 'Documento formatado' : 'Documento ja estava formatado', 'ok')
+    return true
+  } finally {
+    if (btn) btn.disabled = false
+  }
+}
+$('btn-editor-formatar')?.addEventListener('click', () => void formatarDocumentoAtivo())
+
 function atualizarBotoesHist() {
   const v = document.getElementById('tb-voltar')
   const a = document.getElementById('tb-avancar')
@@ -2002,12 +2383,16 @@ async function irHistAbas(delta) {
   atualizarBotoesHist()
 }
 
-async function abrirArquivoNaAba(caminho) {
+async function abrirArquivoNaAba(caminho, linha) {
   // exportada para ferramentas-ui
   ativarAbaCentro('editor')
   const existente = state.abas.find((a) => a.caminho === caminho)
   if (existente) {
     await ativarAba(caminho)
+    if (linha) {
+      if (!editor) await initEditor()
+      editor?.irParaLinha?.(linha)
+    }
     return
   }
   if (ehImagemExt(caminho)) {
@@ -2015,7 +2400,7 @@ async function abrirArquivoNaAba(caminho) {
     state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
     state.abaAtiva = caminho
     registrarHistAba(caminho)
-    if (!editor) initEditor()
+    if (!editor) await initEditor()
     esconderImagem()
     await mostrarImagem(caminho)
     renderizarAbas()
@@ -2027,7 +2412,7 @@ async function abrirArquivoNaAba(caminho) {
   }
   const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
   if (!r.ok) {
-    alert('Não foi possível abrir: ' + (r.erro || 'erro'))
+    mostrarToast('Não foi possível abrir: ' + (r.erro || 'erro'), 'erro')
     return
   }
   // sincronizar dirty da aba atual antes de trocar
@@ -2035,6 +2420,10 @@ async function abrirArquivoNaAba(caminho) {
   state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false })
   await ativarAba(caminho, r.conteudo)
   persistirAbas()
+  if (linha) {
+    if (!editor) await initEditor()
+    editor?.irParaLinha?.(linha)
+  }
 }
 
 function syncDirtyAtiva() {
@@ -2044,31 +2433,44 @@ function syncDirtyAtiva() {
 }
 
 async function ativarAba(caminho, conteudoPrevio) {
+  cancelarAutosave()
   syncDirtyAtiva()
+  let conteudo = conteudoPrevio
+  const imagem = ehImagemExt(caminho)
+  if (!imagem && conteudo == null) {
+    const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
+    if (!r.ok) {
+      // Aba órfã (arquivo removido): fecha a aba limpa; se suja, preserva.
+      const idx = state.abas.findIndex((x) => x.caminho === caminho)
+      const aba = idx >= 0 ? state.abas[idx] : null
+      if (aba && !aba.dirty && caminho !== state.abaAtiva) {
+        state.abas.splice(idx, 1)
+        renderizarAbas()
+        persistirAbas()
+        mostrarToast('Aba fechada: "' + nomeArquivo(caminho) + '" não existe mais.', 'aviso')
+      } else {
+        mostrarToast('Não foi possível abrir: ' + (r.erro || 'erro'), 'erro')
+      }
+      $('editor-tabs')?.querySelector('.editor-tab.active')?.focus()
+      return false
+    }
+    conteudo = r.conteudo
+  }
   state.abaAtiva = caminho
   registrarHistAba(caminho)
   ativarAbaCentro('editor')
-  if (ehImagemExt(caminho)) {
-    if (!editor) initEditor()
+  if (imagem) {
+    if (!editor) await initEditor()
     await mostrarImagem(caminho)
     renderizarAbas()
     atualizarBreadcrumb()
     atualizarEmpty()
     atualizarToolbarPreview(caminho)
     persistirAbas()
-    return
+    return true
   }
   esconderImagem()
-  let conteudo = conteudoPrevio
-  if (conteudo == null) {
-    const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
-    if (!r.ok) {
-      alert('Erro ao ler: ' + (r.erro || 'erro'))
-      return
-    }
-    conteudo = r.conteudo
-  }
-  if (!editor) initEditor()
+  if (!editor) await initEditor()
   editor.abrir(caminho, conteudo)
   const a = state.abas.find((x) => x.caminho === caminho)
   if (a) a.dirty = false
@@ -2088,6 +2490,7 @@ async function ativarAba(caminho, conteudoPrevio) {
   persistirAbas()
   void atualizarPainelVault(caminho)
   void sincronizarOverviewGit(caminho)
+  return true
 }
 
 /** Extrai linhas +/- do unified diff para a overview ruler. */
@@ -2161,6 +2564,9 @@ $('btn-dirty-discard')?.addEventListener('click', () => fecharDirtyModal('descar
 $('btn-dirty-save')?.addEventListener('click', () => fecharDirtyModal('salvar'))
 
 async function fecharAba(caminho) {
+  cancelarAutosave()
+  const barAbas = $('editor-tabs')
+  const focoEmAbas = !!barAbas && barAbas.contains(document.activeElement)
   const a = state.abas.find((x) => x.caminho === caminho)
   if (!a) return
   if (caminho === state.abaAtiva && editor) a.dirty = editor.isDirty()
@@ -2186,7 +2592,14 @@ async function fecharAba(caminho) {
     state.abaAtiva = null
     if (state.abas.length) {
       const next = state.abas[Math.min(idx, state.abas.length - 1)]
-      await ativarAba(next.caminho)
+      const abriu = await ativarAba(next.caminho)
+      if (!abriu) {
+        // Próxima aba não abriu (arquivo removido): sem re-render a barra
+        // continuaria mostrando a aba recém-fechada como elemento fantasma.
+        renderizarAbas()
+        atualizarBreadcrumb()
+        atualizarEmpty()
+      }
     } else {
       editor?.limpar()
       histAbas = []
@@ -2199,11 +2612,40 @@ async function fecharAba(caminho) {
   } else {
     renderizarAbas()
   }
+  if (focoEmAbas && state.abas.length) {
+    barAbas.querySelector('.editor-tab.active')?.focus()
+  }
   persistirAbas()
 }
 
-async function salvarArquivoAtivo() {
+const LS_AUTOSAVE_MS = 'dg.editor.autosave.ms'
+let autosaveTimer = null
+function autosaveMs() {
+  const n = Number(localStorage.getItem(LS_AUTOSAVE_MS) || 0)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+function cancelarAutosave() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer)
+    autosaveTimer = null
+  }
+}
+function agendarAutosave() {
+  cancelarAutosave()
+  const ms = autosaveMs()
+  if (!ms || !state.abaAtiva || !editor) return
+  if (!editor.isDirty()) return
+  autosaveTimer = setTimeout(() => {
+    autosaveTimer = null
+    if (!state.abaAtiva || !editor?.isDirty()) return
+    void salvarArquivoAtivo({ silencioso: true })
+  }, ms)
+}
+
+async function salvarArquivoAtivo(opcoes = {}) {
   if (!state.abaAtiva || !editor) return false
+  cancelarAutosave()
+  if (/.json$/i.test(state.abaAtiva)) await editor.formatar?.()
   const conteudo = editor.getConteudo()
   let r
   if (state.vaultRaiz && caminhoNoVault(state.abaAtiva) && ehMarkdown(state.abaAtiva)) {
@@ -2221,13 +2663,70 @@ async function salvarArquivoAtivo() {
   const a = state.abas.find((x) => x.caminho === state.abaAtiva)
   if (a) a.dirty = false
   renderizarAbas()
-  mostrarToast('Salvo: ' + nomeArquivo(state.abaAtiva), 'ok')
+  if (!opcoes.silencioso) mostrarToast('Salvo: ' + nomeArquivo(state.abaAtiva), 'ok')
   return true
 }
 
-function initEditor() {
+function atualizarDiagEditor(lista) {
+  const el = $('editor-diag')
+  if (!el) return
+  if (!state.abaAtiva) {
+    el.classList.add('hidden')
+    return
+  }
+  const diags = Array.isArray(lista) ? lista : []
+  const erros = diags.filter((d) => d.severidade === 'erro')
+  const avisos = diags.filter((d) => d.severidade !== 'erro')
+  el.classList.remove('hidden', 'tem-erro', 'tem-aviso', 'ok')
+  if (erros.length) {
+    el.classList.add('tem-erro')
+    el.textContent =
+      erros.length + ' erro' + (erros.length > 1 ? 's' : '') +
+      (avisos.length ? ' · ' + avisos.length + ' aviso' + (avisos.length > 1 ? 's' : '') : '')
+  } else if (avisos.length) {
+    el.classList.add('tem-aviso')
+    el.textContent = avisos.length + ' aviso' + (avisos.length > 1 ? 's' : '')
+  } else {
+    el.classList.add('ok')
+    el.textContent = 'Sem problemas'
+  }
+  el.title = diags.slice(0, 8).map((d) => 'L' + d.linha + ': ' + d.mensagem).join('\n') || 'Sem diagnosticos'
+}
+
+const LS_MINIMAP = 'dg.editor.minimapa.ativo'
+function aplicarMinimapa(ligado) {
+  const btn = $('btn-editor-minimapa')
+  if (btn) {
+    btn.setAttribute('aria-pressed', ligado ? 'true' : 'false')
+    btn.classList.toggle('ativo', ligado)
+  }
+  editor?.minimapaAlternar?.(ligado)
+}
+$('btn-editor-minimapa')?.addEventListener('click', () => {
+  const ligado = !(editor?.minimapaVisivel?.() ?? false)
+  localStorage.setItem(LS_MINIMAP, ligado ? '1' : '0')
+  aplicarMinimapa(ligado)
+})
+{
+  const sel = $('editor-autosave')
+  if (sel) {
+    const atual = String(autosaveMs())
+    if (![...sel.options].some((o) => o.value === atual)) sel.value = '0'
+    else sel.value = atual
+    sel.addEventListener('change', () => {
+      localStorage.setItem(LS_AUTOSAVE_MS, String(Number(sel.value) || 0))
+      cancelarAutosave()
+      agendarAutosave()
+    })
+  }
+}
+
+async function initEditor() {
+  const { criarEditor } = await carregarModuloEditor()
+  if (editor) return editor
   const mount = $('editor-mount')
   editor = criarEditor(mount, {
+    onDiagnostics: (lista) => atualizarDiagEditor(lista),
     onChange: () => {
       const a = state.abas.find((x) => x.caminho === state.abaAtiva)
       if (!a || !editor) return
@@ -2237,11 +2736,14 @@ function initEditor() {
         renderizarAbas()
       }
       editor.overviewRefresh?.()
+      agendarAutosave()
     },
     onSave: () => {
       salvarArquivoAtivo()
     }
   })
+  aplicarMinimapa(localStorage.getItem(LS_MINIMAP) !== '0')
+  return editor
 }
 
 function ciclarAbas() {
@@ -2373,19 +2875,75 @@ async function buscarOndeEsta() {
 }
 
 // ---------- Chat ----------
+const usoChatSessao = { entrada: 0, saida: 0, custoUSD: null, turnos: 0 }
+
+function recontarUsoChat(msgs) {
+  usoChatSessao.entrada = 0
+  usoChatSessao.saida = 0
+  usoChatSessao.custoUSD = null
+  usoChatSessao.turnos = 0
+  for (const m of Array.isArray(msgs) ? msgs : []) {
+    const u = m?.usage
+    if (!u) continue
+    usoChatSessao.entrada += Number(u.entrada) || 0
+    usoChatSessao.saida += Number(u.saida) || 0
+    usoChatSessao.turnos++
+    if (typeof u.custoUSD === 'number' && Number.isFinite(u.custoUSD)) {
+      usoChatSessao.custoUSD = (usoChatSessao.custoUSD || 0) + u.custoUSD
+    }
+  }
+  atualizarUsoChatUi()
+}
+
+function registrarUsoTurno(usage) {
+  if (!usage || typeof usage !== 'object') return
+  usoChatSessao.entrada += Number(usage.entrada) || 0
+  usoChatSessao.saida += Number(usage.saida) || 0
+  usoChatSessao.turnos++
+  if (typeof usage.custoUSD === 'number' && Number.isFinite(usage.custoUSD)) {
+    usoChatSessao.custoUSD = (usoChatSessao.custoUSD || 0) + usage.custoUSD
+  }
+  atualizarUsoChatUi()
+}
+
+function formatarTokensChat(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + ' M'
+  if (n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k'
+  return String(Math.round(n))
+}
+
+function atualizarUsoChatUi() {
+  const el = $('chat-usage')
+  if (!el) return
+  const total = usoChatSessao.entrada + usoChatSessao.saida
+  if (!usoChatSessao.turnos) {
+    el.textContent = '0 tok'
+    el.title = 'Tokens e custo estimados desta conversa'
+    return
+  }
+  const custo = usoChatSessao.custoUSD
+  const custoTxt =
+    custo == null ? 'custo n/d' : custo === 0 ? 'grátis' : 'US$ ' + custo.toFixed(4).replace('.', ',')
+  el.textContent = formatarTokensChat(total) + ' tok · ' + custoTxt
+  el.title =
+    'Entrada ' +
+    formatarTokensChat(usoChatSessao.entrada) +
+    ' · saída ' +
+    formatarTokensChat(usoChatSessao.saida) +
+    ' · ' +
+    usoChatSessao.turnos +
+    ' turno(s) — estimativa (~4 caracteres/token)'
+}
+
 function renderizarChat(msgs) {
   const area = $('chat-messages')
   area.innerHTML = ''
   const lista = normalizarMensagensChat(msgs)
+  recontarUsoChat(lista)
   if (!lista.length) {
     area.classList.remove('has-msgs')
-    area.innerHTML =
-      '<div class="empty-state" id="empty-state">' +
-      '<h2>Agent</h2>' +
-      '<p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>' +
-      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>' +
-      '</div>'
-    $('btn-empty-open')?.addEventListener('click', abrirPasta)
+    area.innerHTML = markupEmptyStateChat()
+    ligarEmptyStateChat()
     return
   }
   for (const m of lista) adicionarBolha(m.role, m.content, m.provider)
@@ -2403,14 +2961,17 @@ function marcarChatComMsgs() {
 
 function setChatLiveStatus(texto) {
   const el = $('chat-live-status')
-  if (!el) return
-  if (!texto) {
-    el.hidden = true
-    el.textContent = ''
-    return
+  if (el) {
+    if (!texto) {
+      el.hidden = true
+      el.textContent = ''
+    } else {
+      el.hidden = false
+      el.innerHTML = '<span class="cls-dot" aria-hidden="true"></span><span>' + String(texto) + '</span>'
+    }
   }
-  el.hidden = false
-  el.innerHTML = '<span class="cls-dot" aria-hidden="true"></span><span>' + String(texto) + '</span>'
+  const limpo = String(texto || '').replace(/\s+/g, ' ').trim()
+  if (limpo) anunciar(limpo, { urgencia: /erro|falh|interromp|negad/i.test(limpo) ? 'assertivo' : 'educado' })
 }
 
 function ctxReeditarChat() {
@@ -2634,8 +3195,11 @@ async function enviarMensagem() {
   let streamTexto = ''
   let streamBolha = null
   let streamSpan = null
+  const modoAnuncio = lerPreferenciasA11y().anuncioStreaming
+  let anuncioAte = 0
   let offProg = null
   const jobInicio = Date.now()
+  ultimoStatusAgente = ''
   const agentStats = criarStatsVazios()
   registrarJob({
     pasta: pastaChat,
@@ -2650,11 +3214,30 @@ async function enviarMensagem() {
   const pastaDesteJob = pastaChat
   const visivelNesteJob = () =>
     String(state.pastaAtual || '').toLowerCase() === String(pastaDesteJob || '').toLowerCase()
+  // Leitor de tela: anuncia frases completas do stream, nunca token a token.
+  const anunciarTrechoStream = () => {
+    if (modoAnuncio === 'silencioso' || !visivelNesteJob()) return
+    const minimo = modoAnuncio === 'completo' ? 15 : 40
+    const fallback = modoAnuncio === 'completo' ? 120 : 280
+    const novo = streamTexto.slice(anuncioAte)
+    if (novo.length < minimo) return
+    let corte = -1
+    for (const fim of ['. ', '! ', '? ', '… ', '.\n', '!\n', '?\n']) {
+      corte = Math.max(corte, novo.lastIndexOf(fim))
+    }
+    if (corte >= 0) corte += 1
+    else if (novo.length >= fallback) corte = novo.lastIndexOf(' ', fallback - 20) + 1
+    if (corte <= 0) return
+    const trecho = novo.slice(0, corte).trim()
+    anuncioAte += corte
+    if (trecho) anunciar(trecho)
+  }
   const offDelta = window.api.on('chat:delta', (_evt, payload) => {
     if (!visivelNesteJob()) return
     const p = payload || {}
     if (p.reset) {
       streamTexto = ''
+      anuncioAte = 0
       if (streamSpan) streamSpan.textContent = ''
       return
     }
@@ -2668,6 +3251,7 @@ async function enviarMensagem() {
     streamTexto += p.delta
     if (streamSpan) streamSpan.textContent = streamTexto
     if (area) area.scrollTop = area.scrollHeight
+    anunciarTrechoStream()
   })
   try {
     const agenteSel = document.getElementById('chat-agent-select')
@@ -2862,6 +3446,10 @@ async function enviarMensagem() {
     // Sempre persiste no histórico do job (mesmo se o usuário mudou de repo)
     if (!falhou) {
       histDoJob?.registrarMensagem('assistant', conteudo, r.message.provider)
+      registrarUsoTurno(r.usage || r.message?.usage)
+      if (visivelNesteJob() && Array.isArray(r.tentativas) && r.tentativas.length > 1) {
+        appendChatToolTrace('Fallback de provedor: ' + r.tentativas.join(' → '))
+      }
       if (visivelNesteJob() && r.message.provider) atualizarBadgeProvedor(r.message.provider)
       if (visivelNesteJob() && (r.plano || modo === 'plan')) {
         const plano = r.plano || (await window.api.invoke('agente:plano-ler'))?.plano
@@ -3398,20 +3986,118 @@ async function abrirConfig() {
   } catch (e) {
     $('config-profile').innerHTML = '<h4>Máquina</h4>' + escapar(String(e))
   }
-  const o = await window.api.invoke('brain:ollama-status')
-  $('config-ollama').innerHTML =
-    '<h4>Ollama (IA local)</h4>' +
-    (o.installed
-      ? o.reachable
-        ? 'Instalado e rodando — ' +
-          o.models.length +
-          ' modelo(s): ' +
-          escapar(o.models.map((m) => m.name).join(', ') || '—')
-        : 'Instalado, mas parado. Rode: ollama serve'
-      : 'Não instalado. Baixe em ollama.com')
+  await renderizarConfigOllama()
   await carregarConfigOpenClawUi()
   await atualizarPainelAdapta('adapta-status-cfg')
 }
+
+const OLLAMA_SUGERIDOS = [
+  { id: 'qwen2.5-coder:1.5b', rotulo: 'qwen2.5-coder:1.5b — leve (~1 GB)' },
+  { id: 'qwen2.5-coder:3b', rotulo: 'qwen2.5-coder:3b — equilíbrio (~2 GB)' },
+  { id: 'qwen2.5-coder:7b', rotulo: 'qwen2.5-coder:7b — melhor qualidade (~4,7 GB)' }
+]
+
+/** @type {any} */
+let ollamaPullCache = null
+
+function desenharProgressoOllama(p) {
+  const box = $('cfg-ollama-progresso')
+  if (!box) return
+  if (!p) {
+    box.hidden = true
+    box.innerHTML = ''
+    return
+  }
+  const pct = typeof p.percentual === 'number' ? p.percentual : null
+  box.hidden = false
+  box.innerHTML =
+    '<div class="cfg-pull-linha"><span>' +
+    escapar(p.modelo || '') +
+    '</span><span>' +
+    (pct == null ? '' : pct + '%') +
+    '</span></div>' +
+    '<div class="cfg-pull-barra"><span style="width:' +
+    (pct == null ? 12 : pct) +
+    '%"></span></div>' +
+    '<div class="cfg-pull-status">' +
+    escapar(p.status || '') +
+    (p.erro ? ' — ' + escapar(p.erro) : '') +
+    '</div>'
+}
+
+function atualizarProgressoOllama(p) {
+  if (!p || typeof p !== 'object') return
+  ollamaPullCache = p
+  desenharProgressoOllama(p)
+  const btn = $('cfg-ollama-baixar')
+  if (btn) btn.disabled = p.fase !== 'sucesso' && p.fase !== 'erro'
+  if (p.fase === 'sucesso') {
+    mostrarToast('Modelo pronto: ' + p.modelo, 'ok')
+    setTimeout(() => void renderizarConfigOllama(), 400)
+  } else if (p.fase === 'erro') {
+    mostrarToast('Falha ao baixar ' + (p.modelo || 'modelo') + ': ' + (p.erro || 'erro'), 'erro')
+    if (btn) btn.disabled = false
+  }
+}
+
+async function renderizarConfigOllama() {
+  const el = $('config-ollama')
+  if (!el) return
+  let o = null
+  let st = null
+  try { o = await window.api.invoke('brain:ollama-status') } catch { /* offline */ }
+  try { st = await window.api.invoke('ollama:pull-status') } catch { /* offline */ }
+  const locais = (st && Array.isArray(st.modelos) && st.modelos.length
+    ? st.modelos
+    : ((o && Array.isArray(o.models) ? o.models : []).map((m) => m && m.name).filter(Boolean))
+  ).filter(Boolean)
+  const locaisSet = new Set(locais)
+  const emBaixa = st && st.estado && (st.estado.fase === 'baixando' || st.estado.fase === 'iniciando' || st.estado.fase === 'verificando')
+  const opcoes = OLLAMA_SUGERIDOS.filter((s) => !locaisSet.has(s.id))
+  let status
+  if (!o || o.installed === false) {
+    status = 'Não instalado. Baixe em <code>ollama.com</code> e rode <code>ollama serve</code>.'
+  } else if (!o.reachable) {
+    status = 'Instalado, mas parado. Use "Iniciar Ollama" na barra de status ou rode <code>ollama serve</code>.'
+  } else {
+    status = 'Rodando — ' + locais.length + ' modelo(s) local(is).'
+  }
+  el.innerHTML =
+    '<h4>Ollama (IA local)</h4>' +
+    '<div class="cfg-ollama-status">' + status + '</div>' +
+    '<div class="cfg-ollama-locais"><strong>Instalados:</strong> ' +
+    escapar(locais.join(', ') || 'nenhum') +
+    '</div>' +
+    (locais.length === 0 && o && o.reachable
+      ? '<div class="cfg-ollama-aviso">Nenhum modelo baixado ainda — a IA local precisa de pelo menos um.</div>'
+      : '') +
+    (opcoes.length
+      ? '<div class="config-actions"><select id="cfg-ollama-modelo" class="cfg-ollama-select">' +
+        opcoes.map((s) => '<option value="' + escapar(s.id) + '">' + escapar(s.rotulo) + '</option>').join('') +
+        '</select><button id="cfg-ollama-baixar" class="btn-small">Baixar modelo</button></div>'
+      : '') +
+    '<div id="cfg-ollama-progresso" class="cfg-ollama-progresso" hidden></div>'
+  const btn = $('cfg-ollama-baixar')
+  if (btn) {
+    btn.disabled = !!emBaixa
+    btn.addEventListener('click', async () => {
+      const sel = $('cfg-ollama-modelo')
+      const modelo = sel && sel.value
+      if (!modelo) return
+      btn.disabled = true
+      desenharProgressoOllama({ modelo, percentual: null, status: 'iniciando download…' })
+      const r = await window.api.invoke('ollama:pull', modelo)
+      if (!r || !r.ok) {
+        btn.disabled = false
+        desenharProgressoOllama(null)
+        mostrarToast((r && r.erro) || 'Não foi possível iniciar o download', 'erro')
+      }
+    })
+  }
+  desenharProgressoOllama(emBaixa ? st.estado : null)
+}
+
+window.api.on('ollama:pull-progresso', (_e, p) => atualizarProgressoOllama(p))
 
 /** @type {object | null} */
 let adaptaStatusCache = null
@@ -3824,6 +4510,7 @@ function bootstrapComandos() {
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
     { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
     { id: 'paleta-comandos', titulo: 'Paleta de comandos', atalho: 'Ctrl+Shift+P', fn: () => abrirPaletaComandos() },
+    { id: 'atalhos', titulo: 'Atalhos de teclado', atalho: '?', fn: () => abrirAtalhosTeclado() },
     { id: 'analisar', titulo: 'Analisar sistema aberto', fn: () => state.pastaAtual && escolherEscopoAnalise(state.pastaAtual) },
     { id: 'analisar-completa', titulo: 'Analise completa do projeto', fn: () => state.pastaAtual && analisarCompleta(state.pastaAtual) },
     { id: 'reanalisar', titulo: 'Analisar novamente', fn: () => state.pastaAtual && escolherEscopoAnalise(state.pastaAtual, true) },
@@ -3840,6 +4527,7 @@ function bootstrapComandos() {
     { id: 'orientar-prompt', titulo: 'Assistente de prompt', atalho: 'Ctrl+Alt+P', fn: () => abrirOrientadorPrompt() },
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'formatar', titulo: 'Formatar documento', atalho: 'Shift+Alt+F', fn: () => void formatarDocumentoAtivo() },
     { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
     {
       id: 'agent-panel',
@@ -3852,7 +4540,7 @@ function bootstrapComandos() {
       id: 'agent-undo',
       titulo: 'Desfazer último apply (checkpoint)',
       fn: async () => {
-        const r = await window.api.invoke('agente:checkpoint-desfazer')
+        const r = await window.api.invoke('agente:checkpoint-desfazer', pastasPermitidas())
         alert(r?.ok ? 'Restaurado.' : r?.erro || 'falha')
       }
     },
@@ -3876,6 +4564,11 @@ function bootstrapComandos() {
       titulo: 'Navegador embutido',
       atalho: 'Ctrl+Shift+N',
       fn: () => abrirNavegadorNoBloco3()
+    },
+    {
+      id: 'estudio-midia',
+      titulo: 'Estúdio de mídia (imagem, vídeo, áudio)',
+      fn: () => window.dgEstudioMidia?.()
     },
     {
       id: 'adapta-copiar',
@@ -3907,19 +4600,19 @@ function bootstrapComandos() {
       id: 'zoom-in',
       titulo: 'Zoom: aumentar',
       atalho: 'Ctrl+=',
-      fn: () => void window.api.invoke('janela:zoom', 'in')
+      fn: () => ajustarZoomUi(1)
     },
     {
       id: 'zoom-out',
       titulo: 'Zoom: diminuir',
       atalho: 'Ctrl+-',
-      fn: () => void window.api.invoke('janela:zoom', 'out')
+      fn: () => ajustarZoomUi(-1)
     },
     {
       id: 'zoom-reset',
       titulo: 'Zoom: padrão',
       atalho: 'Ctrl+0',
-      fn: () => void window.api.invoke('janela:zoom', 'reset')
+      fn: () => ajustarZoomUi(0)
     },
     {
       id: 'tela-cheia',
@@ -3954,6 +4647,106 @@ function bootstrapComandos() {
 
 async function mostrarSobreDgEditor() {
   await abrirSobreDgEditor()
+}
+
+function abrirAtalhosTeclado() {
+  const m = $('modal-atalhos')
+  if (!m) return
+  fecharPaleta()
+  fecharBuscaGlobal()
+  m.classList.remove('hidden')
+  requestAnimationFrame(() => m.querySelector('#btn-atalhos-fechar')?.focus())
+}
+
+function fecharAtalhosTeclado() {
+  $('modal-atalhos')?.classList.add('hidden')
+}
+
+function atalhosTecladoAbertos() {
+  return !!$('modal-atalhos') && !$('modal-atalhos').classList.contains('hidden')
+}
+
+function ligarPreferenciasA11y() {
+  const selMov = $('a11y-movimento')
+  const cbContraste = $('a11y-alto-contraste')
+  const selEscala = $('a11y-escala')
+  const selAnuncio = $('a11y-anuncio')
+  const selFonte = $('a11y-fonte')
+  const selTamEditor = $('a11y-fonte-editor')
+  const selTamTerminal = $('a11y-fonte-terminal')
+  if (!selMov || !cbContraste || !selEscala) return
+  const prefs = lerPreferenciasA11y()
+  selMov.value = prefs.movimento
+  cbContraste.checked = !!prefs.altoContraste
+  selEscala.value = String(prefs.escalaInterface)
+  if (selAnuncio) selAnuncio.value = prefs.anuncioStreaming
+  if (selFonte) selFonte.value = prefs.fonteEditor
+  if (selTamEditor) selTamEditor.value = String(prefs.tamanhoEditor)
+  if (selTamTerminal) selTamTerminal.value = String(prefs.tamanhoTerminal)
+  const aplicar = () => {
+    const p = salvarPreferenciasA11y({
+      movimento: selMov.value,
+      altoContraste: cbContraste.checked,
+      escalaInterface: Number(selEscala.value),
+      anuncioStreaming: selAnuncio ? selAnuncio.value : prefs.anuncioStreaming,
+      fonteEditor: selFonte ? selFonte.value : prefs.fonteEditor,
+      tamanhoEditor: selTamEditor ? Number(selTamEditor.value) : prefs.tamanhoEditor,
+      tamanhoTerminal: selTamTerminal ? Number(selTamTerminal.value) : prefs.tamanhoTerminal
+    })
+    aplicarPreferenciasA11y(p)
+    editor?.aplicarTema?.()
+  }
+  for (const el of [selMov, cbContraste, selEscala, selAnuncio, selFonte, selTamEditor, selTamTerminal].filter(Boolean)) {
+    el.addEventListener('change', aplicar)
+  }
+  try {
+    window
+      .matchMedia('(prefers-reduced-motion: reduce)')
+      .addEventListener('change', () => aplicarPreferenciasA11y())
+  } catch {
+    /* navegador sem matchMedia (jsdom antigo) */
+  }
+}
+
+let ultimoAjusteZoom = 0
+
+// A escala altera o zoom nativo do webContents; re-mede editor e terminal
+// para evitar medições antigas (sem aplicar o fator duas vezes).
+window.addEventListener('dg:escala-ui', () => {
+  editor?.requestMeasure?.()
+  requestAnimationFrame(() => {
+    editor?.requestMeasure?.()
+    window.dgTerminal?.fit?.()
+  })
+})
+
+// Fonte/tamanho por painel: editor usa CSS var (re-medir), terminal ajusta xterm.
+window.addEventListener('dg:fonte-painel', (ev) => {
+  const d = ev && ev.detail ? ev.detail : {}
+  editor?.requestMeasure?.()
+  requestAnimationFrame(() => {
+    editor?.requestMeasure?.()
+    window.dgTerminal?.aplicarFonte?.(d.terminal)
+  })
+})
+
+function ajustarZoomUi(delta) {
+  // Debounce: menu nativo e keydown do renderer podem disparar o mesmo atalho.
+  const agora = Date.now()
+  if (agora - ultimoAjusteZoom < 150) return
+  ultimoAjusteZoom = agora
+  const p = ajustarEscalaInterface(delta)
+  const sel = $('a11y-escala')
+  if (sel) sel.value = String(p.escalaInterface)
+  mostrarToast('Escala da interface: ' + Math.round(p.escalaInterface * 100) + '%', 'ok')
+}
+
+function ajustarFontePainelUi(alvo, delta) {
+  const p = ajustarTamanhoFonte(alvo, delta)
+  const px = alvo === 'terminal' ? p.tamanhoTerminal : p.tamanhoEditor
+  const sel = $(alvo === 'terminal' ? 'a11y-fonte-terminal' : 'a11y-fonte-editor')
+  if (sel) sel.value = String(px)
+  mostrarToast('Fonte do ' + (alvo === 'terminal' ? 'terminal' : 'editor') + ': ' + px + ' px', 'ok')
 }
 
 function acaoEditar(cmd) {
@@ -4114,6 +4907,7 @@ function executarComando(id) {
   } else if (id === 'agent-panel') focarPainelIa('agent')
   else if (id === 'guardian') abrirContas()
   else if (id === 'salvar') salvarArquivoAtivo()
+  else if (id === 'formatar') void formatarDocumentoAtivo()
   else if (id === 'fechar-aba') {
     if (state.abaAtiva) fecharAba(state.abaAtiva)
   } else if (id === 'toggle-sidebar') toggleSidebar()
@@ -4160,27 +4954,39 @@ async function rodarBuscaGlobal() {
       box.innerHTML = '<div class="palette-item muted">Cancelado</div>'
       return
     }
-    const grupos = r.grupos || []
-    if (!grupos.length) {
+    const itens = Array.isArray(r.itens) ? r.itens : []
+    if (!itens.length) {
       box.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
       return
     }
-    for (const g of grupos) {
+    const grupos = new Map()
+    for (const it of itens) {
+      const rel = it.rel || it.caminho || ''
+      if (!grupos.has(rel)) grupos.set(rel, { rel, arquivo: it.caminho || rel, hits: [] })
+      grupos.get(rel).hits.push({ linha: Number(it.linha) || 1, texto: it.trecho || '' })
+    }
+    for (const g of grupos.values()) {
       const head = document.createElement('div')
       head.className = 'palette-item'
-      head.innerHTML = '<span class="palette-label">' + escapar(g.rel) + '</span>'
+      head.innerHTML =
+        '<span class="palette-label">' +
+        escapar(g.rel) +
+        '</span><span class="palette-hint">' +
+        g.hits.length +
+        '</span>'
       head.addEventListener('click', () => {
         fecharBuscaGlobal()
-        abrirArquivoNaAba(g.arquivo)
+        abrirArquivoNaAba(g.arquivo, g.hits[0]?.linha)
       })
       box.appendChild(head)
-      for (const h of g.hits || []) {
+      for (const h of g.hits) {
         const hit = document.createElement('div')
         hit.className = 'busca-hit'
         hit.textContent = h.linha + ': ' + h.texto
+        hit.title = h.texto
         hit.addEventListener('click', () => {
           fecharBuscaGlobal()
-          abrirArquivoNaAba(g.arquivo)
+          abrirArquivoNaAba(g.arquivo, h.linha)
         })
         box.appendChild(hit)
       }
@@ -4250,6 +5056,7 @@ function mostrarToast(mensagem, tipo = 'aviso') {
   }
   const el = document.createElement('div')
   el.className = 'dg-toast ' + (tipo === 'erro' ? 'erro' : tipo === 'ok' ? 'ok' : 'aviso')
+  el.setAttribute('role', tipo === 'erro' ? 'alert' : 'status')
   el.textContent = String(mensagem || '')
   host.appendChild(el)
   requestAnimationFrame(() => {
@@ -4388,6 +5195,12 @@ setTimeout(() => {
 }, 20000)
 
 if (typeof window.api?.on === 'function') {
+  window.api.on('chat:fallback', (_e, payload) => {
+    const p = payload || {}
+    const de = p.de || 'provedor'
+    marcarProviderFallback()
+    setChatLiveStatus('Provedor ' + de + ' falhou — tentando outro…')
+  })
   window.api.on('brain:fallback', (_e, payload) => {
     const p = payload || {}
     const de = p.de || '?'
@@ -4654,6 +5467,7 @@ function initChatAgentSelector() {
     btnMais.addEventListener('click', (e) => {
       e.stopPropagation()
       const open = btnMais.getAttribute('aria-expanded') !== 'true'
+      if (open) atualizarItemAuto()
       setMenuOpen(open)
       if (open) itemAuto.focus()
     })
@@ -4717,6 +5531,7 @@ function atualizarStatusAgent(modelo, ms, fila) {
     else if (fila.tamanho) partes.push('fila:' + fila.tamanho)
   }
   el.textContent = partes.length ? 'Agent: ' + partes.join(' · ') : 'Agent: —'
+  el.title = partes.length ? 'Agente: ' + partes.join(' · ') : 'Agente: ocioso'
 }
 
 async function carregarAgentesUi() {
@@ -4816,7 +5631,7 @@ function mostrarChatRestoreAposApply(arquivos) {
 }
 
 async function desfazerCheckpointDoChat() {
-  const r = await window.api.invoke('agente:checkpoint-desfazer')
+  const r = await window.api.invoke('agente:checkpoint-desfazer', pastasPermitidas())
   if (r?.ok) {
     if (window.dgToast) window.dgToast('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).', 'ok')
     else alert('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).')
@@ -4833,7 +5648,8 @@ async function aplicarUmaPropostaAgent(id) {
   window.__dgApplyViaAgente = true
   const r = await window.api.invoke('agente:aplicar-proposta', id, pastasPermitidas())
   if (!r?.ok) {
-    alert('Falha em apply: ' + (r?.erro || ''))
+    if (window.dgToast) window.dgToast('Falha em apply: ' + (r?.erro || 'erro'), 'erro')
+    else alert('Falha em apply: ' + (r?.erro || ''))
     return
   }
   agentPropostas = agentPropostas.filter((p) => p.id !== id)
@@ -4911,10 +5727,12 @@ function mostrarPropostasAgent(propostas) {
   atualizarChatApplyCard(agentPropostas)
   const box = $('agent-propostas-resumo')
   if (!box) return
+  const tinhaFoco = box.contains(document.activeElement)
   if (!agentPropostas.length) {
     box.hidden = true
     box.innerHTML = ''
     box.removeAttribute('aria-label')
+    if (tinhaFoco) $('chat-input')?.focus()
     return
   }
   box.hidden = false
@@ -4956,6 +5774,7 @@ function mostrarPropostasAgent(propostas) {
   acoes.appendChild(btnVer)
   acoes.appendChild(btnAll)
   box.appendChild(acoes)
+  if (tinhaFoco) btnVer.focus()
 }
 
 function abrirFilaPropostasAgent() {
@@ -4974,32 +5793,63 @@ function abrirFilaPropostasAgent() {
 
 async function aplicarTodasPropostasAgent() {
   if (!agentPropostas.length) return
+  const total = agentPropostas.length
   if (
     !(await dgConfirm(
-      'Aplicar ' + agentPropostas.length + ' arquivo(s)? Checkpoint será criado por arquivo.',
+      'Aplicar ' + total + ' arquivo(s)? Um checkpoint será criado por arquivo.',
       'Aplicar propostas'
     ))
   )
     return
   const aplicados = []
+  const checkpoints = []
+  const falhas = []
   window.__dgApplyViaAgente = true
   for (const p of [...agentPropostas]) {
     const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
     if (!r?.ok) {
-      alert('Falha em ' + p.path + ': ' + (r?.erro || ''))
-      break
+      falhas.push({ path: p.path, erro: r?.erro || 'erro' })
+      continue
     }
     aplicados.push(p.path || r.path)
+    if (r.checkpointId) checkpoints.push({ id: r.checkpointId, path: p.path })
   }
   const rest = await window.api.invoke('agente:propostas')
   mostrarPropostasAgent(rest?.pendentes || [])
   atualizarChatApplyCard(rest?.pendentes || [])
-  if (window.dgToast) window.dgToast('Apply concluído.', 'ok')
-  else alert('Apply concluído.')
   if (aplicados.length) {
     mostrarChatRestoreAposApply(aplicados)
     await oferecerCommitAposApply(aplicados)
   }
+  if (falhas.length) {
+    const resume = falhas
+      .slice(0, 5)
+      .map((f) => '· ' + f.path + ': ' + f.erro)
+      .join('\n')
+    const desfazer = await dgConfirm(
+      aplicados.length +
+        ' arquivo(s) aplicado(s), ' +
+        falhas.length +
+        ' falhou(aram):\n' +
+        resume +
+        '\n\nDeseja desfazer os arquivos já aplicados?',
+      'Desfazer aplicados'
+    )
+    if (desfazer && checkpoints.length) {
+      let desfeitos = 0
+      for (const ck of [...checkpoints].reverse()) {
+        const rr = await window.api.invoke('agente:checkpoint-restaurar', ck.id, pastasPermitidas())
+        if (rr?.ok) desfeitos++
+      }
+      ocultarChatRestoreStrip($('chat-messages'))
+      if (window.dgToast) window.dgToast('Apply parcial: ' + desfeitos + ' arquivo(s) revertido(s).', 'aviso')
+    } else if (window.dgToast) {
+      window.dgToast('Apply parcial: ' + aplicados.length + ' ok, ' + falhas.length + ' com falha.', 'aviso')
+    }
+    return
+  }
+  if (window.dgToast) window.dgToast('Apply concluído (' + aplicados.length + ' arquivo(s)).', 'ok')
+  else alert('Apply concluído.')
 }
 
 function ligarProgressoAgent() {
@@ -5031,7 +5881,11 @@ function ligarProgressoAgent() {
       }
       pintarStatsNoCartao($('chat-messages'), painelStats)
     }
-    if (ev.tipo === 'status') appendAgentTraceLive(humanizarStatus(ev.texto))
+    if (ev.tipo === 'status') {
+      const etapa = humanizarStatus(ev.texto)
+      appendAgentTraceLive(etapa)
+      anunciarEtapaAgente(etapa)
+    }
     else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive(humanizarToolInicio(ev.nome) + '…')
     else if (ev.tipo === 'tool' && ev.fase === 'fim')
       appendAgentTraceLive(humanizarToolFim(ev.nome, ev.detalhe))
@@ -5051,6 +5905,22 @@ function ligarProgressoAgent() {
         delete out.dataset.stream
       }
     }
+  })
+}
+
+/** Anuncia etapas e resultado do turno mesmo fora do painel Agent (ex.: chat). */
+function ligarAnuncioEtapasAgente() {
+  window.api.on?.('agente:progresso', (_e, ev) => {
+    if (!ev || typeof ev !== 'object') return
+    if (ev.tipo === 'fim') {
+      if (lerPreferenciasA11y().anuncioStreaming === 'silencioso') return
+      if (ev.cancelado) anunciar('Geração interrompida.')
+      else if (ev.ok) anunciar('Resposta concluída.')
+      else anunciar('Não foi possível concluir a resposta.', { urgencia: 'assertivo' })
+      return
+    }
+    if (ev.tipo !== 'status') return
+    anunciarEtapaAgente(humanizarStatus(ev.texto))
   })
 }
 
@@ -5328,7 +6198,7 @@ $('btn-agent-verificar')?.addEventListener('click', async () => {
   if (out && d && !d.ok) out.textContent = (out.textContent || '') + '\n\n[typecheck]\n' + (d.saida || '')
 })
 $('btn-agent-undo')?.addEventListener('click', async () => {
-  const r = await window.api.invoke('agente:checkpoint-desfazer')
+  const r = await window.api.invoke('agente:checkpoint-desfazer', pastasPermitidas())
   alert(r?.ok ? 'Checkpoint restaurado (' + r.restaurados + ' arquivo(s)).' : 'Falha: ' + (r?.erro || ''))
 })
 $('agent-input')?.addEventListener('keydown', (e) => {
@@ -5490,6 +6360,11 @@ document.addEventListener('keydown', (e) => {
     salvarArquivoAtivo()
     return
   }
+  if (e.altKey && e.shiftKey && key === 'f') {
+    e.preventDefault()
+    void formatarDocumentoAtivo()
+    return
+  }
   if (mod && key === 'w') {
     e.preventDefault()
     if (state.abaAtiva) fecharAba(state.abaAtiva)
@@ -5546,6 +6421,43 @@ $('busca-input')?.addEventListener('keydown', (e) => {
   }
 })
 $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
+
+$('busca-substituir')?.addEventListener('click', async () => {
+  const raiz = state.pastaAtual || state.pastasRecentes[0]
+  const q = ($('busca-input')?.value || '').trim()
+  const subst = $('busca-subst')?.value ?? ''
+  const regex = !!$('busca-regex')?.checked
+  if (!raiz) return mostrarToast('Abra uma pasta primeiro', 'aviso')
+  if (!q) return mostrarToast('Digite o texto a substituir', 'aviso')
+  const btn = $('busca-substituir')
+  if (btn) btn.disabled = true
+  try {
+    const prev = await window.api.invoke('busca:substituir', raiz, q, subst, { regex, previa: true })
+    if (!prev?.ok) return mostrarToast(prev?.erro || 'falha na prévia', 'erro')
+    if (!prev.ocorrencias) return mostrarToast('Nenhuma ocorrência encontrada', 'aviso')
+    const msg =
+      'Substituir ' +
+      prev.ocorrencias +
+      ' ocorrência(s) em ' +
+      prev.arquivos +
+      ' arquivo(s)?\n\nTexto: ' +
+      q +
+      '\nPor: ' +
+      (subst || '(vazio)')
+    if (!window.confirm(msg)) return
+    const r = await window.api.invoke('busca:substituir', raiz, q, subst, { regex, previa: false })
+    if (!r?.ok) return mostrarToast(r?.erro || 'falha ao substituir', 'erro')
+    mostrarToast(
+      r.ocorrencias + ' substituição(ões) em ' + (r.alterados ?? r.arquivos) + ' arquivo(s)',
+      'ok'
+    )
+    void rodarBuscaGlobal()
+  } catch (e) {
+    mostrarToast('Substituição falhou: ' + String(e?.message || e), 'erro')
+  } finally {
+    if (btn) btn.disabled = false
+  }
+})
 // Config/Contas flutuantes: não fecham ao clicar no fundo (só no ×)
 function alternarPainel() {
   toggleRight()
@@ -5706,37 +6618,294 @@ function dirPaiDe(caminho) {
 }
 
 let menuCtxArvore = null
+let menuCtxFocoAnterior = null
 
-function fecharMenuCtxArvore() {
-  if (menuCtxArvore) {
-    menuCtxArvore.remove()
-    menuCtxArvore = null
+/**
+ * @param {boolean} [restaurarFoco] devolve o foco à linha que abriu o menu
+ */
+function fecharMenuCtxArvore(restaurarFoco = false) {
+  const menu = menuCtxArvore
+  const foco = menuCtxFocoAnterior
+  menuCtxArvore = null
+  menuCtxFocoAnterior = null
+  if (menu) menu.remove()
+  if (restaurarFoco && foco && foco.isConnected) {
+    try {
+      foco.focus()
+    } catch {
+      /* */
+    }
   }
 }
 
-function abrirMenuCtxArvore(x, y, cwd) {
+function juntarCaminho(base, nome) {
+  const b = String(base || '').replace(/[/\\]+$/, '')
+  const sep = b.includes('\\') ? '\\' : '/'
+  return b + sep + String(nome || '').replace(/^[/\\]+/, '')
+}
+
+async function recarregarArvoreExplorer() {
+  await renderizarPastas()
+  await atualizarGitStatusArvore()
+}
+
+function erroOperacao(titulo, r) {
+  alert(titulo + ': ' + ((r && r.erro) || 'erro desconhecido'))
+}
+
+async function criarNoExplorer(baseDir, tipo) {
+  const nome = window.prompt(tipo === 'dir' ? 'Nome da nova pasta:' : 'Nome do novo arquivo:')
+  if (nome == null) return
+  const limpo = String(nome).trim()
+  if (!limpo) return
+  const r = await window.api.invoke(
+    'arquivo:criar',
+    juntarCaminho(baseDir, limpo),
+    tipo,
+    pastasPermitidas()
+  )
+  if (!r || !r.ok) return erroOperacao('Falha ao criar', r)
+  await recarregarArvoreExplorer()
+}
+
+async function renomearExplorer(alvoPath) {
+  const linha = Array.from(document.querySelectorAll('.tree-item[data-path]')).find(
+    (el) => el.dataset.path === alvoPath
+  )
+  if (linha) return renomearInlineNaArvore(linha)
+  await dgAlert('Abra a árvore de arquivos e use F2 sobre o item para renomear.', 'Renomear')
+}
+
+function renomearInlineNaArvore(linha) {
+  const alvoPath = linha.dataset.path || ''
+  if (!alvoPath || (linha.dataset.tipo !== 'file' && linha.dataset.tipo !== 'dir')) return
+  const atual = alvoPath.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || ''
+  const htmlOriginal = linha.innerHTML
+  linha.innerHTML = ''
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.className = 'tree-rename-input'
+  input.value = atual
+  input.setAttribute('aria-label', 'Novo nome para ' + atual)
+  linha.appendChild(input)
+  input.focus()
+  input.select()
+  let concluido = false
+  const finalizar = async (salvar) => {
+    if (concluido) return
+    concluido = true
+    const limpo = input.value.trim()
+    linha.innerHTML = htmlOriginal
+    if (!salvar || !limpo || limpo === atual) return
+    const r = await window.api.invoke('arquivo:renomear', alvoPath, limpo, pastasPermitidas())
+    if (!r || !r.ok) return erroOperacao('Falha ao renomear', r)
+    await recarregarArvoreExplorer()
+  }
+  input.addEventListener('keydown', (ev) => {
+    ev.stopPropagation()
+    if (ev.key === 'Enter') {
+      ev.preventDefault()
+      void finalizar(true)
+    } else if (ev.key === 'Escape') {
+      ev.preventDefault()
+      void finalizar(false)
+    }
+  })
+  input.addEventListener('blur', () => void finalizar(true))
+}
+
+const SELETOR_LINHA_ARVORE = '.tree-root-header[data-path], .tree-item[data-path]'
+
+function linhasArvore(lista) {
+  return Array.from(lista.querySelectorAll(SELETOR_LINHA_ARVORE)).filter((el) => el.getClientRects().length > 0)
+}
+
+function garantirLinhaFocavel(lista) {
+  if (!lista) return
+  const linhas = lista.querySelectorAll(SELETOR_LINHA_ARVORE)
+  if (!linhas.length) return
+  if (Array.from(linhas).some((l) => l.tabIndex === 0)) return
+  linhas[0].tabIndex = 0
+}
+
+function focarLinhaArvore(lista, linha) {
+  if (!linha || !lista.contains(linha)) return
+  for (const l of lista.querySelectorAll(SELETOR_LINHA_ARVORE)) l.tabIndex = -1
+  linha.tabIndex = 0
+  try {
+    linha.focus()
+  } catch {
+    /* */
+  }
+}
+
+function linhaAncestralArvore(linhas, indice) {
+  const alvo = (linhas[indice]?.dataset.path || '').toLowerCase()
+  for (let i = indice - 1; i >= 0; i--) {
+    const l = linhas[i]
+    if (l.dataset.tipo !== 'dir') continue
+    const base = (l.dataset.path || '').toLowerCase()
+    if (alvo.startsWith(base + '\\') || alvo.startsWith(base + '/')) return l
+  }
+  return null
+}
+
+function nomeBaseArvore(linha) {
+  return String(linha.dataset.path || '')
+    .replace(/[/\\]+$/, '')
+    .split(/[/\\]/)
+    .pop()
+    .toLowerCase()
+}
+
+/** Próxima linha (com wrap) cujo nome começa pelo termo digitado. */
+function indiceTypeaheadArvore(linhas, inicio, termo) {
+  const t = String(termo || '').toLowerCase()
+  if (!t) return -1
+  for (let k = 1; k <= linhas.length; k++) {
+    const idx = (inicio + k) % linhas.length
+    if (nomeBaseArvore(linhas[idx]).startsWith(t)) return idx
+  }
+  return -1
+}
+
+function ligarTecladoArvore(lista) {
+  if (!lista || lista.dataset.tecladoPronto) return
+  lista.dataset.tecladoPronto = '1'
+  lista.setAttribute('role', 'tree')
+  lista.setAttribute('aria-label', 'Arquivos do repositório')
+  lista.tabIndex = -1
+  let bufferTypeahead = ''
+  let timerTypeahead = null
+  lista.addEventListener('focus', () => {
+    if (document.activeElement !== lista) return
+    const linhas = linhasArvore(lista)
+    const alvo = linhas.find((l) => l.tabIndex === 0) || linhas[0]
+    if (alvo) focarLinhaArvore(lista, alvo)
+  })
+  lista.addEventListener(
+    'click',
+    (e) => {
+      const linha = e.target.closest?.(SELETOR_LINHA_ARVORE)
+      if (linha && !e.target.closest('.pasta-remover')) focarLinhaArvore(lista, linha)
+    },
+    true
+  )
+  lista.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const atual = e.target.closest?.(SELETOR_LINHA_ARVORE)
+    if (!atual) return
+    const linhas = linhasArvore(lista)
+    const i = linhas.indexOf(atual)
+    if (i < 0) return
+    const dir = atual.dataset.tipo === 'dir'
+    const chevron = atual.querySelector('.chevron')
+    const aberto = !!chevron?.classList.contains('open')
+    if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+      e.preventDefault()
+      const r = atual.getBoundingClientRect()
+      const tipo = atual.dataset.tipo || (atual.classList.contains('tree-root-header') ? 'dir' : 'file')
+      abrirMenuCtxArvore(r.left + 24, r.bottom, { path: atual.dataset.path || '', tipo }, atual)
+      return
+    }
+    if (e.key.length === 1 && !/[\u0000-\u001f]/.test(e.key)) {
+      e.preventDefault()
+      bufferTypeahead += e.key.toLowerCase()
+      clearTimeout(timerTypeahead)
+      timerTypeahead = setTimeout(() => {
+        bufferTypeahead = ''
+      }, 800)
+      const alvoIdx = indiceTypeaheadArvore(linhas, i, bufferTypeahead)
+      if (alvoIdx >= 0) focarLinhaArvore(lista, linhas[alvoIdx])
+      return
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      focarLinhaArvore(lista, linhas[Math.min(i + 1, linhas.length - 1)])
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      focarLinhaArvore(lista, linhas[Math.max(i - 1, 0)])
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      if (dir && chevron && !aberto) chevron.click()
+      else focarLinhaArvore(lista, linhas[Math.min(i + 1, linhas.length - 1)])
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      if (dir && chevron && aberto) chevron.click()
+      else focarLinhaArvore(lista, linhaAncestralArvore(linhas, i) || atual)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      focarLinhaArvore(lista, linhas[0])
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      focarLinhaArvore(lista, linhas[linhas.length - 1])
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (dir && chevron) chevron.click()
+      else atual.click()
+    } else if (e.key === 'F2') {
+      e.preventDefault()
+      if (atual.classList.contains('tree-item')) void renomearInlineNaArvore(atual)
+      else mostrarToast('A raiz não pode ser renomeada aqui', 'aviso')
+    }
+  })
+}
+
+async function excluirExplorer(alvoPath) {
+  const nome = String(alvoPath).replace(/[/\\]+$/, '').split(/[/\\]/).pop() || alvoPath
+  if (!window.confirm('Excluir "' + nome + '"? O item vai para a lixeira do sistema.')) return
+  const r = await window.api.invoke('arquivo:excluir', alvoPath, pastasPermitidas())
+  if (!r || !r.ok) return erroOperacao('Falha ao excluir', r)
+  await recarregarArvoreExplorer()
+}
+
+function abrirMenuCtxArvore(x, y, alvo, focoRetorno = null) {
   fecharMenuCtxArvore()
+  const alvoPath = String(alvo.path || '')
+  const tipo = alvo.tipo === 'file' ? 'file' : 'dir'
+  const pastaBase = tipo === 'file' ? dirPaiDe(alvoPath) : alvoPath
+  const ehRaiz = (state.pastasRecentes || []).some((p) => String(p) === alvoPath)
   const menu = document.createElement('div')
   menu.className = 'tree-ctx-menu'
   menu.setAttribute('role', 'menu')
-  const item = document.createElement('button')
-  item.type = 'button'
-  item.className = 'tree-ctx-item'
-  item.setAttribute('role', 'menuitem')
-  item.textContent = 'Abrir terminal nesta pasta'
-  item.addEventListener('click', (e) => {
-    e.stopPropagation()
-    fecharMenuCtxArvore()
-    const api = window.dgTerminal
-    if (typeof garantirTerminal === 'function') garantirTerminal()
-    const api2 = window.dgTerminal
-    if (api2 && typeof api2.abrirEm === 'function') {
-      void api2.abrirEm(cwd)
-    } else {
-      console.warn('[arvore] dgTerminal.abrirEm indisponivel')
-    }
+  menuCtxFocoAnterior = focoRetorno || document.activeElement
+  const add = (label, fn, opts = {}) => {
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.className = 'tree-ctx-item' + (opts.perigo ? ' is-perigo' : '')
+    item.setAttribute('role', 'menuitem')
+    item.textContent = label
+    item.addEventListener('click', (e) => {
+      e.stopPropagation()
+      fecharMenuCtxArvore()
+      fn()
+    })
+    menu.appendChild(item)
+  }
+  const sep = () => {
+    const d = document.createElement('div')
+    d.className = 'tree-ctx-sep'
+    d.setAttribute('role', 'separator')
+    menu.appendChild(d)
+  }
+  add('Novo arquivo…', () => void criarNoExplorer(pastaBase, 'file'))
+  add('Nova pasta…', () => void criarNoExplorer(pastaBase, 'dir'))
+  if (!ehRaiz) {
+    sep()
+    add('Renomear…', () => void renomearExplorer(alvoPath))
+    add('Excluir…', () => void excluirExplorer(alvoPath), { perigo: true })
+  }
+  sep()
+  add('Abrir terminal nesta pasta', () => {
+    void garantirTerminal().then(() => {
+      const api = window.dgTerminal
+      if (api && typeof api.abrirEm === 'function') {
+        void api.abrirEm(pastaBase)
+      } else {
+        console.warn('[arvore] dgTerminal.abrirEm indisponivel')
+      }
+    })
   })
-  menu.appendChild(item)
   document.body.appendChild(menu)
   const pad = 4
   const rect = menu.getBoundingClientRect()
@@ -5746,24 +6915,107 @@ function abrirMenuCtxArvore(x, y, cwd) {
   if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad
   menu.style.left = Math.max(pad, left) + 'px'
   menu.style.top = Math.max(pad, top) + 'px'
+  menu.addEventListener('keydown', (e) => {
+    const itens = Array.from(menu.querySelectorAll('.tree-ctx-item'))
+    if (!itens.length) return
+    const i = itens.indexOf(document.activeElement)
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      itens[(i + 1) % itens.length].focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      itens[(i - 1 + itens.length) % itens.length].focus()
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      itens[0].focus()
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      itens[itens.length - 1].focus()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      fecharMenuCtxArvore(true)
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      fecharMenuCtxArvore(true)
+    }
+  })
   menuCtxArvore = menu
+  const primeiro = menu.querySelector('.tree-ctx-item')
+  try {
+    primeiro?.focus()
+  } catch {
+    /* */
+  }
+}
+
+function limparDropArvore() {
+  document.querySelectorAll('.tree-item.drag-over, .tree-root-header.drag-over').forEach((el) =>
+    el.classList.remove('drag-over')
+  )
+  document.querySelectorAll('.tree-item.dragging').forEach((el) => el.classList.remove('dragging'))
+}
+
+async function moverArvore(origem, destinoPasta) {
+  if (!origem || !destinoPasta) return
+  if (String(origem).toLowerCase() === String(destinoPasta).toLowerCase()) return
+  const r = await window.api.invoke('arquivo:mover', origem, destinoPasta, pastasPermitidas())
+  if (!r || !r.ok) return erroOperacao('Falha ao mover', r)
+  await recarregarArvoreExplorer()
 }
 
 function initMenuCtxArvore() {
-  const lista = $('folder-list')
-  if (!lista) return
-  lista.addEventListener('contextmenu', (e) => {
-    const alvo =
-      e.target.closest('.tree-item[data-path]') || e.target.closest('.tree-root-header[data-path]')
-    if (!alvo) return
-    e.preventDefault()
-    e.stopPropagation()
-    const path = alvo.dataset.path
-    if (!path) return
-    const tipo = alvo.dataset.tipo || (alvo.classList.contains('tree-root-header') ? 'dir' : 'file')
-    const cwd = tipo === 'file' ? dirPaiDe(path) : path
-    abrirMenuCtxArvore(e.clientX, e.clientY, cwd)
-  })
+  ligarTecladoArvore($('files-list'))
+  for (const id of ['folder-list', 'files-list']) {
+    const lista = $(id)
+    if (!lista) continue
+    lista.addEventListener('contextmenu', (e) => {
+      const alvo =
+        e.target.closest('.tree-item[data-path]') || e.target.closest('.tree-root-header[data-path]')
+      if (!alvo) return
+      e.preventDefault()
+      e.stopPropagation()
+      const path = alvo.dataset.path
+      if (!path) return
+      const tipo = alvo.dataset.tipo || (alvo.classList.contains('tree-root-header') ? 'dir' : 'file')
+      abrirMenuCtxArvore(e.clientX, e.clientY, { path, tipo }, alvo)
+    })
+  }
+  const listas = ['folder-list', 'files-list'].map((id) => $(id)).filter(Boolean)
+  for (const lista of listas) {
+    lista.addEventListener('dragstart', (e) => {
+      const alvo = e.target.closest?.('.tree-item[data-path], .tree-root-header[data-path]')
+      if (!alvo) return
+      if (alvo.classList.contains('tree-root-header')) return
+      e.dataTransfer.setData('text/plain', alvo.dataset.path || '')
+      e.dataTransfer.effectAllowed = 'move'
+      alvo.classList.add('dragging')
+    })
+    lista.addEventListener('dragend', limparDropArvore)
+    lista.addEventListener('dragover', (e) => {
+      const destino = e.target.closest?.('.tree-root-header[data-path], .tree-item[data-tipo="dir"][data-path]')
+      if (!destino) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      if (!destino.classList.contains('drag-over')) {
+        document.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'))
+        destino.classList.add('drag-over')
+      }
+    })
+    lista.addEventListener('dragleave', (e) => {
+      const destino = e.target.closest?.('.drag-over')
+      if (destino && !destino.contains(e.relatedTarget)) destino.classList.remove('drag-over')
+    })
+    lista.addEventListener('drop', (e) => {
+      const destino = e.target.closest?.('.tree-root-header[data-path], .tree-item[data-tipo="dir"][data-path]')
+      if (!destino) return
+      e.preventDefault()
+      const origem = e.dataTransfer.getData('text/plain')
+      const pastaDestino = destino.dataset.path || ''
+      limparDropArvore()
+      void moverArvore(origem, pastaDestino)
+    })
+  }
   document.addEventListener('click', (e) => {
     if (menuCtxArvore && !menuCtxArvore.contains(e.target)) fecharMenuCtxArvore()
   })
@@ -5803,7 +7055,9 @@ const MENUS_BARRA = {
     { id: 'edit-cut', label: 'Recortar', accel: 'Ctrl+X', edit: 'cut' },
     { id: 'edit-copy', label: 'Copiar', accel: 'Ctrl+C', edit: 'copy' },
     { id: 'edit-paste', label: 'Colar', accel: 'Ctrl+V', edit: 'paste' },
-    { id: 'edit-selectAll', label: 'Selecionar tudo', accel: 'Ctrl+A', edit: 'selectAll' }
+    { id: 'edit-selectAll', label: 'Selecionar tudo', accel: 'Ctrl+A', edit: 'selectAll' },
+    { sep: true },
+    { id: 'formatar', label: 'Formatar documento', accel: 'Shift+Alt+F' }
   ],
   ver: [
     { id: 'recarregar', label: 'Recarregar', accel: 'Ctrl+R' },
@@ -5835,6 +7089,7 @@ const MENUS_BARRA = {
     { id: 'auditar', label: 'Auto auditoria' },
     { id: 'regras-projeto', label: 'Regras do projeto (.dgrules)' },
     { sep: true },
+    { id: 'estudio-midia', label: 'Estúdio de mídia' },
     { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
   ],
   ajuda: [{ id: 'sobre', label: 'Sobre o DG Editor' }]
@@ -5984,6 +7239,9 @@ initResizers()
 initActivityBar()
 bootstrapComandos()
 initMenubar()
+ligarPreferenciasA11y()
+ligarAnuncioEtapasAgente()
+aplicarPreferenciasA11y()
 carregarTema()
 initChatAgentSelector()
 ligarExtrasUi()
@@ -5998,7 +7256,7 @@ window.addEventListener('dg:workspace-sujo', () => agendarSalvarWorkspace())
 ;(() => {
   const el = $('sb-workspace')
   const mark = (t) => {
-    if (el) el.textContent = 'Workspace: ' + t
+    if (el) el.textContent = 'WS: ' + t
   }
   const _flush = flushWorkspace
   window.__dgFlushWorkspace = async () => {
@@ -6022,18 +7280,82 @@ window.addEventListener('dg:workspace-sujo', () => agendarSalvarWorkspace())
   }).catch(() => {})
 })()
 // Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
-let terminalIniciado = false
+let terminalIniciado = null
 function garantirTerminal() {
-  if (terminalIniciado) return
-  terminalIniciado = true
-  initTerminalPanel()
+  terminalIniciado ??= carregarModuloTerminal().then((m) => m.initTerminalPanel())
+  return terminalIniciado
 }
 document.addEventListener(
   'keydown',
   (e) => {
+    if (e.key === 'Escape' && atalhosTecladoAbertos()) {
+      e.preventDefault()
+      fecharAtalhosTeclado()
+      return
+    }
+    const alvoTecla = e.target
+    const digitando =
+      alvoTecla instanceof HTMLElement &&
+      (alvoTecla.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvoTecla.tagName))
+    const naArvore = alvoTecla instanceof HTMLElement && !!alvoTecla.closest?.('#files-list')
+    if (!digitando && !naArvore && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === '?') {
+      e.preventDefault()
+      abrirAtalhosTeclado()
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === '/') {
+      e.preventDefault()
+      if (atalhosTecladoAbertos()) fecharAtalhosTeclado()
+      else abrirAtalhosTeclado()
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        if (e.shiftKey) ajustarFontePainelUi('editor', 1)
+        else ajustarZoomUi(1)
+        return
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault()
+        if (e.shiftKey) ajustarFontePainelUi('editor', -1)
+        else ajustarZoomUi(-1)
+        return
+      }
+      if ((e.key === '0' || e.code === 'Digit0') && e.shiftKey) {
+        e.preventDefault()
+        ajustarFontePainelUi('editor', 0)
+        ajustarFontePainelUi('terminal', 0)
+        return
+      }
+      if ((e.key === '0' || e.code === 'Digit0') && !e.shiftKey) {
+        e.preventDefault()
+        ajustarZoomUi(0)
+        return
+      }
+    }
+    if ((e.ctrlKey || e.metaKey) && e.altKey) {
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        ajustarFontePainelUi('terminal', 1)
+        return
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault()
+        ajustarFontePainelUi('terminal', -1)
+        return
+      }
+    }
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+      e.preventDefault()
+      if (e.key === '1') focarRegiao('sidebar', 'Barra lateral')
+      else if (e.key === '2') focarRegiao('center-panel', 'Conteúdo principal')
+      else focarRegiao('exec-panel', 'Painel direito')
+      return
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === '`') {
       e.preventDefault()
-      abrirTerminalNoBloco3()
+      alternarTerminalNoBloco3()
     }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
       e.preventDefault()
@@ -6056,6 +7378,15 @@ if (termPanel && !termPanel.dataset.lazyReady) {
   termPanel.dataset.lazyReady = '0'
 }
 initMenuCtxArvore()
+$('dg-skip-link')?.addEventListener('click', (e) => {
+  e.preventDefault()
+  focarRegiao('center-panel', 'Conteúdo principal')
+})
+$('btn-atalhos-fechar')?.addEventListener('click', fecharAtalhosTeclado)
+$('modal-atalhos')?.addEventListener('click', (e) => {
+  if (e.target === $('modal-atalhos')) fecharAtalhosTeclado()
+})
+instalarTrapFocoModais()
 setSidebarMode('explorer')
 // Área de trabalho: autosave + restauração (layout, chats, panes, draft)
 ligarWorkspaceAutosave({
@@ -6078,6 +7409,7 @@ ligarWorkspaceAutosave({
       }
       app.classList.toggle('sidebar-collapsed', !!doc.layout.sidebarCollapsed)
       app.classList.toggle('right-collapsed', !!doc.layout.rightCollapsed)
+      clamparLayout()
     }
     if (doc.tema) aplicarTemaLocal(doc.tema)
     if (doc.ui?.centerPane) ativarPainelCentro(doc.ui.centerPane)
@@ -6088,6 +7420,18 @@ ligarWorkspaceAutosave({
     if (doc.ui?.browserUrl && $('browser-url')) $('browser-url').value = doc.ui.browserUrl
     if (doc.chat?.draft && $('chat-input') && !$('chat-input').value) {
       $('chat-input').value = doc.chat.draft
+    }
+    // Restaura a pasta ativa no main/renderer: sem isso a analise e o agente
+    // acordam sem raiz e o painel de analise fica vazio.
+    const alvoRaiz = typeof doc.pastaAtual === 'string' ? doc.pastaAtual.trim() : ''
+    if (alvoRaiz) {
+      try {
+        const r = await window.api.invoke('workspace:definir-raiz', alvoRaiz)
+        const valida = !!(r?.ok && r?.raiz && String(r.raiz).toLowerCase() === alvoRaiz.toLowerCase())
+        if (valida) await selecionarPasta(r.raiz)
+      } catch (e) {
+        console.warn('[boot] restaurar raiz:', e)
+      }
     }
     sincronizarBotoesPainelDireito()
   }
@@ -6148,14 +7492,20 @@ void renderizarProjects().then(() => atualizarStatusBar(state.pastaAtual || stat
 void atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null)
 iniciarGuardian()
 void atualizarBadgeProvedorReal()
+/** Modo QA (e2e/mock): suprime avisos transitórios de boot nas capturas. */
+const qaModoPromessa = window.api
+  .invoke('app:qa-mode')
+  .then((r) => !!r?.e2e)
+  .catch(() => false)
 void (async () => {
   try {
+    const emQa = await qaModoPromessa
     const st = await window.api.invoke('deps:status')
     if (st) {
       atualizarIndicadorDeps(st)
-      if (st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
+      if (!emQa && st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
         mostrarToast('Ollama instalado, mas offline. Use "Iniciar Ollama" na barra de status ou rode "ollama serve".', 'aviso')
-      } else if (st.ollama === 'nao-instalado' && !st.llmApiKey) {
+      } else if (!emQa && st.ollama === 'nao-instalado' && !st.llmApiKey) {
         mostrarToast('IA local: Ollama não instalado. Instale em ollama.com ou configure LLM_API_KEY.', 'aviso')
       }
     }
@@ -6229,9 +7579,10 @@ initTooltipsRicos()
 
 /** Boot: OpenClaw token + OpenRouter (env/cofre) + status. */
 void (async () => {
+  const emQa = await qaModoPromessa
   try {
     const oc = await window.api.invoke('openclaw:token-ensure')
-    if (oc?.criado) mostrarToast('Token OpenClaw criado automaticamente', 'ok')
+    if (oc?.criado && !emQa) mostrarToast('Token OpenClaw criado automaticamente', 'ok')
   } catch { /* */ }
   try {
     await window.api.invoke('providers:sincronizar-env')
@@ -6240,13 +7591,13 @@ void (async () => {
       r = await window.api.invoke('providers:testar', { id: 'openrouter-inkling' })
     }
     if (r && r.ok) {
-      mostrarToast('OpenRouter OK (' + (r.latenciaMs || '?') + ' ms)', 'ok')
+      if (!emQa) mostrarToast('OpenRouter OK (' + (r.latenciaMs || '?') + ' ms)', 'ok')
       const sb = document.getElementById('sb-ia')
       if (sb) {
         sb.textContent = 'IA: OpenRouter'
         sb.title = 'OpenRouter online'
       }
-    } else {
+    } else if (!emQa) {
       const motivo = (r && r.erro) || 'chave inválida ou ausente'
       mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
     }

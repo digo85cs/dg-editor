@@ -1,7 +1,7 @@
 /**
  * Runner E2E com Playwright Electron (_electron.launch).
  */
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import type { ResultadoCenario } from './tipos'
 import { cenariosUiNavegacao } from './cenarios/ui-navegacao'
@@ -9,10 +9,17 @@ import { cenariosUiTerminal } from './cenarios/ui-terminal'
 import { cenariosUiChat } from './cenarios/ui-chat'
 import { cenariosUiAgent } from './cenarios/ui-agent'
 import { cenariosUiBrowserEmbed } from './cenarios/ui-browser-embed'
+import { cenariosUiExplorer } from './cenarios/ui-explorer'
+import { cenariosUiBusca } from './cenarios/ui-busca'
+import { cenariosUiEditor } from './cenarios/ui-editor'
+import { cenariosUiMidia } from './cenarios/ui-midia'
+import { cenariosUiA11y } from './cenarios/ui-a11y'
+import { cenariosUiVisual } from './cenarios/ui-visual'
 
 export async function executarSuiteE2e(
   raiz: string,
-  artifactsDir: string
+  artifactsDir: string,
+  opcoes: { visualOnly?: boolean; atualizarBaseline?: boolean } = {}
 ): Promise<{ resultados: ResultadoCenario[]; metricasE2e: { id: string; valor: number; limitePadrao: number }[] }> {
   const resultados: ResultadoCenario[] = []
   const metricasE2e: { id: string; valor: number; limitePadrao: number }[] = []
@@ -50,6 +57,14 @@ export async function executarSuiteE2e(
 
   console.log('[qa:e2e] lancando Electron via Playwright...')
   const tBoot = Date.now()
+  // Perfil isolado por execução: sem configs/segredos/estado de runs anteriores.
+  const userDataQa = join(artifactsDir, 'userdata')
+  try {
+    rmSync(userDataQa, { recursive: true, force: true })
+    mkdirSync(userDataQa, { recursive: true })
+  } catch {
+    /* */
+  }
   let app: Awaited<ReturnType<typeof _electron.launch>> | null = null
   try {
     app = await _electron.launch({
@@ -59,6 +74,8 @@ export async function executarSuiteE2e(
         ...process.env,
         DG_NAV_SMOKE: '',
         DG_QA_E2E: '1',
+        DG_FAKE_LLM: '1',
+        DG_QA_USERDATA: userDataQa,
         ELECTRON_DISABLE_SECURITY_WARNINGS: '1'
       },
       timeout: 30000
@@ -78,13 +95,30 @@ export async function executarSuiteE2e(
     const shotDir = join(artifactsDir, 'screenshots')
     if (!existsSync(shotDir)) mkdirSync(shotDir, { recursive: true })
 
-    const suites = [
-      { nome: 'navegacao', fn: () => cenariosUiNavegacao(window) },
-      { nome: 'terminal', fn: () => cenariosUiTerminal(window) },
-      { nome: 'chat', fn: () => cenariosUiChat(window) },
-      { nome: 'agent', fn: () => cenariosUiAgent(window) },
-      { nome: 'browser-embed', fn: () => cenariosUiBrowserEmbed(window) }
-    ]
+    const suites = opcoes.visualOnly
+      ? [
+          {
+            nome: 'visual',
+            fn: () =>
+              cenariosUiVisual(window, {
+                raiz,
+                artifactsDir,
+                atualizarBaseline: !!opcoes.atualizarBaseline
+              })
+          }
+        ]
+      : [
+          { nome: 'navegacao', fn: () => cenariosUiNavegacao(window) },
+          { nome: 'terminal', fn: () => cenariosUiTerminal(window) },
+          { nome: 'chat', fn: () => cenariosUiChat(window, raiz) },
+          { nome: 'agent', fn: () => cenariosUiAgent(window) },
+          { nome: 'browser-embed', fn: () => cenariosUiBrowserEmbed(window) },
+          { nome: 'explorer', fn: () => cenariosUiExplorer(window) },
+          { nome: 'busca', fn: () => cenariosUiBusca(window) },
+          { nome: 'editor', fn: () => cenariosUiEditor(window, raiz) },
+          { nome: 'midia', fn: () => cenariosUiMidia(window) },
+          { nome: 'a11y', fn: () => cenariosUiA11y(window, raiz) }
+        ]
 
     for (const s of suites) {
       try {
@@ -136,6 +170,11 @@ export async function executarSuiteE2e(
       await app?.close()
     } catch {
       /* */
+    }
+    try {
+      rmSync(userDataQa, { recursive: true, force: true })
+    } catch {
+      /* arquivos ainda em uso pelo Electron */
     }
   }
 

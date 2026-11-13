@@ -1,4 +1,4 @@
-import { renderGuardianText } from './render.js'
+import { renderGuardianText, renderGuardianDetalhe } from './render.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -17,13 +17,18 @@ export async function atualizarGuardiao() {
     if (alertEl) {
       if (st?.paused) {
         alertEl.classList.remove('hidden')
-        alertEl.textContent = 'Pausado: ' + (st.pausedReason || '')
+        alertEl.textContent = 'Pausado'
+        alertEl.title = st.pausedReason || 'Recursos baixos — operações pesadas pausadas'
       } else {
         alertEl.classList.add('hidden')
         alertEl.textContent = ''
+        alertEl.title = ''
       }
     }
-    if (el) el.textContent = renderGuardianText(s)
+    if (el) {
+      el.textContent = renderGuardianText(s)
+      el.title = renderGuardianDetalhe(s)
+    }
   } catch (e) {
     if (el) {
       const msg = e && e.message ? String(e.message) : ''
@@ -36,7 +41,10 @@ export async function atualizarGuardiao() {
       void window.api
         .invoke('guardian:snapshot')
         .then((s) => {
-          if (el) el.textContent = renderGuardianText(s)
+          if (el) {
+            el.textContent = renderGuardianText(s)
+            el.title = renderGuardianDetalhe(s)
+          }
         })
         .catch(() => {
           if (el && el.textContent.indexOf('medindo') >= 0) {

@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body class="tema-escuro">
+  <a id="dg-skip-link" class="skip-link" href="#center-panel">Pular para o conteúdo</a>
+  <div id="dg-live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="dg-live-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
   <header id="titlebar">
     <div class="tb-leading">
       <span class="tb-logo-wrap" title="DG Editor">
@@ -76,7 +79,7 @@
     </nav>
 
     <!-- Sidebar explorer -->
-    <aside id="sidebar">
+    <aside id="sidebar" aria-label="Barra lateral">
       <div class="sidebar-header">
         <div class="sidebar-modes" role="tablist" aria-label="Modo da barra lateral">
           <button type="button" id="sidebar-mode-projects" class="sidebar-mode" role="tab" aria-selected="false">Projetos</button>
@@ -120,6 +123,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></svg>
             <span>Memória</span>
           </button>
+          <button type="button" class="tool-nav-btn" data-tool="midia" title="Estúdio de mídia: imagem, diagrama, vídeo e áudio (grátis)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>
+            <span>Mídia</span>
+          </button>
         </nav>
         <div id="tool-panel" class="tool-panel" hidden>
           <button type="button" id="tool-voltar" class="tool-voltar">Voltar ao Explorer</button>
@@ -160,7 +167,7 @@
     <div id="resize-sidebar" class="resizer" data-resize="sidebar" title="Redimensionar (duplo clique = reset)"></div>
 
     <!-- Centro: Chat | Editor (estilo Cursor Agent) -->
-    <section id="center-panel">
+    <section id="center-panel" role="main" aria-label="Conteúdo principal" tabindex="-1">
       <div class="center-tabs" role="tablist" aria-label="Centro">
         <button type="button" class="center-tab active" data-center="chat" role="tab" aria-selected="true">Chat</button>
         <button type="button" class="center-tab" data-center="editor" role="tab" aria-selected="false">Editor</button>
@@ -172,6 +179,7 @@
             <div class="chat-header-meta">
               <span id="chat-title">Agent</span>
               <span id="chat-provider" class="provider-badge sr-only" aria-hidden="true"></span>
+              <span id="chat-usage" class="chat-usage" title="Tokens e custo estimados desta conversa">0 tok</span>
               <button type="button" id="btn-ollama-start" class="btn-small sr-only" title="Iniciar Ollama" tabindex="-1" style="display:none">Iniciar Ollama</button>
             </div>
             <div id="chat-header-actions" class="chat-header-actions" role="group" aria-label="Controles do chat">
@@ -187,12 +195,12 @@
           </header>
           <div id="chat-messages" class="chat-messages">
             <div class="empty-state" id="empty-state">
-              <h2>Agent</h2>
-              <p>Peça uma ação no composer. Abra um repositório para contextualizar o projeto.</p>
+              <h2>Vamos começar</h2>
+              <p>Abra um repositório para o agente ler o código, analisar e executar tarefas.</p>
               <button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>
             </div>
           </div>
-          <div id="chat-live-status" class="chat-live-status" hidden role="status" aria-live="polite"></div>
+          <div id="chat-live-status" class="chat-live-status" hidden></div>
           <footer id="chat-input-bar">
             <div class="chat-composer">
               <textarea id="chat-input" rows="2" placeholder="Pergunte ou peça uma ação… (Enter envia, Shift+Enter quebra linha)"></textarea>
@@ -251,6 +259,18 @@
         <div id="editor-toolbar" class="editor-toolbar hidden">
           <button type="button" id="btn-editor-salvar" class="btn-small" title="Salvar arquivo (Ctrl+S)">Salvar</button>
           <button type="button" id="btn-md-preview" class="btn-small" title="Alternar preview Markdown">Preview</button>
+          <button type="button" id="btn-editor-formatar" class="btn-small" title="Formatar documento (JSON, JS, TS, CSS)">Formatar</button>
+          <button type="button" id="btn-editor-minimapa" class="btn-small" title="Mostrar/ocultar minimapa" aria-pressed="false">Mapa</button>
+          <label class="editor-autosave" title="Salvar automaticamente depois de parar de digitar">
+            <span>Auto</span>
+            <select id="editor-autosave">
+              <option value="0">off</option>
+              <option value="1000">1s</option>
+              <option value="3000">3s</option>
+              <option value="10000">10s</option>
+            </select>
+          </label>
+          <span id="editor-diag" class="editor-diag hidden" title="Diagnosticos"></span>
           <span id="editor-wrap-hint" class="muted" style="font-size:12px;margin-left:auto">Quebra de linha automática</span>
         </div>
         <div id="editor-diff-bar" class="editor-diff-bar" hidden role="region" aria-label="Proposta de diff">
@@ -285,7 +305,7 @@
           </div>
           <div id="editor-empty">
             <h2>DG Editor</h2>
-            <p>Abra um arquivo à esquerda. O Agent fica no centro.</p>
+            <p>Abra um arquivo no explorer para editar. O Agent fica no centro.</p>
             <div class="atalhos">
               <div><kbd>Ctrl+P</kbd> Abrir arquivo</div>
               <div><kbd>Ctrl+B</kbd> Alternar explorer</div>
@@ -316,7 +336,7 @@
     <div id="resize-right" class="resizer" data-resize="right" title="Redimensionar (duplo clique = reset)"></div>
 
     <!-- Direita: Bloco 3 (rail + abas) -->
-    <section id="exec-panel">
+    <section id="exec-panel" role="complementary" aria-label="Painel direito (agente, análise, terminal e navegador)" tabindex="-1">
       <nav id="right-rail" class="right-rail" aria-label="Atalhos do Bloco 3">
         <button type="button" class="right-rail-btn" id="rail-collapse" data-rail="collapse" title="Recolher Bloco 3" aria-label="Recolher Bloco 3">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/></svg>
@@ -336,10 +356,10 @@
       </nav>
       <div class="exec-panel-main">
       <div class="right-tabs">
-        <button type="button" class="right-tab active" data-pane="agent" title="Painel de execução do agente"><span class="right-tab-label">Execução</span><span class="right-tab-close" data-right-close="agent" title="Fechar painel" aria-label="Fechar Execução">×</span></button>
+        <button type="button" class="right-tab active" data-pane="agent" title="Painel de execução do agente"><span class="right-tab-label">Agente</span><span class="right-tab-close" data-right-close="agent" title="Fechar painel" aria-label="Fechar Agente">×</span></button>
         <button type="button" class="right-tab" data-pane="analise" title="Análise do projeto"><span class="right-tab-label">Análise</span><span class="right-tab-close" data-right-close="analise" title="Fechar painel" aria-label="Fechar Análise">×</span></button>
         <button type="button" class="right-tab" data-pane="terminal" title="Terminal integrado"><span class="right-tab-label">Terminal</span><span class="right-tab-close" data-right-close="terminal" title="Fechar painel" aria-label="Fechar Terminal">×</span></button>
-        <button type="button" class="right-tab" data-pane="browser" title="Navegador embutido"><span class="right-tab-label">Navegador</span><span class="right-tab-close" data-right-close="browser" title="Fechar painel" aria-label="Fechar Navegador">×</span></button>
+        <button type="button" class="right-tab" data-pane="browser" title="Navegador embutido"><span class="right-tab-label">Browser</span><span class="right-tab-close" data-right-close="browser" title="Fechar painel" aria-label="Fechar Navegador">×</span></button>
         <button type="button" class="right-tab" data-pane="files" title="Arquivos"><span class="right-tab-label">Arquivos</span><span class="right-tab-close" data-right-close="files" title="Fechar painel" aria-label="Fechar Arquivos">×</span></button>
         <button type="button" id="btn-right-collapse" class="btn-icon" title="Recolher painel direito" aria-label="Recolher painel direito" aria-pressed="false">‹</button>
       </div>
@@ -410,6 +430,9 @@
             <button type="button" id="terminal-btn-orient" class="btn-icon terminal-btn-orient" title="Alternar orientação" aria-label="Orientação" hidden>⇄</button>
             <button type="button" id="terminal-btn-unsplit" class="btn-icon" title="Fechar divisão" aria-label="Fechar divisão" hidden>▣</button>
             <span class="terminal-header-spacer"></span>
+            <select id="terminal-perfil-select" class="terminal-shell-select" title="Perfis salvos (shell + diretório)" aria-label="Perfis de terminal"></select>
+            <button type="button" id="terminal-btn-perfil-salvar" class="btn-icon" title="Salvar aba atual como perfil" aria-label="Salvar perfil" hidden>＋</button>
+            <button type="button" id="terminal-btn-perfil-remover" class="btn-icon" title="Remover perfil selecionado" aria-label="Remover perfil" hidden>－</button>
             <select id="terminal-shell-select" class="terminal-shell-select" title="Shell desta aba" hidden></select>
             <button type="button" id="terminal-btn-padrao" class="terminal-btn-padrao btn-icon" title="Definir shell atual como padrão" aria-label="Definir como padrão" hidden>☆</button>
             <button type="button" id="terminal-btn-padrao-clear" class="btn-icon" title="Restaurar padrão (automático)" aria-label="Restaurar padrão" hidden>↺</button>
@@ -434,10 +457,16 @@
           <button type="button" class="btn-icon" id="browser-atualizar" title="Atualizar" aria-label="Atualizar">↻</button>
           <input type="text" id="browser-url" placeholder="https://" aria-label="URL do navegador" />
           <button type="button" class="btn-small" id="browser-abrir" title="Abrir / ir">Abrir</button>
+          <span id="browser-download" class="browser-download" hidden>
+            <span id="browser-download-nome" class="browser-download-nome"></span>
+            <span id="browser-download-pct" class="browser-download-pct"></span>
+            <button type="button" class="btn-icon" id="browser-download-cancelar" title="Cancelar download" aria-label="Cancelar download">✕</button>
+          </span>
         </div>
         <div id="browser-mount" aria-label="Navegador embutido"></div>
         <div class="browser-pane-overlay" id="browser-overlay">
           <p class="browser-status" id="browser-status">Navegador fechado.</p>
+          <button type="button" class="btn-small" id="browser-abrir-inline">Abrir navegador</button>
         </div>
       </div>
       </div><!-- /.exec-panel-main -->
@@ -466,7 +495,7 @@
         </button>
         <span id="sb-ia" class="sb-meta" title="Status da IA (Ollama / API)">IA: —</span>
         <span id="sb-agent" class="sb-meta" title="Agente: modelo / latência / fila">Agent: —</span>
-        <span id="sb-workspace" class="sb-meta" title="Autosave da área de trabalho">Workspace: —</span>
+        <span id="sb-workspace" class="sb-meta" title="Autosave da área de trabalho">WS: —</span>
         <span id="sb-safe" class="sb-meta hidden" title="Modo seguro">Safe</span>
         <button type="button" id="btn-update-check" class="btn-small sb-btn" title="Verificar atualização do DG Editor" aria-label="Verificar atualização">Update</button>
         <span id="sb-update" class="sb-meta" title="Status de atualização">—</span>
@@ -528,15 +557,19 @@
   </div>
 
   <!-- Paleta de comandos (Ctrl+Shift+P) / arquivos (Ctrl+P) -->
-  <div id="busca-global" class="modal hidden" aria-label="Busca no projeto">
+  <div id="busca-global" class="modal hidden" role="dialog" aria-modal="true" aria-label="Busca no projeto">
     <div class="palette-box busca-box">
       <input id="busca-input" type="text" placeholder="Buscar no projeto (Ctrl+Shift+F)..." autocomplete="off" />
       <label class="busca-opt"><input type="checkbox" id="busca-regex" /> Regex</label>
+      <div class="busca-subst-linha">
+        <input id="busca-subst" type="text" placeholder="Substituir por…" autocomplete="off" />
+        <button type="button" id="busca-substituir" class="btn-small" title="Substituir todas as ocorrências nos arquivos do projeto">Substituir tudo</button>
+      </div>
       <div id="busca-resultados" class="palette-list"></div>
     </div>
   </div>
 
-  <div id="palette" class="modal hidden">
+  <div id="palette" class="modal hidden" role="dialog" aria-modal="true" aria-label="Paleta de comandos">
     <div class="palette-box">
       <input id="palette-input" type="text" placeholder="Digite um comando ou arquivo..." autocomplete="off" />
       <div id="palette-list" class="palette-list"></div>
@@ -551,6 +584,68 @@
       </header>
       <div class="modal-body config-body">
         <div id="config-profile" class="config-section"></div>
+        <div id="config-acessibilidade" class="config-section">
+          <h4>Acessibilidade</h4>
+          <label class="config-field">Animações
+            <select id="a11y-movimento">
+              <option value="sistema">Seguir o sistema</option>
+              <option value="reduzir">Reduzir animações</option>
+              <option value="normal">Sem redução</option>
+            </select>
+          </label>
+          <label class="config-field a11y-check">
+            <input type="checkbox" id="a11y-alto-contraste" />
+            <span>Alto contraste (bordas, textos e editor mais fortes)</span>
+          </label>
+          <label class="config-field">Tamanho da interface
+            <select id="a11y-escala">
+              <option value="0.9">Compacto (90%)</option>
+              <option value="1">Padrão (100%)</option>
+              <option value="1.1">Grande (110%)</option>
+              <option value="1.25">Muito grande (125%)</option>
+            </select>
+          </label>
+          <label class="config-field">Anúncio do chat (leitor de tela)
+            <select id="a11y-anuncio">
+              <option value="frases">Por frases (recomendado)</option>
+              <option value="completo">Contínuo</option>
+              <option value="silencioso">Silencioso</option>
+            </select>
+          </label>
+          <label class="config-field">Fonte do editor
+            <select id="a11y-fonte">
+              <option value="mono">Mono padrão</option>
+              <option value="cascadia">Cascadia Code</option>
+              <option value="consolas">Consolas</option>
+            </select>
+          </label>
+          <label class="config-field">Tamanho do editor
+            <select id="a11y-fonte-editor">
+              <option value="11">11 px</option>
+              <option value="12">12 px</option>
+              <option value="13">13 px (padrão)</option>
+              <option value="14">14 px</option>
+              <option value="15">15 px</option>
+              <option value="16">16 px</option>
+              <option value="17">17 px</option>
+              <option value="18">18 px</option>
+            </select>
+          </label>
+          <label class="config-field">Tamanho do terminal
+            <select id="a11y-fonte-terminal">
+              <option value="10">10 px</option>
+              <option value="11">11 px</option>
+              <option value="12">12 px</option>
+              <option value="13">13 px (padrão)</option>
+              <option value="14">14 px</option>
+              <option value="15">15 px</option>
+              <option value="16">16 px</option>
+              <option value="17">17 px</option>
+              <option value="18">18 px</option>
+            </select>
+          </label>
+          <p class="muted" style="margin:6px 0 0;font-size:12px">Zoom: <kbd>Ctrl</kbd><kbd>+</kbd> / <kbd>Ctrl</kbd><kbd>-</kbd> / <kbd>Ctrl</kbd><kbd>0</kbd>. Prefere teclado? Pressione <kbd>?</kbd> para ver todos os atalhos.</p>
+        </div>
         <div id="config-ollama" class="config-section"></div>
         <div id="config-regras" class="config-section"></div>
         <div id="config-adapta" class="config-section">
@@ -656,9 +751,9 @@
     </div>
   </div>
 
-  <div id="modal-reinicio" class="modal hidden">
+  <div id="modal-reinicio" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-reinicio-title">
     <div class="modal-box">
-      <h3>Reiniciar o DG Editor?</h3>
+      <h3 id="modal-reinicio-title">Reiniciar o DG Editor?</h3>
       <p id="reinicio-motivo">Algumas alterações precisam de reinício para serem aplicadas.</p>
       <div class="reinicio-acoes">
         <button id="btn-reinicio-depois" class="btn-ghost">Reiniciar depois</button>
@@ -667,9 +762,9 @@
     </div>
   </div>
 
-  <div id="modal-dirty" class="modal hidden">
+  <div id="modal-dirty" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-dirty-title">
     <div class="modal-box">
-      <h3>Alterações não salvas</h3>
+      <h3 id="modal-dirty-title">Alterações não salvas</h3>
       <p id="dirty-msg" style="color:var(--dg-text-muted);font-size:13px;line-height:1.55">O arquivo tem alterações. Deseja salvar?</p>
       <div class="dirty-acoes">
         <button id="btn-dirty-cancel" class="btn-ghost">Cancelar</button>
@@ -701,6 +796,66 @@
       <div class="prompt-modal-actions">
         <button type="button" id="btn-prompt-usar" class="btn-primary">Usar no chat</button>
         <button type="button" id="btn-prompt-copiar" class="btn-ghost">Copiar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-atalhos" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-atalhos-title">
+    <div class="modal-box atalhos-box">
+      <header class="modal-titlebar" data-float-handle>
+        <h3 id="modal-atalhos-title">Atalhos de teclado</h3>
+        <button type="button" id="btn-atalhos-fechar" class="btn-icon modal-titlebar-close" title="Fechar" aria-label="Fechar atalhos">×</button>
+      </header>
+      <div class="modal-body atalhos-corpo">
+        <section class="atalhos-grupo" aria-labelledby="atalhos-grupo-geral">
+          <h4 id="atalhos-grupo-geral">Geral</h4>
+          <ul class="atalhos-lista">
+            <li><span>Paleta de comandos</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>P</kbd></li>
+            <li><span>Quick Open (arquivos)</span><kbd>Ctrl</kbd><kbd>P</kbd></li>
+            <li><span>Busca no projeto</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>F</kbd></li>
+            <li><span>Abrir pasta</span><kbd>Ctrl</kbd><kbd>O</kbd></li>
+            <li><span>Salvar arquivo</span><kbd>Ctrl</kbd><kbd>S</kbd></li>
+            <li><span>Fechar aba</span><kbd>Ctrl</kbd><kbd>W</kbd></li>
+            <li><span>Atalhos (esta janela)</span><kbd>?</kbd> <span class="muted">ou</span> <kbd>Ctrl</kbd><kbd>/</kbd></li>
+          </ul>
+        </section>
+        <section class="atalhos-grupo" aria-labelledby="atalhos-grupo-paineis">
+          <h4 id="atalhos-grupo-paineis">Painéis</h4>
+          <ul class="atalhos-lista">
+            <li><span>Explorer (barra lateral)</span><kbd>Ctrl</kbd><kbd>B</kbd></li>
+            <li><span>Bloco 3 (direito)</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>B</kbd></li>
+            <li><span>Terminal</span><kbd>Ctrl</kbd><kbd>`</kbd></li>
+            <li><span>Navegador embutido</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></li>
+            <li><span>Focar chat</span><kbd>Ctrl</kbd><kbd>L</kbd></li>
+            <li><span>Focar blocos: lateral / centro / direita</span><kbd>Alt</kbd><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></li>
+            <li><span>Assistente de prompt</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>P</kbd></li>
+          </ul>
+        </section>
+        <section class="atalhos-grupo" aria-labelledby="atalhos-grupo-edicao">
+          <h4 id="atalhos-grupo-edicao">Edição</h4>
+          <ul class="atalhos-lista">
+            <li><span>Formatar documento</span><kbd>Shift</kbd><kbd>Alt</kbd><kbd>F</kbd></li>
+            <li><span>Enviar mensagem</span><kbd>Enter</kbd></li>
+            <li><span>Nova linha no chat</span><kbd>Shift</kbd><kbd>Enter</kbd></li>
+            <li><span>Renomear item na árvore</span><kbd>F2</kbd></li>
+            <li><span>Menu do item da árvore</span><kbd>Shift</kbd><kbd>F10</kbd></li>
+            <li><span>Pular para item pelo nome (árvore)</span><span class="muted">digite o início do nome</span></li>
+            <li><span>Fechar sobreposições</span><kbd>Esc</kbd></li>
+          </ul>
+        </section>
+        <section class="atalhos-grupo" aria-labelledby="atalhos-grupo-janela">
+          <h4 id="atalhos-grupo-janela">Janela</h4>
+          <ul class="atalhos-lista">
+            <li><span>Recarregar</span><kbd>Ctrl</kbd><kbd>R</kbd></li>
+            <li><span>Recarregar forçado</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>R</kbd></li>
+            <li><span>Zoom</span><kbd>Ctrl</kbd><kbd>+</kbd> <span class="muted">/</span> <kbd>Ctrl</kbd><kbd>-</kbd></li>
+            <li><span>Zoom padrão</span><kbd>Ctrl</kbd><kbd>0</kbd></li>
+            <li><span>Fonte do editor</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>+</kbd> <span class="muted">/</span> <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>-</kbd></li>
+            <li><span>Fonte do terminal</span><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>+</kbd> <span class="muted">/</span> <kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>-</kbd></li>
+            <li><span>Restaurar fontes dos painéis</span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>0</kbd></li>
+            <li><span>Tela cheia</span><kbd>F11</kbd></li>
+          </ul>
+        </section>
       </div>
     </div>
   </div>

@@ -341,19 +341,12 @@ export function getQaArtifactsDir(raizProjeto?: string): string {
  * Caminho do diretorio de dados do usuario (appData)
  */
 export function getUserDataPath(): string {
-  const { app } = require('electron');
-  return app.getPath('userData');
-}
-
-/**
- * Caminho do diretorio de dados do usuario (appData)
- * Com fallback seguro quando executado fora do Electron.
- */
-export function userDataDir(): string {
+  // Funciona dentro e fora do Electron (QA, scripts, testes de unidade).
   try {
     const { app } = require('electron');
     if (app && typeof app.getPath === 'function') {
-      return app.getPath('userData');
+      const p = app.getPath('userData');
+      if (p) return p;
     }
   } catch {}
   const envDir = process.env.DG_USERDATA;
@@ -362,11 +355,25 @@ export function userDataDir(): string {
 }
 
 /**
+ * Caminho do diretorio de dados do usuario (appData)
+ * Com fallback seguro quando executado fora do Electron.
+ */
+export function userDataDir(): string {
+  return getUserDataPath();
+}
+
+/**
  * Caminho do diretorio de cache do usuario
  */
 export function getCachePath(): string {
-  const { app } = require('electron');
-  return app.getPath('cache');
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      const p = app.getPath('cache');
+      if (p) return p;
+    }
+  } catch {}
+  return join(getUserDataPath(), 'Cache');
 }
 
 /**

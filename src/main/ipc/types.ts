@@ -303,6 +303,15 @@ export interface GitReposResult extends IpcResult {
 // CHAT
 // ============================================================================
 
+/** Uso estimado de tokens/custo de um turno (persistido na mensagem). */
+export interface ChatUsage {
+  entrada: number;
+  saida: number;
+  total: number;
+  custoUSD: number | null;
+  estimado: true;
+}
+
 /** Mensagem de chat */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -310,6 +319,7 @@ export interface ChatMessage {
   at: number;
   provider?: string;
   em?: string;
+  usage?: ChatUsage;
 }
 
 /** Payload para enviar mensagem de chat */
@@ -334,6 +344,8 @@ export interface ChatSendResult extends IpcResult {
   propostas?: unknown[];
   autoAprovacao?: { aplicada: boolean; motivo: string };
   diagnostico?: Record<string, unknown>;
+  usage?: ChatUsage;
+  tentativas?: string[];
 }
 
 /** Payload para carregar chat */

@@ -4,7 +4,7 @@
  */
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment, StateField, StateEffect, Prec } from '@codemirror/state'
-import { keymap, Decoration as CMDecoration, WidgetType } from '@codemirror/view'
+import { keymap, Decoration as CMDecoration, WidgetType, ViewPlugin } from '@codemirror/view'
 import { searchKeymap, openSearchPanel } from '@codemirror/search'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { javascript } from '@codemirror/lang-javascript'
@@ -16,6 +16,7 @@ import { python } from '@codemirror/lang-python'
 import { xml } from '@codemirror/lang-xml'
 import { detectarFimDeLinha, paraDisco, paraDocumento } from './editor-texto.js'
 import { anexarOverviewRuler } from './features/editor/overview-ruler.js'
+import { anexarMinimapa } from './features/editor/minimap.js'
 
 const langCompartment = new Compartment()
 const themeCompartment = new Compartment()
@@ -109,6 +110,39 @@ function temaEscuro() {
   return document.body.classList.contains('tema-escuro')
 }
 
+/** Tema do CodeMirror: alto contraste tem precedência sobre claro/escuro. */
+function temaEditor() {
+  if (document.body.classList.contains('dg-alto-contraste')) return temaAltoContraste()
+  return temaEscuro() ? oneDark : []
+}
+
+function temaAltoContraste() {
+  return EditorView.theme(
+    {
+      '&': { backgroundColor: 'var(--dg-bg)', color: 'var(--dg-text)' },
+      '.cm-content': { caretColor: 'var(--dg-accent)' },
+      '.cm-gutters': {
+        backgroundColor: 'var(--dg-bg)',
+        color: 'var(--dg-text)',
+        borderRight: '2px solid var(--dg-border)'
+      },
+      '.cm-lineNumbers .cm-gutterElement': { color: 'var(--dg-text)' },
+      '.cm-activeLine': { backgroundColor: 'transparent' },
+      '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--dg-text)' },
+      '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': {
+        backgroundColor: 'var(--dg-selection)'
+      },
+      '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--dg-text)' },
+      '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
+        backgroundColor: 'transparent',
+        outline: '2px solid var(--dg-accent)'
+      },
+      '.cm-gutterElement': { color: 'var(--dg-text)' }
+    },
+    { dark: temaEscuro() }
+  )
+}
+
 function lineRange(doc, line1based) {
   if (line1based < 1 || line1based > doc.lines) return null
   const line = doc.line(line1based)
@@ -126,10 +160,166 @@ function buildDiffDecorations(doc, linhasDel, linhasAdd) {
     if (r) ranges.push(addMark.range(r.from))
   }
   ranges.sort((a, b) => a.from - b.from)
-  return CMDecoration.of(ranges)
+  return CMDecoration.set(ranges)
 }
 
-export function criarEditor(parent, { onChange, onSave } = {}) {
+const ABERTURAS = { '(': ')', '[': ']', '{': '}' }
+const FECHAMENTOS = { ')': '(', ']': '[', '}': '{' }
+const EXT_CODIGO = new Set(['js', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'css'])
+
+function extDe(caminho) {
+  const m = String(caminho || '').toLowerCase().match(/\.([a-z0-9]+)$/)
+  return m ? m[1] : ''
+}
+
+function diagEquilibrio(doc, ext) {
+  const diags = []
+  const pilha = []
+  let emStr = null
+  let emBloco = false
+  let emLinha = false
+  const texto = doc.toString()
+  for (let i = 0; i < texto.length; i++) {
+    const ch = texto[i]
+    const prox = texto[i + 1]
+    if (emLinha) {
+      if (ch === '\n') emLinha = false
+      continue
+    }
+    if (emBloco) {
+      if (ch === '*' && prox === '/') {
+        emBloco = false
+        i++
+      }
+      continue
+    }
+    if (emStr) {
+      if (ch === '\\') {
+        i++
+        continue
+      }
+      if (ch === emStr) emStr = null
+      continue
+    }
+    if (ch === '"' || ch === "'" || (ext !== 'css' && ch === '`')) {
+      emStr = ch
+      continue
+    }
+    if (ch === '/' && prox === '/') {
+      emLinha = true
+      i++
+      continue
+    }
+    if (ch === '/' && prox === '*') {
+      emBloco = true
+      i++
+      continue
+    }
+    if (ABERTURAS[ch]) {
+      pilha.push({ ch, pos: i })
+      continue
+    }
+    if (FECHAMENTOS[ch]) {
+      const topo = pilha.pop()
+      if (!topo || topo.ch !== FECHAMENTOS[ch]) {
+        diags.push({
+          linha: doc.lineAt(i).number,
+          severidade: 'erro',
+          mensagem: 'Fechamento "' + ch + '" sem abertura correspondente'
+        })
+        if (diags.length >= 50) return diags
+      }
+    }
+  }
+  for (const p of pilha.slice(0, 5)) {
+    diags.push({
+      linha: doc.lineAt(p.pos).number,
+      severidade: 'aviso',
+      mensagem: 'Abertura "' + p.ch + '" sem fechamento'
+    })
+  }
+  return diags
+}
+
+function diagJson(doc) {
+  try {
+    JSON.parse(doc.toString())
+    return []
+  } catch (e) {
+    const msg = String((e && e.message) || e)
+    let linha = 1
+    const l = /line (\d+)/i.exec(msg)
+    const p = /position (\d+)/i.exec(msg)
+    if (l) linha = Number(l[1]) || 1
+    else if (p) {
+      const pos = Math.min(Number(p[1]) || 0, doc.length)
+      linha = doc.lineAt(pos).number
+    }
+    return [{ linha, severidade: 'erro', mensagem: msg }]
+  }
+}
+
+function calcularDiagnosticos(view, caminho) {
+  const doc = view.state.doc
+  if (doc.length > 300_000) return []
+  const ext = extDe(caminho)
+  if (ext === 'json') {
+    const errosJson = diagJson(doc)
+    return errosJson.length ? errosJson : diagEquilibrio(doc, ext)
+  }
+  if (EXT_CODIGO.has(ext)) return diagEquilibrio(doc, ext)
+  return []
+}
+
+function decoDiagnosticos(doc, diags) {
+  const ranges = []
+  const vistos = new Set()
+  for (const d of diags) {
+    const ln = Math.min(Math.max(1, Number(d.linha) || 1), doc.lines)
+    if (vistos.has(ln)) continue
+    vistos.add(ln)
+    const cls = d.severidade === 'erro' ? 'cm-diag-erro' : 'cm-diag-aviso'
+    ranges.push(CMDecoration.line({ class: cls }).range(doc.line(ln).from))
+  }
+  ranges.sort((a, b) => a.from - b.from)
+  return CMDecoration.set(ranges)
+}
+
+function formatarJsonTexto(texto) {
+  return JSON.stringify(JSON.parse(texto), null, 2) + '\n'
+}
+
+const PARSER_PRETTIER = {
+  js: 'babel',
+  mjs: 'babel',
+  cjs: 'babel',
+  jsx: 'babel',
+  ts: 'typescript',
+  tsx: 'typescript',
+  css: 'css'
+}
+
+const OPCOES_PRETTIER = {
+  printWidth: 100,
+  semi: false,
+  singleQuote: true,
+  trailingComma: 'none',
+  arrowParens: 'avoid'
+}
+
+async function formatarComPrettier(texto, ext) {
+  const parser = PARSER_PRETTIER[ext]
+  if (!parser) return null
+  const prettier = await import('prettier/standalone')
+  const estree = await import('prettier/plugins/estree')
+  const plugins = [estree]
+  if (parser === 'babel') plugins.push(await import('prettier/plugins/babel'))
+  else if (parser === 'typescript') plugins.push(await import('prettier/plugins/typescript'))
+  else plugins.push(await import('prettier/plugins/postcss'))
+  return prettier.format(texto, { parser, plugins, ...OPCOES_PRETTIER })
+}
+
+export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
   let view = null
   let caminhoAtual = null
   let salvo = ''
@@ -204,6 +394,27 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     }
   ])
 
+  const emitirDiagnosticos = (lista) => {
+    if (typeof onDiagnostics === 'function') onDiagnostics(lista, caminhoAtual)
+  }
+
+  const diagPlugin = ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.diags = calcularDiagnosticos(view, caminhoAtual)
+        this.decorations = decoDiagnosticos(view.state.doc, this.diags)
+        queueMicrotask(() => emitirDiagnosticos(this.diags))
+      }
+      update(u) {
+        if (!u.docChanged && !u.viewportChanged) return
+        this.diags = calcularDiagnosticos(u.view, caminhoAtual)
+        this.decorations = decoDiagnosticos(u.state.doc, this.diags)
+        if (u.docChanged) emitirDiagnosticos(this.diags)
+      }
+    },
+    { decorations: (v) => v.decorations }
+  )
+
   const state = EditorState.create({
     doc: '',
     extensions: [
@@ -214,8 +425,9 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
       tabSugestao,
       ghostField,
       langCompartment.of([]),
-      themeCompartment.of(temaEscuro() ? oneDark : []),
+      themeCompartment.of(temaEditor()),
       diffField,
+      diagPlugin,
       EditorView.updateListener.of((u) => {
         if (u.docChanged && typeof onChange === 'function') {
           onChange(u.state.doc.toString())
@@ -224,13 +436,15 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
         if (u.docChanged || u.selectionSet || u.geometryChanged) {
           overview?.refresh()
         }
+        if (u.docChanged || u.geometryChanged || u.viewportChanged) minimapa.atualizar()
       }),
       EditorView.theme({
         '&': { height: '100%', position: 'relative' },
         '.cm-scroller': {
           overflow: 'auto',
-          fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)",
-          paddingRight: '14px'
+          fontFamily: "var(--dg-editor-fonte, var(--fonte-mono, 'Cascadia Code', Consolas, monospace))",
+          fontSize: 'var(--dg-editor-fs, 13px)',
+          paddingRight: 'var(--dg-editor-pad-right, 14px)'
         },
         '.cm-content': { wordBreak: 'break-word' },
         '.cm-diff-del-line': {
@@ -245,7 +459,15 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
         '.cm-diff-add-line .cm-gutterElement': {
           borderLeft: '3px solid #3dd68c'
         },
-        '.cm-dg-ghost': { color: '#8b949e', fontStyle: 'italic' }
+        '.cm-dg-ghost': { color: '#8b949e', fontStyle: 'italic' },
+        '.cm-line.cm-diag-erro': {
+          backgroundColor: 'rgba(248, 81, 73, 0.1)',
+          boxShadow: 'inset 2px 0 0 #f85149'
+        },
+        '.cm-line.cm-diag-aviso': {
+          backgroundColor: 'rgba(210, 153, 34, 0.09)',
+          boxShadow: 'inset 2px 0 0 #d29922'
+        }
       })
     ]
   })
@@ -255,6 +477,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
   overview = anexarOverviewRuler(view, {
     getSalvo: () => salvo
   })
+  const minimapa = anexarMinimapa(view, { temaEscuro })
 
   function limparDiff() {
     view.dispatch({ effects: setDiffMarks.of(CMDecoration.none) })
@@ -300,12 +523,13 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
         basicSetup,
         EditorState.readOnly.of(true),
         langCompartment.of(langPorExt(opts.caminho || caminhoAtual)),
-        themeCompartment.of(temaEscuro() ? oneDark : []),
+        themeCompartment.of(temaEditor()),
         EditorView.theme({
           '&': { height: '100%' },
           '.cm-scroller': {
             overflow: 'auto',
-            fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)"
+            fontFamily: "var(--dg-editor-fonte, var(--fonte-mono, 'Cascadia Code', Consolas, monospace))",
+            fontSize: 'var(--dg-editor-fs, 13px)'
           },
           '.cm-diff-add-line': {
             backgroundColor: 'rgba(61, 214, 140, 0.16)'
@@ -358,7 +582,7 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
         changes: { from: 0, to: view.state.doc.length, insert: doc },
         effects: [
           langCompartment.reconfigure(langPorExt(caminho)),
-          themeCompartment.reconfigure(temaEscuro() ? oneDark : []),
+          themeCompartment.reconfigure(temaEditor()),
           setDiffMarks.of(CMDecoration.none)
         ]
       })
@@ -377,22 +601,59 @@ export function criarEditor(parent, { onChange, onSave } = {}) {
     mostrarDiffProposta,
     aplicarTema: () => {
       view.dispatch({
-        effects: themeCompartment.reconfigure(temaEscuro() ? oneDark : [])
+        effects: themeCompartment.reconfigure(temaEditor())
       })
+      minimapa.atualizar()
       if (sideView) {
         sideView.dispatch({
-          effects: themeCompartment.reconfigure(temaEscuro() ? oneDark : [])
+          effects: themeCompartment.reconfigure(temaEditor())
         })
       }
     },
     buscar: () => {
       openSearchPanel(view)
     },
+    irParaLinha: (ln) => {
+      const total = view.state.doc.lines
+      const n = Math.max(1, Math.min(total, Number(ln) || 1))
+      const linha = view.state.doc.line(n)
+      view.dispatch({
+        selection: { anchor: linha.from },
+        effects: EditorView.scrollIntoView(linha.from, { y: 'center' })
+      })
+      view.focus()
+    },
+    diagnosticos: () => calcularDiagnosticos(view, caminhoAtual),
+    formatar: async () => {
+      const ext = extDe(caminhoAtual)
+      const atual = view.state.doc.toString()
+      try {
+        let novo
+        if (ext === 'json') {
+          novo = formatarJsonTexto(atual)
+        } else {
+          novo = await formatarComPrettier(atual, ext)
+          if (novo == null) {
+            return { ok: false, erro: 'tipo nao suportado: .' + (ext || '?') }
+          }
+        }
+        if (novo === atual) return { ok: true, alterado: false }
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: novo } })
+        return { ok: true, alterado: true }
+      } catch (e) {
+        const msg = String((e && e.message) || e).split('\n')[0]
+        return { ok: false, erro: msg }
+      }
+    },
+    minimapaAlternar: (mostrar) => minimapa.alternar(mostrar),
+    minimapaVisivel: () => minimapa.visivel(),
     focar: () => view.focus(),
+    requestMeasure: () => view.requestMeasure(),
     overviewRefresh: () => overview?.refresh(),
     overviewDiff: (parcial) => overview?.setDiff(parcial || {}),
     destruir: () => {
       limparDiff()
+      minimapa.destroy()
       overview?.destroy()
       overview = null
       view.destroy()

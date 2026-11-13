@@ -47,7 +47,7 @@ export interface RelatorioQA {
   avaliacaoDetalhe: string
 }
 
-export type SuiteNome = 'ipc' | 'e2e' | 'perf' | 'all'
+export type SuiteNome = 'ipc' | 'e2e' | 'perf' | 'visual' | 'all'
 
 export interface OpcoesQA {
   suite: SuiteNome

@@ -3,13 +3,16 @@
  * Extraido de src/main/index.ts
  */
 
-import { ipcMain } from 'electron';
+import { ipcMain, shell } from 'electron';
 import {
   lerArquivo,
   lerArquivoBase64,
   salvarArquivo,
   listarDiretorio,
   arquivoExiste,
+  criarEntrada,
+  renomearEntrada,
+  moverEntrada,
 } from '../arquivos';
 import { caminhoSeguro, isErroPayload, exigirString, exigirArrayStrings } from '../ipc-seguro';
 import { dglog } from '../dglog';
@@ -181,6 +184,103 @@ export async function handleArquivoExiste(
   }
 }
 
+
+/**
+ * Handler para criar arquivo ou pasta
+ */
+export async function handleArquivoCriar(
+  _event: Electron.IpcMainInvokeEvent,
+  caminho: unknown,
+  tipo: unknown,
+  pastas: unknown
+): Promise<IpcResult & { erro?: string }> {
+  const c = exigirString(caminho, 'caminho');
+  if (isErroPayload(c)) return { ok: false, erro: c.erro };
+  if (tipo !== 'file' && tipo !== 'dir') return { ok: false, erro: 'tipo invalido' };
+  const p = exigirArrayStrings(pastas, 'pastas');
+  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+  try {
+    return await criarEntrada(c, tipo, p);
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    dglog('[arquivo:criar] erro: ' + msg);
+    return { ok: false, erro: msg };
+  }
+}
+
+/**
+ * Handler para renomear arquivo ou pasta
+ */
+export async function handleArquivoRenomear(
+  _event: Electron.IpcMainInvokeEvent,
+  caminho: unknown,
+  novoNome: unknown,
+  pastas: unknown
+): Promise<IpcResult & { caminho?: string; erro?: string }> {
+  const c = exigirString(caminho, 'caminho');
+  if (isErroPayload(c)) return { ok: false, erro: c.erro };
+  const nome = exigirString(novoNome, 'novoNome');
+  if (isErroPayload(nome)) return { ok: false, erro: nome.erro };
+  const p = exigirArrayStrings(pastas, 'pastas');
+  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+  try {
+    return await renomearEntrada(c, nome, p);
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    dglog('[arquivo:renomear] erro: ' + msg);
+    return { ok: false, erro: msg };
+  }
+}
+
+/**
+ * Handler para mover arquivo ou pasta
+ */
+export async function handleArquivoMover(
+  _event: Electron.IpcMainInvokeEvent,
+  origem: unknown,
+  destinoPasta: unknown,
+  pastas: unknown
+): Promise<IpcResult & { caminho?: string; erro?: string }> {
+  const o = exigirString(origem, 'origem');
+  if (isErroPayload(o)) return { ok: false, erro: o.erro };
+  const d = exigirString(destinoPasta, 'destinoPasta');
+  if (isErroPayload(d)) return { ok: false, erro: d.erro };
+  const p = exigirArrayStrings(pastas, 'pastas');
+  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+  try {
+    return await moverEntrada(o, d, p);
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    dglog('[arquivo:mover] erro: ' + msg);
+    return { ok: false, erro: msg };
+  }
+}
+
+/**
+ * Handler para excluir (lixeira do sistema) arquivo ou pasta
+ */
+export async function handleArquivoExcluir(
+  _event: Electron.IpcMainInvokeEvent,
+  caminho: unknown,
+  pastas: unknown
+): Promise<IpcResult & { erro?: string }> {
+  const c = exigirString(caminho, 'caminho');
+  if (isErroPayload(c)) return { ok: false, erro: c.erro };
+  const p = exigirArrayStrings(pastas, 'pastas');
+  if (isErroPayload(p)) return { ok: false, erro: p.erro };
+  const seg = caminhoSeguro(c, p);
+  if (!seg.ok) return { ok: false, erro: seg.erro };
+  if (seg.rel === '.') return { ok: false, erro: 'nao e possivel excluir a raiz' };
+  try {
+    await shell.trashItem(seg.abs);
+    return { ok: true };
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    dglog('[arquivo:excluir] erro: ' + msg);
+    return { ok: false, erro: msg };
+  }
+}
+
 // ============================================================================
 // FUNCAO DE REGISTRO
 // ============================================================================
@@ -196,6 +296,10 @@ export function registrarHandlersArquivo(): void {
   ipcMain.handle('arquivo:salvar', handleArquivoSalvar);
   ipcMain.handle('arquivo:listar', handleArquivoListar);
   ipcMain.handle('arquivo:existe', handleArquivoExiste);
+  ipcMain.handle('arquivo:criar', handleArquivoCriar);
+  ipcMain.handle('arquivo:renomear', handleArquivoRenomear);
+  ipcMain.handle('arquivo:mover', handleArquivoMover);
+  ipcMain.handle('arquivo:excluir', handleArquivoExcluir);
 
   dglog('[ipc:arquivos] handlers registrados com sucesso');
 }

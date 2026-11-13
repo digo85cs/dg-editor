@@ -24,7 +24,8 @@ import {
   getContentView,
   navegarPara,
   criarJanelaNavegador,
-  forcarLayoutNavegador
+  forcarLayoutNavegador,
+  iniciarDownloadExplicito
 } from './janela'
 import { garantirTokenSessao, validarToken, getTokenSessao } from './token'
 import { resolverCaminhoDownload } from './download-nome'
@@ -646,12 +647,18 @@ async function handleBaixar(body: Json): Promise<Json> {
 
   return new Promise((resolve) => {
     const sess = wc.session
+    // Impede o handler persistente (janela.ts) de salvar o mesmo item duas vezes.
+    const fimExplicito = iniciarDownloadExplicito()
     let settled = false
+    const concluir = (valor: Json) => {
+      fimExplicito()
+      resolve(valor)
+    }
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
       sess.removeListener('will-download', onWill)
-      resolve({ ok: false, motivo: 'timeout download 60s' })
+      concluir({ ok: false, motivo: 'timeout download 60s' })
     }, 60_000)
 
     const onWill = (_e: ElectronEvent, item: DownloadItem) => {
@@ -667,7 +674,7 @@ async function handleBaixar(body: Json): Promise<Json> {
         clearTimeout(timer)
         sess.removeListener('will-download', onWill)
         if (state === 'completed') {
-          resolve({
+          concluir({
             ok: true,
             caminho,
             bytes: item.getTotalBytes(),
@@ -677,7 +684,7 @@ async function handleBaixar(body: Json): Promise<Json> {
             filename: nomeSalvo
           })
         } else {
-          resolve({
+          concluir({
             ok: false,
             motivo: 'download ' + state,
             caminho,
@@ -696,7 +703,7 @@ async function handleBaixar(body: Json): Promise<Json> {
         settled = true
         clearTimeout(timer)
         sess.removeListener('will-download', onWill)
-        resolve({ ok: false, motivo: String((e as Error).message || e) })
+        concluir({ ok: false, motivo: String((e as Error).message || e) })
       }
     }
   })

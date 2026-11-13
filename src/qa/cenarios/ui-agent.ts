@@ -1,5 +1,6 @@
 import type { Page } from 'playwright-core'
 import type { ResultadoCenario } from '../tipos'
+import { fecharSobreposicoes } from './limpeza'
 
 export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   const out: ResultadoCenario[] = []
@@ -7,8 +8,8 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
-      await page.locator('.center-tab[data-center-pane="agent"]').click()
-      await page.waitForSelector('#pane-agent', { timeout: 5000 })
+      await page.locator('.right-tab[data-pane="agent"]').click()
+      await page.waitForSelector('#pane-agent.active', { timeout: 5000 })
       await page.waitForSelector('#agent-input', { timeout: 5000 })
       const plan = page.locator('#agent-plan-mode')
       const send = page.locator('#agent-send')
@@ -50,7 +51,14 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
-      await page.locator('#agent-plan-mode').check()
+      const ligou = await page.evaluate(() => {
+        const el = document.getElementById('agent-plan-mode') as HTMLInputElement | null
+        if (!el) return false
+        el.checked = true
+        el.dispatchEvent(new Event('change', { bubbles: true }))
+        const modo = document.getElementById('chat-mode-select') as HTMLSelectElement | null
+        return el.checked && modo?.value === 'plan'
+      })
       const checked = await page.locator('#agent-plan-mode').isChecked()
       await page.locator('#agent-input').fill('@projeto listar estrutura')
       const val = await page.locator('#agent-input').inputValue()
@@ -58,11 +66,17 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
         id: 'ui.agent.plan-mencao',
         area: 'ui',
         titulo: 'Plan mode + @projeto no input',
-        severidade: checked && /@projeto/.test(val) ? 'ok' : 'erro',
-        duracaoMs: Date.now() - t0
+        severidade: ligou && checked && /@projeto/.test(val) ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'modoSincronizado=' + ligou
       })
       await page.locator('#agent-input').fill('')
-      await page.locator('#agent-plan-mode').uncheck()
+      await page.evaluate(() => {
+        const el = document.getElementById('agent-plan-mode') as HTMLInputElement | null
+        if (!el) return
+        el.checked = false
+        el.dispatchEvent(new Event('change', { bubbles: true }))
+      })
     } catch (e) {
       out.push({
         id: 'ui.agent.plan-mencao',
@@ -105,17 +119,19 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
-      page.once('dialog', async (d) => {
-        await d.accept().catch(() => {})
+      await fecharSobreposicoes(page)
+      const botao = await page.locator('#btn-agent-undo').count()
+      const lista = await page.evaluate(async () => {
+        const r = await (window as any).api.invoke('agente:checkpoint-listar', 5)
+        return { ok: r?.ok !== false, n: Array.isArray(r?.checkpoints) ? r.checkpoints.length : -1 }
       })
-      await page.locator('#btn-agent-undo').click({ timeout: 3000 })
-      await page.waitForTimeout(400)
       out.push({
         id: 'ui.agent.undo',
         area: 'ui',
-        titulo: 'Desfazer apply (checkpoint) responde',
-        severidade: 'ok',
-        duracaoMs: Date.now() - t0
+        titulo: 'Desfazer apply presente e checkpoints listaveis',
+        severidade: botao === 1 && lista.ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: 'checkpoints=' + lista.n
       })
     } catch (e) {
       out.push({
@@ -132,21 +148,18 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
-      page.once('dialog', async (d) => {
-        await d.accept().catch(() => {})
+      const plano = await page.evaluate(async () => {
+        const r = await (window as any).api.invoke('agente:plano-ler')
+        return { ok: r?.ok !== false, passos: Array.isArray(r?.plano?.passos) ? r.plano.passos.length : -1 }
       })
-      await page.locator('#btn-agent-exec-plano').click({ timeout: 3000 })
-      await page.waitForTimeout(500)
-      const outEl = page.locator('#agent-output')
-      const txt = ((await outEl.textContent()) || '').trim()
-      // sem plano salvo: alert; com plano: texto — ambos ok se UI responde
+      const botao = await page.locator('#btn-agent-exec-plano').count()
       out.push({
         id: 'ui.agent.exec-plano',
         area: 'ui',
-        titulo: 'Executar plano (vazio ou salvo) responde',
-        severidade: 'ok',
+        titulo: 'Executar plano disponivel e plano legivel',
+        severidade: botao === 1 && plano.ok ? 'ok' : 'erro',
         duracaoMs: Date.now() - t0,
-        detalhe: txt.slice(0, 80) || 'dialog/empty'
+        detalhe: 'passos=' + plano.passos
       })
     } catch (e) {
       out.push({
@@ -188,6 +201,7 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
   {
     const t0 = Date.now()
     try {
+      await fecharSobreposicoes(page)
       await page.locator('#btn-contas').click({ timeout: 5000 })
       await page.waitForSelector('#contas-adapta', { timeout: 5000 })
       const copiar = page.locator('#btn-adapta-copiar')
@@ -202,8 +216,9 @@ export async function cenariosUiAgent(page: Page): Promise<ResultadoCenario[]> {
         severidade: ok ? 'ok' : 'erro',
         duracaoMs: Date.now() - t0
       })
-      await page.locator('#btn-contas-close').click({ timeout: 3000 }).catch(() => {})
+      await fecharSobreposicoes(page)
     } catch (e) {
+      await fecharSobreposicoes(page)
       out.push({
         id: 'ui.adapta.painel',
         area: 'ui',

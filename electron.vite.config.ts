@@ -12,6 +12,7 @@ export default defineConfig({
     resolve: { alias: sharedAlias },
     build: {
       target: 'node20',
+      minify: 'esbuild',
       rollupOptions: {
         input: resolve('src/main/index.ts'),
         external: ['electron', 'bcryptjs', 'node-pty']
@@ -23,6 +24,7 @@ export default defineConfig({
     resolve: { alias: sharedAlias },
     build: {
       target: 'node20',
+      minify: 'esbuild',
       rollupOptions: {
         input: resolve('src/preload/index.ts'),
         external: ['electron']
@@ -36,6 +38,10 @@ export default defineConfig({
         '@main': resolve('src/main'),
         '@shared': resolve('src/shared')
       }
+    },
+    build: {
+      minify: 'esbuild',
+      chunkSizeWarningLimit: 2500
     },
     plugins: []
   }

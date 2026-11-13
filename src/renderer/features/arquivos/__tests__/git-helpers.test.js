@@ -18,7 +18,7 @@ describe('badgeGitHtml', () => {
   })
   it('gera badge com cor por status', () => {
     expect(badgeGitHtml('M')).toContain('data-git="M"')
-    expect(corGit('A')).toBe('#2e7d4f')
-    expect(corGit('?')).toBe('#888')
+    expect(corGit('A')).toBe('var(--dg-git-a)')
+    expect(corGit('?')).toBe('var(--dg-git-outro)')
   })
 })

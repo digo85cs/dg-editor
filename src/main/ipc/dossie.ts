@@ -6,7 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
-import type { DossieSnapshot } from '../dossie';
+import { caminhoDossie, type DossieSnapshot } from '../dossie';
 import type { IpcResult } from './types';
 
 // ============================================================================
@@ -65,7 +65,6 @@ export function handleDossieCaminho(
   _event: Electron.IpcMainInvokeEvent
 ): { ok: boolean; erro?: string; caminho?: string } {
   try {
-    const { caminhoDossie } = require('../dossie');
     return { ok: true, caminho: caminhoDossie() };
   } catch (e: unknown) {
     return { ok: false, erro: String(e) };

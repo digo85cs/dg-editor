@@ -1,6 +1,7 @@
 /**
  * Diálogos no tema DG Editor (substitui alert/confirm nativos).
  */
+import { criarFocusTrap } from '../../utils/focus-trap.js'
 
 function esc(s) {
   return String(s || '')
@@ -20,6 +21,7 @@ export function dgDialog(opts) {
     const defaultId = Number.isFinite(opts.defaultId) ? opts.defaultId : 0
     const cancelId = Number.isFinite(opts.cancelId) ? opts.cancelId : buttons.length - 1
     const tipo = opts.type || 'question'
+    const focoAnterior = document.activeElement
 
     const overlay = document.createElement('div')
     overlay.className = 'dg-dialog-overlay'
@@ -69,9 +71,11 @@ export function dgDialog(opts) {
 
     const foot = document.createElement('div')
     foot.className = 'dg-dialog-foot'
+    let trap = null
     const finish = (idx) => {
-      overlay.remove()
       document.removeEventListener('keydown', onKey, true)
+      trap?.destroy()
+      overlay.remove()
       resolve(idx)
     }
     buttons.forEach((label, i) => {
@@ -105,6 +109,7 @@ export function dgDialog(opts) {
     document.body.appendChild(overlay)
     const focusBtn = foot.querySelectorAll('button')[defaultId] || foot.querySelector('button')
     focusBtn?.focus()
+    trap = criarFocusTrap(overlay, { anterior: focoAnterior })
   })
 }
 

@@ -6,6 +6,7 @@
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
+import { getSystemProfile, profileStrength } from '../profile';
 
 // ============================================================================
 // HANDLERS DE SISTEMA
@@ -18,7 +19,6 @@ export function handleSystemGetProfile(
   _event: Electron.IpcMainInvokeEvent
 ): IpcResult & { ok: boolean; erro?: string; cpus?: unknown; totalMemory?: number; hostname?: string } {
   try {
-    const { getSystemProfile } = require('../profile');
     const p = getSystemProfile();
     return { ok: true, ...p };
   } catch (e: unknown) {
@@ -33,7 +33,6 @@ export function handleSystemProfileStrength(
   _event: Electron.IpcMainInvokeEvent
 ): IpcResult & { ok: boolean; erro?: string; forca?: string; label?: string } {
   try {
-    const { getSystemProfile, profileStrength } = require('../profile');
     const forca = profileStrength(getSystemProfile()) as string;
     const label =
       forca === 'strong' ? 'forte' : forca === 'medium' ? 'média' : forca === 'light' ? 'leve' : String(forca);

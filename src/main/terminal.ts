@@ -3,6 +3,7 @@
  */
 import type { WebContents } from 'electron'
 import { dglog } from './dglog'
+import { extrairCwdDeOsc } from './terminal-osc'
 import {
   acharShellPorId,
   getShellCache,
@@ -33,6 +34,8 @@ interface Sessao {
   pty: PtyProc
   shell: ShellInfo
   sender: WebContents
+  cwd: string
+  tail: string
 }
 
 const sessoes = new Map<string, Sessao>()
@@ -93,7 +96,7 @@ export function createTerminal(
   id: string,
   opts: TerminalOpts,
   sender: WebContents
-): { shell: ShellInfo; pid: number } {
+): { shell: ShellInfo; pid: number; cwd: string } {
   if (sessoes.has(id)) {
     killTerminal(id)
   }
@@ -115,12 +118,18 @@ export function createTerminal(
         env
       }) as unknown as PtyProc
 
-      const sess: Sessao = { pty: proc, shell, sender }
+      const sess: Sessao = { pty: proc, shell, sender, cwd, tail: '' }
       sessoes.set(id, sess)
 
       proc.onData((data: string) => {
         if (sender.isDestroyed()) return
         sender.send('terminal:data', { id, data })
+        sess.tail = (sess.tail + data).slice(-512)
+        const novoCwd = extrairCwdDeOsc(sess.tail)
+        if (novoCwd && novoCwd !== sess.cwd) {
+          sess.cwd = novoCwd
+          sender.send('terminal:cwd', { id, cwd: novoCwd })
+        }
       })
       proc.onExit(({ exitCode }: { exitCode: number }) => {
         sessoes.delete(id)
@@ -133,7 +142,7 @@ export function createTerminal(
       sender.once('destroyed', onDestroyed)
 
       dglog(`[terminal] sessão ${id} pid=${proc.pid} shell=${shell.tipo} ${shell.versao || ''}`)
-      return { shell, pid: proc.pid }
+      return { shell, pid: proc.pid, cwd }
     } catch (e) {
       lastErr = e
       dglog(`[terminal] spawn falhou (${shell.exe}): ${String((e as Error).message || e)}`)

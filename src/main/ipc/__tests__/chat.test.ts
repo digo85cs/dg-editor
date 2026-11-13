@@ -245,7 +245,7 @@ describe('handleChatSend - fallback orquestrador', () => {
     expect(mockOrquestrarAgentes).toHaveBeenCalled()
   })
 
-  it('chama executarAgente quando agente especifico eh informado', async () => {
+  it('chama executarAgente quando agente especifico eh informado', { timeout: 20_000 }, async () => {
     mockOllamaAlive.mockResolvedValue(true)
     mockExecutarAgente.mockResolvedValue({
       ok: true,

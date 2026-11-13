@@ -9,11 +9,6 @@ import {
   isErroPayload
 } from '../ipc-seguro'
 import { criarCheckpoint, listarCheckpoints, restaurarCheckpoint, ultimoCheckpoint } from './checkpoint'
-try { const m = require('./mencoes-ipc'); if (m.registrarMencoesIpc) m.registrarMencoesIpc() } catch {}
-try { const m = require('./contexto-ipc'); if (m.registrarContextoIpc) m.registrarContextoIpc() } catch {}
-try { const m = require('./orquestrador-ipc'); if (m.registrarOrquestradorIpc) m.registrarOrquestradorIpc() } catch {}
-try { const m = require('./fila-ipc'); if (m.registrarFilaIpc) m.registrarFilaIpc() } catch {}
-try { const m = require('./plano-ipc'); if (m.registrarPlanoIpc) m.registrarPlanoIpc() } catch {}
 import { registrarSimbolosIpc } from '../simbolos-ipc'
 import { expandirMencoes } from './mencoes'
 import { orquestrarAgentes } from './orquestrador'
@@ -98,9 +93,22 @@ function emitirProgresso(event: Electron.IpcMainInvokeEvent, ev: unknown): void 
 }
 
 export function registerAgentExtrasIpc(): void {
-  ipcMain.handle('agente:checkpoint-criar', async (_e, arquivos: unknown, origem?: unknown) => {
+  ipcMain.handle('agente:checkpoint-criar', async (_e, arquivos: unknown, origem?: unknown, pastasRaw?: unknown) => {
     if (!Array.isArray(arquivos) || !arquivos.every((x) => typeof x === 'string')) {
       return { ok: false, erro: 'arquivos deve ser string[]' }
+    }
+    const pastas = exigirArrayStrings(pastasRaw, 'pastas')
+    if (isErroPayload(pastas)) return pastas
+    const raizes = pastas.map((p) => p.trim()).filter(Boolean)
+    if (raizes.length) {
+      const seguros: string[] = []
+      for (const a of arquivos as string[]) {
+        const seg = caminhoSeguro(a, raizes)
+        if (!seg.ok) return { ok: false, erro: 'arquivo fora da raiz aberta: ' + a }
+        seguros.push(seg.abs)
+      }
+      const ck = await criarCheckpoint(seguros, typeof origem === 'string' ? origem : 'manual')
+      return { ok: true, checkpoint: ck }
     }
     const ck = await criarCheckpoint(arquivos as string[], typeof origem === 'string' ? origem : 'manual')
     return { ok: true, checkpoint: ck }
@@ -111,16 +119,23 @@ export function registerAgentExtrasIpc(): void {
     return { ok: true, checkpoints: listarCheckpoints(n) }
   })
 
-  ipcMain.handle('agente:checkpoint-restaurar', async (_e, id: unknown) => {
+  ipcMain.handle('agente:checkpoint-restaurar', async (_e, id: unknown, pastasRaw?: unknown) => {
     const i = exigirString(id, 'id')
     if (isErroPayload(i)) return i
-    return restaurarCheckpoint(i)
+    const pastas = exigirArrayStrings(pastasRaw, 'pastas')
+    if (isErroPayload(pastas)) return pastas
+    const raizes = pastas.map((p) => p.trim()).filter(Boolean)
+    return restaurarCheckpoint(i, raizes.length ? raizes : undefined)
   })
 
-  ipcMain.handle('agente:checkpoint-desfazer', async () => {
+  ipcMain.handle('agente:checkpoint-desfazer', async (_e, pastasRaw?: unknown) => {
+    const pastas = exigirArrayStrings(pastasRaw, 'pastas')
+    if (isErroPayload(pastas)) return pastas
+    const raizes = pastas.map((p) => p.trim()).filter(Boolean)
     const u = ultimoCheckpoint()
-    if (!u) return { ok: false, erro: 'nenhum checkpoint' }
-    return restaurarCheckpoint(u.id)
+    if (!u) return { ok: false, erro: 'nenhum checkpoint pendente de desfazer' }
+    const r = await restaurarCheckpoint(u.id, raizes.length ? raizes : undefined)
+    return { ...r, checkpointId: u.id, origem: u.origem, arquivos: u.arquivos.map((a) => a.path) }
   })
 
   ipcMain.handle('dg:modes:listar', () => ({ ok: true, modos: listarModos() }))

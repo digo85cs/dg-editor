@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>DG Apps</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <img src="icon.png" alt="" width="36" height="36" />
+      <div>
+        <strong>DG Apps</strong>
+        <small>companion offline do DG Editor</small>
+      </div>
+    </div>
+    <span class="tag">grátis</span>
+  </header>
+
+  <main>
+    <section id="tela-meme" class="tela ativa">
+      <h1>Meme rápido</h1>
+      <p class="dica">Escolha uma foto, escreva a legenda e salve em PNG no celular.</p>
+
+      <label class="campo arquivo">
+        <span>Foto</span>
+        <input id="foto" type="file" accept="image/*" />
+      </label>
+
+      <div class="campo">
+        <label for="topo">Texto de cima</label>
+        <input id="topo" type="text" maxlength="80" placeholder="QUANDO O BUILD PASSA" />
+      </div>
+      <div class="campo">
+        <label for="baixo">Texto de baixo</label>
+        <input id="baixo" type="text" maxlength="80" placeholder="DE PRIMEIRA" />
+      </div>
+
+      <div class="palco">
+        <canvas id="canvas" width="1080" height="1080" aria-label="Prévia do meme"></canvas>
+        <div id="vazio" class="vazio">A prévia aparece aqui depois que você escolher uma foto.</div>
+      </div>
+
+      <button id="salvar" class="principal" disabled>Salvar meme</button>
+      <p id="status-meme" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="tela-prompt" class="tela">
+      <h1>Prompt de vídeo</h1>
+      <p class="dica">Monte um prompt estruturado para gerar vídeo no DG Editor.</p>
+
+      <div class="campo">
+        <label for="tema">Tema</label>
+        <input id="tema" type="text" maxlength="120" placeholder="um robô consertando um violão" />
+      </div>
+      <div class="campo">
+        <label for="estilo">Estilo</label>
+        <select id="estilo">
+          <option>cinematográfico realista</option>
+          <option>animação 3D</option>
+          <option>anime</option>
+          <option>pixel art</option>
+          <option>documentário</option>
+          <option>publicidade</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="formato">Formato</label>
+        <select id="formato">
+          <option value="9:16">9:16 (vertical)</option>
+          <option value="16:9">16:9 (horizontal)</option>
+          <option value="1:1">1:1 (quadrado)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="duracao">Duração</label>
+        <select id="duracao">
+          <option value="5">5 segundos</option>
+          <option value="10">10 segundos</option>
+          <option value="15">15 segundos</option>
+          <option value="30">30 segundos</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="camera">Câmera</label>
+        <select id="camera">
+          <option>movimento lento de aproximação</option>
+          <option>plano aberto fixo</option>
+          <option>travelling lateral</option>
+          <option>close-up com foco raso</option>
+          <option>drone subindo</option>
+        </select>
+      </div>
+
+      <button id="gerar-prompt" class="principal">Gerar prompt</button>
+      <pre id="saida-prompt" class="saida" role="status" aria-live="polite">Preencha o tema e toque em Gerar prompt.</pre>
+      <button id="copiar" class="secundario" disabled>Copiar prompt</button>
+    </section>
+
+    <section id="tela-sobre" class="tela">
+      <h1>Sobre</h1>
+      <div class="cartao">
+        <strong>DG Apps</strong>
+        <p>Aplicativo companion offline do DG Editor. Funciona sem internet e sem conta.</p>
+        <ul>
+          <li>Meme com texto em impacto a partir de foto própria.</li>
+          <li>Prompt estruturado para vídeo.</li>
+          <li>Nada é enviado para servidor: tudo roda no aparelho.</li>
+        </ul>
+        <p class="mini">Paródias usam arquétipos, nunca clonagem de pessoa real. Vídeos gerados no DG Editor saem com marca "gerado por IA".</p>
+      </div>
+      <div class="cartao">
+        <strong>Como atualizar</strong>
+        <p>Gere um novo APK em <code>npm run apps:apk</code> e copie para o celular. A versão aparece abaixo.</p>
+        <p class="mini" id="versao">versão —</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="abas" aria-label="Seções">
+    <button data-tela="meme" class="ativa" aria-current="page">Meme</button>
+    <button data-tela="prompt">Prompt</button>
+    <button data-tela="sobre">Sobre</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>

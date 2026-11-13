@@ -5,7 +5,7 @@
 
 import { ipcMain } from 'electron';
 import { dglog } from '../dglog';
-import { guardianSnapshot, guardianResumo, estaBloqueado, guardianPodeOperar } from '../guardian';
+import { guardianSnapshot, guardianResumo } from '../guardian';
 
 // ============================================================================
 // HANDLERS DE GUARDIAN
@@ -21,16 +21,16 @@ export function handleGuardianResumo(_event: Electron.IpcMainInvokeEvent) {
 
 /** Status leve usado pela UI (alertas de pausa). */
 export function handleDgStatus() {
-  const snap = guardianSnapshot() as { ramOk?: boolean; freeMemory?: number }
-  const paused = estaBloqueado() || !guardianPodeOperar()
+  const snap = guardianSnapshot()
+  const paused = !snap.ramOk
   return {
     ok: true,
     paused,
     pausedReason: paused
-      ? (estaBloqueado() ? 'Guardião bloqueou operações pesadas' : 'RAM baixa — operações pesadas pausadas')
+      ? 'Recursos baixos: RAM livre ' + Math.round(snap.freeMemory / 1048576) + ' MB, CPU ' + snap.cpuPercent + '%'
       : undefined,
-    ramOk: snap?.ramOk !== false,
-    freeMemory: snap?.freeMemory
+    ramOk: snap.ramOk,
+    freeMemory: snap.freeMemory
   }
 }
 

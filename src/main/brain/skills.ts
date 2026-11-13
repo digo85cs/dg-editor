@@ -351,6 +351,71 @@ Espelhe o Cursor Agent em qualquer pedido (inventario, edicao, correcao, melhori
 4. Checklist do usuario: complete tudo; falta = NÃO ENCONTRADO.
 5. Resposta curta em pt-BR, um bloco limpo, um unico "copiar tudo" no UI.
 6. Nao peca confirmacao para leitura/status/diagnostico.`
+    },
+    {
+      nome: 'roteiro-shorts.md',
+      conteudo: `---
+titulo: Roteirista de shorts
+gatilho: roteiro, short, reels, tiktok, gancho
+---
+Estruture em: gancho (0-3s), contexto, desenvolvimento, virada e CTA.
+Escreva falas curtas, com uma ideia por frase. Informe a duracao alvo e o formato (9:16).
+Nao prometa viralizacao; foque em clareza e retencao.`
+    },
+    {
+      nome: 'thumbnail-design.md',
+      conteudo: `---
+titulo: Designer de thumbnail
+gatilho: thumbnail, capa, miniatura, clique
+---
+Proponha 3 conceitos de capa 1280x720 com alto contraste, no maximo 3 palavras e um foco visual.
+Use rostos/objetos grandes, fundo limpo e leitura em tela pequena. Descreva o prompt visual.`
+    },
+    {
+      nome: 'legenda-automatica.md',
+      conteudo: `---
+titulo: Legenda automatica
+gatilho: legenda, srt, transcricao, subtitulo
+---
+Transcreva com a tool de transcricao, revise nomes proprios e quebre linhas em ate 2 por tela.
+Grave abaixo da area segura e preserve o audio original. Entregue o .srt junto do video.`
+    },
+    {
+      nome: 'publicacao-social.md',
+      conteudo: `---
+titulo: Publicador social
+gatilho: publicar, pacote, post, descricao, hashtag
+---
+Monte um pacote pronto: video final, capa, legenda curta, hashtags e horario sugerido.
+Nao faca upload sozinho; entregue os arquivos e o texto para o usuario revisar antes.`
+    },
+    {
+      nome: 'pacote-memes.md',
+      conteudo: `---
+titulo: Pacote de memes
+gatilho: meme, memes, template, imgflip
+---
+Sincronize o banco local antes de listar. Legendas: no maximo 2 linhas curtas por campo.
+Use imagem propria ou template do banco; nunca texto de odio ou difamacao.`
+    },
+    {
+      nome: 'dublagem-parodia.md',
+      conteudo: `---
+titulo: Dublagem de parodia
+gatilho: parodia, dublagem, locutor, personagem
+---
+Use apenas os arquetipos do banco de vozes (locutor, ancora, trailer, vila, heroina etc.).
+Nunca clone voz de pessoa real nem sugira que a voz pertence a alguem.
+Mantenha o aviso de arquetipo e deixe o usuario escolher a voz antes de narrar.`
+    },
+    {
+      nome: 'capa-video.md',
+      conteudo: `---
+titulo: Capa de video
+gatilho: capa do video, frame, poster
+---
+Extraia um frame representativo, evite movimento e texto cortado. Se preciso, melhore a nitidez
+e escreva no maximo 3 palavras. Entregue a capa junto do video.`
     }
   ]
   for (const p of padroes) {

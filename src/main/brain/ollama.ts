@@ -7,6 +7,7 @@ import { request, type ClientRequest } from 'http'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { dglog } from '../dglog'
+import { resolverRaizProjeto } from '../paths'
 import type { BrainResponse, OllamaStatus } from '@shared/types'
 import type { EscolherModeloOpts } from './registry'
 
@@ -19,9 +20,7 @@ interface DgConfig {
 function loadDgConfig(): DgConfig {
   let raiz = process.cwd()
   try {
-    // lazy: evita ciclo de import com paths em boot
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    raiz = (require('../paths') as typeof import('../paths')).resolverRaizProjeto()
+    raiz = resolverRaizProjeto()
   } catch { /* cwd */ }
   const p = join(raiz, 'dg-config.json')
   if (!existsSync(p)) return {}
@@ -104,14 +103,21 @@ export async function ollamaHttpJson(
   url: string,
   corpo: unknown | null,
   method = 'POST',
-  timeoutMs = 120000
+  timeoutMs = 120000,
+  signal?: AbortSignal
 ): Promise<unknown> {
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), timeoutMs)
+  const repassarAbort = () => ac.abort()
+  if (signal) {
+    if (signal.aborted) ac.abort()
+    else signal.addEventListener('abort', repassarAbort, { once: true })
+  }
   try {
     return await httpJson(url, corpo, method, timeoutMs, ac.signal)
   } finally {
     clearTimeout(timer)
+    if (signal) signal.removeEventListener('abort', repassarAbort)
   }
 }
 
@@ -346,6 +352,7 @@ export interface AskOllamaOptions {
   systemPrompt?: string
   numPredict?: number
   timeoutMs?: number
+  signal?: AbortSignal
 }
 
 /** Chat simples (sem tools) — usado por analyzer/chat IPC. */
@@ -416,7 +423,8 @@ export async function askOllama(
       OLLAMA_URL + '/api/chat',
       corpo,
       'POST',
-      timeoutMs
+      timeoutMs,
+      requestOptions.signal
     )) as { message?: { content?: string }; eval_count?: number }
     return {
       text: r.message?.content || '',
@@ -429,6 +437,7 @@ export async function askOllama(
     const erroVisao = /image|vision|multimodal|does not support/i.test(msg)
     const podeRetry =
       leve &&
+      !requestOptions.signal?.aborted &&
       model !== 'qwen2.5-coder:1.5b' &&
       (erroVisao || /timeout|abort|ECONNREFUSED|fetch failed|socket/i.test(msg))
     if (!podeRetry) throw e
@@ -447,7 +456,8 @@ export async function askOllama(
       OLLAMA_URL + '/api/chat',
       corpo2,
       'POST',
-      Math.max(timeoutMs, 180_000)
+      Math.max(timeoutMs, 180_000),
+      requestOptions.signal
     )) as { message?: { content?: string }; eval_count?: number }
     return {
       text: r2.message?.content || '',

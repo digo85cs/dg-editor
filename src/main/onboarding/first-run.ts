@@ -1,6 +1,8 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { listarChavesConfiguradas } from '../brain/segredos-providers'
+import { garantirHardwareProfile } from '../hardware-profile'
 
 function baseDir() {
   const dir = join(app.getPath('userData'))
@@ -14,9 +16,6 @@ function onboardingPath() {
 
 function perfilTemContasOuIas(): boolean {
   try {
-    const { listarChavesConfiguradas } = require('../brain/segredos-providers') as {
-      listarChavesConfiguradas: () => string[]
-    }
     if (listarChavesConfiguradas().length > 0) return true
   } catch {
     /* cofre ainda nao pronto */
@@ -42,9 +41,6 @@ export function statusOnboarding() {
   try {
     // Adapta modelos/timeouts ao hardware neste boot
     try {
-      const { garantirHardwareProfile } = require('../hardware-profile') as {
-        garantirHardwareProfile: (f?: boolean) => unknown
-      }
       garantirHardwareProfile(false)
     } catch {
       /* opcional */
@@ -111,9 +107,6 @@ export function concluirOnboarding() {
   try {
     const p = onboardingPath()
     try {
-      const { garantirHardwareProfile } = require('../hardware-profile') as {
-        garantirHardwareProfile: (f?: boolean) => unknown
-      }
       garantirHardwareProfile(true)
     } catch {
       /* */

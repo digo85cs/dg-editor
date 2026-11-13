@@ -15,6 +15,7 @@ import {
 } from './providers'
 import { filaGlobal, configParaProvider } from './providers-registry'
 import { lerChave } from './segredos-providers'
+import { limitesPorHardware } from '../hardware-profile'
 
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'chat-rapido' | 'analise' | 'analisar' | 'codigo' | 'raciocinio' | 'revisao'
@@ -550,9 +551,6 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
 export function limitesPorTarefa(tarefa: string): { num_predict: number; timeoutMs: number } {
   const t = normalizarTarefa(tarefa)
   try {
-    const { limitesPorHardware } = require('../hardware-profile') as {
-      limitesPorHardware: (tarefa: string) => { num_predict: number; timeoutMs: number } | null
-    }
     const hw = limitesPorHardware(t)
     if (hw) return hw
   } catch {

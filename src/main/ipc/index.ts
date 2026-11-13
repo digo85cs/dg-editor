@@ -5,6 +5,7 @@
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { dglog } from '../dglog';
+import { garantirHardwareProfile } from '../hardware-profile';
 
 // Importar todos os registradores
 import { registrarHandlersArquivo } from './arquivos';
@@ -48,6 +49,8 @@ import { registrarHandlersDeploy } from './deploy';
 import { registrarHubExtras } from './hub-extras';
 import { registrarHandlersPerfil } from './perfil';
 import { registrarHandlersAutomation } from './automation';
+import { registrarHandlersMidia } from './midia';
+import { registrarHandlersApps } from './apps';
 import { registrarComfyUIIpc } from '../comfyui-mcp';
 
 // ============================================================================
@@ -125,21 +128,14 @@ export function registrarTodosHandlers(): void {
     registrarHandlersProviders();
     registrarHandlersDeploy();
     registrarHandlersAutomation();
+    registrarHandlersMidia();
+    registrarHandlersApps();
     registrarComfyUIIpc();
     registrarHubExtras();
     registrarHandlersPerfil();
     registrarUpdateIpc()
-    try {
-      const { ipcMain } = require('electron') as typeof import('electron')
-      const hw = require('../hardware-profile') as {
-        garantirHardwareProfile: (f?: boolean) => unknown
-        lerHardwareProfile: () => unknown
-      }
-      ipcMain.handle('hardware:perfil', () => hw.garantirHardwareProfile(false))
-      ipcMain.handle('hardware:atualizar', () => hw.garantirHardwareProfile(true))
-    } catch (e) {
-      dglog('[ipc:registry] hardware ipc: ' + String(e))
-    }
+    ipcMain.handle('hardware:perfil', () => garantirHardwareProfile(false))
+    ipcMain.handle('hardware:atualizar', () => garantirHardwareProfile(true))
 
     dglog('[ipc:registry] <<< Todos os handlers IPC registrados com sucesso!');
   } catch (e) {

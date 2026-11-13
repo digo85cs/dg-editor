@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { caminhoArgumentoValido, sanitizarArgs } from './sanitize'
 
 /** Canais permitidos para ipcRenderer.invoke (request-response). */
 const invokeChannels = [
@@ -15,7 +16,7 @@ const invokeChannels = [
   'analysis:run', 'analysis:cached', 'analysis:choose-scope',
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template', 'rules:write',
-  'chat:load', 'chat:send', 'chat:clear', 'orientar:prompt', 'chat:anexar',
+  'chat:load', 'chat:send', 'chat:cancelar', 'chat:clear', 'orientar:prompt', 'chat:anexar',
   'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
   'git:status', 'git:diff', 'git:repos', 'git:commit',
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
@@ -28,23 +29,26 @@ const invokeChannels = [
   'diagnostico:rodar',
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
-  'janela:recarregar', 'janela:zoom', 'janela:tela-cheia',
-  'app:get-version',
+  'janela:recarregar', 'janela:zoom', 'janela:zoom-fator', 'janela:zoom-estado', 'janela:tela-cheia',
+  'app:get-version', 'app:qa-mode',
   'app:raiz-projeto',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'arquivo:criar', 'arquivo:renomear', 'arquivo:mover', 'arquivo:excluir',
   'navegador:abrir',
   'navegador:fechar',
   'navegador:voltar',
   'navegador:avancar',
   'navegador:recarregar',
+  'navegador:download-cancelar',
   'dg:status',
   'terminal:create', 'terminal:write', 'terminal:resize', 'terminal:kill', 'terminal:shell',
   'terminal:shells', 'terminal:getShellPadrao', 'terminal:setShellPadrao',
   'qa:run',
   'hibrido:analisar', 'hibrido:executar',
   'agente:executar', 'agente:modelo', 'agente:historico',
-  'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'comandos:listar',
+  'busca:arquivos', 'busca:conteudo', 'busca:cancelar', 'busca:substituir', 'comandos:listar',
   'modelos:listar', 'modelos:recarregar', 'modelos:para-tarefa', 'modelos:versoes-remotas',
+  'ollama:pull', 'ollama:pull-status',
   'config:backup', 'backup:onedrive', 'workspace:carregar', 'workspace:salvar', 'workspace:definir-raiz',
   'onboarding:status', 'onboarding:concluir', 'onboarding:resetar',
   'update:status', 'update:verificar', 'update:instalar',
@@ -81,26 +85,42 @@ const invokeChannels = [
   'agente:checkpoint-criar', 'agente:checkpoint-listar', 'agente:checkpoint-restaurar',
   'agente:checkpoint-desfazer', 'contexto:projeto',
   'navegador:embed-status',
-  'dg:comfyui:status', 'dg:comfyui:gerar', 'dg:comfyui:docs',
+  'dg:comfyui:status', 'dg:comfyui:gerar', 'dg:comfyui:docs', 'dg:comfyui:iniciar', 'dg:comfyui:parar',
+  'midia:status', 'midia:escolher-arquivos', 'midia:escolher-pasta', 'midia:listar', 'midia:abrir-pasta',
+  'midia:imagem', 'midia:diagrama', 'midia:html-imagem', 'midia:imagem-melhorar',
+  'midia:fotos-video', 'midia:video-cortar', 'midia:video-juntar', 'midia:video-capa',
+  'midia:transcrever', 'midia:narrar', 'midia:legendas',
+  'midia:vozes', 'midia:vozes-baixar', 'midia:voz-previa', 'midia:voz-padrao',
+  'midia:memes', 'midia:memes-sincronizar', 'midia:memes-pasta', 'midia:meme', 'midia:foto-video',
+  'midia:hardware', 'midia:comfy-pre', 'midia:comfy-instalar', 'midia:comfy-instalacao',
+  'midia:atualizacoes', 'midia:atualizacoes-aplicar', 'midia:atualizacoes-prefs',
+  'apps:status', 'apps:instalar', 'apps:build', 'apps:publicar', 'apps:abrir-pasta',
+  'midia:musicas', 'midia:musicas-pasta', 'midia:musica-mixar',
+  'midia:musicas-catalogo', 'midia:musicas-baixar', 'midia:audio-analisar', 'midia:audio-processar',
   'ui:dialog-responder',
   'automation:listar', 'automation:executar', 'automation:aprovacao-resolver'
 ]
 
 /** Canais de evento (ipcRenderer.on) permitidos. */
-const terminalOnChannels = ['terminal:data', 'terminal:exit'] as const
+const terminalOnChannels = ['terminal:data', 'terminal:exit', 'terminal:cwd'] as const
 const eventOnChannels = [
   'terminal:data',
   'terminal:exit',
+  'terminal:cwd',
   'brain:fallback',
   'navegador:aberto',
   'navegador:fechado',
+  'navegador:download',
+  'navegador:download-progresso',
   'agente:progresso',
   'menu:acao',
   'chat:delta',
+  'chat:fallback',
   'brain:cota',
   'update:status',
   'ui:dialog-pedir',
-  'automation:aprovacao-pendente'
+  'automation:aprovacao-pendente',
+  'ollama:pull-progresso'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */
@@ -109,44 +129,20 @@ const sendChannels = ['app:quit', 'navegador:bounds', 'navegador:mostrar']
 /** Canais que manipulam caminhos de arquivo — exige sanitizacao. */
 const caminhoChannels = new Set([
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
+  'arquivo:criar', 'arquivo:renomear', 'arquivo:mover', 'arquivo:excluir',
   'dossie:ler', 'dossie:gravar',
   'vault:nota', 'vault:salvar',
   'propostas:preview',
   'analise:run'
 ])
 
-const MAX_ARGS = 8
-const MAX_ARG_LEN = 200000
-
-function ehCaminhoSeguro(caminho: unknown): boolean {
-  if (typeof caminho !== 'string') return false
-  if (!caminho || caminho.length > 1000) return false
-  // Bloqueia travessia de diretorio e caminhos absolutos fora do espaco do usuario
-  if (caminho.includes('..')) return false
-  if (caminho.startsWith('/') && !caminho.startsWith('/home/') && !caminho.startsWith('/Users/')) return false
-  if (/^[A-Za-z]:[\\/]/.test(caminho)) return false // C:\, D:\ etc. sem raiz conhecida
-  return true
-}
-
-function sanitizarArgs(args: unknown[]): unknown[] {
-  if (args.length > MAX_ARGS) throw new Error('Demais argumentos para o canal')
-  return args.map((a) => {
-    if (typeof a === 'string' && a.length > MAX_ARG_LEN) {
-      throw new Error('Argumento excede tamanho maximo permitido')
-    }
-    return a
-  })
-}
-
 contextBridge.exposeInMainWorld('api', {
   invoke: (channel: string, ...args: unknown[]) => {
     if (!invokeChannels.includes(channel)) return Promise.reject(new Error(`Unknown channel: ${channel}`))
-    // Sanitiza argumentos de canais de caminho
-    if (caminhoChannels.has(channel)) {
-      const primeiro = args[0]
-      if (!ehCaminhoSeguro(primeiro)) {
-        return Promise.reject(new Error(`Caminho invalido para o canal ${channel}`))
-      }
+    // Canais de caminho recebem caminhos absolutos legitimamente (ex.: C:\proj).
+    // A contencao pelas raizes abertas e validada no main por caminhoSeguro().
+    if (caminhoChannels.has(channel) && !caminhoArgumentoValido(args[0])) {
+      return Promise.reject(new Error(`Caminho invalido para o canal ${channel}`))
     }
     sanitizarArgs(args)
     return ipcRenderer.invoke(channel, ...args)
@@ -186,6 +182,11 @@ contextBridge.exposeInMainWorld('api', {
       const handler = (_e: IpcRendererEvent, payload: { id: string; code: number }) => cb(payload)
       ipcRenderer.on('terminal:exit', handler)
       return () => ipcRenderer.removeListener('terminal:exit', handler)
+    },
+    onCwd: (cb: (payload: { id: string; cwd: string }) => void) => {
+      const handler = (_e: IpcRendererEvent, payload: { id: string; cwd: string }) => cb(payload)
+      ipcRenderer.on('terminal:cwd', handler)
+      return () => ipcRenderer.removeListener('terminal:cwd', handler)
     }
   }
 })

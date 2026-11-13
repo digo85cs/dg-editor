@@ -21,13 +21,16 @@ import {
   View,
   WebContentsView,
   app,
+  dialog,
   ipcMain,
   type WebContents
 } from 'electron'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { dglog } from '../dglog'
 import { projectStateDir, resolverRaizProjeto } from '../paths'
+import { resolverCaminhoDownload } from './download-nome'
 
 const PARTITION = 'persist:dgnav'
 const CHROME_H = 52
@@ -71,21 +74,89 @@ function caminhoUltimaUrl(): string {
   return join(projectStateDir(resolverRaizProjeto()), nome)
 }
 
+const HTML_INICIO = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Início — DG Navegador</title>
+<style>
+  :root{color-scheme:dark}
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;background:#15171a;color:#e8e8e8;font:15px/1.5 system-ui,Segoe UI,sans-serif}
+  main{width:min(640px,88vw);padding:24px}
+  h1{margin:0 0 4px;font-size:24px;font-weight:600;letter-spacing:.2px}
+  p.sub{margin:0 0 20px;opacity:.65;font-size:13px}
+  form{display:flex;gap:8px;margin-bottom:22px}
+  input[type=search]{flex:1;min-width:0;background:#0f1113;border:1px solid #343a40;color:#eee;border-radius:8px;padding:11px 14px;font-size:14px;outline:none}
+  input[type=search]:focus{border-color:#5b9dff}
+  button{background:#2b6cb0;border:0;color:#fff;border-radius:8px;padding:11px 18px;font-size:14px;cursor:pointer}
+  button:hover{background:#2f7ac6}
+  section{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+  a{display:block;padding:9px 14px;border:1px solid #2c3138;border-radius:8px;color:#cbd5e1;text-decoration:none;font-size:13px;background:#191c20}
+  a:hover{border-color:#5b9dff;color:#fff}
+  p.hint{margin:0;opacity:.5;font-size:12px}
+</style>
+</head>
+<body>
+<main>
+  <h1>DG Navegador</h1>
+  <p class="sub">Pesquise ou abra um endereço. Atalho: Ctrl+Shift+N.</p>
+  <form action="https://duckduckgo.com/" method="get">
+    <input type="search" name="q" placeholder="Pesquisar no DuckDuckGo" autofocus/>
+    <button type="submit">Pesquisar</button>
+  </form>
+  <section>
+    <a href="https://developer.mozilla.org/pt-BR/docs/Web">MDN Web Docs</a>
+    <a href="https://github.com">GitHub</a>
+    <a href="https://docs.ollama.com">Ollama</a>
+    <a href="http://localhost:3000">localhost:3000</a>
+    <a href="http://localhost:5173">localhost:5173</a>
+    <a href="http://localhost:8080">localhost:8080</a>
+  </section>
+  <p class="hint">Página inicial local — funciona offline.</p>
+</main>
+</body>
+</html>`
+
+let urlInicioCache: string | null = null
+
+/** Página inicial local (arquivo em userData) — evita about:blank vazio. */
+export function urlPaginaInicialNavegador(): string {
+  if (urlInicioCache) return urlInicioCache
+  try {
+    const dir = join(app.getPath('userData'), 'navegador-ui')
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    const p = join(dir, 'inicio.html')
+    writeFileSync(p, HTML_INICIO, 'utf8')
+    urlInicioCache = pathToFileURL(p).href
+  } catch {
+    urlInicioCache = 'data:text/html;charset=utf-8,' + encodeURIComponent(HTML_INICIO)
+  }
+  return urlInicioCache
+}
+
+function ehPaginaInicial(url: string): boolean {
+  if (!url) return false
+  return url === urlPaginaInicialNavegador() || url.includes('/navegador-ui/inicio.html')
+}
+
 export function lerUltimaUrlNavegador(): string {
   try {
     const p = caminhoUltimaUrl()
-    if (!existsSync(p)) return 'about:blank'
+    if (!existsSync(p)) return urlPaginaInicialNavegador()
     const u = readFileSync(p, 'utf8').trim()
-    if (!u || u === 'about:blank' || u.startsWith('data:')) return 'about:blank'
+    if (!u || u === 'about:blank' || u.startsWith('data:')) return urlPaginaInicialNavegador()
     return u
   } catch {
-    return 'about:blank'
+    return urlPaginaInicialNavegador()
   }
 }
 
 function salvarUltimaUrl(url: string): void {
   try {
     if (!url || url === 'about:blank' || url.startsWith('data:')) return
+    if (ehPaginaInicial(url)) return
     const p = caminhoUltimaUrl()
     mkdirSync(join(p, '..'), { recursive: true })
     writeFileSync(p, url, 'utf8')
@@ -175,6 +246,29 @@ type Listeners = {
   onFinish?: (url: string) => void
   onTitle?: (titulo: string) => void
   onClose?: () => void
+  onDownload?: (info: InfoDownloadNavegador) => void
+  onDownloadProgress?: (info: ProgressoDownloadNavegador) => void
+}
+
+/** Progresso incremental enviado à UI (toolbar do painel Browser). */
+export type ProgressoDownloadNavegador = {
+  id: string
+  nomeOriginal: string
+  caminho: string
+  recebido: number
+  total: number
+  percentual: number
+  estado: 'iniciado' | 'andamento' | 'concluido' | 'cancelado' | 'interrompido'
+}
+
+export type InfoDownloadNavegador = {
+  ok: boolean
+  estado: string
+  caminho: string
+  nomeOriginal: string
+  nomeSalvo: string
+  renomeado: boolean
+  bytes: number
 }
 
 type Bounds = { x: number; y: number; width: number; height: number }
@@ -194,6 +288,120 @@ let hostAnexado = false
 /** true após criar; false após fechar (mesmo com views ainda em memória no app). */
 let sessaoAberta = false
 const listeners: Listeners = {}
+
+/**
+ * handleBaixar (controle.ts) assume o will-download enquanto ativo;
+ * o handler persistente ignora esses itens para não duplicar o salvamento.
+ */
+let downloadsExplicitos = 0
+export function iniciarDownloadExplicito(): () => void {
+  downloadsExplicitos += 1
+  let encerrado = false
+  return () => {
+    if (encerrado) return
+    encerrado = true
+    downloadsExplicitos = Math.max(0, downloadsExplicitos - 1)
+  }
+}
+
+let downloadHandlerLigado = false
+/** Downloads em andamento por id — permite cancelamento pela UI. */
+const downloadsAtivos = new Map<string, Electron.DownloadItem>()
+let seqDownload = 0
+
+function emitirProgressoDownload(info: ProgressoDownloadNavegador): void {
+  try {
+    listeners.onDownloadProgress?.(info)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Cancela um download persistente pelo id (toolbar do painel Browser). */
+export function cancelarDownloadNavegador(id: string): { ok: boolean; erro?: string } {
+  const item = downloadsAtivos.get(id)
+  if (!item) return { ok: false, erro: 'download nao encontrado' }
+  try {
+    item.cancel()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, erro: String((e as Error).message || e) }
+  }
+}
+
+function downloadsDirNavegador(): string {
+  const base = join(projectStateDir(resolverRaizProjeto()), 'downloads')
+  const d = emSmokeNav() ? join(base, '_smoke') : base
+  if (!existsSync(d)) mkdirSync(d, { recursive: true })
+  return d
+}
+
+/** Downloads iniciados pelo usuário (clique em link) vão para a pasta do projeto. */
+function ligarDownloadsPersistentes(wc: WebContents): void {
+  if (downloadHandlerLigado) return
+  downloadHandlerLigado = true
+  wc.session.on('will-download', (_e, item) => {
+    if (downloadsExplicitos > 0) return
+    try {
+      const dir = downloadsDirNavegador()
+      const { caminho, nomeOriginal, nomeSalvo, renomeado } = resolverCaminhoDownload(
+        dir,
+        item.getFilename() || `download-${Date.now()}`
+      )
+      item.setSavePath(caminho)
+      const id = `dl-${++seqDownload}`
+      downloadsAtivos.set(id, item)
+      const progresso = (
+        estado: ProgressoDownloadNavegador['estado']
+      ): ProgressoDownloadNavegador => {
+        const total = item.getTotalBytes()
+        const recebido = item.getReceivedBytes()
+        return {
+          id,
+          nomeOriginal,
+          caminho,
+          recebido,
+          total,
+          percentual: total > 0 ? Math.min(100, Math.round((recebido / total) * 100)) : 0,
+          estado
+        }
+      }
+      emitirProgressoDownload(progresso('iniciado'))
+      item.on('updated', (_ev, state) => {
+        emitirProgressoDownload(progresso(state === 'interrupted' ? 'interrompido' : 'andamento'))
+      })
+      item.once('done', (_ev, state) => {
+        downloadsAtivos.delete(id)
+        emitirProgressoDownload(
+          progresso(
+            state === 'completed'
+              ? 'concluido'
+              : state === 'cancelled'
+                ? 'cancelado'
+                : 'interrompido'
+          )
+        )
+        const info: InfoDownloadNavegador = {
+          ok: state === 'completed',
+          estado: state,
+          caminho,
+          nomeOriginal,
+          nomeSalvo,
+          renomeado,
+          bytes: item.getTotalBytes()
+        }
+        dglog(`[navegador] download ${state}: ${caminho}`)
+        try {
+          listeners.onDownload?.(info)
+        } catch {
+          /* ignore */
+        }
+      })
+    } catch (e) {
+      dglog('[navegador] download falhou: ' + String((e as Error).message || e))
+    }
+  })
+}
 
 function garantirChromePreload(): string {
   const dir = join(app.getPath('userData'), 'navegador-ui')
@@ -295,8 +503,9 @@ function goForward(wc: WebContents): void {
 function emitirEstadoChrome(): void {
   if (!chromeView || !contentView) return
   const wc = contentView.webContents
+  const atual = wc.getURL()
   chromeView.webContents.send('dgnav:estado', {
-    url: wc.getURL(),
+    url: ehPaginaInicial(atual) ? '' : atual,
     titulo: wc.getTitle(),
     canBack: canGoBack(wc),
     canForward: canGoForward(wc)
@@ -435,8 +644,11 @@ export function statusEmbedNavegador(): {
   aberto: boolean
   bounds: Bounds | null
   conteudoCompartilhado: true
+  url: string
+  ehPaginaInicial: boolean
 } {
   const host = caminhoHostNavegador()
+  const url = contentView ? contentView.webContents.getURL() : ''
   return {
     modo: host,
     host,
@@ -445,7 +657,9 @@ export function statusEmbedNavegador(): {
     aberto: navegadorAberto(),
     bounds: ultimoBounds.width > 0 ? { ...ultimoBounds } : null,
     /** chrome/content/loadURL via criarViews+carregarUrlNasViews nos dois hosts */
-    conteudoCompartilhado: true
+    conteudoCompartilhado: true,
+    url,
+    ehPaginaInicial: ehPaginaInicial(url)
   }
 }
 
@@ -518,6 +732,27 @@ function ligarEventosContent(wc: WebContents): void {
     void wc.loadURL(url)
     return { action: 'deny' }
   })
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const key = input.key || ''
+    const ctrlOuMeta = input.control || input.meta
+    if (key === 'F5' || (ctrlOuMeta && key.toLowerCase() === 'r')) {
+      event.preventDefault()
+      wc.reload()
+      return
+    }
+    if (input.alt && key === 'ArrowLeft') {
+      event.preventDefault()
+      goBack(wc)
+      emitirEstadoChrome()
+      return
+    }
+    if (input.alt && key === 'ArrowRight') {
+      event.preventDefault()
+      goForward(wc)
+      emitirEstadoChrome()
+    }
+  })
   wc.on('did-start-loading', () => {
     carregando = true
   })
@@ -548,6 +783,72 @@ function ligarEventosContent(wc: WebContents): void {
   })
 }
 
+/** Permissões inofensivas passam direto; sensíveis pedem confirmação ao usuário. */
+const PERMISSOES_LIVRES = new Set([
+  'clipboard-sanitized-write',
+  'clipboard-write',
+  'fullscreen',
+  'pointerLock'
+])
+const PERMISSOES_SENSIVEIS = new Set([
+  'media',
+  'geolocation',
+  'notifications',
+  'midi',
+  'midiSysex',
+  'clipboard-read',
+  'display-capture'
+])
+
+function ligarPermissoes(sess: Electron.Session): void {
+  sess.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    if (PERMISSOES_LIVRES.has(permission)) {
+      callback(true)
+      return
+    }
+    if (!PERMISSOES_SENSIVEIS.has(permission)) {
+      callback(false)
+      return
+    }
+    // Smoke/QA: sem diálogo modal (evita travar execução automatizada).
+    if (process.env.DG_QA_E2E === '1' || process.env.DG_NAV_SMOKE === '1') {
+      callback(false)
+      return
+    }
+    const tipos = ((details as { mediaTypes?: string[] })?.mediaTypes || []).join(', ')
+    const rotulo: Record<string, string> = {
+      media: 'câmera/microfone',
+      geolocation: 'localização',
+      notifications: 'notificações',
+      midi: 'dispositivos MIDI',
+      midiSysex: 'dispositivos MIDI',
+      'clipboard-read': 'área de transferência',
+      'display-capture': 'captura de tela'
+    }
+    const alvo = parentWin && !parentWin.isDestroyed() ? parentWin : null
+    let host = ''
+    try {
+      host = new URL(details.requestingUrl || '').host
+    } catch {
+      /* url inválida */
+    }
+    const opts: Electron.MessageBoxOptions = {
+      type: 'question',
+      buttons: ['Permitir', 'Bloquear'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+      title: 'Permissão do navegador',
+      message: `Permitir acesso a ${rotulo[permission] || permission}?`,
+      detail: (host ? `Site: ${host}` : 'Site desconhecido') + (tipos ? ` (${tipos})` : '')
+    }
+    const dialogo = alvo ? dialog.showMessageBox(alvo, opts) : dialog.showMessageBox(opts)
+    void dialogo
+      .then((r) => callback(r.response === 0))
+      .catch(() => callback(false))
+  })
+}
+
 function criarViews(): void {
   const preload = garantirChromePreload()
   chromeView = new WebContentsView({
@@ -572,16 +873,18 @@ function criarViews(): void {
   } catch {
     /* ignore */
   }
+  ligarPermissoes(contentView.webContents.session)
   chromeView.webContents.loadURL(
     'data:text/html;charset=utf-8,' + encodeURIComponent(CHROME_HTML)
   )
   ligarEventosContent(contentView.webContents)
+  ligarDownloadsPersistentes(contentView.webContents)
 }
 
 /** Caminho de conteúdo compartilhado smoke↔embed (loadURL na contentView). */
 function carregarUrlNasViews(url: string): void {
   if (!contentView) return
-  void contentView.webContents.loadURL(url || 'about:blank')
+  void contentView.webContents.loadURL(url || urlPaginaInicialNavegador())
 }
 
 /** Host atual: smoke (BaseWindow) ou embed (View na principal / smoke-embed). */
@@ -679,7 +982,7 @@ export function criarJanelaNavegador(
       }
     })
     sessaoAberta = true
-    const urlLoad = destino || 'about:blank'
+    const urlLoad = destino || urlPaginaInicialNavegador()
     carregarUrlNasViews(urlLoad)
     if (mostrar) {
       janelaSmoke.show()
@@ -717,7 +1020,7 @@ export function criarJanelaNavegador(
   hostView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
   layoutInterno(0, 0)
 
-  const urlLoad = destino || 'about:blank'
+  const urlLoad = destino || urlPaginaInicialNavegador()
   carregarUrlNasViews(urlLoad)
   if (mostrar || process.env.DG_NAV_SMOKE_EMBED === '1') {
     embutidoVisivel = true

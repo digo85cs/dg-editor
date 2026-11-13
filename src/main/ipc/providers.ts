@@ -9,6 +9,7 @@ import {
   listarProviders,
   obterProvider,
   configParaProvider,
+  registrarProvider,
   type ProviderDescriptor,
 } from '../brain/providers-registry';
 import { chaveConfigurada, salvarChave } from '../brain/segredos-providers';
@@ -23,6 +24,7 @@ import {
   precoConhecido,
 } from '../brain/roteador-cota';
 import { chamarProvider, type ProviderConfig, type Message } from '../brain/providers';
+import { sincronizarChavesDoAmbiente } from '../brain/providers-sync-env';
 
 // ============================================================================
 // TIPOS DE RESULTADO
@@ -100,8 +102,6 @@ async function handleProvidersConfigurar(
     }
     if (p.ativo !== undefined) {
       const atualizado: ProviderDescriptor = { ...desc, ativo: !!p.ativo };
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { registrarProvider } = require('../brain/providers-registry');
       registrarProvider(atualizado);
     }
     return { ok: true };
@@ -270,7 +270,6 @@ export function registrarHandlersProviders(): void {
   ipcMain.handle('providers:teto-diario', handleProvidersTetoDiario);
   ipcMain.handle('providers:sincronizar-env', async () => {
     try {
-      const { sincronizarChavesDoAmbiente } = require('../brain/providers-sync-env') as typeof import('../brain/providers-sync-env')
       return sincronizarChavesDoAmbiente()
     } catch (e: unknown) {
       return { ok: false, erro: String(e), gravadas: [], jaTinham: [], semEnv: [] }

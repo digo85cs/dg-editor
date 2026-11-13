@@ -16,6 +16,7 @@ import {
   navegadorVoltar,
   navegadorAvancar,
   navegadorRecarregar,
+  cancelarDownloadNavegador,
 } from '../navegador/janela';
 import { dglog } from '../dglog';
 import type { IpcResult } from './types';
@@ -136,6 +137,13 @@ export function handleNavegadorRecarregar(): IpcResult & { ok: boolean } {
   return navegadorRecarregar();
 }
 
+export function handleNavegadorDownloadCancelar(
+  _event: Electron.IpcMainInvokeEvent,
+  id: unknown
+): IpcResult & { ok: boolean } {
+  return cancelarDownloadNavegador(String(id || ''))
+}
+
 // ============================================================================
 // EVENTOS DO NAVEGADOR
 // ============================================================================
@@ -167,6 +175,7 @@ export function registrarHandlersNavegador(): void {
   ipcMain.handle('navegador:voltar', handleNavegadorVoltar);
   ipcMain.handle('navegador:avancar', handleNavegadorAvancar);
   ipcMain.handle('navegador:recarregar', handleNavegadorRecarregar);
+  ipcMain.handle('navegador:download-cancelar', handleNavegadorDownloadCancelar);
 
   ipcMain.on('navegador:bounds', handleNavegadorBounds);
   ipcMain.on('navegador:mostrar', handleNavegadorMostrar);

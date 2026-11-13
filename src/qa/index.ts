@@ -3,7 +3,7 @@
  * CLI: --suite=ipc|e2e|perf|all  --atualizar-baseline  --report-only  --no-e2e
  */
 import { execSync } from 'child_process'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { avaliarGeral, gravarRelatorio } from './relatorio'
 import { aplicarBaseline } from './baseline'
@@ -48,29 +48,51 @@ export async function executarQA(raiz: string, opts: OpcoesQA): Promise<Relatori
   const suite = opts.suite || 'all'
   const runIpc = suite === 'all' || suite === 'ipc'
   const runPerf = suite === 'all' || suite === 'perf' || opts.atualizarBaseline
-  const runE2e = !opts.noE2e && (suite === 'all' || suite === 'e2e')
+  const runE2e = !opts.noE2e && (suite === 'all' || suite === 'e2e' || suite === 'visual')
 
   if (opts.reportOnly) {
     // só gera relatório vazio/meta
   } else {
-    if (runIpc) {
-      const ipc = await executarSuiteIpc()
-      resultados.push(...ipc.resultados)
+    // IPC/perf rodam fora do Electron: DG_USERDATA isola config/cache por execução.
+    const userDataIpc = join(outDir, 'userdata-ipc')
+    const userDataAnterior = process.env.DG_USERDATA
+    try {
+      mkdirSync(userDataIpc, { recursive: true })
+      process.env.DG_USERDATA = userDataIpc
+    } catch {
+      /* */
     }
-    if (runPerf) {
-      const perf = await executarSuitePerf(raiz, !!opts.atualizarBaseline)
-      resultados.push(...perf.resultados)
-      metricas = perf.metricas
-    }
-    if (runE2e) {
-      const e2e = await executarSuiteE2e(raiz, outDir)
-      resultados.push(...e2e.resultados)
-      if (e2e.metricasE2e.length) {
-        const { metricas: m2 } = aplicarBaseline(raiz, e2e.metricasE2e, false)
-        // mescla sem duplicar ids já medidos no perf headless
-        for (const m of m2) {
-          if (!metricas.find((x) => x.id === m.id)) metricas.push(m)
+    try {
+      if (runIpc) {
+        const ipc = await executarSuiteIpc()
+        resultados.push(...ipc.resultados)
+      }
+      if (runPerf) {
+        const perf = await executarSuitePerf(raiz, !!opts.atualizarBaseline)
+        resultados.push(...perf.resultados)
+        metricas = perf.metricas
+      }
+      if (runE2e) {
+        const e2e = await executarSuiteE2e(raiz, outDir, {
+          visualOnly: suite === 'visual',
+          atualizarBaseline: !!opts.atualizarBaseline
+        })
+        resultados.push(...e2e.resultados)
+        if (e2e.metricasE2e.length) {
+          const { metricas: m2 } = aplicarBaseline(raiz, e2e.metricasE2e, false)
+          // mescla sem duplicar ids já medidos no perf headless
+          for (const m of m2) {
+            if (!metricas.find((x) => x.id === m.id)) metricas.push(m)
+          }
         }
+      }
+    } finally {
+      if (userDataAnterior === undefined) delete process.env.DG_USERDATA
+      else process.env.DG_USERDATA = userDataAnterior
+      try {
+        rmSync(userDataIpc, { recursive: true, force: true })
+      } catch {
+        /* arquivos em uso */
       }
     }
   }

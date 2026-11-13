@@ -1,4 +1,7 @@
 /** Painel das cinco ferramentas, ligado so ao que o DG Editor ja executa. */
+import { pastasPermitidas } from './features/arquivos/index.js'
+import { pintarMidia } from './midia-ui.js'
+
 export function ligarFerramentas(pastaFn) {
   const nav = document.getElementById('tool-nav')
   const painel = document.getElementById('tool-panel')
@@ -12,7 +15,8 @@ export function ligarFerramentas(pastaFn) {
     artefatos: 'Artefatos',
     skills: 'Skills',
     conectores: 'Conectores',
-    memoria: 'Memória'
+    memoria: 'Memória',
+    midia: 'Estúdio de mídia'
   }
 
   function pasta() {
@@ -111,6 +115,7 @@ export function ligarFerramentas(pastaFn) {
     else if (id === 'skills') await pintarSkills(raiz)
     else if (id === 'conectores') await pintarConectores()
     else if (id === 'memoria') await pintarMemoria(raiz)
+    else if (id === 'midia') await pintarMidia(corpo, raiz)
   }
 
   function fechar() {
@@ -183,7 +188,7 @@ export function ligarFerramentas(pastaFn) {
     media.className = 'tool-bloco tool-comfy'
     media.innerHTML =
       '<h4>Assistente de mídia (ComfyUI)</h4>' +
-      '<p class="muted" style="margin:0 0 8px;font-size:12px">Gera imagem ou vídeo via ComfyUI local (porta 8188). Importe um workflow Wan/SDXL no ComfyUI antes.</p>' +
+      '<p class="muted" style="margin:0 0 8px;font-size:12px">Imagem/vídeo ilimitados no ComfyUI local (CPU). O servidor inicia sozinho; vídeos curtos levam minutos em CPU.</p>' +
       '<label class="muted" style="display:block;font-size:11px;margin-bottom:4px">Prompt' +
       '<textarea id="comfy-prompt" rows="3" class="whereis-input" style="width:100%;margin-top:4px;resize:vertical" placeholder="Descreva a cena…"></textarea></label>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">' +
@@ -200,11 +205,11 @@ export function ligarFerramentas(pastaFn) {
       const r = await seguro('dg:comfyui:status')
       const el = msg()
       if (el) {
-        el.textContent = r?.ok
-          ? 'ComfyUI online · ' + (r.docs || '')
-          : 'ComfyUI offline · ' + (r?.erro || 'inicie em 127.0.0.1:8188')
+        el.textContent = r?.online
+          ? 'ComfyUI online · ' + (r.versao || '') + ' · modelos: ' + ((r.modelos?.checkpoints || []).join(', ') || 'nenhum')
+          : (r?.instalado ? 'ComfyUI instalado, servidor parado.' : 'ComfyUI não instalado.') + ' ' + (r?.erro || '')
       }
-      if (window.dgToast) window.dgToast(r?.ok ? 'ComfyUI online' : 'ComfyUI offline', r?.ok ? 'ok' : 'erro')
+      if (window.dgToast) window.dgToast(r?.online ? 'ComfyUI online' : 'ComfyUI offline', r?.online ? 'ok' : 'erro')
     })
     media.querySelector('#comfy-docs')?.addEventListener('click', async () => {
       const r = await seguro('dg:comfyui:docs')
@@ -221,10 +226,14 @@ export function ligarFerramentas(pastaFn) {
         return
       }
       const el = msg()
-      if (el) el.textContent = 'Enviando ao ComfyUI…'
-      const r = await seguro('dg:comfyui:gerar', { prompt, modo })
-      if (el) el.textContent = r?.ok ? (r.mensagem || 'Enfileirado') : (r?.erro || 'Falha')
-      if (window.dgToast) window.dgToast(r?.ok ? 'Pedido enviado ao ComfyUI' : (r?.erro || 'Falha'), r?.ok ? 'ok' : 'erro')
+      if (el) el.textContent = modo === 'video' ? 'Gerando vídeo no ComfyUI (CPU)… pode levar minutos.' : 'Gerando imagem no ComfyUI…'
+      const r = await seguro('dg:comfyui:gerar', { raiz, prompt, modo })
+      if (el) {
+        el.textContent = r?.ok
+          ? 'Salvo em ' + (r.caminhoRel || r.caminho || '') + (r.aviso ? ' · ' + r.aviso : '')
+          : (r?.erro || 'Falha')
+      }
+      if (window.dgToast) window.dgToast(r?.ok ? 'Gerado no ComfyUI' : (r?.erro || 'Falha'), r?.ok ? 'ok' : 'erro')
     }
     media.querySelector('#comfy-gerar-img')?.addEventListener('click', () => void gerar('imagem'))
     media.querySelector('#comfy-gerar-vid')?.addEventListener('click', () => void gerar('video'))
@@ -242,7 +251,7 @@ export function ligarFerramentas(pastaFn) {
             if (window.dgToast) window.dgToast('Abra um repositório antes', 'aviso')
             return
           }
-          const r = await seguro('agente:checkpoint-criar', [], vals.origem || 'manual-ui')
+          const r = await seguro('agente:checkpoint-criar', [], vals.origem || 'manual-ui', pastasPermitidas())
           if (r && r.ok !== false) {
             if (window.dgToast) window.dgToast('Checkpoint criado', 'ok')
             await pintarArtefatos()
@@ -655,4 +664,8 @@ export function ligarFerramentas(pastaFn) {
     void abrir(btn.dataset.tool)
   })
   document.getElementById('tool-voltar')?.addEventListener('click', fechar)
+
+  // Atalho para menu, paleta de comandos e agente abrirem uma ferramenta.
+  window.dgAbrirFerramenta = (id) => abrir(String(id || ''))
+  window.dgEstudioMidia = () => abrir('midia')
 }

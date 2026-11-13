@@ -9,6 +9,7 @@ import { caminhoSeguro, exigirString, isErroPayload } from '../ipc-seguro';
 import { CodigoErro, criarErro } from '@shared/erros';
 import type { IpcResult } from './types';
 import type { FolderScanResult } from '@shared/types';
+import { formatScanSummary } from '../scanner';
 
 // ============================================================================
 // ESTADO
@@ -63,8 +64,7 @@ export function handleFolderFormatSummary(
   result: unknown
 ): string {
   try {
-    const { formatScanSummary } = require('../scanner');
-    return formatScanSummary(result);
+    return formatScanSummary(result as FolderScanResult);
   } catch (e: unknown) {
     return 'Erro ao formatar resumo: ' + String(e);
   }

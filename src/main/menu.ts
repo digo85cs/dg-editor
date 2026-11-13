@@ -69,6 +69,8 @@ export function installPtBrMenu(hooks: MenuHooks = {}): void {
         { label: 'Auto auditoria', click: acao('auditar') },
         { label: 'Regras do projeto', click: acao('regras-projeto') },
         { type: 'separator' },
+        { label: 'Estúdio de mídia', click: acao('estudio-midia') },
+        { type: 'separator' },
         {
           label: 'Navegador embutido',
           accelerator: 'CmdOrCtrl+Shift+N',

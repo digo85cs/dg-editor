@@ -7,12 +7,14 @@ import { join, basename } from 'path'
 import { createHash, randomBytes } from 'crypto'
 import { promises as fsp } from 'fs'
 import { dirname } from 'path'
+import { caminhoSeguro } from '../ipc-seguro'
 
 export type CheckpointMeta = {
   id: string
   criadoEm: string
   origem: string
   arquivos: Array<{ path: string; hash: string; existia: boolean }>
+  desfeitoEm?: string
 }
 
 function dirCheckpoints(): string {
@@ -117,7 +119,15 @@ export function listarCheckpoints(limite = 10): CheckpointMeta[] {
   }
 }
 
-export async function restaurarCheckpoint(id: string): Promise<{ ok: boolean; erro?: string; restaurados: number }> {
+/**
+ * Restaura o conteudo dos arquivos gravados no checkpoint.
+ * Quando `raizes` e informado, cada caminho precisa estar dentro de uma raiz
+ * aberta — impede que um checkpoint adulterado escreva fora do workspace.
+ */
+export async function restaurarCheckpoint(
+  id: string,
+  raizes?: string[]
+): Promise<{ ok: boolean; erro?: string; restaurados: number }> {
   const mp = metaPath(id)
   if (!existsSync(mp)) return { ok: false, erro: 'checkpoint inexistente', restaurados: 0 }
   let meta: CheckpointMeta
@@ -125,6 +135,17 @@ export async function restaurarCheckpoint(id: string): Promise<{ ok: boolean; er
     meta = JSON.parse(readFileSync(mp, 'utf8')) as CheckpointMeta
   } catch {
     return { ok: false, erro: 'meta invalida', restaurados: 0 }
+  }
+  const permitidas = Array.isArray(raizes)
+    ? raizes.filter((r) => typeof r === 'string' && r.trim())
+    : []
+  if (permitidas.length) {
+    for (const a of meta.arquivos) {
+      const seg = caminhoSeguro(a.path, permitidas)
+      if (!seg.ok) {
+        return { ok: false, erro: 'arquivo fora da raiz aberta: ' + a.path, restaurados: 0 }
+      }
+    }
   }
   let n = 0
   for (const a of meta.arquivos) {
@@ -149,9 +170,16 @@ export async function restaurarCheckpoint(id: string): Promise<{ ok: boolean; er
       return { ok: false, erro: String((e as Error).message || e), restaurados: n }
     }
   }
+  meta.desfeitoEm = new Date().toISOString()
+  try {
+    writeFileSync(mp, JSON.stringify(meta, null, 2), 'utf8')
+  } catch {
+    /* best-effort */
+  }
   return { ok: true, restaurados: n }
 }
 
+/** Ultimo checkpoint ainda nao desfeito (base do "Desfazer"). */
 export function ultimoCheckpoint(): CheckpointMeta | null {
-  return listarCheckpoints(1)[0] || null
+  return listarCheckpoints(50).find((c) => !c.desfeitoEm) || null
 }

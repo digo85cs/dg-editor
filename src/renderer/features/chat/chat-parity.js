@@ -10,6 +10,27 @@ function esc(s) {
     .replace(/"/g, '&quot;')
 }
 
+/** Colore cada linha do unified diff sem usar innerHTML. */
+function marcarLinhasDiff(pre) {
+  const texto = pre.textContent || ''
+  pre.textContent = ''
+  for (const ln of texto.split('\n')) {
+    const span = document.createElement('span')
+    span.className =
+      ln.startsWith('+++') || ln.startsWith('---')
+        ? 'dg-diff-meta'
+        : ln.startsWith('@@')
+          ? 'dg-diff-hunk'
+          : ln.startsWith('+')
+            ? 'dg-diff-add'
+            : ln.startsWith('-')
+              ? 'dg-diff-del'
+              : 'dg-diff-ctx'
+    span.textContent = ln + '\n'
+    pre.appendChild(span)
+  }
+}
+
 /**
  * Cartao de plano com checklist + botao Implementar plano.
  * @param {HTMLElement} area
@@ -108,34 +129,109 @@ export function renderChatApplyCard(area, propostas, handlers) {
     area.appendChild(card)
   }
   card.innerHTML = ''
+  const contarDiff = (p) => {
+    const d = String(p.unifiedDiff || '')
+    return {
+      add: Math.max(0, (d.match(/^\+/gm) || []).length - 1),
+      del: Math.max(0, (d.match(/^-/gm) || []).length - 1)
+    }
+  }
+  const totais = lista.reduce(
+    (acc, p) => {
+      const c = contarDiff(p)
+      acc.add += c.add
+      acc.del += c.del
+      return acc
+    },
+    { add: 0, del: 0 }
+  )
   const head = document.createElement('div')
   head.className = 'chat-parity-head'
-  head.innerHTML = '<strong>' + lista.length + ' proposta(s)</strong> <span class="muted">Apply</span>'
+  head.innerHTML =
+    '<strong>' +
+    lista.length +
+    ' proposta(s)</strong> <span class="muted">+' +
+    totais.add +
+    '/-' +
+    totais.del +
+    ' · Apply</span>'
   card.appendChild(head)
 
+  const LIMITE_INLINE = 12
   const ul = document.createElement('ul')
   ul.className = 'chat-apply-lista'
   for (const p of lista) {
     const li = document.createElement('li')
-    const add = (String(p.unifiedDiff || '').match(/^\+/gm) || []).length
-    const del = (String(p.unifiedDiff || '').match(/^-/gm) || []).length
-    li.innerHTML =
+    const { add, del } = contarDiff(p)
+    const linha = document.createElement('div')
+    linha.className = 'chat-apply-linha'
+    linha.innerHTML =
       '<code>' +
       esc(p.path) +
       '</code> <span class="muted">+' +
-      Math.max(0, add - 1) +
+      add +
       '/-' +
-      Math.max(0, del - 1) +
+      del +
       '</span>'
+    const btnDiff = document.createElement('button')
+    btnDiff.type = 'button'
+    btnDiff.className = 'btn-small chat-apply-ver'
+    btnDiff.textContent = 'Ver diff'
+    btnDiff.dataset.parity = 'ver-diff'
+    btnDiff.setAttribute('aria-expanded', 'false')
     const btnOne = document.createElement('button')
     btnOne.type = 'button'
     btnOne.className = 'btn-small'
     btnOne.textContent = 'Aplicar'
     btnOne.dataset.parity = 'aplicar-uma'
-    btnOne.addEventListener('click', () => {
-      if (handlers && typeof handlers.onAplicarUma === 'function') handlers.onAplicarUma(p.id)
+    btnOne.addEventListener('click', async () => {
+      if (!handlers || typeof handlers.onAplicarUma !== 'function') return
+      btnOne.disabled = true
+      try {
+        await handlers.onAplicarUma(p.id)
+      } finally {
+        btnOne.disabled = false
+      }
     })
-    li.appendChild(btnOne)
+    linha.appendChild(btnDiff)
+    linha.appendChild(btnOne)
+    li.appendChild(linha)
+
+    const diff = String(p.unifiedDiff || '')
+    const linhasDiff = diff ? diff.split('\n') : []
+    const pre = document.createElement('pre')
+    pre.className = 'chat-apply-diff'
+    pre.dataset.parity = 'diff'
+    const renderDiff = (completo) => {
+      if (!diff) {
+        pre.textContent = '(sem diff)'
+        return
+      }
+      if (completo || linhasDiff.length <= LIMITE_INLINE) {
+        pre.textContent = diff
+        return
+      }
+      pre.textContent =
+        linhasDiff.slice(0, LIMITE_INLINE).join('\n') +
+        '\n… ' +
+        (linhasDiff.length - LIMITE_INLINE) +
+        ' linha(s) ocultas'
+    }
+    // Diff inline imediato quando ha uma unica proposta; varias ficam recolhidas.
+    const inline = lista.length === 1
+    pre.hidden = !inline
+    renderDiff(inline)
+    btnDiff.textContent = inline ? 'Ocultar diff' : 'Ver diff'
+    btnDiff.setAttribute('aria-expanded', inline ? 'true' : 'false')
+    marcarLinhasDiff(pre)
+    btnDiff.addEventListener('click', () => {
+      pre.hidden = !pre.hidden
+      renderDiff(!pre.hidden)
+      marcarLinhasDiff(pre)
+      btnDiff.setAttribute('aria-expanded', pre.hidden ? 'false' : 'true')
+      btnDiff.textContent = pre.hidden ? 'Ver diff' : 'Ocultar diff'
+    })
+    li.appendChild(pre)
     ul.appendChild(li)
   }
   card.appendChild(ul)

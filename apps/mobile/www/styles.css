@@ -1,0 +1,132 @@
+:root {
+  color-scheme: dark;
+  --fundo: #0b1020;
+  --painel: #131a2e;
+  --painel2: #1a2340;
+  --texto: #e8eefc;
+  --fraco: #9aa8c7;
+  --destaque: #57e0c0;
+  --borda: #263252;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(1200px 600px at 20% -10%, #18264a 0%, var(--fundo) 55%) fixed;
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  position: sticky;
+  top: 0;
+  background: rgba(11, 16, 32, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--borda);
+  z-index: 4;
+}
+.marca { display: flex; align-items: center; gap: 10px; }
+.marca img { border-radius: 9px; }
+.marca strong { display: block; font-size: 17px; }
+.marca small { color: var(--fraco); font-size: 11px; }
+.tag {
+  font-size: 11px;
+  color: var(--destaque);
+  border: 1px solid var(--destaque);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+main { padding: 18px 16px 8px; max-width: 720px; margin: 0 auto; }
+.tela { display: none; }
+.tela.ativa { display: block; animation: entrar 0.18s ease-out; }
+@keyframes entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+h1 { font-size: 22px; margin: 0 0 6px; }
+.dica { color: var(--fraco); font-size: 13px; margin: 0 0 16px; line-height: 1.45; }
+.campo { display: block; margin-bottom: 12px; }
+.campo > span, .campo > label { display: block; font-size: 12px; color: var(--fraco); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+input, select {
+  width: 100%;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  color: var(--texto);
+  padding: 12px;
+  font-size: 15px;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--destaque); box-shadow: 0 0 0 3px rgba(87, 224, 192, 0.16); }
+.arquivo input { padding: 9px; background: var(--painel2); }
+.palco {
+  position: relative;
+  background: var(--painel);
+  border: 1px dashed var(--borda);
+  border-radius: 14px;
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  margin: 14px 0;
+  overflow: hidden;
+}
+canvas { width: 100%; height: auto; display: none; }
+canvas.visivel { display: block; }
+.vazio { color: var(--fraco); font-size: 13px; padding: 28px 20px; text-align: center; line-height: 1.5; }
+button {
+  font: inherit;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  padding: 13px 16px;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.45; cursor: default; }
+.principal { width: 100%; background: var(--destaque); color: #06231c; font-weight: 700; }
+.secundario { width: 100%; background: transparent; color: var(--destaque); border-color: var(--destaque); margin-top: 10px; }
+.status { color: var(--fraco); font-size: 12px; min-height: 16px; text-align: center; }
+.saida {
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0 0;
+  color: #cfe0ff;
+}
+.cartao {
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  line-height: 1.55;
+}
+.cartao p { color: #c7d4ee; font-size: 14px; margin: 8px 0; }
+.cartao ul { color: #c7d4ee; font-size: 14px; padding-left: 18px; margin: 8px 0; }
+.cartao li { margin: 5px 0; }
+.mini { color: var(--fraco) !important; font-size: 12px !important; }
+code { background: #0a1226; padding: 2px 5px; border-radius: 5px; font-size: 12px; }
+.abas {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: rgba(11, 16, 32, 0.96);
+  border-top: 1px solid var(--borda);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+.abas button {
+  flex: 1;
+  background: transparent;
+  color: var(--fraco);
+  padding: 11px 8px;
+  font-size: 13px;
+}
+.abas button.ativa { background: var(--painel2); color: var(--destaque); }

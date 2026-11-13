@@ -107,21 +107,21 @@ export async function flushWorkspace() {
   const doc = coletor()
   espelharLocal(doc)
   const el = document.getElementById('sb-workspace')
-  if (el) el.textContent = 'Workspace: salvando…'
+  if (el) el.textContent = 'WS: salvando…'
   try {
     const r = await window.api.invoke('workspace:salvar', doc)
     if (el) {
-      el.textContent = r?.ok ? 'Workspace: salvo' : 'Workspace: local'
+      el.textContent = r?.ok ? 'WS: salvo' : 'WS: local'
       setTimeout(() => {
-        if (el.textContent.startsWith('Workspace: salvo') || el.textContent.startsWith('Workspace: local')) {
-          el.textContent = 'Workspace: auto'
+        if (el.textContent.startsWith('WS: salvo') || el.textContent.startsWith('WS: local')) {
+          el.textContent = 'WS: auto'
         }
       }, 2200)
     }
     return r
   } catch (e) {
     console.warn('[workspace] salvar:', e)
-    if (el) el.textContent = 'Workspace: local'
+    if (el) el.textContent = 'WS: local'
     return { ok: false, erro: String(e) }
   }
 }

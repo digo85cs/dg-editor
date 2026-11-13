@@ -27,10 +27,10 @@ export function handleTerminalCreate(
   event: Electron.IpcMainInvokeEvent,
   id: string,
   opts?: { cwd?: string; cols?: number; rows?: number; shellExe?: string; shellId?: string }
-): IpcResult & { ok: boolean; erro?: string } {
+): IpcResult & { ok: boolean; erro?: string; shell?: unknown; pid?: number; cwd?: string } {
   try {
-    createTerminal(String(id), opts || {}, event.sender);
-    return { ok: true };
+    const r = createTerminal(String(id), opts || {}, event.sender);
+    return { ok: true, shell: r.shell, pid: r.pid, cwd: r.cwd };
   } catch (err) {
     const msg = String(err instanceof Error ? err.message : err);
     dglog(`[terminal:create] erro: ${msg}`);

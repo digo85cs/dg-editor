@@ -2,7 +2,7 @@
  * Chat simples em stream (OpenAI-compatible e Ollama).
  * Cada trecho vai para onDelta; o retorno e o texto completo.
  */
-import { request as httpRequest, type IncomingMessage } from 'http'
+import { request as httpRequest, type ClientRequest, type IncomingMessage } from 'http'
 import { request as httpsRequest } from 'https'
 import { URL } from 'url'
 import { OLLAMA_URL } from './ollama'
@@ -14,20 +14,31 @@ function lerStream(
   corpo: unknown,
   headers: Record<string, string>,
   timeoutMs: number,
-  onLinha: (linha: string) => void
+  onLinha: (linha: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr)
     const lib = u.protocol === 'https:' ? httpsRequest : httpRequest
     const dados = Buffer.from(JSON.stringify(corpo), 'utf8')
     let settled = false
+    let req: ClientRequest | null = null
+    const onAbortLig = () => {
+      try { req?.destroy(new Error('cancelado')) } catch { /* ja encerrado */ }
+      fim(new Error('cancelado'))
+    }
     const fim = (err?: Error) => {
       if (settled) return
       settled = true
+      if (signal) signal.removeEventListener('abort', onAbortLig)
       if (err) reject(err)
       else resolve()
     }
-    const req = lib(
+    if (signal?.aborted) {
+      fim(new Error('cancelado'))
+      return
+    }
+    req = lib(
       {
         protocol: u.protocol,
         hostname: u.hostname,
@@ -68,6 +79,7 @@ function lerStream(
         })
       }
     )
+    if (signal) signal.addEventListener('abort', onAbortLig, { once: true })
     req.on('error', (e) => fim(e instanceof Error ? e : new Error(String(e))))
     req.on('timeout', () => {
       req.destroy(new Error('timeout'))
@@ -84,6 +96,7 @@ export async function streamOllamaChat(opts: {
   numPredict: number
   timeoutMs: number
   onDelta: DeltaFn
+  signal?: AbortSignal
 }): Promise<string> {
   let texto = ''
   await lerStream(
@@ -110,7 +123,8 @@ export async function streamOllamaChat(opts: {
       } catch {
         /* linha incompleta */
       }
-    }
+    },
+    opts.signal
   )
   return texto
 }
@@ -124,6 +138,7 @@ export async function streamOpenAIChat(opts: {
   numPredict: number
   timeoutMs: number
   onDelta: DeltaFn
+  signal?: AbortSignal
 }): Promise<string> {
   let texto = ''
   const base = opts.baseUrl.replace(/\/$/, '')
@@ -157,7 +172,8 @@ export async function streamOpenAIChat(opts: {
       } catch {
         /* evento SSE ignorado */
       }
-    }
+    },
+    opts.signal
   )
   return texto
 }
