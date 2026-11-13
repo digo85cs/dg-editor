@@ -92,9 +92,35 @@ function dossie() {
   }
 }
 
+function copiarArtefatos(origem, v) {
+  const nomes = [
+    'DG-Editor-' + v + '-x64.exe',
+    'DG-Editor-' + v + '-x64.exe.blockmap',
+    'DG-Editor-Portable-' + v + '.exe',
+    'latest.yml'
+  ];
+  const oneDrive = process.env.DG_ONEDRIVE_APP || join(process.env.OneDrive || join(require('node:os').homedir(), 'OneDrive'), 'APP');
+  const { copyFileSync, mkdirSync } = require('node:fs');
+  mkdirSync(join(RAIZ, 'dist-app'), { recursive: true });
+  mkdirSync(oneDrive, { recursive: true });
+  for (const nome of nomes) {
+    const de = join(origem, nome);
+    if (!existsSync(de)) continue;
+    copyFileSync(de, join(RAIZ, 'dist-app', nome));
+    if (/\.exe$/i.test(nome)) copyFileSync(de, join(oneDrive, nome));
+  }
+  console.log('[versao] artefatos copiados para dist-app e ' + oneDrive);
+}
+
 function build() {
-  console.log('[versao] compilando instalador Windows...');
-  rodar('npm', ['run', 'dist:win:installer'], { cwd: RAIZ });
+  const v = versaoAtual();
+  const saida = join('tmp', 'dist-release-' + v);
+  console.log('[versao] compilando aplicação...');
+  rodar('npm', ['run', 'build'], { cwd: RAIZ });
+  console.log('[versao] empacotando instalador Windows...');
+  // Pasta de saída isolada evita o lock do app.asar em dist-app por antivírus/indexador.
+  rodar('npx', ['electron-builder', '--win', 'nsis', 'portable', '--x64', '-c.directories.output=' + saida], { cwd: RAIZ });
+  copiarArtefatos(join(RAIZ, saida), v);
   console.log('[versao] compilando APK Android...');
   try {
     rodar(process.execPath, [join('scripts', 'apps', 'build.cjs'), '--tipo=apk']);
