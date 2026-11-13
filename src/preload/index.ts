@@ -98,8 +98,10 @@ const invokeChannels = [
   'midia:atualizacoes', 'midia:atualizacoes-aplicar', 'midia:atualizacoes-prefs',
   'apps:status', 'apps:instalar', 'apps:build', 'apps:publicar', 'apps:abrir-pasta',
   'diag:portabilidade',
+  'prov:status', 'prov:executar', 'prov:preferencias',
   'midia:musicas', 'midia:musicas-pasta', 'midia:musica-mixar',
   'midia:musicas-catalogo', 'midia:musicas-baixar', 'midia:audio-analisar', 'midia:audio-processar',
+  'midia:linha-tempo-analisar', 'midia:linha-tempo-exportar', 'midia:onda',
   'ui:dialog-responder',
   'automation:listar', 'automation:executar', 'automation:aprovacao-resolver'
 ]
@@ -123,7 +125,9 @@ const eventOnChannels = [
   'update:status',
   'ui:dialog-pedir',
   'automation:aprovacao-pendente',
-  'ollama:pull-progresso'
+  'ollama:pull-progresso',
+  'prov:progresso',
+  'midia:linha-tempo-progresso'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */

@@ -478,6 +478,29 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
+    name: 'provisionamento_status',
+    description:
+      'Mostra o estado das ferramentas portateis provisionadas automaticamente (ffmpeg/ffprobe mais recente, Python portatil 3.12 e pacotes de voz/transcricao) e se a plataforma deste PC e compativel.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'provisionamento_atualizar',
+    description:
+      'Baixa/atualiza automaticamente as ferramentas portateis gratuitas compatíveis com este PC (ffmpeg do build mais recente, Python portatil se faltar, pacotes pip). Grava em %LOCALAPPDATA%\\dg-editor\\ferramentas.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        forcar: { type: 'boolean', description: 'Reinstala mesmo se ja estiver atualizado' },
+        componentes: {
+          type: 'array',
+          items: { type: 'string', enum: ['ffmpeg', 'python', 'pacotes'] },
+          description: 'Limita a atualizacao a estes componentes'
+        }
+      },
+      required: []
+    }
+  },
+  {
     name: 'midia_imagem_gerar',
     description:
       'Gera imagem gratuita via Pollinations (sem chave; 1 imagem a cada ~45s por IP). Para ilimitado use ComfyUI local.',
@@ -828,6 +851,45 @@ const TOOLS = [
         saida: { type: 'string' }
       },
       required: ['video', 'musica']
+    }
+  },
+  {
+    name: 'midia_linha_tempo',
+    description:
+      'Editor de video/audio embutido (linha do tempo): concatena imagens/videos/audios com recorte, volume e fades, aplica fade global e musica de fundo e exporta MP4. Use analisar=true para validar duracoes sem gravar e onda=<arquivo> para gerar a forma de onda em PNG.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        itens: {
+          type: 'array',
+          description: 'Clipes na ordem. Imagens usam duracao/fim como segundos; videos/audios usam inicio/fim.',
+          items: {
+            type: 'object',
+            properties: {
+              arquivo: { type: 'string', description: 'Arquivo relativo ao projeto' },
+              inicio: { type: 'number' },
+              fim: { type: 'number' },
+              duracao: { type: 'number' },
+              volume: { type: 'number', description: '0 a 2 (padrao 1)' },
+              fadeIn: { type: 'number' },
+              fadeOut: { type: 'number' },
+              mudo: { type: 'boolean' }
+            },
+            required: ['arquivo']
+          }
+        },
+        audioFundo: { type: 'string', description: 'Nome no banco de musicas ou arquivo relativo ao projeto' },
+        volumeFundo: { type: 'number', description: '0 a 1 (padrao 0.2)' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        fps: { type: 'number' },
+        fadeEntrada: { type: 'number' },
+        fadeSaida: { type: 'number' },
+        saida: { type: 'string' },
+        analisar: { type: 'boolean', description: 'So valida e mede a linha do tempo' },
+        onda: { type: 'string', description: 'Gera a forma de onda (PNG) deste audio/video' }
+      },
+      required: []
     }
   },
   {
@@ -1525,6 +1587,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         return await responder(await ext.statusAgentesExternos())
       }
 
+      if (name === 'provisionamento_status') {
+        const prov = await import('../provisionamento')
+        return await responder(await prov.statusProvisionamento())
+      }
+
+      if (name === 'provisionamento_atualizar') {
+        const prov = await import('../provisionamento')
+        const a = (args || {}) as { forcar?: unknown; componentes?: unknown }
+        const comps = Array.isArray(a.componentes)
+          ? a.componentes.filter((c: unknown): c is 'ffmpeg' | 'python' | 'pacotes' => c === 'ffmpeg' || c === 'python' || c === 'pacotes')
+          : undefined
+        return await responder(await prov.provisionar({ forcar: a.forcar === true, componentes: comps }))
+      }
+
       if (name === 'midia_comfyui_status') {
         const comfy = await import('../midia/comfyui')
         return await responder(await comfy.statusComfy())
@@ -1690,6 +1766,64 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             video: caminho(p.video),
             musica: faixa.caminho,
             volume: p.volume,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_linha_tempo') {
+        const p = z
+          .object({
+            itens: z
+              .array(
+                z.object({
+                  arquivo: z.string().min(1),
+                  inicio: z.number().min(0).optional(),
+                  fim: z.number().min(0).optional(),
+                  duracao: z.number().min(0).optional(),
+                  volume: z.number().min(0).max(2).optional(),
+                  fadeIn: z.number().min(0).optional(),
+                  fadeOut: z.number().min(0).optional(),
+                  mudo: z.boolean().optional()
+                })
+              )
+              .optional(),
+            audioFundo: z.string().optional(),
+            volumeFundo: z.number().min(0).max(1).optional(),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            fps: z.number().optional(),
+            fadeEntrada: z.number().min(0).optional(),
+            fadeSaida: z.number().min(0).optional(),
+            saida: z.string().optional(),
+            analisar: z.boolean().optional(),
+            onda: z.string().optional()
+          })
+          .parse(args)
+        const editor = await import('../midia/editor')
+        if (p.onda) {
+          return await responder(
+            await editor.gerarOnda(RAIZ, { entrada: caminho(p.onda), largura: p.largura, altura: p.altura })
+          )
+        }
+        const itens = (p.itens || []).map((i) => ({ ...i, arquivo: caminho(i.arquivo) }))
+        if (p.analisar) return await responder(await editor.analisarLinhaTempo(itens))
+        let musica: string | undefined
+        if (p.audioFundo) {
+          const musicas = await import('../midia/musicas')
+          const faixa = musicas.listarMusicas().itens.find((m) => m.nome === p.audioFundo)
+          musica = faixa ? faixa.caminho : caminho(p.audioFundo)
+        }
+        return await responder(
+          await editor.exportarLinhaTempo(RAIZ, {
+            itens,
+            audioFundo: musica,
+            volumeFundo: p.volumeFundo,
+            largura: p.largura,
+            altura: p.altura,
+            fps: p.fps,
+            fadeEntrada: p.fadeEntrada,
+            fadeSaida: p.fadeSaida,
             saida: p.saida
           })
         )

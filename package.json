@@ -1,7 +1,7 @@
 {
   "name": "dg-editor",
   "productName": "DG Editor",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "DG Editor — editor de sistemas com IA local",
   "author": {
     "name": "Rodrigo Soares",
@@ -103,6 +103,10 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "resources/ferramentas.json",
+        "to": "ferramentas.json"
       }
     ],
     "extraMetadata": {

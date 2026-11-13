@@ -165,6 +165,8 @@ add(
   '- Python portátil (CPython 3.12) com edge-tts, faster-whisper, kokoro-onnx, piper-tts e supertonic em `resources/python` — vozes e transcrição funcionam sem instalar Python no PC.',
   '- `npm run ferramentas` baixa/verifica tudo antes do build; `dist:win`, `dist:all` e `publish:github` já chamam esse passo.',
   '- Diagnóstico em Execução → Ferramentas → "Portabilidade do PC" (canal `diag:portabilidade`, MCP `portabilidade_status`) lista o que está pronto e o que é opcional (Ollama, SDK Android, ComfyUI).',
+  '- Provisionamento automático (`src/main/provisionamento`): no primeiro boot o app consulta `resources/ferramentas.json` (matriz de plataformas/versões), baixa o ffmpeg do build mais recente quando o remoto é mais novo que o embutido, instala Python 3.12 portátil se faltar e roda `pip --upgrade` dos pacotes gratuitos em `%LOCALAPPDATA%\\dg-editor\\ferramentas` (gravável sem admin, prioritário sobre o embutido).',
+  '- Canais `prov:status`, `prov:executar`, `prov:preferencias` + evento `prov:progresso`; MCP `provisionamento_status`/`provisionamento_atualizar`; UI em "Ferramentas automáticas (download no PC novo)" com toggle, log e botão de forçar atualização. Falha de rede recua por 6h e a checagem periódica é diária.',
   '- Agentes externos gratuitos: `agente:externos` / MCP `agentes_externos_status` detectam QCoder (qwen2.5-coder + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent, com o comando de instalação quando faltam.',
   ''
 )

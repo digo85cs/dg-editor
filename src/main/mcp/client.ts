@@ -76,6 +76,9 @@ export async function conectarMcp(raizForcada?: string): Promise<Client> {
       env: {
         ...process.env,
         DG_ROOT: raiz,
+        ...(process.resourcesPath && existsSync(path.join(process.resourcesPath, 'ferramentas.json'))
+          ? { DG_FERRAMENTAS_MANIFESTO: path.join(process.resourcesPath, 'ferramentas.json') }
+          : {}),
         ELECTRON_RUN_AS_NODE: '1'
       },
       stderr: 'pipe'

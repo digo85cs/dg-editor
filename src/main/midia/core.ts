@@ -59,10 +59,28 @@ const EXTS_IMAGEM = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'])
 const EXTS_VIDEO = new Set(['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'])
 const EXTS_AUDIO = new Set(['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'])
 
-/** Pastas onde o instalador embute ferramentas (ffmpeg, python portátil). */
+/** Pasta onde o provisionador guarda ferramentas atualizadas (gravável por usuário). */
+export function pastaFerramentasUsuario(): string {
+  const custom = process.env.DG_FERRAMENTAS_DIR
+  if (custom && custom.trim()) return custom.trim()
+  const base = process.env.LOCALAPPDATA
+    ? join(process.env.LOCALAPPDATA, 'dg-editor')
+    : join(homedir(), '.dg-editor')
+  return join(base, 'ferramentas')
+}
+
+export function chavePlataformaBin(): string {
+  return process.platform + '-' + process.arch
+}
+
+/**
+ * Pastas onde procurar binários. A pasta do provisionador vem primeiro:
+ * ferramentas atualizadas automaticamente têm prioridade sobre as embutidas.
+ */
 export function pastasEmbutidas(): string[] {
   const dirs: string[] = []
   if (process.env.DG_FERRAMENTAS) dirs.push(process.env.DG_FERRAMENTAS)
+  dirs.push(join(pastaFerramentasUsuario(), 'bin', chavePlataformaBin()))
   const rp = (process as unknown as { resourcesPath?: string }).resourcesPath
   if (typeof rp === 'string' && rp) dirs.push(join(rp, 'bin', 'win32-x64'))
   dirs.push(join(process.cwd(), 'resources', 'bin', 'win32-x64'))
@@ -89,17 +107,23 @@ function ffprobeBin(): string {
   return bin('ffprobe', 'DG_FFPROBE')
 }
 
-function pythonBin(): string {
+export function pythonBin(): string {
   const custom = process.env.DG_PYTHON
   if (custom && custom.trim()) return custom.trim()
   const rp = (process as unknown as { resourcesPath?: string }).resourcesPath
   const candidatos = [
+    join(pastaFerramentasUsuario(), 'python', 'python.exe'),
     ...(typeof rp === 'string' && rp ? [join(rp, 'python', 'python.exe')] : []),
     join(process.cwd(), 'resources', 'python', 'python.exe'),
     join(__dirname, '..', '..', 'resources', 'python', 'python.exe')
   ]
   for (const p of candidatos) if (existsSync(p)) return p
   return 'python'
+}
+
+/** Caminho de um binário resolvido (usuário > embutido > PATH). */
+export function binarioResolvido(nome: 'ffmpeg' | 'ffprobe'): string {
+  return nome === 'ffmpeg' ? ffmpegBin() : ffprobeBin()
 }
 
 /** edge-tts: binário próprio ou módulo dentro do Python embutido. */
@@ -111,9 +135,10 @@ function comandoEdgeTts(): { bin: string; prefixo: string[] } {
   return { bin: 'edge-tts', prefixo: [] }
 }
 
-/** Diz se a ferramenta está embutida no app, veio de variável ou do PATH. */
-export function origemFerramenta(caminho: string): 'embutida' | 'ambiente' | 'sistema' {
+/** Diz de onde veio a ferramenta: atualizada pelo app, embutida no instalador ou do sistema. */
+export function origemFerramenta(caminho: string): 'atualizada' | 'embutida' | 'ambiente' | 'sistema' {
   const p = caminho.replace(/\\/g, '/').toLowerCase()
+  if (/\/dg-editor\/ferramentas\//.test(p)) return 'atualizada'
   if (/\/resources\/bin\//.test(p) || /\/resources\/python\//.test(p)) return 'embutida'
   if (/[\\/]/.test(caminho)) return 'ambiente'
   return 'sistema'

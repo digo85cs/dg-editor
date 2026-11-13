@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 19:58:40** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.2** · branch `integra-13-11` · último commit: d076e20 2026-11-13 release: v0.3.1
-> Alterações locais não commitadas: 21 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 20:26:35** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.3** · branch `integra-13-11` · último commit: 720d286 2026-11-13 release: v0.3.2
+> Alterações locais não commitadas: 22 arquivo(s).
 
 ## 1. O que é
 
@@ -24,12 +24,12 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, deploy, ipc, mcp, memory, midia, navegador, onboarding, openclaw, radar, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, deploy, ipc, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, vault, __tests__.
 
 ## 4. IPC
 
-- Canais registrados no main: **308**.
-- Canais expostos pelo preload: **286**.
+- Canais registrados no main: **314**.
+- Canais expostos pelo preload: **294**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -53,6 +53,8 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `midia:imagem-melhorar`
 - `midia:imagem-qualidade`
 - `midia:legendas`
+- `midia:linha-tempo-analisar`
+- `midia:linha-tempo-exportar`
 - `midia:listar`
 - `midia:meme`
 - `midia:memes`
@@ -64,6 +66,7 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `midia:musicas-catalogo`
 - `midia:musicas-pasta`
 - `midia:narrar`
+- `midia:onda`
 - `midia:status`
 - `midia:transcrever`
 - `midia:video-analisar`
@@ -80,7 +83,7 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 
 ## 5. Estúdio de mídia
 
-Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `vozes.ts`.
+Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `vozes.ts`.
 
 ### Biblioteca de músicas livres (por estilo)
 
@@ -107,6 +110,8 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Python portátil (CPython 3.12) com edge-tts, faster-whisper, kokoro-onnx, piper-tts e supertonic em `resources/python` — vozes e transcrição funcionam sem instalar Python no PC.
 - `npm run ferramentas` baixa/verifica tudo antes do build; `dist:win`, `dist:all` e `publish:github` já chamam esse passo.
 - Diagnóstico em Execução → Ferramentas → "Portabilidade do PC" (canal `diag:portabilidade`, MCP `portabilidade_status`) lista o que está pronto e o que é opcional (Ollama, SDK Android, ComfyUI).
+- Provisionamento automático (`src/main/provisionamento`): no primeiro boot o app consulta `resources/ferramentas.json` (matriz de plataformas/versões), baixa o ffmpeg do build mais recente quando o remoto é mais novo que o embutido, instala Python 3.12 portátil se faltar e roda `pip --upgrade` dos pacotes gratuitos em `%LOCALAPPDATA%\dg-editor\ferramentas` (gravável sem admin, prioritário sobre o embutido).
+- Canais `prov:status`, `prov:executar`, `prov:preferencias` + evento `prov:progresso`; MCP `provisionamento_status`/`provisionamento_atualizar`; UI em "Ferramentas automáticas (download no PC novo)" com toggle, log e botão de forçar atualização. Falha de rede recua por 6h e a checagem periódica é diária.
 - Agentes externos gratuitos: `agente:externos` / MCP `agentes_externos_status` detectam QCoder (qwen2.5-coder + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent, com o comando de instalação quando faltam.
 
 ### Demais recursos
@@ -128,12 +133,12 @@ Artefatos locais em `dist-apps/`:
 
 ## 7. MCP
 
-- **70** ferramentas registradas em `src/main/mcp/server.ts`.
+- **73** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
@@ -215,7 +220,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 10. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **147 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **151 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
@@ -228,6 +233,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 12. Histórico recente
 
+- 720d286 2026-11-13 release: v0.3.2
 - d076e20 2026-11-13 release: v0.3.1
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
 - b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
@@ -237,7 +243,6 @@ Artefatos locais em `dist-apps/`:
 - cdbb319 2026-11-12 fix: fila do agent travava sem timeout; fila por workspace; unifica cache; proximoDisponivel usa todos os modelos
 - 5b8cf9d 2026-11-12 feat: cache de respostas LLM, pull auto Ollama, filtro agentes invalidos e custo rastreado
 - c8354ca 2026-11-12 fix: corrige testes flaky pre-existing (chat.test.ts e contratos.test.ts)
-- 81fa3bd 2026-11-12 docs(radar): documenta radar diario e adiciona secao ao .dgrules
 
 ## 13. Como atualizar este dossiê
 

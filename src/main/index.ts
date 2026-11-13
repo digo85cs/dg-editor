@@ -492,6 +492,31 @@ if (process.env.DG_QA_E2E !== '1' && !SAFE_MODE) {
 }
 
 // ============================================================================
+// PROVISIONAMENTO AUTOMATICO DAS FERRAMENTAS (pc novo / build mais recente)
+// ============================================================================
+
+if (process.env.DG_QA_E2E !== '1' && process.env.DG_PROVISIONAMENTO !== '0' && !SAFE_MODE) {
+  setTimeout(() => {
+    void import('./provisionamento')
+      .then(async ({ provisionarEmSegundoPlano }) => {
+        const { enviarProgressoProvisionamento } = await import('./ipc/provisionamento');
+        const r = await provisionarEmSegundoPlano({ onProgresso: enviarProgressoProvisionamento });
+        if (r) {
+          for (const item of r.resultados) {
+            enviarProgressoProvisionamento({
+              id: item.id,
+              etapa: item.ok ? 'ok' : 'erro',
+              mensagem: item.detalhe
+            });
+          }
+          console.log('[provisionamento] ok=' + r.ok + ' itens=' + r.resultados.length);
+        }
+      })
+      .catch((e) => console.warn('[provisionamento] falhou:', String(e?.message || e)));
+  }, 20_000);
+}
+
+// ============================================================================
 // AUDITORIA PERIODICA NO BOOT
 // ============================================================================
 

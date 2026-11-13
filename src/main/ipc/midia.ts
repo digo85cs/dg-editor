@@ -42,6 +42,7 @@ import { listarMusicas, mixarMusica, pastaMusicas } from '../midia/musicas'
 import { analisarVideo, processarImagem, processarVideo } from '../midia/qualidade'
 import { baixarFaixas, catalogoLivres } from '../midia/musicas-livres'
 import { analisarAudio, processarAudio, type FormatoAudio } from '../midia/audio'
+import { analisarLinhaTempo, exportarLinhaTempo, gerarOnda, type ItemLinhaTempo } from '../midia/editor'
 import { gerarFotoVideoComfy } from '../midia/comfyui'
 import { detectarHardware } from '../midia/hardware'
 import { gerarMeme, listarMemes, sincronizarMemes, statusMemes } from '../midia/memes'
@@ -102,6 +103,32 @@ function texto(v: unknown, max = 20000): string {
 
 function numero(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined
+}
+
+function itensLinhaTempo(
+  raiz: string,
+  bruto: unknown
+): { ok: true; itens: ItemLinhaTempo[] } | { ok: false; erro: string } {
+  if (!Array.isArray(bruto) || !bruto.length) return { ok: false, erro: 'adicione ao menos um clipe à linha do tempo' }
+  if (bruto.length > 40) return { ok: false, erro: 'máximo de 40 clipes por exportação' }
+  const itens: ItemLinhaTempo[] = []
+  for (const item of bruto) {
+    const o = objeto(item)
+    const arquivo = texto(o.arquivo, 1000)
+    const bloqueio = entradaAutorizada(raiz, arquivo)
+    if (bloqueio) return { ok: false, erro: bloqueio }
+    itens.push({
+      arquivo: resolve(arquivo),
+      inicio: numero(o.inicio),
+      fim: numero(o.fim),
+      duracao: numero(o.duracao),
+      volume: numero(o.volume),
+      fadeIn: numero(o.fadeIn),
+      fadeOut: numero(o.fadeOut),
+      mudo: o.mudo === true
+    })
+  }
+  return { ok: true, itens }
 }
 
 function falha(erro: unknown): RespostaMidia {
@@ -732,6 +759,87 @@ export function registrarHandlersMidia(): void {
         video,
         musica,
         volume: numero(o.volume),
+        saida: texto(o.saida, 1000) || undefined
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  // ------------------------------------------------- linha do tempo (editor)
+
+  ipcMain.handle('midia:linha-tempo-analisar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const itens = itensLinhaTempo(r.raiz, o.itens)
+      if ('erro' in itens) return { ok: false, erro: itens.erro }
+      return await analisarLinhaTempo(itens.itens)
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:linha-tempo-exportar', async (e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const itens = itensLinhaTempo(r.raiz, o.itens)
+      if ('erro' in itens) return { ok: false, erro: itens.erro }
+
+      let audioFundo = texto(o.audioFundo, 1000)
+      if (audioFundo) {
+        const abs = resolve(audioFundo)
+        const naBiblioteca = (() => {
+          const rel = relative(pastaMusicas(), abs)
+          return !rel.startsWith('..') && !isAbsolute(rel)
+        })()
+        const bloqueio = naBiblioteca ? null : entradaAutorizada(r.raiz, abs)
+        if (bloqueio) return { ok: false, erro: 'música de fundo: ' + bloqueio }
+        audioFundo = abs
+      }
+
+      return await exportarLinhaTempo(
+        r.raiz,
+        {
+          itens: itens.itens,
+          audioFundo: audioFundo || undefined,
+          volumeFundo: numero(o.volumeFundo),
+          largura: numero(o.largura),
+          altura: numero(o.altura),
+          fps: numero(o.fps),
+          fadeEntrada: numero(o.fadeEntrada),
+          fadeSaida: numero(o.fadeSaida),
+          saida: texto(o.saida, 1000) || undefined
+        },
+        (etapa, atual, total) => {
+          try {
+            if (!e.sender.isDestroyed()) e.sender.send('midia:linha-tempo-progresso', { etapa, atual, total })
+          } catch {
+            /* janela fechou durante a renderização */
+          }
+        }
+      )
+    } catch (err) {
+      return falha(err)
+    }
+  })
+
+  ipcMain.handle('midia:onda', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      return await gerarOnda(r.raiz, {
+        entrada,
+        largura: numero(o.largura),
+        altura: numero(o.altura),
+        cor: texto(o.cor, 20) || undefined,
         saida: texto(o.saida, 1000) || undefined
       })
     } catch (e) {

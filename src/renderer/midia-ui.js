@@ -1275,6 +1275,201 @@ export async function pintarMidia(corpo, raiz) {
     )
   )
 
+  // ------------------------------------------------------------ editor de linha do tempo
+  let clipesEditor = []
+  const listaClipes = el('div', { style: 'display:flex;flex-direction:column;gap:6px;margin-top:6px' })
+  const lblTotalEditor = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Nenhum clipe na linha do tempo.' })
+  const resEditor = el('div', { style: 'font-size:12px' })
+  const ondaEditor = el('div', { style: 'margin-top:6px;font-size:12px' })
+  const selTrilhaEditor = select([['', 'Sem música de fundo']], '')
+  const numFundoEditor = el('input', { type: 'number', value: '0.2', min: '0', max: '1', step: '0.05', style: 'width:64px' })
+  const resEditorCfg = select([['1280x720', '1280×720'], ['1920x1080', '1920×1080'], ['854x480', '854×480']], '1280x720')
+  const fpsEditor = select([['30', '30 fps'], ['24', '24 fps'], ['60', '60 fps']], '30')
+  const fadeInEditor = el('input', { type: 'number', value: '0.6', min: '0', max: '10', step: '0.1', style: 'width:64px' })
+  const fadeOutEditor = el('input', { type: 'number', value: '0.6', min: '0', max: '10', step: '0.1', style: 'width:64px' })
+
+  const ehImagemEditor = (p) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(p || ''))
+  const duracaoAproxEditor = (c) => {
+    if (ehImagemEditor(c.arquivo)) return Number(c.duracao ?? 3) || 3
+    const ini = Number(c.inicio ?? 0)
+    const fim = Number(c.fim ?? 0)
+    return fim > ini ? fim - ini : 0
+  }
+  const entradaNum = (valor, min, max, step, onChange) => {
+    const i = el('input', { type: 'number', value: String(valor), min: String(min), max: String(max), step: String(step), style: 'width:64px' })
+    i.addEventListener('change', () => {
+      const n = Number(i.value)
+      onChange(Number.isFinite(n) ? n : valor)
+    })
+    return i
+  }
+  function atualizarTotalEditor() {
+    const soma = clipesEditor.reduce((s, c) => s + duracaoAproxEditor(c), 0)
+    const semFim = clipesEditor.filter((c) => !ehImagemEditor(c.arquivo) && !Number(c.fim)).length
+    lblTotalEditor.textContent = clipesEditor.length
+      ? clipesEditor.length + ' clipe(s) · total ' + soma.toFixed(1) + 's' + (semFim ? ' (+ ' + semFim + ' sem fim definido usam a duração inteira)' : '')
+      : 'Nenhum clipe na linha do tempo.'
+  }
+  function renderClipesEditor() {
+    listaClipes.textContent = ''
+    clipesEditor.forEach((c, i) => {
+      const imagem = ehImagemEditor(c.arquivo)
+      const chkMudo = el('input', { type: 'checkbox' })
+      chkMudo.checked = c.mudo === true
+      chkMudo.addEventListener('change', () => {
+        c.mudo = chkMudo.checked
+      })
+      const mover = (para) => {
+        if (para < 0 || para >= clipesEditor.length) return
+        const [x] = clipesEditor.splice(i, 1)
+        clipesEditor.splice(para, 0, x)
+        renderClipesEditor()
+      }
+      listaClipes.appendChild(
+        el('div', { style: 'border:1px solid var(--dg-border);border-radius:6px;padding:6px' },
+          el('div', { style: 'display:flex;align-items:center;gap:6px;font-size:12px' },
+            el('strong', { text: String(i + 1).padStart(2, '0') }),
+            el('span', { className: 'muted', style: 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: nomeCurto(c.arquivo) }),
+            el('span', { className: 'muted', style: 'font-size:10px', text: imagem ? 'imagem' : 'vídeo/áudio' }),
+            botao('↑', () => mover(i - 1)),
+            botao('↓', () => mover(i + 1)),
+            botao('Onda', async () => {
+              ondaEditor.textContent = 'Gerando forma de onda…'
+              const r = await seguro('midia:onda', { raiz, entrada: c.arquivo })
+              ondaEditor.textContent = ''
+              if (!r?.ok) {
+                ondaEditor.appendChild(el('p', { style: 'margin:0;color:#ff8a8a;font-size:12px', text: 'Erro: ' + (r?.erro || 'falha') }))
+                return
+              }
+              if (r.previewBase64) {
+                ondaEditor.appendChild(el('img', { src: r.previewBase64, alt: 'Forma de onda', style: 'max-width:100%;border-radius:6px;border:1px solid var(--dg-border)' }))
+              }
+              ondaEditor.appendChild(el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0 0', text: 'Onda salva em ' + (r.caminhoRel || r.caminho) }))
+            }),
+            botao('✕', () => {
+              clipesEditor.splice(i, 1)
+              renderClipesEditor()
+            })
+          ),
+          el('div', { style: 'display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:6px' },
+            imagem
+              ? campo('Duração s', entradaNum(c.duracao ?? 3, 0.2, 120, 0.5, (v) => { c.duracao = v; atualizarTotalEditor() }))
+              : campo('Início s', entradaNum(c.inicio ?? 0, 0, 7200, 0.5, (v) => { c.inicio = v; atualizarTotalEditor() })),
+            imagem
+              ? null
+              : campo('Fim s', entradaNum(c.fim ?? 0, 0, 7200, 0.5, (v) => { c.fim = v; atualizarTotalEditor() })),
+            campo('Fade in s', entradaNum(c.fadeIn ?? 0, 0, 10, 0.5, (v) => { c.fadeIn = v })),
+            campo('Fade out s', entradaNum(c.fadeOut ?? 0, 0, 10, 0.5, (v) => { c.fadeOut = v })),
+            campo('Volume', entradaNum(c.volume ?? 1, 0, 2, 0.05, (v) => { c.volume = v })),
+            campo('Mudo', chkMudo)
+          )
+        )
+      )
+    })
+    atualizarTotalEditor()
+  }
+  function payloadEditor() {
+    const [largura, altura] = String(resEditorCfg.value).split('x').map(Number)
+    return {
+      raiz,
+      itens: clipesEditor.map((c) => ({
+        arquivo: c.arquivo,
+        inicio: c.inicio,
+        fim: c.fim,
+        duracao: c.duracao,
+        volume: c.volume,
+        fadeIn: c.fadeIn,
+        fadeOut: c.fadeOut,
+        mudo: c.mudo === true
+      })),
+      audioFundo: selTrilhaEditor.value || undefined,
+      volumeFundo: Number(numFundoEditor.value),
+      largura,
+      altura,
+      fps: Number(fpsEditor.value),
+      fadeEntrada: Number(fadeInEditor.value),
+      fadeSaida: Number(fadeOutEditor.value)
+    }
+  }
+  if (window.api?.on) {
+    window.api.on('midia:linha-tempo-progresso', (_e, ev) => {
+      if (!ev || !ev.etapa) return
+      resEditor.textContent = 'Exportando: ' + ev.etapa + ' (' + ev.atual + '/' + ev.total + ')…'
+    })
+  }
+  corpo.appendChild(
+    caixa(
+      'Editor de vídeo/áudio (linha do tempo)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Junte imagens, vídeos e áudios na ordem; cada clipe pode ser recortado e receber volume/fade. No final aplique fade global e música de fundo. Renderiza localmente com ffmpeg.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Adicionar mídia', async () => {
+          const caminhos = await escolher('midia', true)
+          if (!caminhos.length) return
+          for (const p of caminhos) clipesEditor.push({ arquivo: p, volume: 1, fadeIn: 0, fadeOut: 0 })
+          if (clipesEditor.length > 40) {
+            clipesEditor = clipesEditor.slice(0, 40)
+            toast('Máximo de 40 clipes por exportação', 'aviso')
+          }
+          renderClipesEditor()
+        }, true),
+        botao('Limpar', () => {
+          clipesEditor = []
+          ondaEditor.textContent = ''
+          renderClipesEditor()
+        }),
+        botao('Escolher música…', async () => {
+          const [p] = await escolher('audio')
+          if (!p) return
+          selTrilhaEditor.appendChild(el('option', { value: p, text: nomeCurto(p) }))
+          selTrilhaEditor.value = p
+        }),
+        botao('Abrir banco de músicas', () => void seguro('midia:musicas-pasta'))
+      ),
+      listaClipes,
+      lblTotalEditor,
+      el('div', { style: 'display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:6px' },
+        campo('Música de fundo', selTrilhaEditor),
+        campo('Volume fundo', numFundoEditor),
+        campo('Resolução', resEditorCfg),
+        campo('FPS', fpsEditor),
+        campo('Fade entrada s', fadeInEditor),
+        campo('Fade saída s', fadeOutEditor)
+      ),
+      el('div', { style: 'display:flex;gap:6px;margin-top:8px' },
+        botao('Analisar', async () => {
+          if (!clipesEditor.length) return toast('Adicione clipes à linha do tempo', 'aviso')
+          resEditor.textContent = 'Analisando…'
+          const r = await seguro('midia:linha-tempo-analisar', payloadEditor())
+          if (!r?.ok) {
+            resEditor.textContent = 'Erro: ' + (r?.erro || 'falha')
+            return
+          }
+          resEditor.textContent = ''
+          resEditor.appendChild(el('p', { style: 'margin:0;font-size:12px', text: 'Duração total: ' + r.duracaoSeg + 's · ' + (r.itens || []).length + ' clipe(s)' }))
+          for (const it of r.itens || []) {
+            resEditor.appendChild(
+              el('div', { className: 'muted', style: 'font-size:11px', text: it.nome + ' — ' + it.tipo + ' · ' + it.duracao + 's' + (it.temAudio ? '' : ' · sem áudio') })
+            )
+          }
+        }),
+        botao('Exportar MP4', async () => {
+          if (!clipesEditor.length) return toast('Adicione clipes à linha do tempo', 'aviso')
+          resEditor.textContent = 'Exportando…'
+          const r = await seguro('midia:linha-tempo-exportar', payloadEditor())
+          mostrarResultado(resEditor, r)
+          toast(r?.ok ? 'Linha do tempo exportada' : r?.erro || 'Falha ao exportar', r?.ok ? 'ok' : 'erro')
+        }, true)
+      ),
+      ondaEditor,
+      resEditor
+    )
+  )
+  renderClipesEditor()
+  void (async () => {
+    const r = await seguro('midia:musicas')
+    for (const m of r?.itens || []) selTrilhaEditor.appendChild(el('option', { value: m.caminho, text: m.nome }))
+  })()
+
   // ------------------------------------------------------------ apps
   const appsInfo = el('div', { style: 'font-size:12px;line-height:1.6' })
   const appsLog = el('pre', {
@@ -1369,6 +1564,89 @@ export async function pintarMidia(corpo, raiz) {
       diagPort
     )
   )
+
+  // ------------------------------------------- provisionamento automático
+  const provInfo = el('div', { style: 'font-size:12px;line-height:1.6' })
+  const provLog = el('div', { className: 'muted', style: 'font-size:11px;max-height:110px;overflow:auto;white-space:pre-wrap' })
+  const autoProv = el('input', { type: 'checkbox', id: 'prov-auto' })
+  autoProv.checked = true
+  autoProv.style.margin = '0 4px 0 0'
+  const rotuloAuto = el('label', { style: 'font-size:12px;display:flex;align-items:center;gap:2px;cursor:pointer' }, autoProv, el('span', { text: 'Manter ferramentas atualizadas automaticamente' }))
+
+  function linhaProv(ev) {
+    const quando = new Date().toLocaleTimeString('pt-BR')
+    const pct = ev && typeof ev.total === 'number' && ev.total > 0 ? ' (' + Math.min(100, Math.round((ev.recebido / ev.total) * 100)) + '%)' : ''
+    provLog.appendChild(el('div', { text: '[' + quando + '] ' + ev.id + ': ' + ev.mensagem + pct }))
+    while (provLog.childElementCount > 40) provLog.removeChild(provLog.firstChild)
+    provLog.scrollTop = provLog.scrollHeight
+  }
+
+  async function atualizarStatusProv() {
+    provInfo.textContent = 'Consultando…'
+    const s = await seguro('prov:status')
+    provInfo.textContent = ''
+    if (!s || s.erro) {
+      provInfo.textContent = 'Erro: ' + (s?.erro || 'falha ao consultar')
+      return
+    }
+    provInfo.appendChild(
+      el('div', {
+        className: 'muted',
+        style: 'font-size:11px',
+        text:
+          (s.rotulo || s.plataforma) +
+          (s.suportado ? '' : ' · não suportado: ' + (s.motivo || '?')) +
+          (typeof s.espacoLivreMB === 'number' ? ' · ' + s.espacoLivreMB + ' MB livres em ' + (s.pasta || '') : '')
+      })
+    )
+    for (const it of s.itens || []) {
+      const cor = it.ok ? 'var(--dg-ok, #3fb950)' : it.estado === 'incompativel' ? 'var(--dg-aviso, #d29922)' : 'var(--dg-erro, #f85149)'
+      provInfo.appendChild(
+        el('div', { style: 'margin:2px 0' },
+          el('strong', { style: 'color:' + cor, text: (it.ok ? '[OK] ' : '[!] ') + it.nome }),
+          el('span', { className: 'muted', text: ' — ' + it.detalhe + (it.origem ? ' · ' + it.origem : '') })
+        )
+      )
+    }
+    if (s.emAndamento) provInfo.appendChild(el('div', { className: 'muted', text: 'Download em andamento…' }))
+    if (s.ultimoErro) {
+      provInfo.appendChild(
+        el('div', { className: 'muted', style: 'color:var(--dg-aviso, #d29922);font-size:11px', text: 'Última falha: ' + s.ultimoErro.detalhe })
+      )
+    }
+  }
+
+  async function executarProv(forcar) {
+    provLog.textContent = 'Iniciando…'
+    const r = await seguro('prov:executar', { forcar: Boolean(forcar) })
+    for (const it of (r && r.resultados) || []) {
+      provLog.appendChild(el('div', { text: (it.ok ? '[OK] ' : '[FALHA] ') + it.id + ': ' + it.detalhe }))
+    }
+    await atualizarStatusProv()
+  }
+
+  autoProv.addEventListener('change', () => void seguro('prov:preferencias', { auto: autoProv.checked }))
+  if (window.api?.on) window.api.on('prov:progresso', (_e, ev) => linhaProv(ev))
+
+  corpo.appendChild(
+    caixa(
+      'Ferramentas automáticas (download no PC novo)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Baixa sempre o ffmpeg mais recente, o Python portátil (quando faltar) e os pacotes de voz/transcrição compatíveis com este PC. Tudo grátis, gravado em %LOCALAPPDATA%\\dg-editor\\ferramentas.' }),
+      rotuloAuto,
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin:6px 0' },
+        botao('Baixar o que falta', () => void executarProv(false), true),
+        botao('Forçar atualização', () => void executarProv(true)),
+        botao('Atualizar status', () => void atualizarStatusProv())
+      ),
+      provInfo,
+      provLog
+    )
+  )
+  void (async () => {
+    const p = await seguro('prov:preferencias')
+    if (p && typeof p.auto === 'boolean') autoProv.checked = p.auto
+    await atualizarStatusProv()
+  })()
 
   // ------------------------------------------------------------ galeria
   const galeria = el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px' })

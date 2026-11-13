@@ -20,6 +20,9 @@ const RAIZ = join(__dirname, '..');
 const DESTINO = join(RAIZ, 'resources', 'bin', process.platform === 'win32' ? 'win32-x64' : process.platform + '-' + process.arch);
 const URL_BUILD =
   'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip';
+const API_BUILD = 'https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest';
+const ASSET_BUILD = 'ffmpeg-master-latest-win64-gpl.zip';
+const META = join(DESTINO, '.dg-build.json');
 const CACHE = join(tmpdir(), 'dg-editor-ffmpeg-cache');
 const TAR = process.platform === 'win32' ? join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 const ZIP = join(CACHE, basename(URL_BUILD));
@@ -100,6 +103,28 @@ function verificar() {
   };
 }
 
+function metadadosBuild() {
+  return { fonte: 'build', repo: 'BtbN/FFmpeg-Builds', tag: 'latest', asset: ASSET_BUILD, url: URL_BUILD };
+}
+
+/** Registra a data do build embutido para o app não baixar uma cópia igual. */
+async function gravarMetadados() {
+  const meta = { ...metadadosBuild(), build: '', instaladoEm: new Date().toISOString() };
+  try {
+    const res = await fetch(API_BUILD, { headers: { 'User-Agent': 'DG-Editor-build' } });
+    if (res.ok) {
+      const j = await res.json();
+      const asset = (j.assets || []).find((a) => a.name === ASSET_BUILD);
+      if (asset && asset.updated_at) meta.build = String(asset.updated_at).slice(0, 10);
+      meta.tag = j.tag_name || 'latest';
+    }
+  } catch {
+    /* offline: o app trata build vazio como "desconhecido" */
+  }
+  writeFileSync(META, JSON.stringify(meta, null, 2) + '\n', 'utf8');
+  log('metadados do build: ' + (meta.build || 'sem data (offline)'));
+}
+
 async function main() {
   if (process.platform !== 'win32') {
     log('plataforma ' + process.platform + ': ffmpeg estático só é embutido no Windows; usando o do sistema.');
@@ -109,6 +134,7 @@ async function main() {
     const v = verificar();
     log('ffmpeg/ffprobe já embutidos (' + Math.round(tamanho(join(DESTINO, 'ffmpeg.exe')) / 1024 / 1024) + ' MB)');
     if (v.ok) log(v.versao);
+    if (!statSync(META, { throwIfNoEntry: false })) await gravarMetadados();
     return { ok: true, embutido: true, ...v };
   }
   await baixar();
@@ -130,6 +156,7 @@ async function main() {
     'utf8'
   );
   rmSync(pasta, { recursive: true, force: true });
+  await gravarMetadados();
   const v = verificar();
   if (!v.ok) throw new Error(v.erro);
   log(v.versao);

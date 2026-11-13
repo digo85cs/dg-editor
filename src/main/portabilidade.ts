@@ -77,7 +77,10 @@ export async function diagnosticoPortabilidade(): Promise<DiagnosticoPortabilida
     ok: f.ffmpeg.ok,
     obrigatorio: true,
     detalhe: (f.ffmpeg.versao || f.ffmpeg.erro || 'não encontrado') + ' · ' + (f.ffmpeg.origem || '?'),
-    dica: f.ffmpeg.origem === 'embutida' ? undefined : 'Rode "npm run ferramentas" antes de gerar o instalador para embutir.'
+    dica:
+      f.ffmpeg.origem === 'embutida' || f.ffmpeg.origem === 'atualizada'
+        ? undefined
+        : 'O app baixa automaticamente; para embutir no instalador rode "npm run ferramentas".'
   })
   add({
     id: 'ffprobe',
@@ -92,7 +95,10 @@ export async function diagnosticoPortabilidade(): Promise<DiagnosticoPortabilida
     ok: f.python.ok,
     obrigatorio: false,
     detalhe: (f.python.versao || f.python.erro || 'não encontrado') + ' · ' + (f.python.origem || '?'),
-    dica: f.python.origem === 'embutida' ? undefined : 'Embute com "npm run python-portatil"; sem ele só resta edge-tts do sistema.'
+    dica:
+      f.python.origem === 'embutida' || f.python.origem === 'atualizada'
+        ? undefined
+        : 'O app baixa o Python portátil automaticamente quando há rede.'
   })
   add({
     id: 'edge-tts',

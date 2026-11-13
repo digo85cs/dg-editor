@@ -37,7 +37,7 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
       )
       const titulo = ((await page.locator('#tool-titulo').textContent()) || '').trim()
       const corpo = (await page.locator('#tool-corpo').textContent()) || ''
-      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Imagem: nitidez, cor e reescala', 'Vídeo: filtros, estabilização e re-render', 'Apps (APK Android + instalador)', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever']
+      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Editor de vídeo/áudio (linha do tempo)', 'Imagem: nitidez, cor e reescala', 'Vídeo: filtros, estabilização e re-render', 'Apps (APK Android + instalador)', 'Ferramentas automáticas (download no PC novo)', 'Portabilidade do PC', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever']
       const faltando = secoes.filter((s) => !corpo.includes(s))
       out.push({
         id: 'ui.midia.painel',
@@ -536,6 +536,112 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         id: 'ui.agentes.externos',
         area: 'ui',
         titulo: 'agentes externos',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
+      const r = await page.evaluate(async () => {
+        // @ts-expect-error api bridge
+        return await window.api.invoke('prov:status')
+      })
+      const ids: string[] = (r?.itens || []).map((i: { id: string }) => i.id)
+      const ok =
+        r?.suportado === true &&
+        ids.includes('ffmpeg') &&
+        ids.includes('python') &&
+        ids.includes('pacotes') &&
+        typeof r?.pasta === 'string'
+      out.push({
+        id: 'ui.provisionamento.status',
+        area: 'ui',
+        titulo: 'Provisionamento automático cobre ffmpeg/Python/pacotes',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: ok
+          ? r.plataforma + ' · ' + ids.map((id, i) => id + ':' + (r.itens[i].estado as string)).join(' ')
+          : 'itens: ' + ids.join(', ')
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.provisionamento.status',
+        area: 'ui',
+        titulo: 'provisionamento automático',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    try {
+      const r = await page.evaluate(async () => {
+        // @ts-expect-error api bridge
+        const api = window.api
+        const raiz = await api.invoke('app:raiz-projeto')
+        const a = await api.invoke('midia:html-imagem', {
+          raiz,
+          html: '<div style="width:100%;height:100%;background:#123"></div>',
+          largura: 320,
+          altura: 180
+        })
+        if (!a?.ok) return a
+        const b = await api.invoke('midia:html-imagem', {
+          raiz,
+          html: '<div style="width:100%;height:100%;background:#a31"></div>',
+          largura: 320,
+          altura: 180
+        })
+        if (!b?.ok) return b
+        const itens = [
+          { arquivo: a.caminho, duracao: 1, fadeIn: 0.2 },
+          { arquivo: b.caminho, duracao: 1, fadeOut: 0.2 }
+        ]
+        const analise = await api.invoke('midia:linha-tempo-analisar', { raiz, itens })
+        if (!analise?.ok) return analise
+        const exp = await api.invoke('midia:linha-tempo-exportar', {
+          raiz,
+          itens,
+          largura: 320,
+          altura: 180,
+          fps: 24,
+          fadeEntrada: 0.3,
+          fadeSaida: 0.3
+        })
+        if (!exp?.ok) return exp
+        const onda = await api.invoke('midia:onda', { raiz, entrada: exp.caminho, largura: 320, altura: 80 })
+        return { ...exp, analise, onda }
+      })
+      const ok =
+        !!r?.ok &&
+        typeof r.bytes === 'number' &&
+        r.bytes > 1000 &&
+        Math.abs(Number(r.duracaoSeg) - 2) < 0.2 &&
+        !!r.analise?.ok &&
+        !!r.onda?.ok &&
+        !!r.onda?.previewBase64
+      out.push({
+        id: 'ui.midia.linha-tempo',
+        area: 'ui',
+        titulo: 'Editor de linha do tempo exporta MP4 com fade e gera onda',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: ok
+          ? r.duracaoSeg + 's · ' + Math.round(r.bytes / 1024) + ' KB · onda OK'
+          : r?.erro || 'exportação/onda falhou'
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.midia.linha-tempo',
+        area: 'ui',
+        titulo: 'editor de linha do tempo',
         severidade: 'erro',
         duracaoMs: Date.now() - t0,
         erro: String(e)
