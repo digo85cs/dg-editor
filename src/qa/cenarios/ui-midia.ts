@@ -600,9 +600,18 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
           altura: 180
         })
         if (!b?.ok) return b
+        const vid = await api.invoke('midia:fotos-video', {
+          raiz,
+          imagens: [a.caminho],
+          segundosPorFoto: 1,
+          largura: 320,
+          altura: 180,
+          fps: 24
+        })
+        if (!vid?.ok) return vid
         const itens = [
-          { arquivo: a.caminho, duracao: 1, fadeIn: 0.2 },
-          { arquivo: b.caminho, duracao: 1, fadeOut: 0.2 }
+          { arquivo: vid.caminho, inicio: 0.2, fim: 0.8, volume: 0.6 },
+          { arquivo: b.caminho, duracao: 1, fadeOut: 0.2, mudo: true }
         ]
         const analise = await api.invoke('midia:linha-tempo-analisar', { raiz, itens })
         if (!analise?.ok) return analise
@@ -612,8 +621,8 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
           largura: 320,
           altura: 180,
           fps: 24,
-          fadeEntrada: 0.3,
-          fadeSaida: 0.3
+          fadeEntrada: 0.2,
+          fadeSaida: 0.2
         })
         if (!exp?.ok) return exp
         const onda = await api.invoke('midia:onda', { raiz, entrada: exp.caminho, largura: 320, altura: 80 })
@@ -623,14 +632,14 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         !!r?.ok &&
         typeof r.bytes === 'number' &&
         r.bytes > 1000 &&
-        Math.abs(Number(r.duracaoSeg) - 2) < 0.2 &&
+        Math.abs(Number(r.duracaoSeg) - 1.6) < 0.25 &&
         !!r.analise?.ok &&
         !!r.onda?.ok &&
         !!r.onda?.previewBase64
       out.push({
         id: 'ui.midia.linha-tempo',
         area: 'ui',
-        titulo: 'Editor de linha do tempo exporta MP4 com fade e gera onda',
+        titulo: 'Editor de linha do tempo exporta MP4 (vídeo+imagem) com fade e gera onda',
         severidade: ok ? 'ok' : 'erro',
         duracaoMs: Date.now() - t0,
         detalhe: ok

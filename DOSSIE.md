@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 20:26:35** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.3** · branch `integra-13-11` · último commit: 720d286 2026-11-13 release: v0.3.2
-> Alterações locais não commitadas: 22 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 20:38:14** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.4** · branch `integra-13-11` · último commit: 8b18036 2026-11-13 release: v0.3.3
+> Alterações locais não commitadas: 6 arquivo(s).
 
 ## 1. O que é
 
@@ -96,6 +96,13 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Normalização (`loudnorm I=-16 TP=-1.5 LRA=11`), EQ (graves/agudos), compressor, ganho, fade in/out, corte e conversão (mp3/wav/m4a/ogg).
 - Análise de volume via `volumedetect` (média/pico) com sugestão de ganho.
 - Canais: `midia:audio-analisar`, `midia:audio-processar`; MCP: `midia_audio`.
+
+### Editor de vídeo/áudio (linha do tempo embutido)
+
+- `src/main/midia/editor.ts`: monta um MP4 juntando imagens (com duração), vídeos e áudios (faixa sobre fundo preto) na ordem escolhida.
+- Cada clipe aceita recorte (`inicio`/`fim`), volume 0–2, fade in/out e mudo; tudo é normalizado para a mesma resolução/fps (`scale`+`pad`+`setsar`) e concatenado sem reencode desnecessário.
+- No final: fade global de entrada/saída e música de fundo repetida com `amix` (volume ajustável); forma de onda em PNG via `showwavespic` para prévia.
+- Canais `midia:linha-tempo-analisar`, `midia:linha-tempo-exportar`, `midia:onda` + evento `midia:linha-tempo-progresso`; MCP `midia_linha_tempo` (analisar/exportar/onda); UI na seção "Editor de vídeo/áudio (linha do tempo)".
 
 ### Qualidade de vídeo e imagem (ffmpeg)
 
@@ -229,10 +236,11 @@ Artefatos locais em `dist-apps/`:
 - Somente ferramentas gratuitas; nenhuma chave paga configurada.
 - GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.
 - Músicas: o catálogo é royalty-free com atribuição; o banco local não baixa nada sem ação explícita do usuário.
-- Editores completos de PDF/DOC/vídeo não são incorporados; o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).
+- Editores completos de PDF/DOC não são incorporados; vídeo/áudio contam com um editor de linha do tempo embutido (ffmpeg) e o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).
 
 ## 12. Histórico recente
 
+- 8b18036 2026-11-13 release: v0.3.3
 - 720d286 2026-11-13 release: v0.3.2
 - d076e20 2026-11-13 release: v0.3.1
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
@@ -242,7 +250,6 @@ Artefatos locais em `dist-apps/`:
 - 85a5b9d 2026-11-12 fix: fallback de modelo leve quando Ollama rejeita imagem/visao
 - cdbb319 2026-11-12 fix: fila do agent travava sem timeout; fila por workspace; unifica cache; proximoDisponivel usa todos os modelos
 - 5b8cf9d 2026-11-12 feat: cache de respostas LLM, pull auto Ollama, filtro agentes invalidos e custo rastreado
-- c8354ca 2026-11-12 fix: corrige testes flaky pre-existing (chat.test.ts e contratos.test.ts)
 
 ## 13. Como atualizar este dossiê
 

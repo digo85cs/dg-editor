@@ -151,6 +151,14 @@ add(
   '- Canais: `midia:audio-analisar`, `midia:audio-processar`; MCP: `midia_audio`.',
   ''
 )
+add('### Editor de vídeo/áudio (linha do tempo embutido)', '')
+add(
+  '- `src/main/midia/editor.ts`: monta um MP4 juntando imagens (com duração), vídeos e áudios (faixa sobre fundo preto) na ordem escolhida.',
+  '- Cada clipe aceita recorte (`inicio`/`fim`), volume 0–2, fade in/out e mudo; tudo é normalizado para a mesma resolução/fps (`scale`+`pad`+`setsar`) e concatenado sem reencode desnecessário.',
+  '- No final: fade global de entrada/saída e música de fundo repetida com `amix` (volume ajustável); forma de onda em PNG via `showwavespic` para prévia.',
+  '- Canais `midia:linha-tempo-analisar`, `midia:linha-tempo-exportar`, `midia:onda` + evento `midia:linha-tempo-progresso`; MCP `midia_linha_tempo` (analisar/exportar/onda); UI na seção "Editor de vídeo/áudio (linha do tempo)".',
+  ''
+)
 add('### Qualidade de vídeo e imagem (ffmpeg)', '')
 add(
   '- Vídeo: estabilização em 2 passadas (`vidstabdetect`/`vidstabtransform`), denoise (`hqdn3d`), nitidez (`unsharp`), correção de cor (`eq`), escala Lanczos, fps, re-render H.264 com CRF/preset e áudio normalizado (EBU R128).',
@@ -220,7 +228,7 @@ add(
   '- Somente ferramentas gratuitas; nenhuma chave paga configurada.',
   '- GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.',
   '- Músicas: o catálogo é royalty-free com atribuição; o banco local não baixa nada sem ação explícita do usuário.',
-  '- Editores completos de PDF/DOC/vídeo não são incorporados; o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).',
+  '- Editores completos de PDF/DOC não são incorporados; vídeo/áudio contam com um editor de linha do tempo embutido (ffmpeg) e o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).',
   ''
 )
 
