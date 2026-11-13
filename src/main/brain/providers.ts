@@ -12,6 +12,7 @@ import { dglog } from '../dglog'
 import { OLLAMA_URL } from './ollama'
 import { lerChave } from './segredos-providers'
 import { resolverRaizProjeto } from '../paths'
+import { obterRaizWorkspace } from '../workspace-raiz'
 import { executarCodex, CodexCliError, statusCodexEmCache } from './codex-cli'
 
 export interface ProviderConfig {
@@ -396,7 +397,7 @@ const CURSOR_STATUS_REL = join('.dg-editor', 'cursor-cli-status.json')
 
 export function marcarCursorCliAprovado(ok: boolean, detalhe?: string): void {
   try {
-    const raiz = resolverRaizProjeto()
+    const raiz = obterRaizWorkspace() || resolverRaizProjeto()
     const p = join(raiz, CURSOR_STATUS_REL)
     mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
     writeFileSync(
@@ -410,7 +411,7 @@ export function marcarCursorCliAprovado(ok: boolean, detalhe?: string): void {
 export function cursorCliAprovadoNaSessao(): boolean {
   if (process.env.DG_CURSOR_CLI_OK === '1') return true
   try {
-    const raiz = resolverRaizProjeto()
+    const raiz = obterRaizWorkspace() || resolverRaizProjeto()
     const p = join(raiz, CURSOR_STATUS_REL)
     if (!existsSync(p)) return false
     const j = JSON.parse(readFileSync(p, 'utf8')) as { ok?: boolean; at?: string }
@@ -457,7 +458,7 @@ export async function chamarCursorCli(
   const preview = mensagem.slice(0, 80)
   dglog('[cursor-cli] start msg=' + JSON.stringify(preview) + ' timeoutMs=' + cfg.timeoutMs)
 
-  const raiz = resolverRaizProjeto()
+  const raiz = obterRaizWorkspace() || resolverRaizProjeto()
   const args: string[] = ['-p', mensagem, '--mode', 'ask', '--trust', '--output-format', 'text']
   if (cfg.modelo && cfg.modelo !== 'cursor-agent') {
     args.push('--model', cfg.modelo)
@@ -565,7 +566,7 @@ export async function chamarProvider(
         prompt: 'Responda à conversa abaixo com a resposta final. Não emita chamadas de ferramentas do DG Editor.',
         context: transcript,
         model: cfg.modelo || undefined,
-        cwd: resolverRaizProjeto(),
+        cwd: obterRaizWorkspace() || resolverRaizProjeto(),
         timeoutMs: cfg.timeoutMs,
         signal
       })

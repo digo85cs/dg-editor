@@ -157,6 +157,40 @@ export async function handleChatSend(
     return { ok: false, message: assistantMsg };
   }
 
+  // === DETECAO DE ANEXOS DE IMAGEM (sem suporte a visão) ===
+  const options = opts && typeof opts === 'object' && !Array.isArray(opts)
+    ? opts as Record<string, unknown>
+    : {};
+  try {
+    const anexosBruto = (options as Record<string, unknown>)?.anexos;
+    if (Array.isArray(anexosBruto)) {
+      const EXT_IMAGEM = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico']);
+      const imagens = anexosBruto.filter((a: unknown) => {
+        if (!a || typeof a !== 'object') return false;
+        const nome = String((a as Record<string, unknown>).nome || '');
+        const tipo = String((a as Record<string, unknown>).tipo || '');
+        const ext = nome.includes('.') ? nome.split('.').pop() || '' : '';
+        return EXT_IMAGEM.has(ext.toLowerCase()) || /^image\//i.test(tipo);
+      });
+      if (imagens.length > 0) {
+        const lista = imagens.map((a: Record<string, unknown>) => String(a.nome || 'imagem')).join(', ');
+        const msgImagem = {
+          role: 'assistant' as const,
+          content:
+            'O DG Editor nao suporta analise de imagens (visao nao disponível no modelo local). ' +
+            'Anexo(s) nao processado(s): ' + lista +
+            '. Descreva o problema em texto (o que a imagem mostra, erro, codigo ou comportamento) que eu tento resolver.',
+          at: Date.now(),
+          provider: 'erro'
+        };
+        appendChat(rootOk, msgImagem);
+        return { ok: false, message: msgImagem };
+      }
+    }
+  } catch {
+    /* nao bloqueia o fluxo por falha na detecao de anexos */
+  }
+
   // === DEGRADACAO GRACIOSA: verifica se ha pelo menos um provedor disponível ===
   try {
     const { ollamaAlive } = await import('../ollama-keeper');
@@ -195,9 +229,6 @@ export async function handleChatSend(
     /* segue se nao conseguir verificar — deixa o fluxo normal tentar */
   }
 
-  const options = opts && typeof opts === 'object' && !Array.isArray(opts)
-    ? opts as Record<string, unknown>
-    : {};
   const agenteSel = typeof options.agente === 'string' ? options.agente.slice(0, 100) : 'auto';
   const modoSel = typeof options.modo === 'string' ? options.modo : 'auto';
   const modoValido = ['auto', 'code', 'plan', 'ask', 'debug', 'agent'].includes(modoSel)

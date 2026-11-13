@@ -21,6 +21,7 @@
     "include": [
       "server.ts",
       "client.ts",
+      "http-server.ts",
       "navegador-client.ts",
       "ollama-tools.ts",
       "../conectores-status.ts",

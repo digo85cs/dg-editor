@@ -155,8 +155,9 @@ export async function escolherModelo(
 ): Promise<string> {
   try {
     const { resolverRaizProjeto } = await import('../paths')
+    const { obterRaizWorkspace } = await import('../workspace-raiz')
     const { modeloParaTarefa, lerCatalogo } = await import('./modelos-catalogo')
-    const raiz = resolverRaizProjeto()
+    const raiz = obterRaizWorkspace() || resolverRaizProjeto()
     const doCat = modeloParaTarefa(raiz, tarefa)
     if (doCat) {
       dglog('[ollama] escolherModelo(' + tarefa + ') = ' + doCat + ' via=modeloParaTarefa')
@@ -361,8 +362,9 @@ export async function askOllama(
   if (!model) {
     try {
       const { resolverRaizProjeto } = await import('../paths')
+      const { obterRaizWorkspace } = await import('../workspace-raiz')
       const { modeloParaTarefa } = await import('./modelos-catalogo')
-      model = modeloParaTarefa(resolverRaizProjeto(), tarefa)
+      model = modeloParaTarefa(obterRaizWorkspace() || resolverRaizProjeto(), tarefa)
     } catch {
       model = null
     }
