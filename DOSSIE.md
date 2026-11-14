@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 21:37:53** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.4.0** · branch `integra-13-11` · último commit: 98fe284 2026-11-13 release: v0.3.6
-> Alterações locais não commitadas: 7 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 21:54:45** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.4.1** · branch `integra-13-11` · último commit: a0c2fa2 2026-11-13 release: v0.4.0
+> Alterações locais não commitadas: 14 arquivo(s).
 
 ## 1. O que é
 
@@ -25,12 +25,12 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, imagens, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, vault, __tests__.
 
 ## 4. IPC
 
-- Canais registrados no main: **347**.
-- Canais expostos pelo preload: **327**.
+- Canais registrados no main: **358**.
+- Canais expostos pelo preload: **339**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -156,6 +156,15 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Upload em streaming com `pipeline`, limite de 1 GB por arquivo, nomes únicos e destino `.dg-editor/recebidos`; a UI mostra URL, QR-friendly, lista de recebidos e status (ativo/porta/IP).
 - Canais `compartilhar:iniciar`, `compartilhar:parar`, `compartilhar:status`, `compartilhar:listar`, `compartilhar:abrir-pasta`; MCP `receber_lan`; UI no modal `.share-modal`; QA `ui.compartilhar.ipc` e `ui.compartilhar.ui`.
 
+### Imagens de instalação e pendrive inicializável (estilo Rufus)
+
+- Análise própria de ISO 9660 + Joliet + UDF e El Torito (BIOS e UEFI), sem ferramentas externas: rótulo, tamanho, sistema (Windows/Linux/macOS), distro, presença de boot, MBR/GPT e amostra da raiz. IMG/RAW são classificados por assinatura (FAT32/NTFS/MBR/GPT) e DMG pelo trailer `koly`.
+- Personalização com pycdlib (Python gratuito embutido em `resources/python`): lista o conteúdo completo, extrai para o projeto, injeta uma pasta *overlay* e reconstrói a ISO preservando as entradas El Torito de BIOS e UEFI (catálogos `BOOT.CAT` de cada plataforma).
+- Gravação de pendrive: enumera discos USB/SD/MMC via `Get-Disk`, recusa discos fixos e do sistema, exige confirmação digitando o token derivado do serial e opcionalmente verifica a leitura de volta. Escrita crua em `\\.\PhysicalDriveN` com `CreateFileW`, trava e desmonta o volume, blocos de 1 MB e alinhamento em 2048 bytes.
+- Guardrails: o renderer nunca informa dados confiáveis da unidade — o main reenumera e casa disco + serial; a gravação exige `podeGravar` e token. O MCP **não** expõe escrita em USB (só análise, listagem, extração, reconstrução e `usb-listar`).
+- Canais: `imagens:escolher-imagem`, `imagens:analisar`, `imagens:listar-conteudo`, `imagens:extrair`, `imagens:reconstruir`, `imagens:overlay-pasta`, `imagens:abrir-overlay`, `imagens:suporte`, `imagens:instalar-suporte`, `imagens:usb-listar`, `imagens:usb-gravar`, `imagens:usb-progresso` (evento). MCP `imagens_iso`. UI no quadro "Imagens e ISO (estilo Rufus)" do Estúdio de mídia.
+- Código: `src/main/imagens/iso.ts` (parser), `personalizar.ts` (pycdlib), `usb.ts` (gravação), `src/main/ipc/imagens.ts` (IPC). Testes: `iso.test.ts` (10), `usb.test.ts` (14, inclui cópia real para arquivo), `personalizar-integracao.test.ts` (4, com pycdlib real); QA `ui.midia.imagens`.
+
 ### Demais recursos
 
 - Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).
@@ -193,13 +202,13 @@ Artefatos locais em `dist-apps/`:
 
 ## 9. MCP
 
-- **82** ferramentas registradas em `src/main/mcp/server.ts`.
+- **83** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
-- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`.
+- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `imagens_iso`, `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`. A ferramenta `imagens_iso` é somente leitura: não grava pendrive.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
@@ -281,7 +290,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 12. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **18 arquivos**, **180 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **18 arquivos**, **182 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
@@ -294,6 +303,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 14. Histórico recente
 
+- a0c2fa2 2026-11-13 release: v0.4.0
 - 98fe284 2026-11-13 release: v0.3.6
 - 1d9922a 2026-11-13 release: v0.3.5
 - a0586d6 2026-11-13 release: v0.3.4
@@ -303,7 +313,6 @@ Artefatos locais em `dist-apps/`:
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
 - b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
 - e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
-- 4f1ec4b 2026-11-12 fix: orquestrador e agente com fallback garantido
 
 ## 15. Como atualizar este dossiê
 

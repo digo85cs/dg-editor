@@ -943,6 +943,26 @@ const TOOLS = [
     }
   },
   {
+    name: 'imagens_iso',
+    description:
+      'Imagens de instalacao (Windows/Linux/macOS): analisar ISO/IMG/DMG (rotulo, sistema, boot BIOS/UEFI, UDF/Joliet), listar conteudo, extrair, abrir a pasta de personalizacao, reconstruir ISO bootavel com arquivos injetados e listar pendrives USB. Nao grava em pendrive por seguranca: a gravacao crua exige confirmacao manual na interface.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: {
+          type: 'string',
+          enum: ['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar'],
+          description: 'Padrao analisar'
+        },
+        entrada: { type: 'string', description: 'ISO/IMG/DMG relativa ao projeto' },
+        saida: { type: 'string', description: 'Arquivo/pasta de saida (relativo ao projeto)' },
+        rotulo: { type: 'string', description: 'Novo rotulo de volume na reconstrucao' },
+        limite: { type: 'number', description: 'Maximo de itens ao listar (padrao 200)' }
+      },
+      required: []
+    }
+  },
+  {
     name: 'midia_video_efeito',
     description:
       'Efeitos de video gratuitos via ffmpeg: listar catalogo, aplicar aprimorar/upscale, interpolacao de quadros e slow motion, velocidade, boomerang, transicao, picture-in-picture, chroma key, titulo, presets de cor, reframe vertical 9:16, delogo, blur de regiao, proxy, correcao de lente, GIF e extracao de audio; e detectar cenas (destaques).',
@@ -1723,6 +1743,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
 
     if (
       name.startsWith('midia_') ||
+      name === 'imagens_iso' ||
       name.startsWith('apps_') ||
       name.startsWith('reversa_') ||
       name === 'notas_mapa_mental' ||
@@ -2071,6 +2092,44 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             formato: p.formato,
             saida: p.saida
           })
+        )
+      }
+
+      if (name === 'imagens_iso') {
+        const p = z
+          .object({
+            acao: z.enum(['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar']).optional(),
+            entrada: z.string().optional(),
+            saida: z.string().optional(),
+            rotulo: z.string().optional(),
+            limite: z.number().optional()
+          })
+          .parse(args)
+        const acao = p.acao || 'analisar'
+        const pers = await import('../imagens/personalizar')
+        if (acao === 'usb-listar') {
+          const usb = await import('../imagens/usb')
+          return await responder(await usb.listarUnidadesUsb())
+        }
+        if (acao === 'suporte') return await responder(await pers.suporteIso())
+        if (acao === 'overlay') {
+          const pasta = pers.criarPastaOverlay(RAIZ)
+          return await responder({ ok: true, caminho: pasta.caminho, caminhoRel: pasta.caminhoRel })
+        }
+        if (!p.entrada) return await responder({ ok: false, erro: 'informe entrada (ISO/IMG/DMG do projeto)' })
+        const abs = caminho(p.entrada)
+        if (acao === 'analisar') {
+          const iso = await import('../imagens/iso')
+          return await responder(iso.analisarImagem(abs))
+        }
+        if (acao === 'listar') {
+          return await responder(await pers.listarConteudoIso({ entrada: abs, limite: p.limite }))
+        }
+        if (acao === 'extrair') {
+          return await responder(await pers.extrairIso(RAIZ, { entrada: abs, saida: p.saida }))
+        }
+        return await responder(
+          await pers.reconstruirIso(RAIZ, { entrada: abs, saida: p.saida, rotulo: p.rotulo })
         )
       }
 

@@ -1,4 +1,6 @@
 import type { Page } from 'playwright-core'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { ResultadoCenario } from '../tipos'
 import { fecharSobreposicoes } from './limpeza'
 
@@ -37,7 +39,7 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
       )
       const titulo = ((await page.locator('#tool-titulo').textContent()) || '').trim()
       const corpo = (await page.locator('#tool-corpo').textContent()) || ''
-      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Editor de vídeo/áudio (linha do tempo)', 'Imagem: nitidez, cor e reescala', 'Vídeo: filtros, estabilização e re-render', 'Apps (APK Android + instalador)', 'Ferramentas automáticas (download no PC novo)', 'Portabilidade do PC', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever']
+      const secoes = ['Gerar imagem', 'ComfyUI local', 'Memes', 'Foto → vídeo', 'Hardware e instalação', 'Atualizações', 'Música de fundo (banco local)', 'Biblioteca de músicas livres (por estilo)', 'Áudio: normalizar, equalizar e cortar', 'Editor de vídeo/áudio (linha do tempo)', 'Imagem: nitidez, cor e reescala', 'Vídeo: filtros, estabilização e re-render', 'Apps (APK Android + instalador)', 'Ferramentas automáticas (download no PC novo)', 'Portabilidade do PC', 'Diagrama Mermaid', 'HTML → imagem', 'Fotos → vídeo', 'Cortar vídeo', 'Narrar texto', 'Transcrever', 'Imagens e ISO (estilo Rufus)']
       const faltando = secoes.filter((s) => !corpo.includes(s))
       out.push({
         id: 'ui.midia.painel',
@@ -655,6 +657,84 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         duracaoMs: Date.now() - t0,
         erro: String(e)
       })
+    }
+  }
+
+  {
+    const t0 = Date.now()
+    const pastaQa = join(process.cwd(), '.dg-editor', 'qa-imagens')
+    const fixture = join(pastaQa, 'fixture-fat32.img')
+    try {
+      mkdirSync(pastaQa, { recursive: true })
+      const buf = Buffer.alloc(64 * 1024)
+      buf.write('MSWIN4.1', 3, 'latin1')
+      buf.write('DGQA-FAT32 ', 71, 'latin1')
+      buf.write('FAT32   ', 82, 'latin1')
+      buf[510] = 0x55
+      buf[511] = 0xaa
+      writeFileSync(fixture, buf)
+
+      const r = await page.evaluate(async (caminho: string) => {
+        // @ts-expect-error api bridge
+        const api = window.api
+        const raiz = await api.invoke('app:raiz-projeto')
+        return {
+          raiz,
+          suporte: await api.invoke('imagens:suporte'),
+          usb: await api.invoke('imagens:usb-listar'),
+          overlay: await api.invoke('imagens:overlay-pasta', { raiz }),
+          analise: await api.invoke('imagens:analisar', { raiz, caminho }),
+          gravarInvalido: await api.invoke('imagens:usb-gravar', {
+            raiz,
+            imagem: caminho,
+            disco: -1,
+            serial: '',
+            confirmacao: '',
+            verificar: false
+          })
+        }
+      }, fixture)
+
+      const analise = r?.analise || {}
+      const analisou =
+        analise.ok === true &&
+        analise.formato === 'img' &&
+        analise.boot?.mbr === true &&
+        /FAT32/.test(String((analise.avisos || []).join(' '))) &&
+        /DGQA/.test(String(analise.rotulo || ''))
+      const recusouGravacao = r?.gravarInvalido?.ok === false && /unidade não encontrada/i.test(String(r.gravarInvalido.erro || ''))
+      const overlayOk = r?.overlay?.ok === true && /overlay/i.test(String(r.overlay.caminhoRel || ''))
+      const usbOk = r?.usb?.ok === true && Array.isArray(r.usb.unidades)
+      const suporteOk = r?.suporte?.ok === true
+      const ok = analisou && recusouGravacao && overlayOk && usbOk && suporteOk
+      out.push({
+        id: 'ui.midia.imagens',
+        area: 'ui',
+        titulo: 'Análise de imagens, suporte ISO e trava de gravação USB',
+        severidade: ok ? 'ok' : 'erro',
+        duracaoMs: Date.now() - t0,
+        detalhe: ok
+          ? 'img FAT32/MBR · pycdlib=' + (r.suporte.versao || 'ok') + ' · ' + r.usb.unidades.length + ' unidade(s) USB · gravação inválida recusada'
+          : JSON.stringify({
+              analisou,
+              recusouGravacao,
+              overlayOk,
+              usbOk,
+              suporteOk,
+              erro: analise.erro || r?.gravarInvalido?.erro || r?.usb?.erro || r?.suporte?.erro
+            }).slice(0, 300)
+      })
+    } catch (e) {
+      out.push({
+        id: 'ui.midia.imagens',
+        area: 'ui',
+        titulo: 'Imagens e ISO (estilo Rufus)',
+        severidade: 'erro',
+        duracaoMs: Date.now() - t0,
+        erro: String(e)
+      })
+    } finally {
+      rmSync(fixture, { force: true })
     }
   }
 

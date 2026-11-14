@@ -17,7 +17,7 @@
       "x64": "cpython-3\\.12\\.\\d+\\+\\d+-x86_64-pc-windows-msvc-install_only\\.tar\\.gz$",
       "arm64": "cpython-3\\.12\\.\\d+\\+\\d+-aarch64-pc-windows-msvc-install_only\\.tar\\.gz$"
     },
-    "pacotes": ["edge-tts", "faster-whisper", "kokoro-onnx", "piper-tts", "supertonic"],
+    "pacotes": ["edge-tts", "faster-whisper", "kokoro-onnx", "piper-tts", "supertonic", "pycdlib"],
     "pacotesMinVersaoApp": "0.3.0"
   },
   "ffmpeg": {

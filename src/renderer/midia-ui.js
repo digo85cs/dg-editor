@@ -3,6 +3,8 @@ import { abrirGravador } from './gravador.js'
 import { abrirCompartilhamento } from './compartilhar.js'
 import { abrirReversa } from './reversa.js'
 
+let cancelarProgressoUsb = null
+
 function el(tag, attrs = {}, ...filhos) {
   const n = document.createElement(tag)
   for (const [k, v] of Object.entries(attrs)) {
@@ -1881,6 +1883,200 @@ export async function pintarMidia(corpo, raiz) {
       resVozFx
     )
   )
+
+  // ------------------------------------------------------------ imagens e ISO
+  let imagemIso = null
+  let unidadeIso = null
+  const lblIso = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Nenhuma imagem escolhida (ISO, IMG ou DMG).' })
+  const resIso = el('div', { style: 'font-size:12px' })
+  const listaUsb = el('div', { style: 'display:flex;flex-direction:column;gap:4px;margin-top:6px' })
+  const dicaToken = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0 0' })
+  const tokenUsb = entrada({ placeholder: 'Digite o serial da unidade para liberar a gravação' })
+  const chkVerificarUsb = el('input', { type: 'checkbox' })
+  chkVerificarUsb.checked = true
+  const chkApagar = el('input', { type: 'checkbox' })
+  const progressoUsb = el('div', { style: 'font-size:11px;margin-top:6px;min-height:14px' })
+  const resUsb = el('div', { style: 'font-size:12px' })
+  const suporteIso = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Suporte pycdlib: verificando…' })
+  const rotuloIso = entrada({ placeholder: 'Rótulo do volume (opcional, ex.: WIN11_CUSTOM)' })
+  const resExtrair = el('div', { style: 'font-size:12px' })
+  const resReconstruir = el('div', { style: 'font-size:12px' })
+
+  const mb = (bytes) => (bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(0, Math.round(bytes / 1024)) + ' KB')
+  const gb = (bytes) => (bytes / 1073741824).toFixed(1) + ' GB'
+
+  function pintarAnaliseIso(r) {
+    resIso.textContent = ''
+    if (!r?.ok) {
+      resIso.appendChild(el('p', { style: 'margin:0;color:#ff8a8a;font-size:12px', text: 'Erro: ' + (r?.erro || 'falha ao analisar') }))
+      return
+    }
+    const boot = []
+    if (r.boot?.bios) boot.push('BIOS')
+    if (r.boot?.uefi) boot.push('UEFI')
+    if (r.boot?.eltorito) boot.push('El Torito')
+    if (r.boot?.gpt) boot.push('GPT')
+    if (r.boot?.mbr) boot.push('MBR')
+    if (r.boot?.hfs) boot.push('HFS')
+    const sistemas = []
+    if (r.iso?.iso9660) sistemas.push('ISO 9660')
+    if (r.iso?.joliet) sistemas.push('Joliet')
+    if (r.iso?.udf) sistemas.push('UDF')
+    resIso.appendChild(
+      el('p', { style: 'margin:0;font-size:12px', text: (r.rotulo || '(sem rótulo)') + ' · ' + (r.sistema || 'desconhecido') + (r.distro && r.distro !== r.sistema ? ' (' + r.distro + ')' : '') })
+    )
+    resIso.appendChild(el('p', { className: 'muted', style: 'margin:2px 0 0;font-size:11px', text: (r.formato || '').toUpperCase() + ' · ' + mb(r.bytes || 0) + (sistemas.length ? ' · ' + sistemas.join(' + ') : '') }))
+    resIso.appendChild(el('p', { className: 'muted', style: 'margin:2px 0 0;font-size:11px', text: 'Boot: ' + (boot.length ? boot.join(' + ') : 'não detectado') }))
+    const raiz = Array.isArray(r.iso?.raiz) ? r.iso.raiz : []
+    if (raiz.length) {
+      const amostra = raiz.slice(0, 12).map((i) => (i.pasta ? '📁 ' : '') + i.nome).join(' · ')
+      resIso.appendChild(el('p', { className: 'muted', style: 'margin:2px 0 0;font-size:11px;word-break:break-word', text: 'Raiz: ' + amostra + (raiz.length > 12 ? ' …' : '') }))
+    }
+    if (Array.isArray(r.avisos) && r.avisos.length) {
+      resIso.appendChild(el('p', { style: 'margin:2px 0 0;font-size:11px;color:#e8b45a', text: r.avisos.join(' · ') }))
+    }
+    if (!rotuloIso.value && r.rotulo) rotuloIso.value = r.rotulo
+  }
+
+  async function analisarImagemIso(caminho) {
+    resIso.textContent = 'Analisando imagem…'
+    const r = await seguro('imagens:analisar', { raiz, caminho })
+    pintarAnaliseIso(r)
+    if (r?.ok) toast('Imagem analisada', 'ok')
+    else toast(r?.erro || 'Falha ao analisar', 'erro')
+  }
+
+  async function listarPendrives() {
+    listaUsb.textContent = 'Procurando unidades removíveis…'
+    unidadeIso = null
+    const r = await seguro('imagens:usb-listar')
+    listaUsb.textContent = ''
+    if (!r?.ok) {
+      listaUsb.appendChild(el('p', { style: 'margin:0;color:#ff8a8a;font-size:12px', text: 'Erro: ' + (r?.erro || 'falha ao listar') }))
+      return
+    }
+    const unidades = Array.isArray(r.unidades) ? r.unidades : []
+    if (!unidades.length) {
+      listaUsb.appendChild(el('p', { className: 'muted', style: 'margin:0;font-size:11px', text: 'Nenhum pendrive ou cartão SD conectado.' }))
+      return
+    }
+    for (const u of unidades) {
+      const radio = el('input', { type: 'radio', name: 'dg-usb-escolha' })
+      radio.disabled = !u.podeGravar
+      radio.addEventListener('change', () => {
+        unidadeIso = u
+        tokenUsb.value = ''
+        dicaToken.textContent = 'Confirme digitando: ' + u.token
+      })
+      const texto = u.nome + ' · disco ' + u.disco + ' · ' + gb(u.tamanhoBytes || 0) + ' · ' + (u.bus || '?') + (u.volumes?.length ? ' · ' + u.volumes.map((v) => v + ':').join(' ') : '')
+      listaUsb.appendChild(
+        el('label', { style: 'display:flex;gap:8px;align-items:flex-start;font-size:11px;padding:4px 0;border-bottom:1px solid var(--dg-border-subtle)' },
+          radio,
+          el('span', {}, el('span', { text: texto }), u.motivo ? el('span', { style: 'display:block;color:#e8b45a', text: u.motivo }) : null)
+        )
+      )
+    }
+  }
+
+  if (cancelarProgressoUsb) cancelarProgressoUsb()
+  cancelarProgressoUsb = window.api.on('imagens:usb-progresso', (_ev, ev) => {
+    if (!ev) return
+    if (ev.etapa === 'verificando') {
+      progressoUsb.textContent = 'Verificando a gravação (leitura de volta)…'
+      return
+    }
+    const pct = ev.total ? Math.min(100, Math.round((ev.escritos / ev.total) * 100)) : 0
+    progressoUsb.textContent = 'Gravando… ' + pct + '% (' + mb(ev.escritos || 0) + ' de ' + mb(ev.total || 0) + ')'
+  })
+
+  corpo.appendChild(
+    caixa(
+      'Imagens e ISO (estilo Rufus)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Analise ISO/IMG/DMG de Windows, Linux e macOS, personalize o conteúdo (extrair, injetar arquivos e reconstruir mantendo boot BIOS/UEFI) e grave em pendrive. Gravação crua apaga a unidade — só discos USB/SD são aceitos, nunca o disco do sistema, e é preciso digitar o serial para confirmar.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Escolher imagem', async () => {
+          const r = await seguro('imagens:escolher-imagem')
+          if (!r?.ok || r.cancelado || !r.caminho) return
+          imagemIso = r.caminho
+          lblIso.textContent = nomeCurto(r.caminho)
+          await analisarImagemIso(r.caminho)
+        }, true),
+        botao('Analisar', async () => {
+          if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+          await analisarImagemIso(imagemIso)
+        }),
+        botao('Listar pendrives', () => void listarPendrives()),
+        botao('Abrir pasta de personalização', () => void seguro('imagens:abrir-overlay', { raiz }))
+      ),
+      lblIso,
+      resIso,
+      suporteIso,
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' },
+        botao('Extrair ISO', async () => {
+          if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+          resExtrair.textContent = 'Extraindo…'
+          const r = await seguro('imagens:extrair', { raiz, entrada: imagemIso })
+          mostrarResultado(resExtrair, r)
+          toast(r?.ok ? 'Conteúdo extraído' : r?.erro || 'Falha ao extrair', r?.ok ? 'ok' : 'erro')
+        }),
+        botao('Reconstruir ISO personalizada', async () => {
+          if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+          resReconstruir.textContent = 'Reconstruindo (extrai, injeta a pasta de personalização e recria o boot)…'
+          const r = await seguro('imagens:reconstruir', { raiz, entrada: imagemIso, rotulo: rotuloIso.value.trim() || undefined })
+          mostrarResultado(resReconstruir, r)
+          toast(r?.ok ? 'ISO personalizada criada' : r?.erro || 'Falha ao reconstruir', r?.ok ? 'ok' : 'erro')
+        }, true)
+      ),
+      campo('Rótulo do volume ao reconstruir', rotuloIso),
+      resExtrair,
+      resReconstruir,
+      el('h5', { style: 'margin:12px 0 4px;font-size:12px', text: 'Gravar em pendrive (apaga todos os dados)' }),
+      listaUsb,
+      campo('Confirmação', tokenUsb),
+      dicaToken,
+      el('div', { style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px' },
+        el('label', { style: 'display:flex;gap:6px;align-items:center;font-size:11px' }, chkVerificarUsb, 'Verificar após gravar'),
+        el('label', { style: 'display:flex;gap:6px;align-items:center;font-size:11px' }, chkApagar, 'Entendi que todos os dados da unidade serão apagados')
+      ),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' },
+        botao('Gravar USB', async () => {
+          if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+          if (!unidadeIso) return toast('Selecione um pendrive na lista', 'aviso')
+          if (tokenUsb.value.trim().toUpperCase() !== String(unidadeIso.token).toUpperCase()) {
+            return toast('Confirmação não confere — digite exatamente ' + unidadeIso.token, 'erro')
+          }
+          if (!chkApagar.checked) return toast('Marque a caixa confirmando que os dados serão apagados', 'aviso')
+          const ok = window.confirm('Gravar ' + nomeCurto(imagemIso) + ' em "' + unidadeIso.nome + '" (disco ' + unidadeIso.disco + ')?\n\nTODOS os dados da unidade serão apagados. Se o DG Editor não estiver como administrador, a gravação será recusada.')
+          if (!ok) return
+          progressoUsb.textContent = 'Preparando gravação…'
+          resUsb.textContent = ''
+          const r = await seguro('imagens:usb-gravar', {
+            raiz,
+            imagem: imagemIso,
+            disco: unidadeIso.disco,
+            serial: unidadeIso.serial,
+            confirmacao: tokenUsb.value.trim(),
+            verificar: chkVerificarUsb.checked
+          })
+          progressoUsb.textContent = ''
+          mostrarResultado(resUsb, r?.ok ? { ...r, aviso: (r.verificado ? 'verificado · ' : '') + (r.duracaoSeg + 's') } : r)
+          toast(r?.ok ? 'Gravação concluída' : r?.erro || 'Falha na gravação', r?.ok ? 'ok' : 'erro')
+        }, true),
+        botao('Instalar suporte ISO (pycdlib)', async () => {
+          suporteIso.textContent = 'Instalando pycdlib no Python do app…'
+          const r = await seguro('imagens:instalar-suporte')
+          suporteIso.textContent = r?.ok ? 'Suporte pycdlib: ' + (r.versao || 'ok') : 'Suporte pycdlib indisponível: ' + (r?.erro || 'falha')
+          toast(r?.ok ? 'Suporte ISO pronto' : r?.erro || 'Falha ao instalar', r?.ok ? 'ok' : 'erro')
+        })
+      ),
+      progressoUsb,
+      resUsb
+    )
+  )
+
+  void seguro('imagens:suporte').then((r) => {
+    suporteIso.textContent = r?.ok ? 'Suporte pycdlib: ' + (r.versao || 'ok') : 'Suporte pycdlib não encontrado — use "Instalar suporte ISO" para extrair e reconstruir.'
+  })
 
   // ------------------------------------------------------------ captura e envio
   corpo.appendChild(

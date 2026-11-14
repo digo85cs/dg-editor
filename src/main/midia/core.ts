@@ -177,7 +177,8 @@ export function nomeArquivo(prefixo: string, ext: string, quando = new Date()): 
     pad(quando.getMinutes()) +
     pad(quando.getSeconds())
   const rand = Math.random().toString(36).slice(2, 6)
-  return p + '-' + stamp + '-' + rand + (ext.startsWith('.') ? ext : '.' + ext)
+  const sufixo = !ext ? '' : ext.startsWith('.') ? ext : '.' + ext
+  return p + '-' + stamp + '-' + rand + sufixo
 }
 
 /** Pasta padrão de saída: <projeto>/.dg-editor/midia. */

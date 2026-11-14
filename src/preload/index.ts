@@ -105,6 +105,9 @@ const invokeChannels = [
   'midia:musicas-catalogo', 'midia:musicas-baixar', 'midia:audio-analisar', 'midia:audio-processar',
   'midia:video-efeitos', 'midia:video-efeito', 'midia:voz-presets', 'midia:voz-efeito', 'midia:cenas',
   'midia:linha-tempo-analisar', 'midia:linha-tempo-exportar', 'midia:onda',
+  'imagens:escolher-imagem', 'imagens:analisar', 'imagens:listar-conteudo',
+  'imagens:extrair', 'imagens:reconstruir', 'imagens:overlay-pasta', 'imagens:abrir-overlay',
+  'imagens:suporte', 'imagens:instalar-suporte', 'imagens:usb-listar', 'imagens:usb-gravar',
   'gravacao:fontes', 'gravacao:iniciar', 'gravacao:chunk', 'gravacao:finalizar',
   'gravacao:cancelar', 'gravacao:listar', 'gravacao:converter', 'gravacao:abrir-pasta',
   'compartilhar:iniciar', 'compartilhar:parar', 'compartilhar:status',
@@ -136,7 +139,8 @@ const eventOnChannels = [
   'automation:aprovacao-pendente',
   'ollama:pull-progresso',
   'prov:progresso',
-  'midia:linha-tempo-progresso'
+  'midia:linha-tempo-progresso',
+  'imagens:usb-progresso'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */

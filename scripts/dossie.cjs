@@ -212,6 +212,16 @@ add(
   '- Canais `compartilhar:iniciar`, `compartilhar:parar`, `compartilhar:status`, `compartilhar:listar`, `compartilhar:abrir-pasta`; MCP `receber_lan`; UI no modal `.share-modal`; QA `ui.compartilhar.ipc` e `ui.compartilhar.ui`.',
   ''
 )
+add('### Imagens de instalação e pendrive inicializável (estilo Rufus)', '')
+add(
+  '- Análise própria de ISO 9660 + Joliet + UDF e El Torito (BIOS e UEFI), sem ferramentas externas: rótulo, tamanho, sistema (Windows/Linux/macOS), distro, presença de boot, MBR/GPT e amostra da raiz. IMG/RAW são classificados por assinatura (FAT32/NTFS/MBR/GPT) e DMG pelo trailer `koly`.',
+  '- Personalização com pycdlib (Python gratuito embutido em `resources/python`): lista o conteúdo completo, extrai para o projeto, injeta uma pasta *overlay* e reconstrói a ISO preservando as entradas El Torito de BIOS e UEFI (catálogos `BOOT.CAT` de cada plataforma).',
+  '- Gravação de pendrive: enumera discos USB/SD/MMC via `Get-Disk`, recusa discos fixos e do sistema, exige confirmação digitando o token derivado do serial e opcionalmente verifica a leitura de volta. Escrita crua em `\\\\.\\PhysicalDriveN` com `CreateFileW`, trava e desmonta o volume, blocos de 1 MB e alinhamento em 2048 bytes.',
+  '- Guardrails: o renderer nunca informa dados confiáveis da unidade — o main reenumera e casa disco + serial; a gravação exige `podeGravar` e token. O MCP **não** expõe escrita em USB (só análise, listagem, extração, reconstrução e `usb-listar`).',
+  '- Canais: `imagens:escolher-imagem`, `imagens:analisar`, `imagens:listar-conteudo`, `imagens:extrair`, `imagens:reconstruir`, `imagens:overlay-pasta`, `imagens:abrir-overlay`, `imagens:suporte`, `imagens:instalar-suporte`, `imagens:usb-listar`, `imagens:usb-gravar`, `imagens:usb-progresso` (evento). MCP `imagens_iso`. UI no quadro "Imagens e ISO (estilo Rufus)" do Estúdio de mídia.',
+  '- Código: `src/main/imagens/iso.ts` (parser), `personalizar.ts` (pycdlib), `usb.ts` (gravação), `src/main/ipc/imagens.ts` (IPC). Testes: `iso.test.ts` (10), `usb.test.ts` (14, inclui cópia real para arquivo), `personalizar-integracao.test.ts` (4, com pycdlib real); QA `ui.midia.imagens`.',
+  ''
+)
 add('### Demais recursos', '')
 add(
   '- Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).',
@@ -254,7 +264,7 @@ const art = artefatos('dist-apps')
 if (art.length) add('Artefatos locais em `dist-apps/`:', '', ...art, '')
 
 add('## 9. MCP', '')
-add(`- **${ferramentasMcp.length}** ferramentas registradas em \`src/main/mcp/server.ts\`.`, `- Build: \`npm run build:mcp\` → \`.dg-editor/bin/main/mcp/server.js\`; HTTP: \`npm run mcp:http\`.`, '- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`.', '')
+add(`- **${ferramentasMcp.length}** ferramentas registradas em \`src/main/mcp/server.ts\`.`, `- Build: \`npm run build:mcp\` → \`.dg-editor/bin/main/mcp/server.js\`; HTTP: \`npm run mcp:http\`.`, '- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `imagens_iso`, `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`. A ferramenta `imagens_iso` é somente leitura: não grava pendrive.', '')
 add('<details><summary>Ferramentas</summary>', '')
 add(ferramentasMcp.map((n) => '`' + n + '`').join(', '))
 add('', '</details>', '')
