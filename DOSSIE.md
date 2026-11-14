@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 22:00:51** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.5.0** · branch `integra-13-11` · último commit: 043e097 2026-11-13 release: v0.4.1
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 22:18:47** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: cf305fb 2026-11-13 release: v0.5.0
+> Alterações locais não commitadas: 13 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **358**.
-- Canais expostos pelo preload: **339**.
+- Canais registrados no main: **365**.
+- Canais expostos pelo preload: **346**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -160,10 +160,13 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 
 - Análise própria de ISO 9660 + Joliet + UDF e El Torito (BIOS e UEFI), sem ferramentas externas: rótulo, tamanho, sistema (Windows/Linux/macOS), distro, presença de boot, MBR/GPT e amostra da raiz. IMG/RAW são classificados por assinatura (FAT32/NTFS/MBR/GPT) e DMG pelo trailer `koly`.
 - Personalização com pycdlib (Python gratuito embutido em `resources/python`): lista o conteúdo completo, extrai para o projeto, injeta uma pasta *overlay* e reconstrói a ISO preservando as entradas El Torito de BIOS e UEFI (catálogos `BOOT.CAT` de cada plataforma).
+- Instalação sem supervisão: gera `autounattend.xml` (idioma, EULA, OOBE, nome do PC) e `sources/ei.cfg` (edição/canal) direto na pasta de personalização, prontos para a reconstrução.
+- Presets: salva a pasta de personalização em `.dg-editor/midia/imagens/presets/<id>` e aplica de volta no overlay (mescla), com nomes validados contra traversal.
 - Gravação de pendrive: enumera discos USB/SD/MMC via `Get-Disk`, recusa discos fixos e do sistema, exige confirmação digitando o token derivado do serial e opcionalmente verifica a leitura de volta. Escrita crua em `\\.\PhysicalDriveN` com `CreateFileW`, trava e desmonta o volume, blocos de 1 MB e alinhamento em 2048 bytes.
+- Gravação: mostra progresso com ETA, permite cancelar o processo e calcula SHA-256 da imagem em streaming antes de gravar; a UI avisa quando o app não está elevado (sem administrador o Windows recusa a escrita crua).
 - Guardrails: o renderer nunca informa dados confiáveis da unidade — o main reenumera e casa disco + serial; a gravação exige `podeGravar` e token. O MCP **não** expõe escrita em USB (só análise, listagem, extração, reconstrução e `usb-listar`).
-- Canais: `imagens:escolher-imagem`, `imagens:analisar`, `imagens:listar-conteudo`, `imagens:extrair`, `imagens:reconstruir`, `imagens:overlay-pasta`, `imagens:abrir-overlay`, `imagens:suporte`, `imagens:instalar-suporte`, `imagens:usb-listar`, `imagens:usb-gravar`, `imagens:usb-progresso` (evento). MCP `imagens_iso`. UI no quadro "Imagens e ISO (estilo Rufus)" do Estúdio de mídia.
-- Código: `src/main/imagens/iso.ts` (parser), `personalizar.ts` (pycdlib), `usb.ts` (gravação), `src/main/ipc/imagens.ts` (IPC). Testes: `iso.test.ts` (10), `usb.test.ts` (14, inclui cópia real para arquivo), `personalizar-integracao.test.ts` (4, com pycdlib real); QA `ui.midia.imagens`.
+- Canais: `imagens:escolher-imagem`, `imagens:analisar`, `imagens:listar-conteudo`, `imagens:extrair`, `imagens:reconstruir`, `imagens:overlay-pasta`, `imagens:abrir-overlay`, `imagens:suporte`, `imagens:instalar-suporte`, `imagens:usb-listar`, `imagens:usb-gravar`, `imagens:usb-cancelar`, `imagens:usb-admin`, `imagens:hash`, `imagens:unattend`, `imagens:presets-listar/salvar/aplicar`, `imagens:usb-progresso` (evento). MCP `imagens_iso` (inclui `hash` e `presets`; nunca grava USB). UI no quadro "Imagens e ISO (estilo Rufus)" do Estúdio de mídia.
+- Código: `src/main/imagens/iso.ts` (parser), `personalizar.ts` (pycdlib, autounattend e presets), `usb.ts` (gravação, hash, elevação e cancelamento), `src/main/ipc/imagens.ts` (IPC). Testes: `iso.test.ts` (10), `usb.test.ts` (14), `unattend-presets.test.ts` (10), `personalizar-integracao.test.ts` (4, com pycdlib real); QA `ui.midia.imagens`.
 
 ### Demais recursos
 
@@ -303,6 +306,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 14. Histórico recente
 
+- cf305fb 2026-11-13 release: v0.5.0
 - 043e097 2026-11-13 release: v0.4.1
 - a0c2fa2 2026-11-13 release: v0.4.0
 - 98fe284 2026-11-13 release: v0.3.6
@@ -312,7 +316,6 @@ Artefatos locais em `dist-apps/`:
 - 720d286 2026-11-13 release: v0.3.2
 - d076e20 2026-11-13 release: v0.3.1
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
-- b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
 
 ## 15. Como atualizar este dossiê
 

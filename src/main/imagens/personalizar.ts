@@ -6,7 +6,7 @@
  * cai para a montagem nativa do Windows (Mount-DiskImage, exige admin) na
  * extração. Nada é enviado para a nuvem.
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import {
@@ -16,6 +16,7 @@ import {
   pastaMidia,
   pythonBin,
   rodar,
+  slug,
   type RespostaMidia
 } from '../midia/core'
 import { isInsidePath } from '../paths'
@@ -345,6 +346,206 @@ export function criarPastaOverlay(raiz: string): { caminho: string; caminhoRel: 
   const p = join(pastaImagens(raiz), 'overlay')
   mkdirSync(p, { recursive: true })
   return { caminho: p, caminhoRel: caminhoRelativo(raiz, p) }
+}
+
+// ---------------------------------------------------------------- unattend
+
+export type OpcoesUnattend = {
+  edicao?: string
+  canal?: string
+  locale?: string
+  fusoHorario?: string
+  nomePc?: string
+  pularOobe?: boolean
+  aceitarEula?: boolean
+}
+
+const EDICOES_VALIDAS = new Set(['Core', 'Professional', 'ProfessionalN', 'Enterprise', 'Education', 'HomeSingleLanguage'])
+const CANAIS_VALIDOS = new Set(['Retail', 'OEM', 'Volume'])
+
+export function escaparXml(valor: string): string {
+  return String(valor)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+function opcoesSanitizadas(o: OpcoesUnattend): Required<OpcoesUnattend> {
+  const locale = /^[a-z]{2}-[A-Z]{2}$/.test(String(o.locale || '')) ? String(o.locale) : 'pt-BR'
+  const fuso = /^[A-Za-z][A-Za-z ._\-]{2,59}$/.test(String(o.fusoHorario || ''))
+    ? String(o.fusoHorario)
+    : 'E. South America Standard Time'
+  const nomePc = /^[A-Za-z0-9-]{1,15}$/.test(String(o.nomePc || '')) ? String(o.nomePc) : 'DG-PC'
+  const edicao = EDICOES_VALIDAS.has(String(o.edicao || '')) ? String(o.edicao) : 'Professional'
+  const canal = CANAIS_VALIDOS.has(String(o.canal || '')) ? String(o.canal) : 'Retail'
+  return {
+    edicao,
+    canal,
+    locale,
+    fusoHorario: fuso,
+    nomePc,
+    pularOobe: o.pularOobe !== false,
+    aceitarEula: o.aceitarEula !== false
+  }
+}
+
+/** autounattend.xml para Windows 10/11: idioma, EULA e OOBE sem supervisão. */
+export function construirUnattend(o: OpcoesUnattend = {}): string {
+  const c = opcoesSanitizadas(o)
+  const oobe = c.pularOobe
+    ? `      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+`
+    : ''
+  return `<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>${escaparXml(c.locale)}</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>${escaparXml(c.locale)}</InputLocale>
+      <SystemLocale>${escaparXml(c.locale)}</SystemLocale>
+      <UILanguage>${escaparXml(c.locale)}</UILanguage>
+      <UserLocale>${escaparXml(c.locale)}</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserData>
+        <AcceptEula>${c.aceitarEula ? 'true' : 'false'}</AcceptEula>
+      </UserData>
+    </component>
+  </settings>
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+${oobe}      <ComputerName>${escaparXml(c.nomePc)}</ComputerName>
+      <TimeZone>${escaparXml(c.fusoHorario)}</TimeZone>
+    </component>
+  </settings>
+</unattend>
+`
+}
+
+/** sources/ei.cfg: escolhe canal/edição em instaladores Windows antigos sem essa tela. */
+export function construirEiCfg(o: OpcoesUnattend = {}): string {
+  const c = opcoesSanitizadas(o)
+  return `[EditionID]
+${c.edicao}
+[Channel]
+${c.canal}
+[VL]
+${c.canal === 'Volume' ? 1 : 0}
+`
+}
+
+/** Escreve autounattend.xml e sources/ei.cfg na pasta de personalização. */
+export function gerarUnattend(raiz: string, o: OpcoesUnattend = {}): RespostaMidia {
+  const overlay = criarPastaOverlay(raiz)
+  const xml = join(overlay.caminho, 'autounattend.xml')
+  const sources = join(overlay.caminho, 'sources')
+  const ei = join(sources, 'ei.cfg')
+  writeFileSync(xml, construirUnattend(o), 'utf8')
+  mkdirSync(sources, { recursive: true })
+  writeFileSync(ei, construirEiCfg(o), 'utf8')
+  return {
+    ok: true,
+    caminho: overlay.caminho,
+    caminhoRel: overlay.caminhoRel,
+    detalhes: {
+      arquivos: [caminhoRelativo(raiz, xml), caminhoRelativo(raiz, ei)],
+      edicao: opcoesSanitizadas(o).edicao
+    },
+    aviso: 'arquivos criados na pasta de personalização — use "Reconstruir ISO personalizada" para aplicar na imagem'
+  }
+}
+
+// ---------------------------------------------------------------- presets
+
+const PRESET_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
+
+function pastaPresets(raiz: string): string {
+  const p = join(pastaImagens(raiz), 'presets')
+  mkdirSync(p, { recursive: true })
+  return p
+}
+
+export function idPreset(nome: string): string | null {
+  if (!String(nome || '').trim()) return null
+  const id = slug(nome, 40)
+  return id && PRESET_RE.test(id) ? id : null
+}
+
+function contarArquivos(dir: string): number {
+  let total = 0
+  for (const item of readdirSync(dir, { withFileTypes: true })) {
+    if (item.isDirectory()) total += contarArquivos(join(dir, item.name))
+    else total += 1
+  }
+  return total
+}
+
+export type PresetPersonalizacao = { id: string; caminhoRel: string; arquivos: number; atualizadoEm: string }
+
+export function listarPresets(raiz: string): { ok: boolean; itens: PresetPersonalizacao[]; erro?: string } {
+  try {
+    const base = pastaPresets(raiz)
+    const itens: PresetPersonalizacao[] = []
+    for (const item of readdirSync(base, { withFileTypes: true })) {
+      if (!item.isDirectory() || !PRESET_RE.test(item.name)) continue
+      const abs = join(base, item.name)
+      itens.push({
+        id: item.name,
+        caminhoRel: caminhoRelativo(raiz, abs),
+        arquivos: contarArquivos(abs),
+        atualizadoEm: statSync(abs).mtime.toISOString()
+      })
+    }
+    itens.sort((a, b) => a.id.localeCompare(b.id))
+    return { ok: true, itens }
+  } catch (e) {
+    return { ok: false, itens: [], erro: String(e instanceof Error ? e.message : e) }
+  }
+}
+
+/** Copia a pasta de personalização atual para um preset nomeado. */
+export function salvarPreset(raiz: string, nome: string): RespostaMidia {
+  const id = idPreset(nome)
+  if (!id) return { ok: false, erro: 'nome do preset inválido — use letras, números e hífen' }
+  const overlay = criarPastaOverlay(raiz)
+  const arquivos = contarArquivos(overlay.caminho)
+  if (!arquivos) return { ok: false, erro: 'a pasta de personalização está vazia — adicione arquivos antes de salvar o preset' }
+  const destino = join(pastaPresets(raiz), id)
+  rmSync(destino, { recursive: true, force: true })
+  cpSync(overlay.caminho, destino, { recursive: true })
+  return {
+    ok: true,
+    caminho: destino,
+    caminhoRel: caminhoRelativo(raiz, destino),
+    detalhes: { id, arquivos }
+  }
+}
+
+/** Mescla um preset dentro da pasta de personalização (sobrescreve arquivos iguais). */
+export function aplicarPreset(raiz: string, nome: string): RespostaMidia {
+  const id = idPreset(nome)
+  if (!id) return { ok: false, erro: 'nome do preset inválido' }
+  const origem = join(pastaPresets(raiz), id)
+  if (!existsSync(origem)) return { ok: false, erro: 'preset não encontrado: ' + id }
+  const overlay = criarPastaOverlay(raiz)
+  cpSync(origem, overlay.caminho, { recursive: true, force: true })
+  return {
+    ok: true,
+    caminho: overlay.caminho,
+    caminhoRel: overlay.caminhoRel,
+    detalhes: { id, arquivos: contarArquivos(origem) },
+    aviso: 'preset aplicado — reconstrua a ISO para gerar a imagem final'
+  }
 }
 
 function validarImagem(entrada: string): string | null {

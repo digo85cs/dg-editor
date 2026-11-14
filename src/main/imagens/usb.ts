@@ -7,8 +7,9 @@
  * DG Editor como administrador. A gravação é feita por um script PowerShell
  * embutido que trava/desmonta os volumes e escreve direto em \\.\PhysicalDriveN.
  */
-import { spawn } from 'node:child_process'
-import { mkdtempSync, statSync, writeFileSync } from 'node:fs'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { createReadStream, mkdtempSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -178,6 +179,55 @@ function pastaScript(): { dir: string; gravar: string; listar: string } {
   return { dir, gravar, listar }
 }
 
+const SCRIPT_ADMIN = String.raw`
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 'ADMIN 1' } else { 'ADMIN 0' }
+`
+
+let cacheAdmin: { em: number; admin: boolean } | null = null
+
+/** Indica se o processo está elevado (necessário para escrever em \\.\PhysicalDriveN). */
+export async function ehAdministrador(): Promise<{ ok: boolean; admin: boolean; erro?: string }> {
+  if (process.platform !== 'win32') return { ok: true, admin: false, erro: 'gravação USB disponível apenas no Windows' }
+  if (cacheAdmin && Date.now() - cacheAdmin.em < 30_000) return { ok: true, admin: cacheAdmin.admin }
+  const dir = mkdtempSync(join(tmpdir(), 'dg-admin-'))
+  const script = join(dir, 'admin.ps1')
+  writeFileSync(script, SCRIPT_ADMIN, 'utf8')
+  const r = await executarPowerShell(script, [], 30_000)
+  const txt = (r.stdout || '').trim()
+  if (!/^ADMIN [01]$/.test(txt)) return { ok: false, admin: false, erro: (r.erro || r.stderr || 'não foi possível checar a elevação').slice(0, 300) }
+  const admin = txt === 'ADMIN 1'
+  cacheAdmin = { em: Date.now(), admin }
+  return { ok: true, admin }
+}
+
+/** SHA-256 da imagem sem carregar o arquivo inteiro na memória. */
+export function sha256Imagem(
+  caminho: string,
+  onProgresso?: (lidos: number, total: number) => void
+): Promise<{ ok: boolean; hash?: string; bytes?: number; erro?: string }> {
+  return new Promise((finalizar) => {
+    let total = 0
+    try {
+      total = statSync(caminho).size
+    } catch {
+      finalizar({ ok: false, erro: 'imagem não encontrada: ' + caminho })
+      return
+    }
+    const hash = createHash('sha256')
+    let lidos = 0
+    const fluxo = createReadStream(caminho, { highWaterMark: 4 * 1024 * 1024 })
+    fluxo.on('data', (bloco) => {
+      hash.update(bloco)
+      lidos += bloco.length
+      onProgresso?.(lidos, total)
+    })
+    fluxo.on('error', (e) => finalizar({ ok: false, erro: String(e.message || e) }))
+    fluxo.on('end', () => finalizar({ ok: true, hash: hash.digest('hex'), bytes: total }))
+  })
+}
+
 export function limparSerial(bruto: string): string {
   return String(bruto || '')
     .replace(/[^\x20-\x7e]/g, '')
@@ -193,7 +243,13 @@ export function tokenConfirmacao(serial: string, disco: number): string {
 
 type RetornoProcesso = { ok: boolean; codigo: number; stdout: string; stderr: string; erro?: string }
 
-function executarPowerShell(arquivo: string, args: string[], timeoutMs: number, onLinha?: (linha: string) => void): Promise<RetornoProcesso> {
+function executarPowerShell(
+  arquivo: string,
+  args: string[],
+  timeoutMs: number,
+  onLinha?: (linha: string) => void,
+  onProcesso?: (filho: ChildProcess) => void
+): Promise<RetornoProcesso> {
   return new Promise((finalizar) => {
     if (process.platform !== 'win32') {
       finalizar({ ok: false, codigo: -1, stdout: '', stderr: '', erro: 'gravação USB disponível apenas no Windows' })
@@ -202,6 +258,7 @@ function executarPowerShell(arquivo: string, args: string[], timeoutMs: number, 
     const filho = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', arquivo, ...args], {
       windowsHide: true
     })
+    onProcesso?.(filho)
     let stdout = ''
     let stderr = ''
     let pendente = ''
@@ -295,6 +352,21 @@ export function confirmacaoConfere(unidade: UnidadeUsb, confirmacao: string): bo
   return String(confirmacao || '').trim().toUpperCase() === alvo
 }
 
+let processoGravacao: ChildProcess | null = null
+let canceladoPeloUsuario = false
+
+/** Interrompe a gravação em andamento (a unidade pode precisar ser reconectada). */
+export function cancelarGravacaoUsb(): { ok: boolean; erro?: string } {
+  if (!processoGravacao) return { ok: false, erro: 'nenhuma gravação em andamento' }
+  canceladoPeloUsuario = true
+  try {
+    processoGravacao.kill()
+  } catch {
+    /* processo já encerrado */
+  }
+  return { ok: true }
+}
+
 async function rodarGravador(
   imagem: string,
   args: string[],
@@ -303,15 +375,30 @@ async function rodarGravador(
 ): Promise<RetornoProcesso> {
   const { gravar } = pastaScript()
   let etapa: 'gravando' | 'verificando' = 'gravando'
-  const r = await executarPowerShell(gravar, ['-Image', imagem, ...args], timeoutMs, (linha) => {
-    if (linha === 'VERIFICANDO') {
-      etapa = 'verificando'
-      onProgresso?.({ escritos: 0, total: 0, etapa })
-      return
+  canceladoPeloUsuario = false
+  const r = await executarPowerShell(
+    gravar,
+    ['-Image', imagem, ...args],
+    timeoutMs,
+    (linha) => {
+      if (linha === 'VERIFICANDO') {
+        etapa = 'verificando'
+        onProgresso?.({ escritos: 0, total: 0, etapa })
+        return
+      }
+      const m = linha.match(/^PROGRESS (\d+) (\d+)$/)
+      if (m) onProgresso?.({ escritos: Number(m[1]), total: Number(m[2]), etapa })
+    },
+    (filho) => {
+      processoGravacao = filho
+      filho.on('close', () => {
+        if (processoGravacao === filho) processoGravacao = null
+      })
     }
-    const m = linha.match(/^PROGRESS (\d+) (\d+)$/)
-    if (m) onProgresso?.({ escritos: Number(m[1]), total: Number(m[2]), etapa })
-  })
+  )
+  if (canceladoPeloUsuario) {
+    return { ok: false, codigo: -1, stdout: r.stdout, stderr: r.stderr, erro: 'gravação cancelada pelo usuário — a unidade pode precisar ser reconectada' }
+  }
   if (!r.ok) {
     const erroLinha = r.stdout.split(/\r?\n/).reverse().find((l) => l.startsWith('ERRO '))
     return { ...r, erro: erroLinha ? erroLinha.slice(5) : r.erro || (r.stderr || 'falha na gravação').slice(0, 400) }

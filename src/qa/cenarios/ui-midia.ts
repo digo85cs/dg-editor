@@ -682,8 +682,14 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
           raiz,
           suporte: await api.invoke('imagens:suporte'),
           usb: await api.invoke('imagens:usb-listar'),
+          admin: await api.invoke('imagens:usb-admin'),
           overlay: await api.invoke('imagens:overlay-pasta', { raiz }),
           analise: await api.invoke('imagens:analisar', { raiz, caminho }),
+          hash: await api.invoke('imagens:hash', { raiz, caminho }),
+          unattend: await api.invoke('imagens:unattend', { raiz, edicao: 'Professional', canal: 'Retail', nomePc: 'DG-QA' }),
+          presetSalvo: await api.invoke('imagens:presets-salvar', { raiz, nome: 'QA Rufus' }),
+          presets: await api.invoke('imagens:presets-listar', { raiz }),
+          presetAplicado: await api.invoke('imagens:presets-aplicar', { raiz, nome: 'qa-rufus' }),
           gravarInvalido: await api.invoke('imagens:usb-gravar', {
             raiz,
             imagem: caminho,
@@ -706,23 +712,38 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
       const overlayOk = r?.overlay?.ok === true && /overlay/i.test(String(r.overlay.caminhoRel || ''))
       const usbOk = r?.usb?.ok === true && Array.isArray(r.usb.unidades)
       const suporteOk = r?.suporte?.ok === true
-      const ok = analisou && recusouGravacao && overlayOk && usbOk && suporteOk
+      const hashOk = r?.hash?.ok === true && /^[0-9a-f]{64}$/.test(String(r.hash.hash || ''))
+      const adminOk = r?.admin?.ok === true && typeof r.admin.admin === 'boolean'
+      const unattendOk =
+        r?.unattend?.ok === true &&
+        (r.unattend.detalhes?.arquivos || []).some((f: string) => /autounattend\.xml$/.test(f)) &&
+        (r.unattend.detalhes?.arquivos || []).some((f: string) => /ei\.cfg$/.test(f))
+      const presetOk =
+        r?.presetSalvo?.ok === true &&
+        (r?.presets?.itens || []).some((p: { id: string }) => p.id === 'qa-rufus') &&
+        r?.presetAplicado?.ok === true
+      const ok = analisou && recusouGravacao && overlayOk && usbOk && suporteOk && hashOk && adminOk && unattendOk && presetOk
       out.push({
         id: 'ui.midia.imagens',
         area: 'ui',
-        titulo: 'Análise de imagens, suporte ISO e trava de gravação USB',
+        titulo: 'Análise de imagens, autounattend, presets, hash e trava de gravação USB',
         severidade: ok ? 'ok' : 'erro',
         duracaoMs: Date.now() - t0,
         detalhe: ok
-          ? 'img FAT32/MBR · pycdlib=' + (r.suporte.versao || 'ok') + ' · ' + r.usb.unidades.length + ' unidade(s) USB · gravação inválida recusada'
+          ? 'img FAT32/MBR · pycdlib=' + (r.suporte.versao || 'ok') + ' · ' + r.usb.unidades.length + ' unidade(s) USB · admin=' +
+            (r.admin.admin ? 'sim' : 'não') + ' · SHA-256 ok · preset qa-rufus · gravação inválida recusada'
           : JSON.stringify({
               analisou,
               recusouGravacao,
               overlayOk,
               usbOk,
               suporteOk,
-              erro: analise.erro || r?.gravarInvalido?.erro || r?.usb?.erro || r?.suporte?.erro
-            }).slice(0, 300)
+              hashOk,
+              adminOk,
+              unattendOk,
+              presetOk,
+              erro: analise.erro || r?.gravarInvalido?.erro || r?.usb?.erro || r?.suporte?.erro || r?.unattend?.erro
+            }).slice(0, 400)
       })
     } catch (e) {
       out.push({
@@ -735,6 +756,9 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
       })
     } finally {
       rmSync(fixture, { force: true })
+      rmSync(join(process.cwd(), '.dg-editor', 'midia', 'imagens', 'presets', 'qa-rufus'), { recursive: true, force: true })
+      rmSync(join(process.cwd(), '.dg-editor', 'midia', 'imagens', 'overlay', 'autounattend.xml'), { force: true })
+      rmSync(join(process.cwd(), '.dg-editor', 'midia', 'imagens', 'overlay', 'sources', 'ei.cfg'), { force: true })
     }
   }
 

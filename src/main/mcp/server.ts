@@ -945,13 +945,13 @@ const TOOLS = [
   {
     name: 'imagens_iso',
     description:
-      'Imagens de instalacao (Windows/Linux/macOS): analisar ISO/IMG/DMG (rotulo, sistema, boot BIOS/UEFI, UDF/Joliet), listar conteudo, extrair, abrir a pasta de personalizacao, reconstruir ISO bootavel com arquivos injetados e listar pendrives USB. Nao grava em pendrive por seguranca: a gravacao crua exige confirmacao manual na interface.',
+      'Imagens de instalacao (Windows/Linux/macOS): analisar ISO/IMG/DMG (rotulo, sistema, boot BIOS/UEFI, UDF/Joliet), listar conteudo, extrair, abrir a pasta de personalizacao, reconstruir ISO bootavel com arquivos injetados, calcular SHA-256, listar presets e listar pendrives USB. Nao grava em pendrive por seguranca: a gravacao crua exige confirmacao manual na interface.',
     inputSchema: {
       type: 'object',
       properties: {
         acao: {
           type: 'string',
-          enum: ['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar'],
+          enum: ['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar', 'hash', 'presets'],
           description: 'Padrao analisar'
         },
         entrada: { type: 'string', description: 'ISO/IMG/DMG relativa ao projeto' },
@@ -2098,7 +2098,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       if (name === 'imagens_iso') {
         const p = z
           .object({
-            acao: z.enum(['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar']).optional(),
+            acao: z
+              .enum(['analisar', 'listar', 'extrair', 'reconstruir', 'overlay', 'suporte', 'usb-listar', 'hash', 'presets'])
+              .optional(),
             entrada: z.string().optional(),
             saida: z.string().optional(),
             rotulo: z.string().optional(),
@@ -2112,6 +2114,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           return await responder(await usb.listarUnidadesUsb())
         }
         if (acao === 'suporte') return await responder(await pers.suporteIso())
+        if (acao === 'presets') return await responder(pers.listarPresets(RAIZ))
         if (acao === 'overlay') {
           const pasta = pers.criarPastaOverlay(RAIZ)
           return await responder({ ok: true, caminho: pasta.caminho, caminhoRel: pasta.caminhoRel })
@@ -2121,6 +2124,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         if (acao === 'analisar') {
           const iso = await import('../imagens/iso')
           return await responder(iso.analisarImagem(abs))
+        }
+        if (acao === 'hash') {
+          const usb = await import('../imagens/usb')
+          return await responder(await usb.sha256Imagem(abs))
         }
         if (acao === 'listar') {
           return await responder(await pers.listarConteudoIso({ entrada: abs, limite: p.limite }))

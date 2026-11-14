@@ -1901,6 +1901,93 @@ export async function pintarMidia(corpo, raiz) {
   const rotuloIso = entrada({ placeholder: 'Rótulo do volume (opcional, ex.: WIN11_CUSTOM)' })
   const resExtrair = el('div', { style: 'font-size:12px' })
   const resReconstruir = el('div', { style: 'font-size:12px' })
+  const avisoAdmin = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Permissão de administrador: verificando…' })
+  const resHash = el('div', { style: 'font-size:11px;word-break:break-all' })
+  const conteudoIso = el('div', { style: 'font-size:11px;max-height:180px;overflow:auto;border:1px solid var(--dg-border-subtle);border-radius:6px;padding:6px;margin-top:6px;display:none' })
+  const filtroConteudo = entrada({ placeholder: 'Filtrar conteúdo (ex.: install.wim, boot)' })
+  let itensConteudo = []
+  const resUnattend = el('div', { style: 'font-size:11px' })
+  const selEdicaoWin = select([
+    ['Professional', 'Professional'],
+    ['Core', 'Home (Core)'],
+    ['HomeSingleLanguage', 'Home Single Language'],
+    ['Enterprise', 'Enterprise'],
+    ['Education', 'Education']
+  ], 'Professional')
+  const selCanalWin = select([['Retail', 'Retail'], ['Volume', 'Volume'], ['OEM', 'OEM']], 'Retail')
+  const nomePcWin = entrada({ placeholder: 'Nome do PC (opcional, até 15 caracteres)' })
+  const resPreset = el('div', { style: 'font-size:11px' })
+  const nomePreset = entrada({ placeholder: 'Nome do preset (ex.: win11-pro)' })
+  const listaPresets = el('div', { style: 'display:flex;flex-direction:column;gap:4px;margin-top:6px' })
+
+  function formatarSegundos(s) {
+    if (!Number.isFinite(s) || s <= 0) return ''
+    if (s < 60) return Math.round(s) + 's'
+    const m = Math.floor(s / 60)
+    const r = Math.round(s % 60)
+    return m + 'min' + (r ? ' ' + r + 's' : '')
+  }
+
+  function pintarConteudo() {
+    conteudoIso.textContent = ''
+    const filtro = filtroConteudo.value.trim().toLowerCase()
+    const vistos = filtro ? itensConteudo.filter((i) => i.nome.toLowerCase().includes(filtro)) : itensConteudo
+    if (!vistos.length) {
+      conteudoIso.appendChild(el('p', { className: 'muted', style: 'margin:0', text: filtro ? 'Nada corresponde ao filtro.' : 'Nenhum item listado.' }))
+      return
+    }
+    for (const item of vistos.slice(0, 800)) {
+      conteudoIso.appendChild(
+        el('div', { style: 'display:flex;gap:6px;justify-content:space-between;padding:1px 0;border-bottom:1px solid var(--dg-border-subtle)' },
+          el('span', { style: 'word-break:break-all', text: (item.pasta ? '📁 ' : '') + item.nome }),
+          el('span', { className: 'muted', style: 'white-space:nowrap', text: item.pasta || !item.bytes ? '' : mb(item.bytes) })
+        )
+      )
+    }
+    if (vistos.length > 800) {
+      conteudoIso.appendChild(el('p', { className: 'muted', style: 'margin:4px 0 0', text: '… ' + (vistos.length - 800) + ' item(ns) omitido(s)' }))
+    }
+  }
+
+  async function listarConteudoIsoUi() {
+    if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+    conteudoIso.style.display = 'block'
+    conteudoIso.textContent = 'Lendo o conteúdo da ISO…'
+    const r = await seguro('imagens:listar-conteudo', { raiz, entrada: imagemIso, limite: 2000 })
+    if (!r?.ok) {
+      conteudoIso.textContent = ''
+      conteudoIso.appendChild(el('p', { style: 'margin:0;color:#ff8a8a', text: 'Erro: ' + (r?.erro || 'falha ao listar') }))
+      return
+    }
+    const bruto = r.detalhes?.itens || r.detalhes?.conteudo || []
+    itensConteudo = (Array.isArray(bruto) ? bruto : []).map((i) => ({
+      nome: String(i.nome || i.caminho || ''),
+      pasta: !!i.pasta,
+      bytes: Number(i.bytes) || 0
+    }))
+    pintarConteudo()
+  }
+
+  async function atualizarPresets() {
+    const r = await seguro('imagens:presets-listar', { raiz })
+    listaPresets.textContent = ''
+    const itens = Array.isArray(r?.itens) ? r.itens : []
+    if (!itens.length) {
+      listaPresets.appendChild(el('p', { className: 'muted', style: 'margin:0', text: 'Nenhum preset salvo ainda.' }))
+      return
+    }
+    for (const p of itens) {
+      listaPresets.appendChild(
+        el('div', { style: 'display:flex;gap:6px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--dg-border-subtle);padding:2px 0' },
+          el('span', { style: 'word-break:break-all', text: p.id + ' · ' + p.arquivos + ' arquivo(s)' }),
+          botao('Aplicar', async () => {
+            const a = await seguro('imagens:presets-aplicar', { raiz, nome: p.id })
+            toast(a?.ok ? 'Preset aplicado na pasta de personalização' : a?.erro || 'Falha ao aplicar', a?.ok ? 'ok' : 'erro')
+          })
+        )
+      )
+    }
+  }
 
   const mb = (bytes) => (bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(0, Math.round(bytes / 1024)) + ' KB')
   const gb = (bytes) => (bytes / 1073741824).toFixed(1) + ' GB'
@@ -1940,6 +2027,9 @@ export async function pintarMidia(corpo, raiz) {
 
   async function analisarImagemIso(caminho) {
     resIso.textContent = 'Analisando imagem…'
+    resHash.textContent = ''
+    conteudoIso.style.display = 'none'
+    itensConteudo = []
     const r = await seguro('imagens:analisar', { raiz, caminho })
     pintarAnaliseIso(r)
     if (r?.ok) toast('Imagem analisada', 'ok')
@@ -1979,15 +2069,24 @@ export async function pintarMidia(corpo, raiz) {
   }
 
   if (cancelarProgressoUsb) cancelarProgressoUsb()
+  let inicioProgressoUsb = 0
   cancelarProgressoUsb = window.api.on('imagens:usb-progresso', (_ev, ev) => {
     if (!ev) return
     if (ev.etapa === 'verificando') {
       progressoUsb.textContent = 'Verificando a gravação (leitura de volta)…'
       return
     }
+    if (!inicioProgressoUsb) inicioProgressoUsb = Date.now()
     const pct = ev.total ? Math.min(100, Math.round((ev.escritos / ev.total) * 100)) : 0
-    progressoUsb.textContent = 'Gravando… ' + pct + '% (' + mb(ev.escritos || 0) + ' de ' + mb(ev.total || 0) + ')'
+    const decorrido = (Date.now() - inicioProgressoUsb) / 1000
+    const taxa = decorrido > 0.5 ? (ev.escritos || 0) / decorrido : 0
+    const restante = taxa > 0 && ev.total ? formatarSegundos((ev.total - ev.escritos) / taxa) : ''
+    progressoUsb.textContent =
+      'Gravando… ' + pct + '% (' + mb(ev.escritos || 0) + ' de ' + mb(ev.total || 0) + ')' +
+      (restante ? ' · faltam ~' + restante : '')
   })
+
+  filtroConteudo.addEventListener('input', () => pintarConteudo())
 
   corpo.appendChild(
     caixa(
@@ -2005,12 +2104,23 @@ export async function pintarMidia(corpo, raiz) {
           if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
           await analisarImagemIso(imagemIso)
         }),
+        botao('Listar conteúdo', () => void listarConteudoIsoUi()),
+        botao('SHA-256', async () => {
+          if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
+          resHash.textContent = 'Calculando SHA-256…'
+          const r = await seguro('imagens:hash', { raiz, caminho: imagemIso })
+          resHash.textContent = r?.ok ? 'SHA-256: ' + r.hash : 'Falha no hash: ' + (r?.erro || 'erro')
+        }),
         botao('Listar pendrives', () => void listarPendrives()),
         botao('Abrir pasta de personalização', () => void seguro('imagens:abrir-overlay', { raiz }))
       ),
       lblIso,
       resIso,
+      resHash,
       suporteIso,
+      avisoAdmin,
+      filtroConteudo,
+      conteudoIso,
       el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' },
         botao('Extrair ISO', async () => {
           if (!imagemIso) return toast('Escolha uma imagem primeiro', 'aviso')
@@ -2030,6 +2140,39 @@ export async function pintarMidia(corpo, raiz) {
       campo('Rótulo do volume ao reconstruir', rotuloIso),
       resExtrair,
       resReconstruir,
+      el('h5', { style: 'margin:12px 0 4px;font-size:12px', text: 'Instalação sem supervisão (autounattend.xml + ei.cfg)' }),
+      el('div', { style: 'display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap' },
+        campo('Edição', selEdicaoWin),
+        campo('Canal', selCanalWin),
+        campo('Nome do PC', nomePcWin),
+        botao('Gerar arquivos', async () => {
+          const r = await seguro('imagens:unattend', {
+            raiz,
+            edicao: selEdicaoWin.value,
+            canal: selCanalWin.value,
+            nomePc: nomePcWin.value.trim() || undefined
+          })
+          resUnattend.textContent = r?.ok
+            ? 'Criado: ' + (r.detalhes?.arquivos || []).join(' · ')
+            : 'Falha: ' + (r?.erro || 'erro')
+          toast(r?.ok ? 'autounattend.xml e ei.cfg criados' : r?.erro || 'Falha', r?.ok ? 'ok' : 'erro')
+        })
+      ),
+      resUnattend,
+      el('h5', { style: 'margin:10px 0 4px;font-size:12px', text: 'Presets de personalização' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end' },
+        campo('Nome do preset', nomePreset),
+        botao('Salvar atual', async () => {
+          if (!nomePreset.value.trim()) return toast('Informe um nome para o preset', 'aviso')
+          const r = await seguro('imagens:presets-salvar', { raiz, nome: nomePreset.value.trim() })
+          resPreset.textContent = r?.ok ? 'Preset salvo (' + (r.detalhes?.arquivos || 0) + ' arquivo(s))' : 'Falha: ' + (r?.erro || 'erro')
+          toast(r?.ok ? 'Preset salvo' : r?.erro || 'Falha ao salvar', r?.ok ? 'ok' : 'erro')
+          if (r?.ok) void atualizarPresets()
+        }),
+        botao('Atualizar lista', () => void atualizarPresets())
+      ),
+      resPreset,
+      listaPresets,
       el('h5', { style: 'margin:12px 0 4px;font-size:12px', text: 'Gravar em pendrive (apaga todos os dados)' }),
       listaUsb,
       campo('Confirmação', tokenUsb),
@@ -2048,6 +2191,7 @@ export async function pintarMidia(corpo, raiz) {
           if (!chkApagar.checked) return toast('Marque a caixa confirmando que os dados serão apagados', 'aviso')
           const ok = window.confirm('Gravar ' + nomeCurto(imagemIso) + ' em "' + unidadeIso.nome + '" (disco ' + unidadeIso.disco + ')?\n\nTODOS os dados da unidade serão apagados. Se o DG Editor não estiver como administrador, a gravação será recusada.')
           if (!ok) return
+          inicioProgressoUsb = 0
           progressoUsb.textContent = 'Preparando gravação…'
           resUsb.textContent = ''
           const r = await seguro('imagens:usb-gravar', {
@@ -2062,6 +2206,10 @@ export async function pintarMidia(corpo, raiz) {
           mostrarResultado(resUsb, r?.ok ? { ...r, aviso: (r.verificado ? 'verificado · ' : '') + (r.duracaoSeg + 's') } : r)
           toast(r?.ok ? 'Gravação concluída' : r?.erro || 'Falha na gravação', r?.ok ? 'ok' : 'erro')
         }, true),
+        botao('Cancelar gravação', async () => {
+          const r = await seguro('imagens:usb-cancelar')
+          toast(r?.ok ? 'Cancelando — aguarde o processo encerrar' : r?.erro || 'Nada para cancelar', r?.ok ? 'aviso' : 'erro')
+        }),
         botao('Instalar suporte ISO (pycdlib)', async () => {
           suporteIso.textContent = 'Instalando pycdlib no Python do app…'
           const r = await seguro('imagens:instalar-suporte')
@@ -2077,6 +2225,17 @@ export async function pintarMidia(corpo, raiz) {
   void seguro('imagens:suporte').then((r) => {
     suporteIso.textContent = r?.ok ? 'Suporte pycdlib: ' + (r.versao || 'ok') : 'Suporte pycdlib não encontrado — use "Instalar suporte ISO" para extrair e reconstruir.'
   })
+  void seguro('imagens:usb-admin').then((r) => {
+    if (!r?.ok) {
+      avisoAdmin.textContent = 'Não foi possível verificar a elevação: ' + (r?.erro || 'erro')
+      return
+    }
+    avisoAdmin.textContent = r.admin
+      ? 'Administrador: sim — gravação USB liberada.'
+      : 'Administrador: não — o Windows recusará a gravação crua. Feche o DG Editor e abra como administrador.'
+    avisoAdmin.style.color = r.admin ? '' : '#e8b45a'
+  })
+  void atualizarPresets()
 
   // ------------------------------------------------------------ captura e envio
   corpo.appendChild(

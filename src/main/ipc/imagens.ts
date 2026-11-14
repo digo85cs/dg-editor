@@ -11,14 +11,18 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { obterRaizWorkspace } from '../workspace-raiz'
 import { analisarImagem } from '../imagens/iso'
 import {
+  aplicarPreset,
   criarPastaOverlay,
   extrairIso,
+  gerarUnattend,
   instalarSuporteIso,
   listarConteudoIso,
+  listarPresets,
   reconstruirIso,
+  salvarPreset,
   suporteIso
 } from '../imagens/personalizar'
-import { gravarEmUsb, listarUnidadesUsb } from '../imagens/usb'
+import { cancelarGravacaoUsb, ehAdministrador, gravarEmUsb, listarUnidadesUsb, sha256Imagem } from '../imagens/usb'
 import type { RespostaMidia } from '../midia/core'
 
 const arquivosAutorizados = new Set<string>()
@@ -205,6 +209,88 @@ export function registrarHandlersImagens(): void {
   ipcMain.handle('imagens:usb-listar', async () => {
     try {
       return await listarUnidadesUsb()
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:usb-admin', async () => {
+    try {
+      return await ehAdministrador()
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:usb-cancelar', async () => {
+    try {
+      return cancelarGravacaoUsb()
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:hash', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const caminho = texto(o.caminho)
+      const bloqueio = entradaAutorizada(r.raiz, caminho)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      return await sha256Imagem(resolve(caminho))
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:unattend', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      return gerarUnattend(r.raiz, {
+        edicao: texto(o.edicao, 40) || undefined,
+        canal: texto(o.canal, 20) || undefined,
+        locale: texto(o.locale, 10) || undefined,
+        fusoHorario: texto(o.fusoHorario, 60) || undefined,
+        nomePc: texto(o.nomePc, 20) || undefined,
+        pularOobe: o.pularOobe !== false,
+        aceitarEula: o.aceitarEula !== false
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:presets-listar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      return listarPresets(r.raiz)
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:presets-salvar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      return salvarPreset(r.raiz, texto(o.nome, 60))
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('imagens:presets-aplicar', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      return aplicarPreset(r.raiz, texto(o.nome, 60))
     } catch (e) {
       return falha(e)
     }

@@ -108,6 +108,8 @@ const invokeChannels = [
   'imagens:escolher-imagem', 'imagens:analisar', 'imagens:listar-conteudo',
   'imagens:extrair', 'imagens:reconstruir', 'imagens:overlay-pasta', 'imagens:abrir-overlay',
   'imagens:suporte', 'imagens:instalar-suporte', 'imagens:usb-listar', 'imagens:usb-gravar',
+  'imagens:usb-admin', 'imagens:usb-cancelar', 'imagens:hash', 'imagens:unattend',
+  'imagens:presets-listar', 'imagens:presets-salvar', 'imagens:presets-aplicar',
   'gravacao:fontes', 'gravacao:iniciar', 'gravacao:chunk', 'gravacao:finalizar',
   'gravacao:cancelar', 'gravacao:listar', 'gravacao:converter', 'gravacao:abrir-pasta',
   'compartilhar:iniciar', 'compartilhar:parar', 'compartilhar:status',
