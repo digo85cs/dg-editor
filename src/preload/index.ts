@@ -103,7 +103,14 @@ const invokeChannels = [
   'prov:status', 'prov:executar', 'prov:preferencias',
   'midia:musicas', 'midia:musicas-pasta', 'midia:musica-mixar',
   'midia:musicas-catalogo', 'midia:musicas-baixar', 'midia:audio-analisar', 'midia:audio-processar',
+  'midia:video-efeitos', 'midia:video-efeito', 'midia:voz-presets', 'midia:voz-efeito', 'midia:cenas',
   'midia:linha-tempo-analisar', 'midia:linha-tempo-exportar', 'midia:onda',
+  'gravacao:fontes', 'gravacao:iniciar', 'gravacao:chunk', 'gravacao:finalizar',
+  'gravacao:cancelar', 'gravacao:listar', 'gravacao:converter', 'gravacao:abrir-pasta',
+  'compartilhar:iniciar', 'compartilhar:parar', 'compartilhar:status',
+  'compartilhar:listar', 'compartilhar:abrir-pasta',
+  'reversa:status', 'reversa:analisar', 'reversa:strings', 'reversa:asar',
+  'reversa:relatorios', 'reversa:abrir-pasta', 'reversa:escolher',
   'ui:dialog-responder',
   'automation:listar', 'automation:executar', 'automation:aprovacao-resolver'
 ]

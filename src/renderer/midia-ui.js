@@ -1,4 +1,7 @@
 /** Estúdio de mídia: geração/edição de imagem, diagramas, vídeo e áudio — tudo grátis. */
+import { abrirGravador } from './gravador.js'
+import { abrirCompartilhamento } from './compartilhar.js'
+import { abrirReversa } from './reversa.js'
 
 function el(tag, attrs = {}, ...filhos) {
   const n = document.createElement(tag)
@@ -1647,6 +1650,259 @@ export async function pintarMidia(corpo, raiz) {
     if (p && typeof p.auto === 'boolean') autoProv.checked = p.auto
     await atualizarStatusProv()
   })()
+
+  // ------------------------------------------------------------ efeitos de vídeo
+  let videoEscolhido = null
+  let segundaEscolhida = null
+  const lblVideoFx = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Escolha um vídeo (MP4/MOV/MKV/WEBM).' })
+  const lblSegunda = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Nenhum segundo arquivo escolhido (necessário para transição, PiP e chroma key).' })
+  const resEfeito = el('div', { style: 'font-size:12px' })
+  const resCenas = el('div', { style: 'font-size:12px' })
+  const gridCenas = el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:6px' })
+  const catalogoFx = await seguro('midia:video-efeitos')
+  const listaEfeitos = Array.isArray(catalogoFx?.efeitos) ? catalogoFx.efeitos : []
+  const selEfeito = select(listaEfeitos.map((e) => [e.id, e.rotulo]), listaEfeitos[0]?.id || 'aprimorar')
+  const descEfeito = el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: listaEfeitos[0]?.descricao || '' })
+
+  const nFator = el('input', { type: 'number', value: '2', min: '1', max: '4', step: '0.5', style: 'width:64px' })
+  const nDenoise = el('input', { type: 'number', value: '0.25', min: '0', max: '1', step: '0.05', style: 'width:64px' })
+  const nNitidez = el('input', { type: 'number', value: '0.7', min: '0', max: '2', step: '0.1', style: 'width:64px' })
+  const nGrao = el('input', { type: 'number', value: '0', min: '0', max: '100', step: '5', style: 'width:64px' })
+  const nFps = el('input', { type: 'number', value: '60', min: '15', max: '240', step: '1', style: 'width:64px' })
+  const chkSuave = el('input', { type: 'checkbox' })
+  const nSlow = el('input', { type: 'number', value: '1', min: '1', max: '8', step: '0.25', style: 'width:64px' })
+  const nTaxa = el('input', { type: 'number', value: '1', min: '0.25', max: '4', step: '0.25', style: 'width:64px' })
+  const selLook = select((catalogoFx?.cores || []).map((c) => [c.id, c.rotulo]), 'cinema')
+  const inTexto = entrada({ placeholder: 'Texto do título' })
+  const inCor = el('input', { type: 'text', value: '#ffffff', style: 'width:90px' })
+  const nTamanho = el('input', { type: 'number', value: '48', min: '12', max: '200', step: '1', style: 'width:64px' })
+  const selPosicao = select([['base', 'Base'], ['centro', 'Centro'], ['topo', 'Topo']], 'base')
+  const nDuracao = el('input', { type: 'number', value: '1', min: '0.2', max: '10', step: '0.1', style: 'width:64px' })
+  const selTipo = select((catalogoFx?.transicoes || ['fade']).map((t) => [t, t]), 'fade')
+  const nEscala = el('input', { type: 'number', value: '0.3', min: '0.05', max: '1', step: '0.05', style: 'width:64px' })
+  const selPosPip = select(
+    [
+      ['inferior-direito', 'Inferior direito'],
+      ['inferior-esquerdo', 'Inferior esquerdo'],
+      ['superior-direito', 'Superior direito'],
+      ['superior-esquerdo', 'Superior esquerdo']
+    ],
+    'inferior-direito'
+  )
+  const nOpacidade = el('input', { type: 'number', value: '1', min: '0.05', max: '1', step: '0.05', style: 'width:64px' })
+  const nSimilaridade = el('input', { type: 'number', value: '0.16', min: '0.01', max: '1', step: '0.01', style: 'width:64px' })
+  const nMistura = el('input', { type: 'number', value: '0.1', min: '0', max: '1', step: '0.05', style: 'width:64px' })
+  const nRegX = el('input', { type: 'number', value: '20', min: '0', step: '1', style: 'width:70px' })
+  const nRegY = el('input', { type: 'number', value: '20', min: '0', step: '1', style: 'width:70px' })
+  const nRegW = el('input', { type: 'number', value: '240', min: '2', step: '1', style: 'width:70px' })
+  const nRegH = el('input', { type: 'number', value: '90', min: '2', step: '1', style: 'width:70px' })
+  const nIntensidade = el('input', { type: 'number', value: '10', min: '1', max: '30', step: '1', style: 'width:64px' })
+
+  const camposFx = {
+    fator: campo('Upscale (1–4×)', nFator),
+    denoise: campo('Denoise', nDenoise),
+    nitidez: campo('Nitidez', nNitidez),
+    grao: campo('Grão', nGrao),
+    fps: campo('FPS alvo', nFps),
+    suave: campo('Suave (rápido)', chkSuave),
+    slow: campo('Slow motion', nSlow),
+    taxa: campo('Velocidade', nTaxa),
+    preset: campo('Look de cor', selLook),
+    texto: campo('Título', inTexto),
+    cor: campo('Cor (#hex)', inCor),
+    tamanho: campo('Tamanho', nTamanho),
+    posicao: campo('Posição', selPosicao),
+    duracao: campo('Duração (s)', nDuracao),
+    tipo: campo('Transição', selTipo),
+    escala: campo('Escala PiP', nEscala),
+    posicaoPip: campo('Posição PiP', selPosPip),
+    opacidade: campo('Opacidade', nOpacidade),
+    similaridade: campo('Similaridade', nSimilaridade),
+    mistura: campo('Mistura', nMistura),
+    regiao: el('div', { style: 'display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap' },
+      campo('X', nRegX), campo('Y', nRegY), campo('Largura', nRegW), campo('Altura', nRegH)),
+    intensidade: campo('Intensidade', nIntensidade)
+  }
+  const areaCampos = el('div', { style: 'display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:8px' })
+  function atualizarCamposEfeito() {
+    const id = selEfeito.value
+    const def = listaEfeitos.find((e) => e.id === id)
+    descEfeito.textContent = def ? def.descricao : ''
+    areaCampos.textContent = ''
+    for (const chave of def?.opcoes || []) if (camposFx[chave]) areaCampos.appendChild(camposFx[chave])
+    if (id === 'gif') {
+      // Aproveita "duração" e "tamanho" (largura do GIF) nos mesmos campos.
+      areaCampos.textContent = ''
+      areaCampos.appendChild(campo('Duração (s)', nDuracao))
+      areaCampos.appendChild(campo('Largura do GIF', nTamanho))
+    }
+  }
+  selEfeito.addEventListener('change', atualizarCamposEfeito)
+  atualizarCamposEfeito()
+
+  corpo.appendChild(
+    caixa(
+      'Efeitos de vídeo (estilo Topaz / PowerDirector / Filmora)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Upscale, interpolação de quadros, slow motion, transições, PiP, chroma key, títulos, looks de cor, reframe vertical, remoção de logo/blur, proxy, correção de lente, GIF e extração de áudio. Tudo processado localmente pelo ffmpeg embutido.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Escolher vídeo', async () => {
+          const [p] = await escolher('video')
+          if (!p) return
+          videoEscolhido = p
+          lblVideoFx.textContent = nomeCurto(p)
+        }),
+        botao('Escolher 2º arquivo', async () => {
+          const [p] = await escolher('midia')
+          if (!p) return
+          segundaEscolhida = p
+          lblSegunda.textContent = 'Segundo arquivo: ' + nomeCurto(p)
+        })
+      ),
+      lblVideoFx,
+      lblSegunda,
+      campo('Efeito', selEfeito),
+      descEfeito,
+      areaCampos,
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' },
+        botao('Aplicar efeito', async () => {
+          if (!videoEscolhido) return toast('Escolha um vídeo', 'aviso')
+          resEfeito.textContent = 'Processando (pode levar alguns minutos)…'
+          const r = await seguro('midia:video-efeito', {
+            raiz,
+            entrada: videoEscolhido,
+            segunda: segundaEscolhida || undefined,
+            efeito: selEfeito.value,
+            fator: Number(nFator.value),
+            denoise: Number(nDenoise.value),
+            nitidez: Number(nNitidez.value),
+            grao: Number(nGrao.value),
+            fps: Number(nFps.value),
+            suave: chkSuave.checked,
+            slow: Number(nSlow.value),
+            taxa: Number(nTaxa.value),
+            preset: selLook.value,
+            texto: inTexto.value,
+            cor: inCor.value,
+            tamanho: Number(nTamanho.value),
+            posicao: selPosicao.value,
+            duracao: Number(nDuracao.value),
+            tipo: selTipo.value,
+            escala: Number(nEscala.value),
+            posicaoPip: selPosPip.value,
+            opacidade: Number(nOpacidade.value),
+            similaridade: Number(nSimilaridade.value),
+            mistura: Number(nMistura.value),
+            regiao: { x: Number(nRegX.value), y: Number(nRegY.value), w: Number(nRegW.value), h: Number(nRegH.value) },
+            intensidade: Number(nIntensidade.value)
+          })
+          mostrarResultado(resEfeito, r)
+          toast(r?.ok ? 'Efeito aplicado' : r?.erro || 'Falha ao aplicar', r?.ok ? 'ok' : 'erro')
+          void atualizarGaleria()
+        }, true),
+        botao('Detectar cenas (destaques)', async () => {
+          if (!videoEscolhido) return toast('Escolha um vídeo', 'aviso')
+          resCenas.textContent = 'Detectando cortes…'
+          gridCenas.textContent = ''
+          const r = await seguro('midia:cenas', { raiz, entrada: videoEscolhido, limiar: 0.32, max: 12 })
+          const cenas = r?.detalhes?.cenas || []
+          resCenas.textContent = r?.ok ? cenas.length + ' cena(s): ' + cenas.map((c) => c.tempo + 's').join(' · ') : 'Erro: ' + (r?.erro || 'falha')
+          for (const c of cenas) {
+            const img = await seguro('arquivo:ler-base64', c.miniatura, [raiz])
+            if (img?.ok && img.dataUrl) gridCenas.appendChild(el('img', { src: img.dataUrl, alt: 'Cena em ' + c.tempo + 's', style: 'width:100%;border-radius:6px;border:1px solid var(--dg-border)' }))
+          }
+        })
+      ),
+      resEfeito,
+      resCenas,
+      gridCenas
+    )
+  )
+
+  // ------------------------------------------------------------ efeitos de voz
+  let audioVoz = null
+  const lblVozFx = el('p', { className: 'muted', style: 'font-size:11px;margin:4px 0', text: 'Escolha um áudio com voz (MP3/WAV/M4A/OGG/FLAC).' })
+  const resVozFx = el('div', { style: 'font-size:12px' })
+  const catalogoVoz = await seguro('midia:voz-presets')
+  const presetsVoz = Array.isArray(catalogoVoz?.presets) ? catalogoVoz.presets : []
+  const selPresetVoz = select(presetsVoz.map((p) => [p.id, p.rotulo]), 'grave')
+  const descPresetVoz = el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: presetsVoz.find((p) => p.id === 'grave')?.descricao || '' })
+  const nVozIntensidade = el('input', { type: 'number', value: '0.7', min: '0.1', max: '1', step: '0.1', style: 'width:64px' })
+  const chkRuido = el('input', { type: 'checkbox' })
+  chkRuido.checked = true
+  const chkDeesser = el('input', { type: 'checkbox' })
+  const chkSilencios = el('input', { type: 'checkbox' })
+  const chkNormalizarVoz = el('input', { type: 'checkbox' })
+  chkNormalizarVoz.checked = true
+  const selFormatoVoz = select([['mp3', 'MP3'], ['wav', 'WAV'], ['m4a', 'M4A'], ['ogg', 'OGG']], 'mp3')
+  selPresetVoz.addEventListener('change', () => {
+    descPresetVoz.textContent = presetsVoz.find((p) => p.id === selPresetVoz.value)?.descricao || ''
+  })
+  corpo.appendChild(
+    caixa(
+      'Efeitos de voz (estilo RealVoice / PowerDirector)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Muda o timbre (grave, agudo, criança, monstro, robô), simula telefone/rádio/caverna/megafone e limpa ruído, chiado e silêncios. Processamento local, sem enviar áudio para a nuvem.' }),
+      botao('Escolher áudio', async () => {
+        const [p] = await escolher('audio')
+        if (!p) return
+        audioVoz = p
+        lblVozFx.textContent = nomeCurto(p)
+      }),
+      lblVozFx,
+      campo('Preset de voz', selPresetVoz),
+      descPresetVoz,
+      el('div', { style: 'display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:8px' },
+        campo('Intensidade', nVozIntensidade),
+        campo('Reduzir ruído', chkRuido),
+        campo('De-esser', chkDeesser),
+        campo('Cortar silêncios', chkSilencios),
+        campo('Normalizar', chkNormalizarVoz),
+        campo('Formato', selFormatoVoz)
+      ),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' },
+        botao('Aplicar voz', async () => {
+          if (!audioVoz) return toast('Escolha um áudio', 'aviso')
+          resVozFx.textContent = 'Processando voz…'
+          const r = await seguro('midia:voz-efeito', {
+            raiz,
+            entrada: audioVoz,
+            preset: selPresetVoz.value,
+            intensidade: Number(nVozIntensidade.value),
+            reduzirRuido: chkRuido.checked,
+            deesser: chkDeesser.checked,
+            cortarSilencios: chkSilencios.checked,
+            normalizar: chkNormalizarVoz.checked,
+            formato: selFormatoVoz.value
+          })
+          mostrarResultado(resVozFx, r)
+          toast(r?.ok ? 'Voz processada' : r?.erro || 'Falha na voz', r?.ok ? 'ok' : 'erro')
+          void atualizarGaleria()
+        }, true)
+      ),
+      resVozFx
+    )
+  )
+
+  // ------------------------------------------------------------ captura e envio
+  corpo.appendChild(
+    caixa(
+      'Gravação de tela e envio local',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Grave a tela ou uma janela (com áudio do sistema e microfone) em WebM e converta para MP4. Também abre uma página local para o celular enviar arquivos para este PC pela mesma rede Wi-Fi — sem nuvem e sem conta.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Abrir gravador de tela', () => void abrirGravador({ raiz }), true),
+        botao('Receber do celular (LAN)', () => void abrirCompartilhamento({ raiz }))
+      )
+    )
+  )
+
+  corpo.appendChild(
+    caixa(
+      'Engenharia reversa local (REA)',
+      el('p', { className: 'muted', style: 'font-size:11px;margin:0 0 6px', text: 'Analisa binários PE/ELF/Mach-O, apps Electron (app.asar), JAR/APK e páginas web: arquitetura, imports, strings, canais IPC e riscos, com evidências e limitações. 100% offline, sem Hopper/IDA. Use apenas em software que você possui ou tem autorização para inspecionar.' }),
+      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
+        botao('Abrir análise de reversa', () => void abrirReversa({ raiz }))
+      )
+    )
+  )
 
   // ------------------------------------------------------------ galeria
   const galeria = el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px' })

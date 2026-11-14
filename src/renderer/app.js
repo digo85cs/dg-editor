@@ -23,6 +23,9 @@ import {
 import { ligarFerramentas } from './ferramentas-ui.js'
 import { abrirGrafoVault } from './grafo-vault.js'
 import { abrirMapaMental } from './mapa-mental.js'
+import { abrirGravador } from './gravador.js'
+import { abrirCompartilhamento } from './compartilhar.js'
+import { abrirReversa } from './reversa.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
 import { instalarTrapFocoModais } from './utils/focus-trap.js'
@@ -4532,6 +4535,9 @@ function bootstrapComandos() {
     { id: 'abrir-vault', titulo: 'Abrir vault Markdown', fn: () => abrirVault() },
     { id: 'grafo-vault', titulo: 'Grafo do vault', fn: () => void abrirGrafoVault({ abrirNota: (p) => void abrirArquivoNaAba(p) }) },
     { id: 'mapa-mental', titulo: 'Mapa mental (MindNode)', fn: () => void abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
+    { id: 'gravar-tela', titulo: 'Gravar tela (janela ou monitor)', fn: () => void abrirGravador({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
+    { id: 'receber-lan', titulo: 'Receber arquivos do celular (LAN)', fn: () => void abrirCompartilhamento({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
+    { id: 'reversa', titulo: 'Engenharia reversa local (REA)', fn: () => void abrirReversa({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
     { id: 'colar-markdown', titulo: 'Colar como Markdown', atalho: 'Ctrl+Shift+V', fn: () => void colarComoMarkdown() },
     { id: 'fechar-vault', titulo: 'Fechar vault', fn: () => fecharVault() },
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },

@@ -943,6 +943,91 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_video_efeito',
+    description:
+      'Efeitos de video gratuitos via ffmpeg: listar catalogo, aplicar aprimorar/upscale, interpolacao de quadros e slow motion, velocidade, boomerang, transicao, picture-in-picture, chroma key, titulo, presets de cor, reframe vertical 9:16, delogo, blur de regiao, proxy, correcao de lente, GIF e extracao de audio; e detectar cenas (destaques).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['listar', 'aplicar', 'cenas'], description: 'Padrao listar' },
+        entrada: { type: 'string', description: 'Video relativo ao projeto' },
+        efeito: {
+          type: 'string',
+          enum: [
+            'aprimorar',
+            'interpolar',
+            'velocidade',
+            'boomerang',
+            'transicao',
+            'pip',
+            'chromakey',
+            'titulo',
+            'cor',
+            'reframe',
+            'delogo',
+            'borrar-regiao',
+            'proxy',
+            'lente',
+            'gif',
+            'extrair-audio'
+          ]
+        },
+        segunda: { type: 'string', description: 'Segundo arquivo para transicao/pip/chromakey' },
+        fator: { type: 'number', description: 'Upscale 1 a 4' },
+        denoise: { type: 'number', description: '0 a 1' },
+        nitidez: { type: 'number', description: '0 a 2' },
+        grao: { type: 'number', description: '0 a 100' },
+        fps: { type: 'number', description: 'FPS alvo da interpolacao' },
+        suave: { type: 'boolean', description: 'Interpolacao por mistura (mais rapida)' },
+        slow: { type: 'number', description: 'Camera lenta 1 a 8' },
+        taxa: { type: 'number', description: 'Velocidade 0.25 a 4' },
+        preset: { type: 'string', description: 'Look de cor: cinema, quente, frio, pb, vintage, vivo, suave' },
+        texto: { type: 'string', description: 'Texto do titulo' },
+        cor: { type: 'string', description: '#RRGGBB do texto ou chroma key' },
+        tamanho: { type: 'number' },
+        posicao: { type: 'string', enum: ['centro', 'topo', 'base'] },
+        duracao: { type: 'number', description: 'Duracao da transicao ou do GIF' },
+        tipo: { type: 'string', description: 'Tipo de transicao (fade, wipeleft, dissolve...)' },
+        escala: { type: 'number', description: 'Escala do PiP (0.05 a 1)' },
+        posicaoPip: { type: 'string' },
+        opacidade: { type: 'number' },
+        similaridade: { type: 'number' },
+        mistura: { type: 'number' },
+        regiao: {
+          type: 'object',
+          description: 'Regiao x/y/w/h em pixels para delogo ou blur',
+          properties: { x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, h: { type: 'number' } }
+        },
+        intensidade: { type: 'number' },
+        limiar: { type: 'number', description: 'Sensibilidade da deteccao de cenas (0.05 a 0.95)' },
+        max: { type: 'number', description: 'Maximo de cenas' },
+        saida: { type: 'string' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_voz_efeito',
+    description:
+      'Efeitos de voz gratuitos via ffmpeg: listar presets ou aplicar grave, agudo, crianca, idoso, monstro, robo, telefone, radio, caverna, megafone, sussurro e coro, com reducao de ruido, de-esser e corte de silencios.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['listar', 'aplicar'], description: 'Padrao listar' },
+        entrada: { type: 'string', description: 'Audio relativo ao projeto' },
+        preset: { type: 'string' },
+        intensidade: { type: 'number', description: '0.1 a 1' },
+        reduzirRuido: { type: 'boolean' },
+        deesser: { type: 'boolean' },
+        cortarSilencios: { type: 'boolean' },
+        normalizar: { type: 'boolean' },
+        formato: { type: 'string', enum: ['mp3', 'wav', 'm4a', 'ogg'] },
+        saida: { type: 'string' }
+      },
+      required: []
+    }
+  },
+  {
     name: 'notas_mapa_mental',
     description:
       'Mapa mental estilo MindNode: renderiza um outline Markdown indentado como SVG em arvore, salva/carrega mapas em .dg-editor/mapas e lista os mapas do projeto.',
@@ -959,6 +1044,77 @@ const TOOLS = [
         titulo: { type: 'string', description: 'Titulo exibido no topo do SVG' }
       },
       required: []
+    }
+  },
+  {
+    name: 'tela_gravacoes',
+    description:
+      'Gravacoes de tela salvas em .dg-editor/gravacoes: lista os WebM/MP4 e converte um WebM em MP4 com ffmpeg (a captura em si roda na interface do DG Editor).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['listar', 'converter'], description: 'Padrao listar' },
+        entrada: { type: 'string', description: 'Gravacao relativa ao projeto (acao converter)' },
+        crf: { type: 'number', description: 'Qualidade x264 (padrao 23)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'receber_lan',
+    description:
+      'Compartilhamento local estilo AirDrop: inicia/para um servidor HTTP com token para o celular enviar arquivos ao PC pela mesma rede, lista os recebidos em .dg-editor/recebidos e informa a URL.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['iniciar', 'parar', 'status', 'listar'], description: 'Padrao status' },
+        porta: { type: 'number', description: 'Porta fixa (padrao aleatoria)' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'reversa_status',
+    description:
+      'Engenharia reversa local (inspirada no REA, MIT): verifica quais ferramentas gratuitas estao disponiveis (strings, objdump, java, python, jadx, radare2, ghidra).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'reversa_analisar',
+    description:
+      'Analise estatica local de um arquivo, pasta ou URL do projeto: PE/ELF/Mach-O, strings categorizadas, ASAR/Electron (IPC, preload, riscos), APK/JAR e cabecalhos web. Gera relatorio com evidencias e limitacoes em .dg-editor/reversa. Use apenas em software que voce possui ou tem autorizacao para inspecionar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        alvo: { type: 'string', description: 'Arquivo/pasta relativo ao projeto ou URL http(s)' }
+      },
+      required: ['alvo']
+    }
+  },
+  {
+    name: 'reversa_strings',
+    description:
+      'Extrai strings ASCII/UTF-16 de um arquivo do projeto, categorizadas (URL, IP, e-mail, caminho, registro, PDB, DLL, cripto, Electron, Android).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        arquivo: { type: 'string', description: 'Arquivo relativo ao projeto' },
+        minimo: { type: 'number', description: 'Tamanho minimo da string (padrao 5)' }
+      },
+      required: ['arquivo']
+    }
+  },
+  {
+    name: 'reversa_asar',
+    description:
+      'Extrai o conteudo de um app.asar (Electron) para .dg-editor/reversa/<alvo>/asar e devolve destino e contagem de arquivos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        arquivo: { type: 'string', description: 'Caminho do .asar relativo ao projeto' },
+        destino: { type: 'string', description: 'Pasta de destino relativa ao projeto (opcional)' }
+      },
+      required: ['arquivo']
     }
   },
   {
@@ -1565,7 +1721,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       }
     }
 
-    if (name.startsWith('midia_')) {
+    if (
+      name.startsWith('midia_') ||
+      name.startsWith('apps_') ||
+      name.startsWith('reversa_') ||
+      name === 'notas_mapa_mental' ||
+      name === 'tela_gravacoes' ||
+      name === 'receber_lan'
+    ) {
       const midia = await import('../midia/core')
       const responder = async (r: { ok: boolean; erro?: string; [k: string]: unknown }) => ({
         content: [{ type: 'text' as const, text: JSON.stringify(r, null, 2) }],
@@ -1911,6 +2074,116 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         )
       }
 
+      if (name === 'midia_video_efeito') {
+        const regiaoSchema = z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional()
+        const p = z
+          .object({
+            acao: z.enum(['listar', 'aplicar', 'cenas']).optional(),
+            entrada: z.string().optional(),
+            efeito: z.string().optional(),
+            segunda: z.string().optional(),
+            fator: z.number().optional(),
+            denoise: z.number().optional(),
+            nitidez: z.number().optional(),
+            grao: z.number().optional(),
+            fps: z.number().optional(),
+            suave: z.boolean().optional(),
+            slow: z.number().optional(),
+            taxa: z.number().optional(),
+            preset: z.string().optional(),
+            texto: z.string().optional(),
+            cor: z.string().optional(),
+            tamanho: z.number().optional(),
+            posicao: z.enum(['centro', 'topo', 'base']).optional(),
+            duracao: z.number().optional(),
+            tipo: z.string().optional(),
+            escala: z.number().optional(),
+            posicaoPip: z.string().optional(),
+            opacidade: z.number().optional(),
+            similaridade: z.number().optional(),
+            mistura: z.number().optional(),
+            regiao: regiaoSchema,
+            intensidade: z.number().optional(),
+            limiar: z.number().optional(),
+            max: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const fx = await import('../midia/efeitos')
+        const acao = p.acao || 'listar'
+        if (acao === 'listar') return await responder({ ok: true, ...fx.catalogoEfeitos() })
+        if (acao === 'cenas') {
+          if (!p.entrada) return await responder({ ok: false, erro: 'informe a entrada' })
+          return await responder(
+            await fx.detectarCenas(RAIZ, { entrada: caminho(p.entrada), limiar: p.limiar, max: p.max })
+          )
+        }
+        if (!p.entrada || !p.efeito) return await responder({ ok: false, erro: 'informe entrada e efeito' })
+        return await responder(
+          await fx.aplicarEfeitoVideo(RAIZ, {
+            entrada: caminho(p.entrada),
+            efeito: p.efeito as Parameters<typeof fx.aplicarEfeitoVideo>[1]['efeito'],
+            segunda: p.segunda ? caminho(p.segunda) : undefined,
+            fator: p.fator,
+            denoise: p.denoise,
+            nitidez: p.nitidez,
+            grao: p.grao,
+            fps: p.fps,
+            suave: p.suave,
+            slow: p.slow,
+            taxa: p.taxa,
+            preset: p.preset as Parameters<typeof fx.aplicarEfeitoVideo>[1]['preset'],
+            texto: p.texto,
+            cor: p.cor,
+            tamanho: p.tamanho,
+            posicao: p.posicao,
+            duracao: p.duracao,
+            tipo: p.tipo,
+            escala: p.escala,
+            posicaoPip: p.posicaoPip as Parameters<typeof fx.aplicarEfeitoVideo>[1]['posicaoPip'],
+            opacidade: p.opacidade,
+            similaridade: p.similaridade,
+            mistura: p.mistura,
+            regiao: p.regiao,
+            intensidade: p.intensidade,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_voz_efeito') {
+        const p = z
+          .object({
+            acao: z.enum(['listar', 'aplicar']).optional(),
+            entrada: z.string().optional(),
+            preset: z.string().optional(),
+            intensidade: z.number().optional(),
+            reduzirRuido: z.boolean().optional(),
+            deesser: z.boolean().optional(),
+            cortarSilencios: z.boolean().optional(),
+            normalizar: z.boolean().optional(),
+            formato: z.enum(['mp3', 'wav', 'm4a', 'ogg']).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const vozFx = await import('../midia/voz-efeitos')
+        if ((p.acao || 'listar') === 'listar') return await responder({ ok: true, ...vozFx.catalogoVoz() })
+        if (!p.entrada || !p.preset) return await responder({ ok: false, erro: 'informe entrada e preset' })
+        return await responder(
+          await vozFx.aplicarEfeitoVoz(RAIZ, {
+            entrada: caminho(p.entrada),
+            preset: p.preset as Parameters<typeof vozFx.aplicarEfeitoVoz>[1]['preset'],
+            intensidade: p.intensidade,
+            reduzirRuido: p.reduzirRuido,
+            deesser: p.deesser,
+            cortarSilencios: p.cortarSilencios,
+            normalizar: p.normalizar,
+            formato: p.formato,
+            saida: p.saida
+          })
+        )
+      }
+
       if (name === 'notas_mapa_mental') {
         const p = z
           .object({
@@ -2033,6 +2306,69 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             saida: p.saida
           })
         )
+      }
+
+      if (name === 'tela_gravacoes') {
+        const p = z
+          .object({
+            acao: z.enum(['listar', 'converter']).optional(),
+            entrada: z.string().optional(),
+            crf: z.number().optional()
+          })
+          .parse(args)
+        const g = await import('../gravacao')
+        if ((p.acao || 'listar') === 'listar') {
+          return await responder({ ok: true, pasta: g.pastaGravacoes(RAIZ), gravacoes: g.listarGravacoes(RAIZ) })
+        }
+        if (!p.entrada) return await responder({ ok: false, erro: 'informe a gravacao de entrada' })
+        return await responder(await g.converterParaMp4(RAIZ, { entrada: caminho(p.entrada), crf: p.crf }))
+      }
+
+      if (name === 'receber_lan') {
+        const p = z
+          .object({
+            acao: z.enum(['iniciar', 'parar', 'status', 'listar']).optional(),
+            porta: z.number().optional()
+          })
+          .parse(args)
+        const sh = await import('../compartilhar')
+        const acao = p.acao || 'status'
+        if (acao === 'iniciar') return await responder(await sh.iniciarCompartilhamento(RAIZ, { porta: p.porta }))
+        if (acao === 'parar') return await responder(await sh.pararCompartilhamento())
+        if (acao === 'listar') return await responder({ ok: true, recebidos: sh.listarRecebidos(RAIZ) })
+        return await responder(sh.statusCompartilhamento(RAIZ))
+      }
+
+      if (name === 'reversa_status') {
+        const rv = await import('../reversa')
+        return await responder({ ok: true, ferramentas: rv.detectarFerramentasReversa() })
+      }
+
+      if (name === 'reversa_analisar') {
+        const p = z.object({ alvo: z.string().min(1) }).parse(args)
+        const rv = await import('../reversa')
+        const url = /^https?:\/\//i.test(p.alvo)
+        const resultado = url ? await rv.analisarUrl(p.alvo) : rv.analisarArquivo(caminho(p.alvo))
+        return await responder(await rv.salvarRelatorioReversa(RAIZ, resultado))
+      }
+
+      if (name === 'reversa_strings') {
+        const p = z
+          .object({ arquivo: z.string().min(1), minimo: z.number().optional() })
+          .parse(args)
+        const rv = await import('../reversa')
+        const { readFileSync } = await import('node:fs')
+        const abs = caminho(p.arquivo)
+        const strings = rv.extrairStrings(readFileSync(abs), p.minimo ?? 5)
+        return await responder({ ok: true, arquivo: p.arquivo, total: strings.length, strings })
+      }
+
+      if (name === 'reversa_asar') {
+        const p = z
+          .object({ arquivo: z.string().min(1), destino: z.string().optional() })
+          .parse(args)
+        const rv = await import('../reversa')
+        return await responder(rv.extrairAsar(RAIZ, caminho(p.arquivo), p.destino))
       }
 
       if (name === 'apps_status') {

@@ -94,6 +94,11 @@ tmp/
 # Midia gerada pelo Estudio de midia (runtime)
 .dg-editor/midia/
 
+# Gravacoes de tela, arquivos recebidos via LAN e relatorios de reversa (runtime)
+.dg-editor/gravacoes/
+.dg-editor/recebidos/
+.dg-editor/reversa/
+
 # Avaliacoes de modelo (runtime)
 .dg-editor/avaliacoes/
 .dg-editor/analise.json

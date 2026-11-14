@@ -42,6 +42,20 @@ import { listarMusicas, mixarMusica, pastaMusicas } from '../midia/musicas'
 import { analisarVideo, processarImagem, processarVideo } from '../midia/qualidade'
 import { baixarFaixas, catalogoLivres } from '../midia/musicas-livres'
 import { analisarAudio, processarAudio, type FormatoAudio } from '../midia/audio'
+import {
+  aplicarEfeitoVideo,
+  catalogoEfeitos,
+  detectarCenas,
+  type EfeitoVideoId,
+  type OpcoesEfeitoVideo,
+  type PresetCor
+} from '../midia/efeitos'
+import {
+  aplicarEfeitoVoz,
+  catalogoVoz,
+  type FormatoVoz,
+  type PresetVoz
+} from '../midia/voz-efeitos'
 import { analisarLinhaTempo, exportarLinhaTempo, gerarOnda, type ItemLinhaTempo } from '../midia/editor'
 import { gerarFotoVideoComfy } from '../midia/comfyui'
 import { detectarHardware } from '../midia/hardware'
@@ -742,8 +756,107 @@ export function registrarHandlersMidia(): void {
     }
   })
 
-  ipcMain.handle('midia:musica-mixar', async (_e, payload?: unknown) => {
+  ipcMain.handle('midia:video-efeitos', async () => catalogoEfeitos())
+
+  ipcMain.handle('midia:voz-presets', async () => catalogoVoz())
+
+  ipcMain.handle('midia:video-efeito', async (_e, payload?: unknown) => {
     try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      const segunda = texto(o.segunda, 1000)
+      if (segunda) {
+        const bloqueio2 = entradaAutorizada(r.raiz, segunda)
+        if (bloqueio2) return { ok: false, erro: bloqueio2 }
+      }
+      const regiao = o.regiao && typeof o.regiao === 'object' ? (o.regiao as Record<string, unknown>) : undefined
+      return await aplicarEfeitoVideo(r.raiz, {
+        entrada,
+        efeito: texto(o.efeito, 40) as EfeitoVideoId,
+        saida: texto(o.saida, 1000) || undefined,
+        segunda: segunda || undefined,
+        fator: numero(o.fator),
+        denoise: numero(o.denoise),
+        nitidez: numero(o.nitidez),
+        grao: numero(o.grao),
+        fps: numero(o.fps),
+        suave: o.suave === true,
+        slow: numero(o.slow),
+        taxa: numero(o.taxa),
+        preset: texto(o.preset, 20) as PresetCor,
+        texto: texto(o.texto, 400) || undefined,
+        cor: texto(o.cor, 20) || undefined,
+        tamanho: numero(o.tamanho),
+        posicao: texto(o.posicao, 20) as OpcoesEfeitoVideo['posicao'],
+        duracao: numero(o.duracao),
+        tipo: texto(o.tipo, 30) || undefined,
+        escala: numero(o.escala),
+        posicaoPip: texto(o.posicaoPip, 30) as OpcoesEfeitoVideo['posicaoPip'],
+        opacidade: numero(o.opacidade),
+        similaridade: numero(o.similaridade),
+        mistura: numero(o.mistura),
+        intensidade: numero(o.intensidade),
+        regiao:
+          regiao && typeof regiao.x === 'number'
+            ? { x: numero(regiao.x) || 0, y: numero(regiao.y) || 0, w: numero(regiao.w) || 0, h: numero(regiao.h) || 0 }
+            : undefined
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:voz-efeito', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      const formatos: FormatoVoz[] = ['mp3', 'wav', 'm4a', 'ogg']
+      const formato = formatos.includes(texto(o.formato, 10) as FormatoVoz)
+        ? (texto(o.formato, 10) as FormatoVoz)
+        : undefined
+      return await aplicarEfeitoVoz(r.raiz, {
+        entrada,
+        preset: texto(o.preset, 30) as PresetVoz,
+        intensidade: numero(o.intensidade),
+        reduzirRuido: o.reduzirRuido === true,
+        deesser: o.deesser === true,
+        cortarSilencios: o.cortarSilencios === true,
+        normalizar: o.normalizar !== false,
+        formato,
+        saida: texto(o.saida, 1000) || undefined
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:cenas', async (_e, payload?: unknown) => {
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const entrada = texto(o.entrada, 1000)
+      const bloqueio = entradaAutorizada(r.raiz, entrada)
+      if (bloqueio) return { ok: false, erro: bloqueio }
+      return await detectarCenas(r.raiz, {
+        entrada,
+        limiar: numero(o.limiar),
+        max: numero(o.max)
+      })
+    } catch (e) {
+      return falha(e)
+    }
+  })
+
+  ipcMain.handle('midia:musica-mixar', async (_e, payload?: unknown) => {    try {
       const o = objeto(payload)
       const r = raizValida(o.raiz)
       if (!r.ok) return r

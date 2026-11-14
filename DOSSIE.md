@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 21:03:24** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.5** · branch `integra-13-11` · último commit: a0586d6 2026-11-13 release: v0.3.4
-> Alterações locais não commitadas: 27 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 21:26:17** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.6** · branch `integra-13-11` · último commit: 1d9922a 2026-11-13 release: v0.3.5
+> Alterações locais não commitadas: 31 arquivo(s).
 
 ## 1. O que é
 
@@ -25,12 +25,12 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, deploy, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, vault, __tests__.
 
 ## 4. IPC
 
-- Canais registrados no main: **322**.
-- Canais expostos pelo preload: **302**.
+- Canais registrados no main: **347**.
+- Canais expostos pelo preload: **327**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -40,6 +40,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `midia:atualizacoes-prefs`
 - `midia:audio-analisar`
 - `midia:audio-processar`
+- `midia:cenas`
 - `midia:comfy-instalacao`
 - `midia:comfy-instalar`
 - `midia:comfy-pre`
@@ -73,9 +74,13 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `midia:video-analisar`
 - `midia:video-capa`
 - `midia:video-cortar`
+- `midia:video-efeito`
+- `midia:video-efeitos`
 - `midia:video-juntar`
 - `midia:video-melhorar`
+- `midia:voz-efeito`
 - `midia:voz-padrao`
+- `midia:voz-presets`
 - `midia:voz-previa`
 - `midia:vozes`
 - `midia:vozes-baixar`
@@ -84,7 +89,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 5. Estúdio de mídia
 
-Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `vozes.ts`.
+Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/efeitos.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/voz-efeitos.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `efeitos.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `voz-efeitos.ts`, `vozes.ts`.
 
 ### Biblioteca de músicas livres (por estilo)
 
@@ -122,6 +127,20 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Canais `prov:status`, `prov:executar`, `prov:preferencias` + evento `prov:progresso`; MCP `provisionamento_status`/`provisionamento_atualizar`; UI em "Ferramentas automáticas (download no PC novo)" com toggle, log e botão de forçar atualização. Falha de rede recua por 6h e a checagem periódica é diária.
 - Agentes externos gratuitos: `agente:externos` / MCP `agentes_externos_status` detectam QCoder (qwen2.5-coder + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent, com o comando de instalação quando faltam.
 
+### Gravação de tela (estilo OBS)
+
+- `desktopCapturer` no processo principal lista telas e janelas com miniatura; o renderer captura via `getUserMedia` com as restrições legadas de desktop e grava em WebM (VP9 com fallback VP8, timeslice de 2 s).
+- Áudio do sistema e microfone são mixados num `AudioContext` (ganho por fonte) antes do `MediaRecorder`; o usuário escolhe fonte, fps, bitrate e quais áudios entram.
+- Chunks vão ao main por `gravacao:chunk` e são escritos em fluxo em `.dg-editor/gravacoes/<nome>.webm`; ao finalizar o arquivo aparece com caminho relativo ao projeto.
+- Conversão para MP4 com `ffmpeg` (libx264 CRF 23, aac 160k, `+faststart`), escala opcional Lanczos; listagem ordenada por data e botão para abrir a pasta.
+- Canais `gravacao:fontes`, `gravacao:iniciar`, `gravacao:chunk`, `gravacao:finalizar`, `gravacao:cancelar`, `gravacao:listar`, `gravacao:converter`, `gravacao:abrir-pasta`; MCP `tela_gravacoes` (listar/converter); UI no modal `.gravador-modal`; QA `ui.gravacao.captura` e `ui.gravacao.modal`.
+
+### Compartilhamento local (estilo AirDrop)
+
+- Servidor HTTP em `0.0.0.0` com porta aleatória e token aleatório comparado com `timingSafeEqual`; página HTML de upload usa `fetch PUT` direto do celular na mesma rede.
+- Upload em streaming com `pipeline`, limite de 1 GB por arquivo, nomes únicos e destino `.dg-editor/recebidos`; a UI mostra URL, QR-friendly, lista de recebidos e status (ativo/porta/IP).
+- Canais `compartilhar:iniciar`, `compartilhar:parar`, `compartilhar:status`, `compartilhar:listar`, `compartilhar:abrir-pasta`; MCP `receber_lan`; UI no modal `.share-modal`; QA `ui.compartilhar.ipc` e `ui.compartilhar.ui`.
+
 ### Demais recursos
 
 - Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).
@@ -129,14 +148,25 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Voz: biblioteca pt-BR local, prévia, download de modelos, padrão configurável.
 - Música: banco local em `musicas/`, mixagem em vídeo, atualizações de componentes.
 
-## 6. Produtividade e anotações
+## 6. Engenharia reversa local (REA)
+
+- Inspirado no REA (github.com/morluto/rea), reimplementado 100% local e gratuito: só analisa arquivos do próprio usuário ou autorizados via diálogo, e não contorna DRM/proteções.
+- **Binários**: detecta PE (cabeçalhos COFF/opcional, seções, imports/exports, entropia por seção, indícios de packer, metadados .NET), ELF e Mach-O por assinatura; extrai strings ASCII e UTF-16LE categorizadas (URLs, caminhos, domínios, IPs, e-mails).
+- **Apps Electron**: lê o header do ASAR (offset/size por arquivo), extrai conteúdo, e coleta evidências de `package.json`, canais IPC, preload, `nodeIntegration` e `contextIsolation`.
+- **Web**: inspeciona URL http(s) — headers, scripts, metas, formulários e frameworks detectados.
+- Cada análise gera relatório Markdown com evidências e limitações em `.dg-editor/reversa/<slug>/relatorio.md` (escrita atômica).
+- Canais `reversa:status`, `reversa:analisar`, `reversa:strings`, `reversa:asar`, `reversa:relatorios`, `reversa:escolher`, `reversa:abrir-pasta`; MCP `reversa_status`, `reversa_analisar`, `reversa_strings`, `reversa_asar`; UI no modal `.reversa-modal` com aviso de uso autorizado.
+- Guardrails: `alvoValido` aceita apenas caminhos dentro do workspace ou adicionados pela caixa de diálogo de autorização; URLs restritas a http/https.
+- Testes: `src/main/reversa/__tests__/reversa.test.ts` (detecção de tipo, PE sintético, strings, ASAR, entropia, relatório); QA `ui.reversa.*`.
+
+## 7. Produtividade e anotações
 
 - **Grafo do vault (estilo Obsidian)**: `vault:grafo` devolve notas, grau e arestas resolvidas por wiki links (sem auto-link/duplicatas); layout de forças (Fruchterman–Reingold) em canvas com pan, zoom, arraste, filtro de busca e abertura de nota ao clicar. Módulo: `src/renderer/grafo-vault.js`; núcleo: `grafoVault` em `src/main/vault/indice.ts`.
 - **Mapa mental (estilo MindNode)**: outline Markdown indentado vira SVG em árvore horizontal com quebra de linha, nós coloridos por profundidade e exportação PNG. Persistência em `.dg-editor/mapas/<nome>.md`. IPC `mapas:listar/carregar/salvar/excluir/svg`; MCP `notas_mapa_mental` (renderizar, salvar, carregar, listar); UI pelo botão "Mapa" no cabeçalho do vault.
 - **Colar como Markdown (estilo Notion)**: converte HTML rico da área de transferência (tabelas GFM, listas, tarefas, links, ênfase, imagens) em Markdown limpo via turndown + plugin GFM; insere no editor ativo ou abre prévia com "Copiar Markdown". Canal `clipboard:colar-markdown` e `clipboard:gravar`; atalho Ctrl+Shift+V e comando na paleta.
 - Testes: `src/main/vault/__tests__/grafo.test.ts`, `src/main/mapas/__tests__/mapas.test.ts`, `src/main/clipboard/__tests__/markdown.test.ts`.
 
-## 7. Apps (Android + Windows)
+## 8. Apps (Android + Windows)
 
 - `npm run apps:setup` instala SDK/JDK/Gradle e dependências; `apps:status` mostra o estado.
 - `npm run apps:apk` gera APK debug validado com aapt2; `apps:win` gera instalador/portátil; `apps` faz tudo.
@@ -146,23 +176,24 @@ Artefatos locais em `dist-apps/`:
 
   - DG-Apps-0.1.0.apk (4.167 KB)
 
-## 8. MCP
+## 9. MCP
 
-- **74** ferramentas registradas em `src/main/mcp/server.ts`.
+- **82** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
+- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
-## 9. Skills e agentes
+## 10. Skills e agentes
 
 - Skills embutidas: **23** — editar-seguro.md, arvore-projeto.md, navegador-embutido.md, free-mode.md, prompt-melhorar.md, anexos.md, leitor-codigo.md, refatorador.md, testador.md, debugger.md, revisor-seguranca.md, documentador.md, analisador.md, terminal-local.md, inventario-disco.md, estilo-cursor.md, roteiro-shorts.md, thumbnail-design.md, legenda-automatica.md, publicacao-social.md, pacote-memes.md, dublagem-parodia.md, capa-video.md.
 - Agentes: **19** — Revisor, Arquiteto, Seguranca, Testador, DG Engenheiro, Hibrido Core, Auto Free, Coder Free, Assist Free, Architect Free, Debugger Free, Reviewer Free, Qoder, Devin (OpenHands), Trae, Roteirista, Thumbnail, Legendas, Publicador.
 
-## 10. Comandos npm
+## 11. Comandos npm
 
 <details><summary>Lista completa</summary>
 
@@ -233,21 +264,22 @@ Artefatos locais em `dist-apps/`:
 
 </details>
 
-## 11. Qualidade (QA)
+## 12. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **15 arquivos**, **165 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **18 arquivos**, **180 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
-## 12. Limites e decisões
+## 13. Limites e decisões
 
 - Somente ferramentas gratuitas; nenhuma chave paga configurada.
 - GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.
 - Músicas: o catálogo é royalty-free com atribuição; o banco local não baixa nada sem ação explícita do usuário.
 - Editores completos de PDF/DOC não são incorporados; vídeo/áudio contam com um editor de linha do tempo embutido (ffmpeg) e o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).
 
-## 13. Histórico recente
+## 14. Histórico recente
 
+- 1d9922a 2026-11-13 release: v0.3.5
 - a0586d6 2026-11-13 release: v0.3.4
 - 8b18036 2026-11-13 release: v0.3.3
 - 720d286 2026-11-13 release: v0.3.2
@@ -257,9 +289,8 @@ Artefatos locais em `dist-apps/`:
 - e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
 - 4f1ec4b 2026-11-12 fix: orquestrador e agente com fallback garantido
 - 85a5b9d 2026-11-12 fix: fallback de modelo leve quando Ollama rejeita imagem/visao
-- cdbb319 2026-11-12 fix: fila do agent travava sem timeout; fila por workspace; unifica cache; proximoDisponivel usa todos os modelos
 
-## 14. Como atualizar este dossiê
+## 15. Como atualizar este dossiê
 
 ```bash
 npm run dossie     # regenera DOSSIE.md

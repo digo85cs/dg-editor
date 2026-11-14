@@ -14,6 +14,9 @@ import { cenariosUiVault } from './cenarios/ui-vault'
 import { cenariosUiBusca } from './cenarios/ui-busca'
 import { cenariosUiEditor } from './cenarios/ui-editor'
 import { cenariosUiMidia } from './cenarios/ui-midia'
+import { cenariosUiGravacao } from './cenarios/ui-gravacao'
+import { cenariosUiCompartilhar } from './cenarios/ui-compartilhar'
+import { cenariosUiReversa } from './cenarios/ui-reversa'
 import { cenariosUiA11y } from './cenarios/ui-a11y'
 import { cenariosUiVisual } from './cenarios/ui-visual'
 
@@ -119,6 +122,9 @@ export async function executarSuiteE2e(
           { nome: 'busca', fn: () => cenariosUiBusca(window) },
           { nome: 'editor', fn: () => cenariosUiEditor(window, raiz) },
           { nome: 'midia', fn: () => cenariosUiMidia(window) },
+          { nome: 'gravacao', fn: () => cenariosUiGravacao(window) },
+          { nome: 'compartilhar', fn: () => cenariosUiCompartilhar(window) },
+          { nome: 'reversa', fn: () => cenariosUiReversa(window) },
           { nome: 'a11y', fn: () => cenariosUiA11y(window, raiz) }
         ]
 

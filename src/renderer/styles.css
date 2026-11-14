@@ -3859,3 +3859,149 @@ body.tema-claro .editor-diag.tem-erro {
 body.tema-claro .editor-diag.tem-aviso { color: #7a5200; }
 body.tema-claro .tree-ctx-item.is-perigo { color: #b3261e; }
 body.tema-escuro .tree-ctx-item.is-perigo { color: #f07178; }
+
+/* ---------- Gravador de tela ---------- */
+.gravador-modal-box {
+  width: min(860px, 94vw);
+}
+.gravador-head {
+  display: flex;
+  align-items: center;
+  gap: var(--dg-space-2);
+  margin-bottom: var(--dg-space-3);
+}
+.gravador-head h3 { margin: 0; margin-right: auto; }
+.gravador-controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin-bottom: 10px;
+}
+.gravador-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--dg-text-muted);
+}
+.gravador-select {
+  font-size: 12px;
+  padding: 5px;
+  border-radius: 6px;
+  border: 1px solid var(--dg-border);
+  background: var(--dg-surface);
+  color: var(--dg-text);
+}
+.gravador-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.gravador-cronometro {
+  font: 600 18px/1 ui-monospace, monospace;
+  color: var(--dg-text);
+  min-width: 58px;
+}
+.gravador-status { font-size: 12px; }
+.gravador-preview {
+  width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  background: #000;
+  border: 1px solid var(--dg-border);
+  margin-bottom: 8px;
+}
+.gravador-resultado { font-size: 12px; margin-bottom: 8px; }
+.gravador-resultado p { margin: 0 0 6px; }
+.gravador-lista { display: flex; flex-direction: column; gap: 4px; }
+.gravador-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+}
+.gravador-item span { flex: 1; word-break: break-all; }
+
+/* ---------- Compartilhamento local (LAN) ---------- */
+.share-modal-box { width: min(680px, 94vw); }
+.share-head {
+  display: flex;
+  align-items: center;
+  gap: var(--dg-space-2);
+  margin-bottom: var(--dg-space-2);
+}
+.share-head h3 { margin: 0; margin-right: auto; }
+.share-url {
+  font: 600 13px/1.4 ui-monospace, monospace;
+  padding: 8px 10px;
+  border: 1px solid var(--dg-border);
+  border-radius: 8px;
+  background: var(--dg-surface-raised);
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+.share-barra { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.share-status { font-size: 12px; margin-bottom: 10px; }
+.share-lista { display: flex; flex-direction: column; gap: 4px; }
+.share-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+}
+
+/* ---------- Engenharia reversa (REA) ---------- */
+.reversa-modal-box { width: min(860px, 94vw); }
+.reversa-head {
+  display: flex;
+  align-items: center;
+  gap: var(--dg-space-2);
+  margin-bottom: var(--dg-space-2);
+}
+.reversa-head h3 { margin: 0; margin-right: auto; }
+.reversa-barra { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.reversa-status { font-size: 12px; margin-bottom: 6px; }
+.reversa-ferramentas { font-size: 11px; margin-bottom: 8px; }
+.reversa-resultado { font-size: 12px; margin-bottom: 10px; }
+.reversa-ev-lista {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-top: 4px;
+}
+.reversa-ev {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--dg-border-subtle);
+}
+.reversa-ev:last-child { border-bottom: 0; }
+.reversa-ev-tipo {
+  flex: 0 0 110px;
+  color: var(--dg-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reversa-ev-valor { flex: 1; word-break: break-all; }
+.reversa-limitacoes { font-size: 11px; margin-top: 6px; }
+.reversa-lista { display: flex; flex-direction: column; gap: 4px; }
+.reversa-item {
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--dg-border-subtle);
+  border-radius: 6px;
+  word-break: break-all;
+}

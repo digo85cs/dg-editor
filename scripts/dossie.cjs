@@ -179,6 +179,22 @@ add(
   '- Agentes externos gratuitos: `agente:externos` / MCP `agentes_externos_status` detectam QCoder (qwen2.5-coder + qc-cli), OpenDevin/OpenHands (WSL) e Trae Agent, com o comando de instalação quando faltam.',
   ''
 )
+add('### Gravação de tela (estilo OBS)', '')
+add(
+  '- `desktopCapturer` no processo principal lista telas e janelas com miniatura; o renderer captura via `getUserMedia` com as restrições legadas de desktop e grava em WebM (VP9 com fallback VP8, timeslice de 2 s).',
+  '- Áudio do sistema e microfone são mixados num `AudioContext` (ganho por fonte) antes do `MediaRecorder`; o usuário escolhe fonte, fps, bitrate e quais áudios entram.',
+  '- Chunks vão ao main por `gravacao:chunk` e são escritos em fluxo em `.dg-editor/gravacoes/<nome>.webm`; ao finalizar o arquivo aparece com caminho relativo ao projeto.',
+  '- Conversão para MP4 com `ffmpeg` (libx264 CRF 23, aac 160k, `+faststart`), escala opcional Lanczos; listagem ordenada por data e botão para abrir a pasta.',
+  '- Canais `gravacao:fontes`, `gravacao:iniciar`, `gravacao:chunk`, `gravacao:finalizar`, `gravacao:cancelar`, `gravacao:listar`, `gravacao:converter`, `gravacao:abrir-pasta`; MCP `tela_gravacoes` (listar/converter); UI no modal `.gravador-modal`; QA `ui.gravacao.captura` e `ui.gravacao.modal`.',
+  ''
+)
+add('### Compartilhamento local (estilo AirDrop)', '')
+add(
+  '- Servidor HTTP em `0.0.0.0` com porta aleatória e token aleatório comparado com `timingSafeEqual`; página HTML de upload usa `fetch PUT` direto do celular na mesma rede.',
+  '- Upload em streaming com `pipeline`, limite de 1 GB por arquivo, nomes únicos e destino `.dg-editor/recebidos`; a UI mostra URL, QR-friendly, lista de recebidos e status (ativo/porta/IP).',
+  '- Canais `compartilhar:iniciar`, `compartilhar:parar`, `compartilhar:status`, `compartilhar:listar`, `compartilhar:abrir-pasta`; MCP `receber_lan`; UI no modal `.share-modal`; QA `ui.compartilhar.ipc` e `ui.compartilhar.ui`.',
+  ''
+)
 add('### Demais recursos', '')
 add(
   '- Imagem: geração (Pollinations), melhoria, meme, HTML → imagem (captura offscreen).',
@@ -188,7 +204,20 @@ add(
   ''
 )
 
-add('## 6. Produtividade e anotações', '')
+add('## 6. Engenharia reversa local (REA)', '')
+add(
+  '- Inspirado no REA (github.com/morluto/rea), reimplementado 100% local e gratuito: só analisa arquivos do próprio usuário ou autorizados via diálogo, e não contorna DRM/proteções.',
+  '- **Binários**: detecta PE (cabeçalhos COFF/opcional, seções, imports/exports, entropia por seção, indícios de packer, metadados .NET), ELF e Mach-O por assinatura; extrai strings ASCII e UTF-16LE categorizadas (URLs, caminhos, domínios, IPs, e-mails).',
+  '- **Apps Electron**: lê o header do ASAR (offset/size por arquivo), extrai conteúdo, e coleta evidências de `package.json`, canais IPC, preload, `nodeIntegration` e `contextIsolation`.',
+  '- **Web**: inspeciona URL http(s) — headers, scripts, metas, formulários e frameworks detectados.',
+  '- Cada análise gera relatório Markdown com evidências e limitações em `.dg-editor/reversa/<slug>/relatorio.md` (escrita atômica).',
+  '- Canais `reversa:status`, `reversa:analisar`, `reversa:strings`, `reversa:asar`, `reversa:relatorios`, `reversa:escolher`, `reversa:abrir-pasta`; MCP `reversa_status`, `reversa_analisar`, `reversa_strings`, `reversa_asar`; UI no modal `.reversa-modal` com aviso de uso autorizado.',
+  '- Guardrails: `alvoValido` aceita apenas caminhos dentro do workspace ou adicionados pela caixa de diálogo de autorização; URLs restritas a http/https.',
+  '- Testes: `src/main/reversa/__tests__/reversa.test.ts` (detecção de tipo, PE sintético, strings, ASAR, entropia, relatório); QA `ui.reversa.*`.',
+  ''
+)
+
+add('## 7. Produtividade e anotações', '')
 add(
   '- **Grafo do vault (estilo Obsidian)**: `vault:grafo` devolve notas, grau e arestas resolvidas por wiki links (sem auto-link/duplicatas); layout de forças (Fruchterman–Reingold) em canvas com pan, zoom, arraste, filtro de busca e abertura de nota ao clicar. Módulo: `src/renderer/grafo-vault.js`; núcleo: `grafoVault` em `src/main/vault/indice.ts`.',
   '- **Mapa mental (estilo MindNode)**: outline Markdown indentado vira SVG em árvore horizontal com quebra de linha, nós coloridos por profundidade e exportação PNG. Persistência em `.dg-editor/mapas/<nome>.md`. IPC `mapas:listar/carregar/salvar/excluir/svg`; MCP `notas_mapa_mental` (renderizar, salvar, carregar, listar); UI pelo botão "Mapa" no cabeçalho do vault.',
@@ -197,7 +226,7 @@ add(
   ''
 )
 
-add('## 7. Apps (Android + Windows)', '')
+add('## 8. Apps (Android + Windows)', '')
 add(
   '- `npm run apps:setup` instala SDK/JDK/Gradle e dependências; `apps:status` mostra o estado.',
   '- `npm run apps:apk` gera APK debug validado com aapt2; `apps:win` gera instalador/portátil; `apps` faz tudo.',
@@ -207,25 +236,25 @@ add(
 const art = artefatos('dist-apps')
 if (art.length) add('Artefatos locais em `dist-apps/`:', '', ...art, '')
 
-add('## 8. MCP', '')
-add(`- **${ferramentasMcp.length}** ferramentas registradas em \`src/main/mcp/server.ts\`.`, `- Build: \`npm run build:mcp\` → \`.dg-editor/bin/main/mcp/server.js\`; HTTP: \`npm run mcp:http\`.`, '')
+add('## 9. MCP', '')
+add(`- **${ferramentasMcp.length}** ferramentas registradas em \`src/main/mcp/server.ts\`.`, `- Build: \`npm run build:mcp\` → \`.dg-editor/bin/main/mcp/server.js\`; HTTP: \`npm run mcp:http\`.`, '- Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`.', '')
 add('<details><summary>Ferramentas</summary>', '')
 add(ferramentasMcp.map((n) => '`' + n + '`').join(', '))
 add('', '</details>', '')
 
-add('## 9. Skills e agentes', '')
+add('## 10. Skills e agentes', '')
 add(
   `- Skills embutidas: **${skills.length}** — ${skills.join(', ')}.`,
   `- Agentes: **${agentes.length}** — ${agentes.join(', ')}.`,
   ''
 )
 
-add('## 10. Comandos npm', '')
+add('## 11. Comandos npm', '')
 add('<details><summary>Lista completa</summary>', '')
 for (const [nome, cmd] of scripts) add(`- \`npm run ${nome}\` — \`${cmd}\``)
 add('', '</details>', '')
 
-add('## 11. Qualidade (QA)', '')
+add('## 12. Qualidade (QA)', '')
 add(
   `- Cenários Playwright em \`src/qa/cenarios\`: **${cenarios.length} arquivos**, **${idsQa.length} verificações**.`,
   '- Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.',
@@ -233,7 +262,7 @@ add(
   ''
 )
 
-add('## 12. Limites e decisões', '')
+add('## 13. Limites e decisões', '')
 add(
   '- Somente ferramentas gratuitas; nenhuma chave paga configurada.',
   '- GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.',
@@ -242,10 +271,10 @@ add(
   ''
 )
 
-add('## 13. Histórico recente', '')
+add('## 14. Histórico recente', '')
 add(log || '- sem histórico', '')
 
-add('## 14. Como atualizar este dossiê', '')
+add('## 15. Como atualizar este dossiê', '')
 add(
   '```bash',
   'npm run dossie     # regenera DOSSIE.md',
