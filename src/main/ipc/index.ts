@@ -50,6 +50,8 @@ import { registrarHubExtras } from './hub-extras';
 import { registrarHandlersPerfil } from './perfil';
 import { registrarHandlersAutomation } from './automation';
 import { registrarHandlersMidia } from './midia';
+import { registrarHandlersMapas } from './mapas';
+import { registrarHandlersClipboard } from './clipboard';
 import { registrarHandlersApps } from './apps';
 import { registrarHandlersPortabilidade } from './portabilidade';
 import { registrarHandlersProvisionamento } from './provisionamento';
@@ -131,6 +133,8 @@ export function registrarTodosHandlers(): void {
     registrarHandlersDeploy();
     registrarHandlersAutomation();
     registrarHandlersMidia();
+    registrarHandlersMapas();
+    registrarHandlersClipboard();
     registrarHandlersApps();
     registrarHandlersPortabilidade();
     registrarHandlersProvisionamento();

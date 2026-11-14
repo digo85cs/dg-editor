@@ -10,6 +10,7 @@ import { cenariosUiChat } from './cenarios/ui-chat'
 import { cenariosUiAgent } from './cenarios/ui-agent'
 import { cenariosUiBrowserEmbed } from './cenarios/ui-browser-embed'
 import { cenariosUiExplorer } from './cenarios/ui-explorer'
+import { cenariosUiVault } from './cenarios/ui-vault'
 import { cenariosUiBusca } from './cenarios/ui-busca'
 import { cenariosUiEditor } from './cenarios/ui-editor'
 import { cenariosUiMidia } from './cenarios/ui-midia'
@@ -114,6 +115,7 @@ export async function executarSuiteE2e(
           { nome: 'agent', fn: () => cenariosUiAgent(window) },
           { nome: 'browser-embed', fn: () => cenariosUiBrowserEmbed(window) },
           { nome: 'explorer', fn: () => cenariosUiExplorer(window) },
+          { nome: 'vault', fn: () => cenariosUiVault(window) },
           { nome: 'busca', fn: () => cenariosUiBusca(window) },
           { nome: 'editor', fn: () => cenariosUiEditor(window, raiz) },
           { nome: 'midia', fn: () => cenariosUiMidia(window) },

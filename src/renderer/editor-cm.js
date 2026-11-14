@@ -647,6 +647,17 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
     },
     minimapaAlternar: (mostrar) => minimapa.alternar(mostrar),
     minimapaVisivel: () => minimapa.visivel(),
+    inserirTexto: (texto) => {
+      const t = String(texto || '')
+      if (!t) return
+      const sel = view.state.selection.main
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: t },
+        selection: { anchor: sel.from + t.length },
+        scrollIntoView: true
+      })
+      view.focus()
+    },
     focar: () => view.focus(),
     requestMeasure: () => view.requestMeasure(),
     overviewRefresh: () => overview?.refresh(),

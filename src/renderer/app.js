@@ -21,6 +21,8 @@ import {
   animarEntradaMsg
 } from './chat.js'
 import { ligarFerramentas } from './ferramentas-ui.js'
+import { abrirGrafoVault } from './grafo-vault.js'
+import { abrirMapaMental } from './mapa-mental.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
 import { instalarTrapFocoModais } from './utils/focus-trap.js'
@@ -779,6 +781,28 @@ async function abrirWikiLink(alvo) {
   }
   await abrirArquivoNaAba(r.path)
   void atualizarPainelVault(r.path)
+}
+
+async function colarComoMarkdown() {
+  try {
+    const r = await window.api.invoke('clipboard:colar-markdown')
+    if (!r?.ok) {
+      mostrarToast(r?.erro || 'Área de transferência vazia', 'erro')
+      return
+    }
+    const painelEditor = $('center-pane-editor')
+    const editorAtivo = painelEditor?.classList.contains('active')
+    if (editorAtivo && editor && state.abaAtiva && typeof editor.inserirTexto === 'function') {
+      editor.inserirTexto(r.markdown)
+      mostrarToast('Markdown colado · ' + r.caracteres + ' caracteres', 'ok')
+      anunciar('Conteúdo colado como Markdown no editor')
+      return
+    }
+    const { abrirColarMarkdown } = await import('./colar-markdown.js')
+    abrirColarMarkdown(r.markdown, r.origem)
+  } catch (e) {
+    mostrarToast('Falha ao colar Markdown: ' + String(e), 'erro')
+  }
 }
 
 function adicionarPasta(path) {
@@ -4506,6 +4530,9 @@ function bootstrapComandos() {
   const defs = [
     { id: 'abrir-pasta', titulo: 'Abrir pasta de trabalho', atalho: 'Ctrl+O', fn: () => abrirPasta() },
     { id: 'abrir-vault', titulo: 'Abrir vault Markdown', fn: () => abrirVault() },
+    { id: 'grafo-vault', titulo: 'Grafo do vault', fn: () => void abrirGrafoVault({ abrirNota: (p) => void abrirArquivoNaAba(p) }) },
+    { id: 'mapa-mental', titulo: 'Mapa mental (MindNode)', fn: () => void abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
+    { id: 'colar-markdown', titulo: 'Colar como Markdown', atalho: 'Ctrl+Shift+V', fn: () => void colarComoMarkdown() },
     { id: 'fechar-vault', titulo: 'Fechar vault', fn: () => fecharVault() },
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
     { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
@@ -5247,6 +5274,12 @@ $('btn-sidebar-nova-chat')?.addEventListener('click', () => {
 })
 $('btn-desktop-use')?.addEventListener('click', () => pedirPermissaoDesktop())
 $('btn-open-vault')?.addEventListener('click', () => void abrirVault())
+$('btn-vault-grafo')?.addEventListener('click', () =>
+  void abrirGrafoVault({ abrirNota: (p) => void abrirArquivoNaAba(p) })
+)
+$('btn-mapa-mental')?.addEventListener('click', () =>
+  void abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' })
+)
 $('btn-close-vault')?.addEventListener('click', () => void fecharVault())
 $('md-preview')?.addEventListener('click', (ev) => {
   const a = ev.target?.closest?.('a.wiki-link')
@@ -6314,6 +6347,25 @@ $('palette-input').addEventListener('keydown', (e) => {
     }
   }
 })
+
+// Ctrl+Shift+V em captura: no editor vira "colar como Markdown";
+// fora de campos de texto abre a prévia. Terminal e inputs mantêm o padrão.
+document.addEventListener(
+  'keydown',
+  (e) => {
+    const mod = e.ctrlKey || e.metaKey
+    if (!mod || !e.shiftKey || e.altKey || e.key.toLowerCase() !== 'v') return
+    const el = document.activeElement
+    if (el instanceof Element && !el.closest('.cm-editor')) {
+      const tag = el.tagName
+      if (el.closest('.xterm') || tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable) return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    void colarComoMarkdown()
+  },
+  true
+)
 
 document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey

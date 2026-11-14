@@ -943,6 +943,25 @@ const TOOLS = [
     }
   },
   {
+    name: 'notas_mapa_mental',
+    description:
+      'Mapa mental estilo MindNode: renderiza um outline Markdown indentado como SVG em arvore, salva/carrega mapas em .dg-editor/mapas e lista os mapas do projeto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: {
+          type: 'string',
+          enum: ['renderizar', 'salvar', 'carregar', 'listar'],
+          description: 'Padrao renderizar (outline -> SVG)'
+        },
+        outline: { type: 'string', description: 'Lista indentada (2 espacos); titulos # e bullets sao aceitos' },
+        nome: { type: 'string', description: 'Nome do mapa (sem .md)' },
+        titulo: { type: 'string', description: 'Titulo exibido no topo do SVG' }
+      },
+      required: []
+    }
+  },
+  {
     name: 'apps_status',
     description:
       'Status do construtor Apps: SDK Android, Java, projeto mobile, APK/instalador gerados e arquivos publicados em OneDrive/APP.',
@@ -1890,6 +1909,53 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             saida: p.saida
           })
         )
+      }
+
+      if (name === 'notas_mapa_mental') {
+        const p = z
+          .object({
+            acao: z.enum(['renderizar', 'salvar', 'carregar', 'listar']).optional(),
+            outline: z.string().optional(),
+            nome: z.string().optional(),
+            titulo: z.string().optional()
+          })
+          .parse(args)
+        const arquivo = await import('../mapas/arquivo')
+        const svgMod = await import('../mapas/svg')
+        const outlineMod = await import('../mapas/outline')
+        const acao = p.acao || 'renderizar'
+        if (acao === 'listar') return await responder({ ok: true, mapas: arquivo.listarMapas(RAIZ) })
+        if (acao === 'carregar') {
+          if (!p.nome) return await responder({ ok: false, erro: 'informe o nome do mapa' })
+          const r = await arquivo.carregarMapa(RAIZ, p.nome)
+          if (!r.ok) return await responder(r)
+          const arvore = outlineMod.parseOutline(r.outline)
+          const vis = arvore ? svgMod.svgMapa(arvore, { titulo: p.titulo || r.nome }) : null
+          return await responder({
+            ...r,
+            svg: vis?.svg,
+            largura: vis?.largura,
+            altura: vis?.altura,
+            nos: vis?.nos,
+            profundidade: vis?.profundidade
+          })
+        }
+        if (acao === 'salvar') {
+          if (!p.nome || !p.outline) return await responder({ ok: false, erro: 'informe nome e outline' })
+          return await responder(await arquivo.salvarMapa(RAIZ, p.nome, p.outline))
+        }
+        if (!p.outline) return await responder({ ok: false, erro: 'informe o outline do mapa' })
+        const arvore = outlineMod.parseOutline(p.outline)
+        if (!arvore) return await responder({ ok: false, erro: 'outline vazio' })
+        const vis = svgMod.svgMapa(arvore, { titulo: p.titulo || 'Mapa mental' })
+        return await responder({
+          ok: true,
+          svg: vis.svg,
+          largura: vis.largura,
+          altura: vis.altura,
+          nos: vis.nos,
+          profundidade: vis.profundidade
+        })
       }
 
       if (name === 'midia_video_qualidade') {

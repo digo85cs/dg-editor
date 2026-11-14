@@ -104,8 +104,9 @@ add(
 add('## 1. O que é', '')
 add(
   'DG Editor é um editor de código/sistemas com IA local (Ollama e provedores gratuitos), terminal, navegador embutido,',
-  'agente autônomo com skills, estúdio de mídia (imagem, vídeo, áudio, voz, música), pipeline de apps (Android APK +',
-  'instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga é necessária.',
+  'agente autônomo com skills, vault com grafo de notas e mapa mental, captura de área de transferência em Markdown,',
+  'estúdio de mídia (imagem, vídeo, áudio, voz, música), pipeline de apps (Android APK + instalador Windows) e servidor',
+  'MCP para integração externa. Nenhuma chave paga é necessária.',
   ''
 )
 
@@ -187,7 +188,16 @@ add(
   ''
 )
 
-add('## 6. Apps (Android + Windows)', '')
+add('## 6. Produtividade e anotações', '')
+add(
+  '- **Grafo do vault (estilo Obsidian)**: `vault:grafo` devolve notas, grau e arestas resolvidas por wiki links (sem auto-link/duplicatas); layout de forças (Fruchterman–Reingold) em canvas com pan, zoom, arraste, filtro de busca e abertura de nota ao clicar. Módulo: `src/renderer/grafo-vault.js`; núcleo: `grafoVault` em `src/main/vault/indice.ts`.',
+  '- **Mapa mental (estilo MindNode)**: outline Markdown indentado vira SVG em árvore horizontal com quebra de linha, nós coloridos por profundidade e exportação PNG. Persistência em `.dg-editor/mapas/<nome>.md`. IPC `mapas:listar/carregar/salvar/excluir/svg`; MCP `notas_mapa_mental` (renderizar, salvar, carregar, listar); UI pelo botão "Mapa" no cabeçalho do vault.',
+  '- **Colar como Markdown (estilo Notion)**: converte HTML rico da área de transferência (tabelas GFM, listas, tarefas, links, ênfase, imagens) em Markdown limpo via turndown + plugin GFM; insere no editor ativo ou abre prévia com "Copiar Markdown". Canal `clipboard:colar-markdown` e `clipboard:gravar`; atalho Ctrl+Shift+V e comando na paleta.',
+  '- Testes: `src/main/vault/__tests__/grafo.test.ts`, `src/main/mapas/__tests__/mapas.test.ts`, `src/main/clipboard/__tests__/markdown.test.ts`.',
+  ''
+)
+
+add('## 7. Apps (Android + Windows)', '')
 add(
   '- `npm run apps:setup` instala SDK/JDK/Gradle e dependências; `apps:status` mostra o estado.',
   '- `npm run apps:apk` gera APK debug validado com aapt2; `apps:win` gera instalador/portátil; `apps` faz tudo.',
@@ -197,25 +207,25 @@ add(
 const art = artefatos('dist-apps')
 if (art.length) add('Artefatos locais em `dist-apps/`:', '', ...art, '')
 
-add('## 7. MCP', '')
+add('## 8. MCP', '')
 add(`- **${ferramentasMcp.length}** ferramentas registradas em \`src/main/mcp/server.ts\`.`, `- Build: \`npm run build:mcp\` → \`.dg-editor/bin/main/mcp/server.js\`; HTTP: \`npm run mcp:http\`.`, '')
 add('<details><summary>Ferramentas</summary>', '')
 add(ferramentasMcp.map((n) => '`' + n + '`').join(', '))
 add('', '</details>', '')
 
-add('## 8. Skills e agentes', '')
+add('## 9. Skills e agentes', '')
 add(
   `- Skills embutidas: **${skills.length}** — ${skills.join(', ')}.`,
   `- Agentes: **${agentes.length}** — ${agentes.join(', ')}.`,
   ''
 )
 
-add('## 9. Comandos npm', '')
+add('## 10. Comandos npm', '')
 add('<details><summary>Lista completa</summary>', '')
 for (const [nome, cmd] of scripts) add(`- \`npm run ${nome}\` — \`${cmd}\``)
 add('', '</details>', '')
 
-add('## 10. Qualidade (QA)', '')
+add('## 11. Qualidade (QA)', '')
 add(
   `- Cenários Playwright em \`src/qa/cenarios\`: **${cenarios.length} arquivos**, **${idsQa.length} verificações**.`,
   '- Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.',
@@ -223,7 +233,7 @@ add(
   ''
 )
 
-add('## 11. Limites e decisões', '')
+add('## 12. Limites e decisões', '')
 add(
   '- Somente ferramentas gratuitas; nenhuma chave paga configurada.',
   '- GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.',
@@ -232,10 +242,10 @@ add(
   ''
 )
 
-add('## 12. Histórico recente', '')
+add('## 13. Histórico recente', '')
 add(log || '- sem histórico', '')
 
-add('## 13. Como atualizar este dossiê', '')
+add('## 14. Como atualizar este dossiê', '')
 add(
   '```bash',
   'npm run dossie     # regenera DOSSIE.md',

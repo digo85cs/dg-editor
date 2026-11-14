@@ -4,7 +4,7 @@ import { extrairFrontmatter } from './frontmatter'
 import { extrairWikiLinks, resolverLink, type EntradaResolucao } from './links'
 import { extrairTagsInline, unirTags } from './tags'
 import { lerNotaArquivo } from './io'
-import type { EstadoVault, NotaVault, ResumoNota } from './tipos'
+import type { ArestaGrafoVault, EstadoVault, GrafoVault, NotaVault, ResumoNota } from './tipos'
 
 const IGNORE = /(^|[\\/])(node_modules|\.git|out|dist|coverage|\.next|\.obsidian|qa-artifacts)([\\/]|$)/
 
@@ -209,6 +209,57 @@ export function indiceTags(): Record<string, ResumoNota[]> {
     map[k].sort((a, b) => a.rel.localeCompare(b.rel))
   }
   return map
+}
+
+/**
+ * Grafo de notas para a visualização estilo Obsidian.
+ * Quando o vault excede `limite`, mantém os nós de maior grau.
+ */
+export function grafoVault(limite = 400): GrafoVault {
+  const entradas: EntradaResolucao[] = [...notas.values()].map((n) => ({
+    path: n.path,
+    rel: n.rel,
+    basename: n.basename,
+    aliases: n.frontmatter.aliases
+  }))
+  const grau = new Map<string, number>()
+  const vistos = new Set<string>()
+  const todas: ArestaGrafoVault[] = []
+  for (const n of notas.values()) {
+    for (const alvo of n.linksOut) {
+      const dest = resolverLink(alvo, entradas, n.rel)
+      if (!dest || dest === n.path) continue
+      const chave = n.path + '\u0000' + dest
+      if (vistos.has(chave)) continue
+      vistos.add(chave)
+      todas.push({ origem: n.path, destino: dest })
+      grau.set(n.path, (grau.get(n.path) || 0) + 1)
+      grau.set(dest, (grau.get(dest) || 0) + 1)
+    }
+  }
+
+  const selecionadas = [...notas.values()]
+  const truncado = selecionadas.length > limite
+  if (truncado) {
+    selecionadas.sort(
+      (a, b) =>
+        (grau.get(b.path) || 0) - (grau.get(a.path) || 0) || a.rel.localeCompare(b.rel)
+    )
+    selecionadas.length = Math.max(1, Math.round(limite))
+  }
+  const incluidos = new Set(selecionadas.map((n) => n.path))
+  return {
+    nos: selecionadas.map((n) => ({
+      path: n.path,
+      rel: n.rel,
+      titulo: n.titulo,
+      tags: n.tags,
+      grau: grau.get(n.path) || 0
+    })),
+    arestas: todas.filter((a) => incluidos.has(a.origem) && incluidos.has(a.destino)),
+    totalNotas: notas.size,
+    truncado
+  }
 }
 
 /** Paths escritos por nós — watch ignora por um instante. */

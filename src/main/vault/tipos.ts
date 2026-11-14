@@ -36,3 +36,25 @@ export type ResumoNota = {
   titulo: string
   tags: string[]
 }
+
+export type NoGrafoVault = {
+  path: string
+  rel: string
+  titulo: string
+  tags: string[]
+  /** links de entrada + saída */
+  grau: number
+}
+
+export type ArestaGrafoVault = {
+  origem: string
+  destino: string
+}
+
+export type GrafoVault = {
+  nos: NoGrafoVault[]
+  arestas: ArestaGrafoVault[]
+  totalNotas: number
+  /** true quando o limite de nós cortou parte do vault */
+  truncado: boolean
+}

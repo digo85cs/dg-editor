@@ -1,14 +1,15 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 20:38:14** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.4** · branch `integra-13-11` · último commit: 8b18036 2026-11-13 release: v0.3.3
-> Alterações locais não commitadas: 6 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 21:03:24** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.3.5** · branch `integra-13-11` · último commit: a0586d6 2026-11-13 release: v0.3.4
+> Alterações locais não commitadas: 27 arquivo(s).
 
 ## 1. O que é
 
 DG Editor é um editor de código/sistemas com IA local (Ollama e provedores gratuitos), terminal, navegador embutido,
-agente autônomo com skills, estúdio de mídia (imagem, vídeo, áudio, voz, música), pipeline de apps (Android APK +
-instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga é necessária.
+agente autônomo com skills, vault com grafo de notas e mapa mental, captura de área de transferência em Markdown,
+estúdio de mídia (imagem, vídeo, áudio, voz, música), pipeline de apps (Android APK + instalador Windows) e servidor
+MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 2. Stack e requisitos
 
@@ -24,12 +25,12 @@ instalador Windows) e servidor MCP para integração externa. Nenhuma chave paga
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, deploy, ipc, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, deploy, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, vault, __tests__.
 
 ## 4. IPC
 
-- Canais registrados no main: **314**.
-- Canais expostos pelo preload: **294**.
+- Canais registrados no main: **322**.
+- Canais expostos pelo preload: **302**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -128,7 +129,14 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Voz: biblioteca pt-BR local, prévia, download de modelos, padrão configurável.
 - Música: banco local em `musicas/`, mixagem em vídeo, atualizações de componentes.
 
-## 6. Apps (Android + Windows)
+## 6. Produtividade e anotações
+
+- **Grafo do vault (estilo Obsidian)**: `vault:grafo` devolve notas, grau e arestas resolvidas por wiki links (sem auto-link/duplicatas); layout de forças (Fruchterman–Reingold) em canvas com pan, zoom, arraste, filtro de busca e abertura de nota ao clicar. Módulo: `src/renderer/grafo-vault.js`; núcleo: `grafoVault` em `src/main/vault/indice.ts`.
+- **Mapa mental (estilo MindNode)**: outline Markdown indentado vira SVG em árvore horizontal com quebra de linha, nós coloridos por profundidade e exportação PNG. Persistência em `.dg-editor/mapas/<nome>.md`. IPC `mapas:listar/carregar/salvar/excluir/svg`; MCP `notas_mapa_mental` (renderizar, salvar, carregar, listar); UI pelo botão "Mapa" no cabeçalho do vault.
+- **Colar como Markdown (estilo Notion)**: converte HTML rico da área de transferência (tabelas GFM, listas, tarefas, links, ênfase, imagens) em Markdown limpo via turndown + plugin GFM; insere no editor ativo ou abre prévia com "Copiar Markdown". Canal `clipboard:colar-markdown` e `clipboard:gravar`; atalho Ctrl+Shift+V e comando na paleta.
+- Testes: `src/main/vault/__tests__/grafo.test.ts`, `src/main/mapas/__tests__/mapas.test.ts`, `src/main/clipboard/__tests__/markdown.test.ts`.
+
+## 7. Apps (Android + Windows)
 
 - `npm run apps:setup` instala SDK/JDK/Gradle e dependências; `apps:status` mostra o estado.
 - `npm run apps:apk` gera APK debug validado com aapt2; `apps:win` gera instalador/portátil; `apps` faz tudo.
@@ -138,23 +146,23 @@ Artefatos locais em `dist-apps/`:
 
   - DG-Apps-0.1.0.apk (4.167 KB)
 
-## 7. MCP
+## 8. MCP
 
-- **73** ferramentas registradas em `src/main/mcp/server.ts`.
+- **74** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_juntar`, `midia_video_qualidade`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `resultado_avaliar`, `skill_ler`, `skill_listar`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
-## 8. Skills e agentes
+## 9. Skills e agentes
 
 - Skills embutidas: **23** — editar-seguro.md, arvore-projeto.md, navegador-embutido.md, free-mode.md, prompt-melhorar.md, anexos.md, leitor-codigo.md, refatorador.md, testador.md, debugger.md, revisor-seguranca.md, documentador.md, analisador.md, terminal-local.md, inventario-disco.md, estilo-cursor.md, roteiro-shorts.md, thumbnail-design.md, legenda-automatica.md, publicacao-social.md, pacote-memes.md, dublagem-parodia.md, capa-video.md.
 - Agentes: **19** — Revisor, Arquiteto, Seguranca, Testador, DG Engenheiro, Hibrido Core, Auto Free, Coder Free, Assist Free, Architect Free, Debugger Free, Reviewer Free, Qoder, Devin (OpenHands), Trae, Roteirista, Thumbnail, Legendas, Publicador.
 
-## 9. Comandos npm
+## 10. Comandos npm
 
 <details><summary>Lista completa</summary>
 
@@ -225,21 +233,22 @@ Artefatos locais em `dist-apps/`:
 
 </details>
 
-## 10. Qualidade (QA)
+## 11. Qualidade (QA)
 
-- Cenários Playwright em `src/qa/cenarios`: **14 arquivos**, **151 verificações**.
+- Cenários Playwright em `src/qa/cenarios`: **15 arquivos**, **165 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
-## 11. Limites e decisões
+## 12. Limites e decisões
 
 - Somente ferramentas gratuitas; nenhuma chave paga configurada.
 - GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.
 - Músicas: o catálogo é royalty-free com atribuição; o banco local não baixa nada sem ação explícita do usuário.
 - Editores completos de PDF/DOC não são incorporados; vídeo/áudio contam com um editor de linha do tempo embutido (ffmpeg) e o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).
 
-## 12. Histórico recente
+## 13. Histórico recente
 
+- a0586d6 2026-11-13 release: v0.3.4
 - 8b18036 2026-11-13 release: v0.3.3
 - 720d286 2026-11-13 release: v0.3.2
 - d076e20 2026-11-13 release: v0.3.1
@@ -249,9 +258,8 @@ Artefatos locais em `dist-apps/`:
 - 4f1ec4b 2026-11-12 fix: orquestrador e agente com fallback garantido
 - 85a5b9d 2026-11-12 fix: fallback de modelo leve quando Ollama rejeita imagem/visao
 - cdbb319 2026-11-12 fix: fila do agent travava sem timeout; fila por workspace; unifica cache; proximoDisponivel usa todos os modelos
-- 5b8cf9d 2026-11-12 feat: cache de respostas LLM, pull auto Ollama, filtro agentes invalidos e custo rastreado
 
-## 13. Como atualizar este dossiê
+## 14. Como atualizar este dossiê
 
 ```bash
 npm run dossie     # regenera DOSSIE.md

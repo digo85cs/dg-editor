@@ -11,6 +11,7 @@ import {
   listarResumos,
   marcarWriteProprio,
   obterNota,
+  grafoVault,
   reindexarNota,
   resolverWikiLink
 } from './indice'
@@ -81,6 +82,17 @@ export function registerVaultIpc(): void {
   ipcMain.handle('vault:tags', async () => {
     if (!getRaizVault()) return { ok: false, erro: 'vault fechado', tags: {} }
     return { ok: true, tags: indiceTags() }
+  })
+
+  ipcMain.handle('vault:grafo', async (_e, limite?: unknown) => {
+    if (!getRaizVault()) {
+      return { ok: false, erro: 'vault fechado', nos: [], arestas: [], totalNotas: 0, truncado: false }
+    }
+    const lim =
+      typeof limite === 'number' && Number.isFinite(limite)
+        ? Math.min(2000, Math.max(10, Math.round(limite)))
+        : undefined
+    return { ok: true, ...grafoVault(lim) }
   })
 
   ipcMain.handle('vault:nota', async (_e, caminho: unknown) => {
