@@ -168,6 +168,23 @@ add(
   '- Canais: `midia:video-analisar`, `midia:video-melhorar`, `midia:imagem-qualidade`; MCP: `midia_video_qualidade`, `midia_imagem_qualidade`.',
   ''
 )
+add('### Efeitos de vídeo (estilo Topaz / PowerDirector / Filmora)', '')
+add(
+  '- `src/main/midia/efeitos.ts`: 16 efeitos ffmpeg puros — aprimorar (upscale Lanczos + `hqdn3d` + `unsharp` + grão), interpolar (minterpolate mci/blend + slow motion sincronizado), velocidade (`setpts` + cadeia `atempo`), boomerang, transição (`xfade`/`acrossfade`), PiP com posição, chroma key, título (`drawtext` com `textfile`), color grading (7 presets + `lenscorrection`), reenquadrar 9:16 com fundo desfocado, delogo, esconder região (split/crop/boxblur), proxy, GIF com paleta e extração de áudio.',
+  '- 11 transições (fade, wipe, slide, radial, circle…) e 7 presets de cor (cinema, quente, frio, P&B, vintage, vivo, suave); tudo mapeado em `CATALOGO_EFEITOS`/`PRESETS_COR`.',
+  '- Detecção de cenas por `select=gt(scene,…)` + `showinfo`, com miniaturas JPG e manifesto JSON em `.dg-editor/<pasta-de-mídia>/cenas-*` para montar destaques.',
+  '- Canais `midia:video-efeitos`, `midia:video-efeito`, `midia:cenas`; MCP `midia_video_efeito` (listar/aplicar/cenas); UI na caixa "Efeitos de vídeo" do Estúdio de mídia com campos dinâmicos e seletor de segundo arquivo.',
+  '- Testes: `__tests__/efeitos.test.ts` (construtores de filtros) e `__tests__/efeitos-integracao.test.ts` (ffmpeg real: 2×, upscale, P&B+título, GIF+MP3, transição/PiP/chroma, boomerang, 1080×1920, cenas) ativado por `DG_TEST_MIDIA=1`.',
+  ''
+)
+add('### Efeitos de voz (estilo RealVoice / PowerDirector)', '')
+add(
+  '- `src/main/midia/voz-efeitos.ts`: 13 presets — original, grave, agudo, criança, idoso, monstro, robô, telefone, rádio, caverna, megafone, sussurro e coro — com `rubberband` (pitch/formant), bandas EQ, `aecho`, `chorus`, `aphaser` e `acompressor`.',
+  '- Limpeza embutida: `afftdn` (denoise), `deesser`, corte de silêncios (`silenceremove`+`areverse`) e `loudnorm` final; intensidade 0–1 modula pitch/efeitos sem tocar no resto da cadeia.',
+  '- Saída mp3/wav/m4a/ogg. Canais `midia:voz-presets`, `midia:voz-efeito`; MCP `midia_voz_efeito` (listar/aplicar); UI na caixa "Efeitos de voz" com prévia de opções e checkbox de limpeza.',
+  '- Testes: `__tests__/voz-efeitos.test.ts` (cadeias por preset) e caso real de voz grave + telefone na suíte de integração.',
+  ''
+)
 add('### Portabilidade (instalar em PC novo)', '')
 add(
   '- O instalador embute `ffmpeg.exe`/`ffprobe.exe` (GPL, com vidstab/loudnorm/rubberband) em `resources/bin/win32-x64` via `extraResources`.',

@@ -1,6 +1,6 @@
 # Radar Diario — DG Editor
 
-Data: 2026-11-14T00:16:27.999Z
+Data: 2026-11-14T00:29:47.891Z
 Provider usado: openrouter-inkling
 Custo estimado total: $0.000000 USD
 
@@ -21,11 +21,11 @@ Custo estimado total: $0.000000 USD
 
 ### Achados da busca
 #### Query: melhores editores de codigo com IA 2024 2025
+- [9 melhores editores codigo e IDEs para programadores em 2025](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.bombounaweb.com.br%2Ftecnologia%2F9%2Dmelhores%2Deditores%2Dcodigo%2De%2Dides%2Dpara%2Dprogramadores%2Dem%2D2025%2F&amp;rut=b6feefc3fd86dd6ba2b3f60f003067f67e7986ddb462062259625a46c7b54365)
 - [Best AI Code Editors in 2025 - builder.io](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.builder.io%2Fblog%2Fbest%2Dai%2Dcode%2Deditors&amp;rut=faecff2971429726c5124d8799d0abdd6ef34c7d1ae3efa4054ea937f2e444be)
-- [Melhores IDEs e Assistentes de Codificação com IA em 2025](//duckduckgo.com/l/?uddg=https%3A%2F%2Fpt.linkedin.com%2Fpulse%2Fmelhores%2Dides%2De%2Dassistentes%2Dde%2Dcodifica%25C3%25A7%25C3%25A3o%2Dcom%2Dia%2Dem%2D3fmsf&amp;rut=a1fc635e740847e7a4e3e900deec9033d17b0b0363939dd93fe916f665efd362)
 - [Melhores ferramentas de IA para escrever código (guia 2025)](//duckduckgo.com/l/?uddg=https%3A%2F%2Fstore.hypergpt.ai%2Fpt%2DPT%2Fblog%2Fmelhores%2Dferramentas%2Dde%2Dia%2Dpara%2Descrever%2Dcodigo%2Dgerar%2Dcompletar%2De%2Drefatorar&amp;rut=ebdcdbe3f4fe951db6948ec4a19961c8b43d4a3c02fa5b387dda5bbda6c51617)
-- [Top 5 AI-Based Code Editors for Coding in 2025 - DEV Community](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdev.to%2Faneeqakhan%2Ftop%2D5%2Dai%2Dbased%2Dcode%2Deditors%2Dfor%2Dcoding%2Din%2D2025%2Dobm&amp;rut=4007782cb5b7661857c8d54ca7b05a84c26fa84b70d9e2bb7ca82947d40e0479)
-- [13 melhores geradores de código de IA para 2025 - ClickUp](//duckduckgo.com/l/?uddg=https%3A%2F%2Fclickup.com%2Fpt%2DBR%2Fblog%2F426858%2Fgeradores%2Dde%2Dcodigo%2Dde%2Dia&amp;rut=3b8e2d1afdf897f8b629291b8dd63717b7c87c3010e63eb1891acc72090dbd4a)
+- [Editor com IA - MaxiDica](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmaxidica.com.br%2F2025%2F09%2F16%2Feditor%2Dcom%2Dia%2F&amp;rut=2bb7865f5acde6e203eee935c414ee0f0426b7a485d8aa028dd614ef246f9c77)
+- [Top 10 Editores de Código para Programadores em 2025](//duckduckgo.com/l/?uddg=https%3A%2F%2Foliveiraweb.com.br%2Ftop%2D10%2Deditores%2Dde%2Dcodigo%2Dpara%2Dprogramadores%2Dem%2D2025%2F&amp;rut=ed44038a65d1eb8421dd8d85db3b3047b1ee31df072c4d9eb07ee4de9233fd47)
 
 #### Query: IDE com inteligencia artificial para programacao comparativa
 - [Melhores Ferramentas de IA para Programar em 2026: Comparativo ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fneuralnet.com.br%2Fmelhores%2Dferramentas%2Dia%2Dprogramar%2D2026%2Dcomparativo%2F&amp;rut=0f90ce585cf1e5b8c94e5371b17465fe36b04d33c535184a549cb01db2c9370b)
@@ -52,18 +52,18 @@ Custo estimado total: $0.000000 USD
 
 ### Achados da busca
 #### Query: agentes de codigo autonomos tipo Devin 2024 2025
-- [Devin AI Ingeniero Software 2024 - Codificación Autónoma](//duckduckgo.com/l/?uddg=https%3A%2F%2Faitoolfit.ai%2Fes%2Ftools%2Fdevin.html&amp;rut=84fcac7bf3b0310a99c2cfaea7ac282d66676274b6905efdf1d1a55b248ae591)
-- [2025 - Devin Docs](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdocs.devin.ai%2Fes%2Frelease%2Dnotes%2F2025&amp;rut=f3c9a9a6b507c167b88a17cc2b09a8e2ed1f588b5b09d07bdff28cac76608a2b)
 - [Coding Agents 101: The Art of Actually Getting Things Done](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdevin.ai%2Fagents101&amp;rut=9f509fd349526ac8e9be3c96c0f3f8e8b2e286dc6dfec6327bf92621d7ad9c36)
 - [Devin AI - Wikipedia, la enciclopedia libre](//duckduckgo.com/l/?uddg=https%3A%2F%2Fes.wikipedia.org%2Fwiki%2FDevin_AI&amp;rut=0965a17fd24f3d3cc7e1063e0ce33cae6a7e3fe9db0dce0086b3df961b0eb085)
+- [Devin vs Claude Code vs Codex 2026: 8 Agents Tested | TECHSY](//duckduckgo.com/l/?uddg=https%3A%2F%2Ftechsy.io%2Fen%2Fblog%2Fbackground%2Dcoding%2Dagents%2Dcompared&amp;rut=d795fb97f551810116d1f56f2793830785cee2caa134825a77907daa46be6e58)
+- [Devin: the autonomous software engineer](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdevin.ai%2F&amp;rut=f770d29270e82b1f3558fd1b4c99433d742d6800248a497240561cfcc39fbacb)
 - [Devin 2.0: Cómo los agentes autónomos están redefiniendo el desarrollo ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Felartesano.digital%2Fdevin%2D2%2Dagentes%2Dautonomos%2Dcodigo%2F&amp;rut=d927241155b3fc56af981095bddddb56aa1bd39ad1a82b3af0c6d3471411481f)
 
 #### Query: agente de programacao que executa tarefas sozinho
-- [Assistente que age sozinho: o que é um agente de IA e como ... - Exame](//duckduckgo.com/l/?uddg=https%3A%2F%2Fexame.com%2Finteligencia%2Dartificial%2Fassistente%2Dque%2Dage%2Dsozinho%2Do%2Dque%2De%2Dum%2Dagente%2Dde%2Dia%2De%2Dcomo%2Dcriar%2Do%2Dseu%2Dsem%2Dsaber%2Dprogramar%2F&amp;rut=aac05ae17516d22e8ae1c2b293d705628b271931d18933b4632d9b4361232b52)
-- [OpenAI transforma Codex em agente digital que executa tarefas sozinho ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.cnnbrasil.com.br%2Feconomia%2Fmoney%2Ftecnologia%2Fopenai%2Dtransforma%2Dcodex%2Dem%2Dagente%2Ddigital%2Dque%2Dexecuta%2Dtarefas%2Dsozinho%2F&amp;rut=26dea5d98355c661079d83a287a7a6efabe80e1edd83d97860d67f2e72f6bff4)
-- [Como criar um agente de IA que pesquisa, organiza informações e executa ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fexame.com%2Finteligencia%2Dartificial%2Fcomo%2Dcriar%2Dum%2Dagente%2Dde%2Dia%2Dque%2Dpesquisa%2Dorganiza%2Dinformacoes%2De%2Dexecuta%2Dtarefas%2Dsozinho%2F&amp;rut=30c68fa400deee8556456af6f694a60e46d296fc88c212696178d2e66eb3ed66)
+- [Assistente que age sozinho: o que é um agente de IA e como criar o seu ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fexame.com%2Finteligencia%2Dartificial%2Fassistente%2Dque%2Dage%2Dsozinho%2Do%2Dque%2De%2Dum%2Dagente%2Dde%2Dia%2De%2Dcomo%2Dcriar%2Do%2Dseu%2Dsem%2Dsaber%2Dprogramar%2F&amp;rut=aac05ae17516d22e8ae1c2b293d705628b271931d18933b4632d9b4361232b52)
+- [OpenAI transforma Codex em agente digital que executa tarefas sozinho](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.cnnbrasil.com.br%2Feconomia%2Fmoney%2Ftecnologia%2Fopenai%2Dtransforma%2Dcodex%2Dem%2Dagente%2Ddigital%2Dque%2Dexecuta%2Dtarefas%2Dsozinho%2F&amp;rut=26dea5d98355c661079d83a287a7a6efabe80e1edd83d97860d67f2e72f6bff4)
+- [Google lança agente autônomo do Gemini que executa tarefas sozinho no ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fexame.com%2Fcarreira%2Fgoogle%2Dlanca%2Dagente%2Dautonomo%2Ddo%2Dgemini%2Dque%2Dexecuta%2Dtarefas%2Dsozinho%2Dno%2Dandroid%2F&amp;rut=1ab2be8afe095656078482d49c936dc83547a065e82e6dfe97c27e11352623d7)
 - [Google Jules: o agente de IA que programa sozinho — e o que isso muda ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fsptechbr.com%2Fgoogle%2Djules%2Dagente%2Dprogramacao%2Dia%2F&amp;rut=d16875ee6838275f8e756849cc2a7155e18b22b4e4f5cc3d4f70d6b89d92bd62)
-- [Goose: agente de IA open-source que executa código sozinho — sem ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fgivanildo.com.br%2Fnoticias%2Fgoose%2Dagente%2Dia%2Dopen%2Dsource%2Dexecuta%2Dcodigo%2Dsozinho%2Dsem%2F&amp;rut=a3d27b6560a4f9b8181cb9e330f7cad89ee83c262b0d5f7d65ff392d9b827dcd)
+- [n8n lança agente gratuito que opera navegador próprio no PC e cancela ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fia.com.br%2Fnoticias%2Fn8n%2Dlanca%2Dagente%2Dgratuito%2Dque%2Dopera%2Dnavegador%2Dproprio%2Dno%2Dpc%2De%2Dcancela%2Dtestes%2Dna%2Dweb&amp;rut=56bb4c74c867df0595f5d9399d2e1a7e70e5bae78e2782cbe4a903a80e20f478)
 
 ### Analise do provider (openrouter-inkling)
 
@@ -85,16 +85,16 @@ Custo estimado total: $0.000000 USD
 #### Query: memoria persistente para agentes de IA longa duracao
 - [O que é memória de agente de IA? | IBM](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.ibm.com%2Fbr%2Dpt%2Fthink%2Ftopics%2Fai%2Dagent%2Dmemory&amp;rut=d81f96bf243528b563967992bc008c5533850819ca27d4f2de2ed2aaad1df7ce)
 - [Memoria persistente en agentes de IA: guía práctica 2026](//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.sergiomarquez.dev%2Fpost%2Fmemoria%2Dpersistente%2Dagentes%2Dia%2F&amp;rut=2b3fe4513e36db1020fedc1870e250c76c23bea573dc5db966b3161d055bc3e7)
+- [Memória Persistente para Agentes de IA: Arquitetura e Impacto no ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Falabia.com.br%2Finsights%2Fia%2Fmemoria%2Dpersistente%2Dagentes%2Dia%2Darquitetura%2Dmercado%2F&amp;rut=2a59d3293a6f53d697173840098617aca50287e2e2df6252338e5e669c07a66d)
 - [Memória em Agentes de IA: tipos e como funciona](//duckduckgo.com/l/?uddg=https%3A%2F%2Fskillstecnologicas.com%2Fmemoria%2Dem%2Dagentes%2Dde%2Dia%2F&amp;rut=c969d3035ae1083b3e73418b5e174da953389cb29425926ed8400db6dfacb242)
-- [Sistemas de Memória para Agentes: Contexto Persistente para sua IA](//duckduckgo.com/l/?uddg=https%3A%2F%2Faiagentsblog.com%2Fpt%2Fblog%2Fagent%2Dmemory%2Dsystems%2F&amp;rut=ec498b78361590f503cefe8ad8e2ee1683849a64b1a08d5da5e931f951365712)
 - [Memória Persistente em Agentes de IA: Os 5 Padrões Essenciais para ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmundoiatech.com.br%2Fmemoria%2Dpersistente%2Dagentes%2Dia%2D5%2Dpadroes%2F&amp;rut=9ddc8f6d7d7ffdbfe2ba95795a696ffe2fbe31dc088c755fec5e5351f2c4c320)
 
 #### Query: agente com memoria de longo prazo contexto persistente
+- [Memória de Agente em IA: Como a Memória Persistente Pode Redefinir ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.unite.ai%2Fpt%2Fagent%2Dmemory%2Din%2Dai%2Dhow%2Dpersistent%2Dmemory%2Dcould%2Dredefine%2Dllm%2Dapplications%2F&amp;rut=09e623707e63bfe503d7b15170f8babcad51bceb1783a9fb74b8759d13aeaf07)
 - [Memoria persistente en agentes de IA: guía práctica 2026](//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.sergiomarquez.dev%2Fpost%2Fmemoria%2Dpersistente%2Dagentes%2Dia%2F&amp;rut=2b3fe4513e36db1020fedc1870e250c76c23bea573dc5db966b3161d055bc3e7)
-- [Memória de agentes de IA explicada (2026) - sista.ai](//duckduckgo.com/l/?uddg=https%3A%2F%2Fsista.ai%2Fpt%2Finsights%2Fai%2Dagent%2Dmemory%2Dshort%2Dterm%2Dlong%2Dterm%2Dexplained&amp;rut=cf1a696742310ae6a9aef22a4c238342983cc4bd2ddcd52a618b9c8dea02c7f3)
-- [Memoria persistente para agentes IA: cómo guardar contexto](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.agentesnexo.com%2Fblog%2Fmemoria%2Dpersistente%2Dagentes%2Dia%2Dcomo%2Dguardar%2Dcontexto&amp;rut=a4b223503266a0fdd9462588c24b9955c9c563a30f8088d6095aa97478edb21e)
-- [IA com Memória de Longo Prazo: Como o Contexto Persistente Transforma ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.jenova.ai%2Fpt%2Fresources%2Fai%2Dwith%2Dlong%2Dterm%2Dmemory&amp;rut=933e3340dc17addeb125ccfb38a2fff5dbf4439c681e4c20817daab7122e1ec1)
-- [Agentes de IA com memória de longo prazo: como isso muda a automação ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fintelecta.digital%2Fagentes%2Dde%2Dia%2Dcom%2Dmemoria%2Dde%2Dlongo%2Dprazo%2F&amp;rut=256546488e78a4db79ac7f7a46b20020713e75cfa00871de0e8c4d7b89d67607)
+- [Memória persistente para agentes de IA: arquitetura, trade-offs e ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.eficify.com.br%2Fblog%2Fmemoria%2Dpersistente%2Dpara%2Dagentes%2Dde%2Dia%2Darquitetura%2Dtrade%2Doffs%2De%2Dpadroes%2Dde%2Dproducao&amp;rut=a718182d18ebea205430fcd5f1517a5de938004acdf0db12568777b3cb34d1d4)
+- [Sobre a Memória do Agente - docs.oracle.com](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdocs.oracle.com%2Fpt%2Dbr%2Fdatabase%2Foracle%2Fagent%2Dmemory%2F26.6%2Fguide%2Fabout.html&amp;rut=66b0be26a828399220665fe4dbadd39c789d3c4b25bbb587190e1200967d4afc)
+- [Memória de longo prazo de agentes de IA: como os agentes se lembram ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fosfoundry.io%2Fpt%2Farticles%2Fagent%2Dlong%2Dterm%2Dmemory%2Dguide&amp;rut=e329724898e7f51984c766788f6b2441cdb5ed997403849b479b35d2f4164ba7)
 
 ### Analise do provider (openrouter-inkling)
 
@@ -114,18 +114,18 @@ Custo estimado total: $0.000000 USD
 
 ### Achados da busca
 #### Query: compressao de contexto LLM janela de contexto grande
+- [O que é uma janela de contexto? - IBM](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.ibm.com%2Fbr%2Dpt%2Fthink%2Ftopics%2Fcontext%2Dwindow&amp;rut=835c47d6f54c9bb6d2b3e2444786204450feaf7e9b3a15c799fbe6849105a03a)
 - [Janela de Contexto em LLMs: O Que É e Como Maximizá-la com Eficiência](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.mjvinnovation.com%2Fpt%2Dbr%2Fblog%2Fjanela%2Dde%2Dcontexto%2Dem%2Dllms%2Do%2Dque%2De%2De%2Dcomo%2Dmaximiza%2Dla%2Dcom%2Deficiencia%2F&amp;rut=992cb221888bab26526ed240a041a56738658bb7269366ee6355c727329c23ca)
-- [O que é uma janela de contexto? | IBM](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.ibm.com%2Fbr%2Dpt%2Fthink%2Ftopics%2Fcontext%2Dwindow&amp;rut=835c47d6f54c9bb6d2b3e2444786204450feaf7e9b3a15c799fbe6849105a03a)
-- [Janela de Contexto em IA: Guia Completo (2026) - mochalabz.com](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.mochalabz.com%2Fartigos%2Fjanela%2Dcontexto%2Dia%2F&amp;rut=3eb1939f115317fc8a368b1628bdb080eec0a81a841f5ebc297fe094e8e12114)
 - [Janela de Contexto — Janela de contexto em LLMs](//duckduckgo.com/l/?uddg=https%3A%2F%2Fsystems%2Danalysis.info%2Fint%2FJanela_de_Contexto&amp;rut=12f51dff4926ed512bd43bed8c64122a08353d0ac60025444a7b7fc523e8069c)
-- [O que é uma janela de contexto para grandes modelos de linguagem?](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.datacamp.com%2Fpt%2Fblog%2Fcontext%2Dwindow&amp;rut=32c2757ae33c03f3e68f0ead0243074af04259b3f28769e5e67d6e6994543042)
+- [Janela de Contexto em IA: Guia Completo (2026)](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.mochalabz.com%2Fartigos%2Fjanela%2Dcontexto%2Dia%2F&amp;rut=3eb1939f115317fc8a368b1628bdb080eec0a81a841f5ebc297fe094e8e12114)
+- [Janela de contexto dos LLMs: o que significa, tamanhos dos principais ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fflatkey.ai%2Fpt%2Fblog%2Flargest%2Dcontext%2Dwindow%2Dllm%2Dapis&amp;rut=c4bce98008f2b49f2bf95f7653d27df118d640a93f65a3a40dc99d2ec9cd0325)
 
 #### Query: tecnicas de resumo e compressao para modelos de linguagem
+- [Técnicas de Resumo de Texto: Manual, IA e Frameworks Testados](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.mochalabz.com%2Fartigos%2Ftecnicas%2Dresumo%2Dtexto%2F&amp;rut=bc84c8f8f00245dc8bb66d0187f3dfc3c7b4b7b03165eea3f78bdff00b826eb9)
+- [Técnicas para Elaboração de Resumos - Scribd](//duckduckgo.com/l/?uddg=https%3A%2F%2Fpt.scribd.com%2Fdocument%2F538364459%2FTecnicas%2Dde%2DResumo&amp;rut=17c01432ba20dbd75b108a4623df4cbe000418b4eb2bf57e23db510ce7a21fdd)
 - [Compressão de Modelos: Pruning, Destilação e Quantização](//duckduckgo.com/l/?uddg=https%3A%2F%2Fsigmoidal.ai%2Fcompressao%2Dde%2Dmodelos%2Dpruning%2Ddestilacao%2De%2Dquantizacao%2F&amp;rut=eea1205652e5f5003c7365abd953598d00f1417ee3bd625ffdc7dce7c1760d08)
 - [O que é Compressão de Modelos? Tornando a IA Menor sem Perder Potência](//duckduckgo.com/l/?uddg=https%3A%2F%2Fresources.rework.com%2Fpt%2Flibraries%2Fai%2Dterms%2Fmodel%2Dcompression&amp;rut=faafb18b230ddae998df04ac491ebf7717a66d99a6b85d8b4629d855a54ede4b)
-- [Roadmap de Compressão de Texto: do básico ao avançado](//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.toolzz.net%2Fblog%2Froadmap%2Dde%2Dcompressao%2Dde%2Dtexto%2Dpara%2Dia%2D2026%2D8ee28c5e%2F&amp;rut=4e111b7a81dd0b0e994e0772cfa4340a6437d6b66e17ded0efeab76994f0a513)
-- [Quantização para modelos de idiomas grandes (LLMs): Reduza o tamanho ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.datacamp.com%2Fpt%2Ftutorial%2Fquantization%2Dfor%2Dlarge%2Dlanguage%2Dmodels&amp;rut=f812dc074eeded2125b69e570a084e587fb447331347ce6bd5ab660662deaa59)
-- [Como o Compressão de Modelos LLMs é Transformando a IA e a Tecnologia](//duckduckgo.com/l/?uddg=https%3A%2F%2Fdavestecnologia.com.br%2Fllms%2Fcompressao%2Dde%2Dmodelos&amp;rut=3f8f9ed6a93d60f174385bca92543603d612c82537bd2bbba4695763be7d4f74)
+- [O que é resumo de textos? - IBM](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.ibm.com%2Fbr%2Dpt%2Fthink%2Ftopics%2Ftext%2Dsummarization&amp;rut=e7bd5f626400a623e2e58c7dd6e113782f95455479ee5fd74f972c6b4f15b18a)
 
 ### Analise do provider (openrouter-inkling)
 
@@ -146,17 +146,17 @@ Custo estimado total: $0.000000 USD
 ### Achados da busca
 #### Query: MCP servers Model Context Protocol lista servidores
 - [Servidores MCP - Model Context Protocol | La Lista #1 de Servidores MCP](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmcpservers.com%2Fes&amp;rut=bf514c00f6a12de0017586875d5f6bad9a931209620f18c9b16581ee7bbaccf8)
-- [Model Context Protocol servers - GitHub](//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmodelcontextprotocol%2Fservers&amp;rut=cd179fb447d3e934713fe9ec385898afd0986a74f2768ef69992b8f90aec3e9a)
 - [MCP Servers Directory | Model Context Protocol](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmodel%2Dcontext%2Dprotocol.com%2Fservers&amp;rut=528e5bf5c4df491ef4ee2228123d851b506be19a09005d0f187ab4e52bedc744)
-- [Awesome MCP Servers](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmcpservers.org%2Fes%2F&amp;rut=bfd4c5956b7a5b98d4b05d3a84bac7e43a376857c58d1ebb973eacd102133198)
+- [Model Context Protocol servers - GitHub](//duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmodelcontextprotocol%2Fservers&amp;rut=cd179fb447d3e934713fe9ec385898afd0986a74f2768ef69992b8f90aec3e9a)
 - [Servidor MCP de Model Context Protocol | Awesome MCP Servers](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmcpservers.org%2Fes%2Fservers%2Fmodelcontextprotocol%2Fservers&amp;rut=01b558d446303a3a18925642ca231edce648a07198f8fddb46a701e87ad696b5)
+- [Awesome MCP Servers](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmcpservers.org%2Fes%2F&amp;rut=bfd4c5956b7a5b98d4b05d3a84bac7e43a376857c58d1ebb973eacd102133198)
 
 #### Query: servidores MCP para ferramentas de desenvolvimento
 - [Os 10 melhores servidores e clientes MCP para automação de fluxo de ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.datacamp.com%2Fpt%2Fblog%2Ftop%2Dmcp%2Dservers%2Dand%2Dclients&amp;rut=0fb5e20a892f689f2a98e1913bef79e0a9e08fdba6e0b6786f34b6d32efc3cb6)
 - [Awesome MCP Servers](//duckduckgo.com/l/?uddg=https%3A%2F%2Fmcpservers.org%2Fpt%2DBR%2F&amp;rut=914d0c0df476b24fbab87d4a5488ee0ac9f0bcd13ac4296e58bf971492b55865)
 - [Top 9 Servidores MCP para Ferramentas Git em 2026: Acelere seu Fluxo de ...](//duckduckgo.com/l/?uddg=https%3A%2F%2Fapidog.com%2Fpt%2Fblog%2Ftop%2D10%2Dmcp%2Dservers%2Dfor%2Dgit%2Dtools%2Dpt%2F&amp;rut=405653e1b8d96beac7a3bb60e2e236154f42249ec892cf8b0632a9b6be07840d)
 - [10 Melhores Servidores MCP para Experimentar Agora (2026)](//duckduckgo.com/l/?uddg=https%3A%2F%2Fhundredtabs.com%2Fpt%2Fblog%2Fbest%2Dmcp%2Dservers%2D2026&amp;rut=b5e7cf6c8c5d1be651fed91e457027f8a6805e4540210e4e7b1757a35be59ea9)
-- [10 servidores MCP úteis para operação de TI em 2026](//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.opservices.com.br%2Fservidores%2Dmcp%2F&amp;rut=159445ad5b5208adcc1648fe2fc5fc67370c5dc622515d034a35c66785563054)
+- [Os 10 Melhores Servidores MCP para Desenvolvedores em 2026](//duckduckgo.com/l/?uddg=https%3A%2F%2Fblink.new%2Fpt%2DBR%2Fblog%2Fbest%2Dmcp%2Dservers%2Ddevelopers&amp;rut=63fde67ceb1605f8d8a9f003a8a9e12fa83ead1157ccd488e1282d90c5a82215)
 
 ### Analise do provider (openrouter-inkling)
 
@@ -196,4 +196,4 @@ Ordenadas por impacto. Cada item entra em modo plan e exige aprovacao do usuario
 
 
 ---
-*Gerado pelo Radar Diario do DG Editor — 2026-11-14T00:16:27.999Z*
+*Gerado pelo Radar Diario do DG Editor — 2026-11-14T00:29:47.891Z*

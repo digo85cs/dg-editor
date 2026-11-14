@@ -20,7 +20,7 @@ describe('efeitos de vídeo (construtores de filtros)', () => {
   it('encadeia atempo dentro dos limites do ffmpeg', () => {
     expect(cadeiaAtempo(0.25)).toEqual(['atempo=0.5', 'atempo=0.5'])
     expect(cadeiaAtempo(4)).toEqual(['atempo=2', 'atempo=2'])
-    expect(cadeiaAtempo(1.5)).toEqual(['atempo=1.5000'])
+    expect(cadeiaAtempo(1.5)).toEqual(['atempo=1.5'])
     expect(cadeiaAtempo(1)).toEqual([])
     expect(cadeiaAtempo(0.01)).toEqual(['atempo=0.5', 'atempo=0.5', 'atempo=0.5', 'atempo=0.5'])
   })

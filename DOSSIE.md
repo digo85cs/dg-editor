@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 21:26:17** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.3.6** · branch `integra-13-11` · último commit: 1d9922a 2026-11-13 release: v0.3.5
-> Alterações locais não commitadas: 31 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 21:37:53** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.4.0** · branch `integra-13-11` · último commit: 98fe284 2026-11-13 release: v0.3.6
+> Alterações locais não commitadas: 7 arquivo(s).
 
 ## 1. O que é
 
@@ -89,7 +89,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 5. Estúdio de mídia
 
-Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/efeitos.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/voz-efeitos.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `efeitos.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `voz-efeitos.ts`, `vozes.ts`.
+Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/efeitos-integracao.test.ts`, `__tests__/efeitos.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/voz-efeitos.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `efeitos.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `voz-efeitos.ts`, `vozes.ts`.
 
 ### Biblioteca de músicas livres (por estilo)
 
@@ -116,6 +116,21 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 - Imagem: denoise, nitidez, brilho/contraste/saturação/gamma, reescala Lanczos 1–4× e conversão PNG/JPG.
 - Análise de vídeo: resolução, fps, duração, codec, bitrate, áudio e dicas automáticas de ajuste.
 - Canais: `midia:video-analisar`, `midia:video-melhorar`, `midia:imagem-qualidade`; MCP: `midia_video_qualidade`, `midia_imagem_qualidade`.
+
+### Efeitos de vídeo (estilo Topaz / PowerDirector / Filmora)
+
+- `src/main/midia/efeitos.ts`: 16 efeitos ffmpeg puros — aprimorar (upscale Lanczos + `hqdn3d` + `unsharp` + grão), interpolar (minterpolate mci/blend + slow motion sincronizado), velocidade (`setpts` + cadeia `atempo`), boomerang, transição (`xfade`/`acrossfade`), PiP com posição, chroma key, título (`drawtext` com `textfile`), color grading (7 presets + `lenscorrection`), reenquadrar 9:16 com fundo desfocado, delogo, esconder região (split/crop/boxblur), proxy, GIF com paleta e extração de áudio.
+- 11 transições (fade, wipe, slide, radial, circle…) e 7 presets de cor (cinema, quente, frio, P&B, vintage, vivo, suave); tudo mapeado em `CATALOGO_EFEITOS`/`PRESETS_COR`.
+- Detecção de cenas por `select=gt(scene,…)` + `showinfo`, com miniaturas JPG e manifesto JSON em `.dg-editor/<pasta-de-mídia>/cenas-*` para montar destaques.
+- Canais `midia:video-efeitos`, `midia:video-efeito`, `midia:cenas`; MCP `midia_video_efeito` (listar/aplicar/cenas); UI na caixa "Efeitos de vídeo" do Estúdio de mídia com campos dinâmicos e seletor de segundo arquivo.
+- Testes: `__tests__/efeitos.test.ts` (construtores de filtros) e `__tests__/efeitos-integracao.test.ts` (ffmpeg real: 2×, upscale, P&B+título, GIF+MP3, transição/PiP/chroma, boomerang, 1080×1920, cenas) ativado por `DG_TEST_MIDIA=1`.
+
+### Efeitos de voz (estilo RealVoice / PowerDirector)
+
+- `src/main/midia/voz-efeitos.ts`: 13 presets — original, grave, agudo, criança, idoso, monstro, robô, telefone, rádio, caverna, megafone, sussurro e coro — com `rubberband` (pitch/formant), bandas EQ, `aecho`, `chorus`, `aphaser` e `acompressor`.
+- Limpeza embutida: `afftdn` (denoise), `deesser`, corte de silêncios (`silenceremove`+`areverse`) e `loudnorm` final; intensidade 0–1 modula pitch/efeitos sem tocar no resto da cadeia.
+- Saída mp3/wav/m4a/ogg. Canais `midia:voz-presets`, `midia:voz-efeito`; MCP `midia_voz_efeito` (listar/aplicar); UI na caixa "Efeitos de voz" com prévia de opções e checkbox de limpeza.
+- Testes: `__tests__/voz-efeitos.test.ts` (cadeias por preset) e caso real de voz grave + telefone na suíte de integração.
 
 ### Portabilidade (instalar em PC novo)
 
@@ -279,6 +294,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 14. Histórico recente
 
+- 98fe284 2026-11-13 release: v0.3.6
 - 1d9922a 2026-11-13 release: v0.3.5
 - a0586d6 2026-11-13 release: v0.3.4
 - 8b18036 2026-11-13 release: v0.3.3
@@ -288,7 +304,6 @@ Artefatos locais em `dist-apps/`:
 - b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
 - e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
 - 4f1ec4b 2026-11-12 fix: orquestrador e agente com fallback garantido
-- 85a5b9d 2026-11-12 fix: fallback de modelo leve quando Ollama rejeita imagem/visao
 
 ## 15. Como atualizar este dossiê
 
