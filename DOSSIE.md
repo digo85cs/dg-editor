@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 21:54:45** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.4.1** · branch `integra-13-11` · último commit: a0c2fa2 2026-11-13 release: v0.4.0
-> Alterações locais não commitadas: 14 arquivo(s).
+> Gerado automaticamente em **13/11/2026, 22:00:51** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.5.0** · branch `integra-13-11` · último commit: 043e097 2026-11-13 release: v0.4.1
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -303,6 +303,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 14. Histórico recente
 
+- 043e097 2026-11-13 release: v0.4.1
 - a0c2fa2 2026-11-13 release: v0.4.0
 - 98fe284 2026-11-13 release: v0.3.6
 - 1d9922a 2026-11-13 release: v0.3.5
@@ -312,7 +313,6 @@ Artefatos locais em `dist-apps/`:
 - d076e20 2026-11-13 release: v0.3.1
 - 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
 - b635c19 2026-11-13 release: v0.3.0 — dossiê automático, músicas livres e ferramentas de áudio
-- e3df21b 2026-11-13 feat(mcp-http): servidor MCP HTTP read-only + isolamento de repositorio
 
 ## 15. Como atualizar este dossiê
 
