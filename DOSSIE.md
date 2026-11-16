@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 19:17:23** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 19:45:28** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.1** · branch `integra-13-11` · último commit: 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -238,6 +238,14 @@ Utilitários locais relevantes:
 - tesseract — OCR: ausente
 - qemu-system-x86_64 — teste de boot (QEMU): ausente
 - soffice — LibreOffice: ausente
+- ghidra — engenharia reversa (via GHIDRA_INSTALL_DIR): ausente
+- rizin — engenharia reversa (CLI): ausente
+- cutter — engenharia reversa (GUI Rizin): ausente
+- jadx — decompilador Android: ausente
+- apktool — descompilador APK/resources: ausente
+- tshark — análise de pacotes: ausente
+- vol — forense de memória: **presente**
+- rea — REA — engenharia reversa com IA: **presente**
 
 - Ausências tratadas sem bloquear o app: o núcleo de mídia usa ffmpeg embutido; ISO usa pycdlib no Python portátil; a gravação USB não depende de ferramentas externas.
 
@@ -328,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
 - fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
 - 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
 - c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
@@ -337,7 +346,6 @@ Utilitários locais relevantes:
 - 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
 - ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
 - 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
-- fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
 
 ## 16. Como atualizar este dossiê
 

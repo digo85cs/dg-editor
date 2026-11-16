@@ -134,8 +134,16 @@ const utilitarios = [
   ['7z', 'arquivos (7-Zip)'],
   ['tesseract', 'OCR'],
   ['qemu-system-x86_64', 'teste de boot (QEMU)'],
-  ['soffice', 'LibreOffice']
-].map(([cmd, papel]) => `- ${cmd === 'magick' ? 'ImageMagick' : cmd} — ${papel}: ${temComando(cmd) ? '**presente**' : 'ausente'}`)
+  ['soffice', 'LibreOffice'],
+  ['ghidra', 'engenharia reversa (via GHIDRA_INSTALL_DIR)'],
+  ['rizin', 'engenharia reversa (CLI)'],
+  ['cutter', 'engenharia reversa (GUI Rizin)'],
+  ['jadx', 'decompilador Android'],
+  ['apktool', 'descompilador APK/resources'],
+  ['tshark', 'análise de pacotes'],
+  ['vol', 'forense de memória'],
+  ['rea', 'REA — engenharia reversa com IA']
+].map(([cmd, papel]) => `- ${cmd === 'magick' ? 'ImageMagick' : cmd} — ${papel}: ${temComando(cmd) || (cmd === 'ghidra' && !!process.env.GHIDRA_INSTALL_DIR) ? '**presente**' : 'ausente'}`)
 
 function artefatos(dir) {
   const base = join(RAIZ, dir)
