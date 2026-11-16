@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 18:57:20** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
-> Alterações locais não commitadas: 5 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 19:06:16** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -328,6 +328,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
+- 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
 - 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
 - a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 - 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
@@ -336,8 +338,6 @@ Utilitários locais relevantes:
 - fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
 - e579020 2026-11-13 release: v0.6.0
 - cf305fb 2026-11-13 release: v0.5.0
-- 043e097 2026-11-13 release: v0.4.1
-- a0c2fa2 2026-11-13 release: v0.4.0
 
 ## 16. Como atualizar este dossiê
 

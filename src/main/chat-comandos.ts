@@ -3,13 +3,14 @@
  * Executados no main antes do fluxo normal de chat — resposta volta como
  * mensagem assistant comum (provider 'comando').
  */
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { gitStatus, gitDiff, gitCommit } from './git'
 import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
+import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'worktree', 'mcps'])
 
 function parse(texto: string): { cmd: string; arg: string } | null {
   const m = texto.trim().match(/^\/([a-zA-Z-]+)(?:\s+([\s\S]*))?$/)
@@ -151,6 +152,68 @@ async function cmdDevin(arg: string): Promise<string> {
   }
 }
 
+async function cmdDevinStatus(arg: string): Promise<string> {
+  const id = arg.trim()
+  if (!id) return 'Uso: `/devin-status <sessionId>`'
+  try {
+    const { devinStatusSessao } = await import('./devin-api')
+    const r = await devinStatusSessao(id)
+    if (!r.ok) return 'Falha ao consultar sessão: ' + (r.erro || 'erro')
+    const msgs = Array.isArray(r.mensagens) ? r.mensagens : []
+    const ultimas = msgs.slice(-3).map((m) => {
+      const o = m as Record<string, unknown>
+      const txt = String(o.text ?? o.message ?? o.content ?? '').slice(0, 200)
+      return '• ' + String(o.role ?? o.type ?? '?') + ': ' + txt
+    })
+    return 'Sessão ' + id + ' — status: ' + (r.status || '?') +
+      (ultimas.length ? '\nÚltimas mensagens:\n' + ultimas.join('\n') : '\n(sem mensagens)')
+  } catch (e) {
+    return 'Devin API erro: ' + String(e)
+  }
+}
+
+async function cmdWorktree(arg: string, raiz: string): Promise<string> {
+  try {
+    const { criarWorktreeCheckpoint, removerWorktreeCheckpoint, listarWorktrees } = await import('./git-worktree')
+    const sub = arg.trim().split(/\s+/)[0] || 'listar'
+    if (sub === 'criar' || sub === 'add') {
+      const nome = arg.trim().split(/\s+/)[1] || 'agente-' + Date.now().toString(36)
+      const r = await criarWorktreeCheckpoint(raiz, nome)
+      return r.ok ? 'Worktree criado: ' + r.caminho + '\nBranch: ' + r.branch : 'Falha: ' + r.erro
+    }
+    if (sub === 'remover' || sub === 'rm') {
+      const nome = arg.trim().split(/\s+/)[1]
+      if (!nome) return 'Uso: `/worktree remover <nome>`'
+      const r = await removerWorktreeCheckpoint(raiz, nome)
+      return r.ok ? 'Worktree removido: ' + nome : 'Falha: ' + r.erro
+    }
+    const lista = await listarWorktrees(raiz)
+    if (!lista.length) return 'Nenhum worktree de checkpoint. Crie com `/worktree criar <nome>`.'
+    return 'Worktrees de checkpoint:\n' + lista.map((w) => '• ' + w.nome + ' → ' + w.caminho + ' (' + w.branch + ')').join('\n')
+  } catch (e) {
+    return 'Worktree erro: ' + String(e)
+  }
+}
+
+function cmdMcps(raiz: string): string {
+  try {
+    const catalogo = lerCatalogoMcp()
+    const cfgPath = join(raiz, '.dg-editor', 'mcp-externos.json')
+    const ativos = new Set<string>()
+    try {
+      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8')) as { servidores?: Record<string, unknown> }
+      for (const k of Object.keys(cfg.servidores || {})) ativos.add(k)
+    } catch { /* sem config */ }
+    const linhas = catalogo.map((s) => {
+      const marca = ativos.has(s.id) ? '[ativo]' : '[     ]'
+      return marca + ' ' + s.id + ' — ' + s.nome + '\n       ' + s.descricao + '\n       install: ' + s.comando
+    })
+    return 'Marketplace MCP (edite .dg-editor/mcp-externos.json para ativar):\n\n' + linhas.join('\n\n')
+  } catch (e) {
+    return 'Marketplace erro: ' + String(e)
+  }
+}
+
 function cmdRegras(raiz: string): string {
   const partes: string[] = []
   const rules = readRules(raiz)
@@ -210,6 +273,12 @@ export async function executarComandoChat(
       return { content: cmdSpecs(raiz) }
     case 'devin':
       return { content: await cmdDevin(parsed.arg) }
+    case 'devin-status':
+      return { content: await cmdDevinStatus(parsed.arg) }
+    case 'worktree':
+      return { content: await cmdWorktree(parsed.arg, raiz) }
+    case 'mcps':
+      return { content: cmdMcps(raiz) }
     case 'ajuda':
       return {
         content:
@@ -223,6 +292,9 @@ export async function executarComandoChat(
           '- `/spec <titulo>` — cria spec em .dg-editor/specs (spec-driven)\n' +
           '- `/specs` — lista specs do projeto\n' +
           '- `/devin <tarefa>` — delega tarefa para sessão cloud do Devin (requer DEVIN_API_KEY/ORG_ID)\n' +
+          '- `/devin-status <id>` — status e últimas mensagens de uma sessão Devin\n' +
+          '- `/worktree [criar|remover <nome>]` — checkpoints isolados via git worktree\n' +
+          '- `/mcps` — catálogo de MCP servers externos disponíveis\n' +
           '- `/ajuda` — esta lista'
       }
     default:
