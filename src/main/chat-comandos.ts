@@ -195,20 +195,42 @@ async function cmdWorktree(arg: string, raiz: string): Promise<string> {
   }
 }
 
-function cmdMcps(raiz: string): string {
+function cmdMcps(raiz: string, arg: string): string {
   try {
     const catalogo = lerCatalogoMcp()
     const cfgPath = join(raiz, '.dg-editor', 'mcp-externos.json')
-    const ativos = new Set<string>()
-    try {
-      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8')) as { servidores?: Record<string, unknown> }
-      for (const k of Object.keys(cfg.servidores || {})) ativos.add(k)
-    } catch { /* sem config */ }
+    const lerCfg = (): { servidores?: unknown[] } => {
+      try { return JSON.parse(readFileSync(cfgPath, 'utf8')) } catch { return { servidores: [] } }
+    }
+    const cfg = lerCfg()
+    const servidores = Array.isArray(cfg.servidores) ? cfg.servidores : []
+    const nomesAtivos = new Set(
+      servidores.map((s) => String((s as Record<string, unknown>).nome || '')).filter(Boolean)
+    )
+
+    const instalando = arg.trim().toLowerCase()
+    if (instalando && instalando !== 'listar') {
+      const item = catalogo.find((s) => s.id === instalando)
+      if (!item) return 'MCP desconhecido: ' + instalando + '. Use `/mcps` para listar.'
+      if (nomesAtivos.has(item.id)) return item.id + ' já está ativo em mcp-externos.json.'
+      const c = item.config as { command?: string; args?: string[]; env?: Record<string, string> }
+      servidores.push({
+        nome: item.id,
+        comando: c.command,
+        args: c.args || [],
+        env: c.env || {},
+        habilitado: true
+      })
+      mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+      writeFileSync(cfgPath, JSON.stringify({ servidores }, null, 2) + '\n', 'utf8')
+      return 'MCP "' + item.id + '" instalado em .dg-editor/mcp-externos.json.\nComando: ' + item.comando + '\nReinicie o app ou recarregue para carregar as tools.'
+    }
+
     const linhas = catalogo.map((s) => {
-      const marca = ativos.has(s.id) ? '[ativo]' : '[     ]'
-      return marca + ' ' + s.id + ' — ' + s.nome + '\n       ' + s.descricao + '\n       install: ' + s.comando
+      const marca = nomesAtivos.has(s.id) ? '[ativo]' : '[     ]'
+      return marca + ' ' + s.id + ' — ' + s.nome + '\n       ' + s.descricao + '\n       install: /mcps ' + s.id
     })
-    return 'Marketplace MCP (edite .dg-editor/mcp-externos.json para ativar):\n\n' + linhas.join('\n\n')
+    return 'Marketplace MCP — instale com `/mcps <id>`:\n\n' + linhas.join('\n\n')
   } catch (e) {
     return 'Marketplace erro: ' + String(e)
   }
@@ -278,7 +300,7 @@ export async function executarComandoChat(
     case 'worktree':
       return { content: await cmdWorktree(parsed.arg, raiz) }
     case 'mcps':
-      return { content: cmdMcps(raiz) }
+      return { content: cmdMcps(raiz, parsed.arg) }
     case 'ajuda':
       return {
         content:
@@ -294,7 +316,7 @@ export async function executarComandoChat(
           '- `/devin <tarefa>` — delega tarefa para sessão cloud do Devin (requer DEVIN_API_KEY/ORG_ID)\n' +
           '- `/devin-status <id>` — status e últimas mensagens de uma sessão Devin\n' +
           '- `/worktree [criar|remover <nome>]` — checkpoints isolados via git worktree\n' +
-          '- `/mcps` — catálogo de MCP servers externos disponíveis\n' +
+          '- `/mcps` — catálogo de MCP servers; `/mcps <id>` instala no projeto\n' +
           '- `/ajuda` — esta lista'
       }
     default:

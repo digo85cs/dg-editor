@@ -32,6 +32,7 @@ const invokeChannels = [
   'janela:recarregar', 'janela:zoom', 'janela:zoom-fator', 'janela:zoom-estado', 'janela:tela-cheia',
   'app:get-version', 'app:qa-mode',
   'devin:status', 'devin:sessao-criar', 'devin:sessao-status',
+  'lsp:abrir', 'lsp:fechar', 'lsp:hover', 'lsp:definicao', 'lsp:diagnosticos',
   'app:raiz-projeto',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'arquivo:criar', 'arquivo:renomear', 'arquivo:mover', 'arquivo:excluir',

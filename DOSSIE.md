@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 19:06:16** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
-> Alterações locais não commitadas: 4 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 19:09:40** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
+> Alterações locais não commitadas: 6 arquivo(s).
 
 ## 1. O que é
 
@@ -25,12 +25,12 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, imagens, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, security, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, imagens, ipc, lsp, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, security, vault, __tests__.
 
 ## 4. IPC
 
-- Canais registrados no main: **368**.
-- Canais expostos pelo preload: **349**.
+- Canais registrados no main: **373**.
+- Canais expostos pelo preload: **354**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -328,6 +328,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
 - c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
 - 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
 - 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
@@ -337,7 +338,6 @@ Utilitários locais relevantes:
 - 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
 - fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
 - e579020 2026-11-13 release: v0.6.0
-- cf305fb 2026-11-13 release: v0.5.0
 
 ## 16. Como atualizar este dossiê
 

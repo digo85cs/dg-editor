@@ -110,6 +110,14 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
   }
 
   try {
+    const { lspResumoDiagnosticos } = await import('../lsp/ts-servico')
+    const diag = lspResumoDiagnosticos(opts.raiz)
+    if (diag) partes.push(diag)
+  } catch {
+    /* LSP é contexto auxiliar — nunca quebra o turno */
+  }
+
+  try {
     const dirSpecs = join(opts.raiz, '.dg-editor', 'specs')
     if (existsSync(dirSpecs)) {
       const specs = readdirSync(dirSpecs).filter((n) => n.endsWith('.md'))
