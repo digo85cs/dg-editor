@@ -10,6 +10,7 @@ import { executarRadar, deveRodarRadar } from './radar'
 import { TEMAS_RADAR } from './temas-radar'
 import { buscaWebDuckDuckGo } from './busca-web'
 import { chamarProvider, type ProviderConfig, type Message, type RespostaProvider } from '../brain/providers'
+import { chamarComCascata } from '../brain/chamar-com-cascata'
 import { selecionarProviderRadar } from './radar'
 import { userDataDir } from '../paths'
 import { resolverRaizProjeto } from '../paths'
@@ -61,41 +62,51 @@ function executarRadarDeveRodar(userDataPath: string): boolean {
 }
 
 function criarChamadaProviderReal() {
-  return async (prompt: string, tema: string): Promise<{
+  return async (prompt: string, _tema: string): Promise<{
     resposta: string | null
     providerUsado: string | null
     custoEstimadoUSD: number
     erro?: string
   }> => {
-    const cfg = selecionarProviderRadar()
-    if (!cfg) {
-      return { resposta: null, providerUsado: null, custoEstimadoUSD: 0, erro: 'Nenhum provider disponivel' }
-    }
-
     const mensagens: Message[] = [
       { role: 'system', content: 'Voce e um analista de mercado de ferramentas de IA para desenvolvedores.' },
       { role: 'user', content: prompt }
     ]
 
     try {
-      const r: RespostaProvider = await chamarProvider(cfg, mensagens)
-      const uso = r.usage
-      let custo = 0
-      if (uso) {
-        // Custo aproximado: nao temos preco do provider aqui, usamos 0 se nao souber
-        custo = 0
-      }
+      // Prioriza cascata com resiliencia a 403, rate-limits e modelos indisponiveis
+      const r = await chamarComCascata('analise', mensagens)
       return {
         resposta: r.content,
-        providerUsado: cfg.id,
-        custoEstimadoUSD: custo
+        providerUsado: r.providerFinal,
+        custoEstimadoUSD: 0
       }
-    } catch (e: any) {
-      return {
-        resposta: null,
-        providerUsado: cfg.id,
-        custoEstimadoUSD: 0,
-        erro: String(e?.message || e)
+    } catch (eCascata: any) {
+      // Fallback para provedor direto caso a cascata inteira nao consiga rotear
+      const cfg = selecionarProviderRadar()
+      if (!cfg) {
+        return {
+          resposta: null,
+          providerUsado: null,
+          custoEstimadoUSD: 0,
+          erro: String(eCascata?.message || eCascata)
+        }
+      }
+
+      try {
+        const r: RespostaProvider = await chamarProvider(cfg, mensagens)
+        return {
+          resposta: r.content,
+          providerUsado: cfg.id,
+          custoEstimadoUSD: 0
+        }
+      } catch (eDireto: any) {
+        return {
+          resposta: null,
+          providerUsado: cfg.id,
+          custoEstimadoUSD: 0,
+          erro: String(eDireto?.message || eDireto)
+        }
       }
     }
   }

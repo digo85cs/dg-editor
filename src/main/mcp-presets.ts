@@ -41,7 +41,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'sequential-thinking',
     nome: 'Sequential Thinking',
-    descricao: 'Racioc?nio passo a passo para tarefas complexas',
+    descricao: 'Raciocínio passo a passo para tarefas complexas',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
     tags: ['raciocinio', 'planejamento']
@@ -49,7 +49,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'memory',
     nome: 'Memory',
-    descricao: 'Mem?ria persistente entre sess?es',
+    descricao: 'Memória persistente entre sessões',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-memory'],
     tags: ['memoria']
@@ -65,7 +65,7 @@ const PRESETS: McpPreset[] = [
   {
     id: 'git',
     nome: 'Git',
-    descricao: 'Opera??es git padronizadas para o agente',
+    descricao: 'Operações git padronizadas para o agente',
     comando: 'npx',
     args: ['-y', '@modelcontextprotocol/server-git'],
     tags: ['git']

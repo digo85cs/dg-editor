@@ -158,11 +158,14 @@ export async function executarRadar(deps: {
       try {
         const chamada = await chamarProvider(prompt, tema.nome)
         custoTotal += chamada.custoEstimadoUSD
+        if (chamada.providerUsado) {
+          providerUsado = chamada.providerUsado
+        }
         chamadas.push({
           tema: tema.nome,
           prompt,
           resposta: chamada.resposta,
-          providerUsado: cfg.id,
+          providerUsado: chamada.providerUsado || cfg.id,
           custoEstimadoUSD: chamada.custoEstimadoUSD,
           erro: chamada.erro
         })

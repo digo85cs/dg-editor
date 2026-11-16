@@ -218,6 +218,19 @@ function validarApk(arquivo) {
     info.ok = r.status === 0 && txt.includes('classes.dex') && txt.includes('AndroidManifest.xml');
   }
   if (!info.ok) throw new Error('APK inválido ou ilegível: ' + arquivo);
+
+  const apksigner = join(sdk, 'build-tools', '35.0.0', process.platform === 'win32' ? 'apksigner.bat' : 'apksigner');
+  if (existsSync(apksigner)) {
+    const rSign = spawnSync(apksigner, ['verify', arquivo], {
+      encoding: 'utf8',
+      shell: process.platform === 'win32'
+    });
+    info.assinado = rSign.status === 0;
+    if (info.assinado) {
+      log('assinatura APK verificada com sucesso (apksigner: OK)');
+    }
+  }
+
   return info;
 }
 

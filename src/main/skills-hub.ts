@@ -16,7 +16,8 @@ function dirs() {
   const raiz = process.cwd()
   return [
     { tipo: '.kilo' as const, dir: join(raiz, '.kilo', 'skills') },
-    { tipo: '.agents' as const, dir: join(raiz, '.agents', 'skills') }
+    { tipo: '.agents' as const, dir: join(raiz, '.agents', 'skills') },
+    { tipo: 'custom' as const, dir: join(raiz, '.dg-editor', 'skills') }
   ]
 }
 

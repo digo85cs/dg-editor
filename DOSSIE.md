@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 10:23:20** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: e579020 2026-11-13 release: v0.6.0
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 11:00:02** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
+> Alterações locais não commitadas: 10 arquivo(s).
 
 ## 1. O que é
 
@@ -222,7 +222,7 @@ Artefatos locais em `dist-apps/`:
 
 ## 11. Ecossistema externo (Qoder, MCP e utilitários)
 
-- Plugins Qoder instalados (5): Qoder Context (`qoder-context`, v1.0.97.fb328997), PPT (`Presentations`, v0.1.4), Excel (`office-excel`, v0.1.2), Word (`office-docx`, v0.4.0), 演示视频导演 (Demo Video Director) (`demo-video-agent`, v0.5.0).
+- Plugins Qoder instalados (6): Qoder Context (`qoder-context`, v1.0.102.7c750f24), PPT (`Presentations`, v0.1.4), Excel (`office-excel`, v0.1.2), Word (`office-docx`, v0.4.0), 演示视频导演 (Demo Video Director) (`demo-video-agent`, v0.5.0), Qoder Memory (`qoder-memory`, v0.1.2).
 - Skills do usuário no Qoder (22): ai-video-script, alibabacloud-avatar-video, doubao-image, glm-image-gen, html-to-image, IMA-AI-Image-&-Photo-Generator-—-Poster,-Thumbnail,-Logo,-Art,-Illustration,-Product-&-Social-Media-Graphic-Design, image-enhancer, kling-video-generator, mermaid-image-generator, midjourney, minimax-image-gen, photo-to-video-ai-free, photo-video-maker-best, qwen-image, seedance-2-0-video, sih-ai-photo-changer, sora-2-futuristic-tech-showcase, veo-skill, video-clip-editor, video-editing, video-generation, wavespeed-veo-31-fast.
 - Skills internas do DG Editor em `.dg-editor/skills` (28): analisador, anexos, arquiteto-aux, arvore-projeto, capa-video, conector-codex, conector-cursor, debugger, documentador, dublagem-parodia, editar-seguro, editor-bloco-notas, estilo-cursor, free-mode, inventario-disco, legenda-automatica, leitor-codigo, navegador-embutido, orquestrador, pacote-memes, prompt-melhorar, publicacao-social, refatorador, revisor-seguranca, roteiro-shorts, terminal-local, testador, thumbnail-design.
 - MCPs externos configurados no Qoder (3): HeyGen (remoto), Cloudinary (remoto), Descript (remoto). HeyGen, Cloudinary e Descript são serviços pagos/freemium e permanecem desativados pela regra de custo zero.
@@ -277,7 +277,7 @@ Utilitários locais relevantes:
 - `npm run mcp:http` — `tsc -p src/main/mcp/tsconfig.mcp.json && node .dg-editor/bin/main/mcp/http-server.js`
 - `npm run postbuild` — `node scripts/dossie.cjs`
 - `npm run postinstall` — `node scripts/patch-node-pty-spectre.cjs && node scripts/rebuild-node-pty.cjs && node scripts/garantir-launchers.cjs && node scripts/garantir-electron.cjs`
-- `npm run prebuild` — `npm run build:mcp`
+- `npm run prebuild` — `npm run build:mcp && node scripts/sincronizar-skills.cjs`
 - `npm run predev` — `node scripts/garantir-build.cjs`
 - `npm run prestart` — `node scripts/garantir-launchers.cjs`
 - `npm run preview` — `electron-vite preview`
@@ -296,6 +296,7 @@ Utilitários locais relevantes:
 - `npm run qa:visual` — `node scripts/run-qa.cjs --suite=visual`
 - `npm run qa:visual:baseline` — `node scripts/run-qa.cjs --suite=visual --atualizar-baseline`
 - `npm run rebuild:pty` — `node scripts/rebuild-node-pty.cjs`
+- `npm run skills:sync` — `node scripts/sincronizar-skills.cjs`
 - `npm run smoke:disco` — `node scripts/smoke-disco.cjs`
 - `npm run start` — `node scripts/iniciar-app.cjs`
 - `npm run test` — `vitest run`
@@ -327,6 +328,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
 - e579020 2026-11-13 release: v0.6.0
 - cf305fb 2026-11-13 release: v0.5.0
 - 043e097 2026-11-13 release: v0.4.1
@@ -336,7 +338,6 @@ Utilitários locais relevantes:
 - a0586d6 2026-11-13 release: v0.3.4
 - 8b18036 2026-11-13 release: v0.3.3
 - 720d286 2026-11-13 release: v0.3.2
-- d076e20 2026-11-13 release: v0.3.1
 
 ## 16. Como atualizar este dossiê
 

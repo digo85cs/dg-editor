@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "dg-editor": {
-      "command": "C:/Users/digo8/OneDrive/CURSOR/DG Editor/node_modules/electron/dist/electron.exe",
-      "args": ["C:\\Users\\digo8\\OneDrive\\CURSOR\\DG Editor\\.dg-editor\\bin\\main\\mcp\\server.js"],
+      "command": "C:/dev/DGEditor/node_modules/electron/dist/electron.exe",
+      "args": ["C:\\dev\\DGEditor\\.dg-editor\\bin\\main\\mcp\\server.js"],
       "env": {
-        "DG_ROOT": "C:\\Users\\digo8\\OneDrive\\CURSOR\\DG Editor",
+        "DG_ROOT": "C:\\dev\\DGEditor",
         "ELECTRON_RUN_AS_NODE": "1"
       }
     }
