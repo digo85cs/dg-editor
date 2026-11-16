@@ -19,7 +19,7 @@
 >
 > **Ambiente:** Node v26.13.1, npm 11.20.0, git 2.56, Electron v33.2.1. Atenção: `ELECTRON_RUN_AS_NODE=1` estava setado no ambiente e quebra o launch do Electron (qa:e2e) — limpar antes de rodar a suíte.
 >
-> **Pendente:** `dist:win:installer`; smoke visual manual; investigar `ui.editor.aba-orfa` + 3 falhas a11y do qa:e2e; `app.js` (~7k linhas) segue sendo o maior risco de regressão.
+> **Pendente:** smoke visual manual do app instalado; `app.js` (~7k linhas) segue sendo o maior risco de regressão. `dist:win:installer` já gerou `DG-Editor-0.6.0-x64.exe` + Portable em `dist-app/`.
 
 ## Melhorias aplicadas (pesquisa GitHub — aider/opencode/Cline/Roo/Continue)
 
