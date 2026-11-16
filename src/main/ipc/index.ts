@@ -59,6 +59,7 @@ import { registrarHandlersCompartilhar } from './compartilhar';
 import { registrarHandlersReversa } from './reversa';
 import { registrarHandlersPortabilidade } from './portabilidade';
 import { registrarHandlersProvisionamento } from './provisionamento';
+import { registrarHandlersDevin } from './devin';
 import { registrarComfyUIIpc } from '../comfyui-mcp';
 
 // ============================================================================
@@ -146,6 +147,7 @@ export function registrarTodosHandlers(): void {
     registrarHandlersReversa();
     registrarHandlersPortabilidade();
     registrarHandlersProvisionamento();
+registrarHandlersDevin();
     registrarComfyUIIpc();
     registrarHubExtras();
     registrarHandlersPerfil();

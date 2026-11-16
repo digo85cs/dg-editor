@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 18:52:58** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
-> Alterações locais não commitadas: 7 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 18:57:20** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
+> Alterações locais não commitadas: 5 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **365**.
-- Canais expostos pelo preload: **346**.
+- Canais registrados no main: **368**.
+- Canais expostos pelo preload: **349**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -328,6 +328,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
 - a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 - 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
 - ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
@@ -337,7 +338,6 @@ Utilitários locais relevantes:
 - cf305fb 2026-11-13 release: v0.5.0
 - 043e097 2026-11-13 release: v0.4.1
 - a0c2fa2 2026-11-13 release: v0.4.0
-- 98fe284 2026-11-13 release: v0.3.6
 
 ## 16. Como atualizar este dossiê
 

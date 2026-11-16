@@ -9,7 +9,7 @@ import { gitStatus, gitDiff, gitCommit } from './git'
 import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin'])
 
 function parse(texto: string): { cmd: string; arg: string } | null {
   const m = texto.trim().match(/^\/([a-zA-Z-]+)(?:\s+([\s\S]*))?$/)
@@ -134,6 +134,23 @@ function cmdSpecs(raiz: string): string {
   return 'Specs em .dg-editor/specs:\n' + itens.map((n) => '- ' + n).join('\n')
 }
 
+async function cmdDevin(arg: string): Promise<string> {
+  try {
+    const { devinStatus, devinCriarSessao } = await import('./devin-api')
+    if (!arg) {
+      const st = await devinStatus()
+      return st.ok
+        ? 'Devin API autenticada (org: ' + (st.org || '?') + '). Uso: `/devin <tarefa>` para delegar uma sessão cloud.'
+        : 'Devin API indisponível: ' + (st.erro || 'configure DEVIN_API_KEY')
+    }
+    const r = await devinCriarSessao(arg)
+    if (!r.ok) return 'Falha ao criar sessão Devin: ' + (r.erro || 'erro')
+    return 'Sessão Devin criada: ' + (r.url || r.sessionId) + '\nAcompanhe em app.devin.ai — o trabalho roda na nuvem.'
+  } catch (e) {
+    return 'Devin API erro: ' + String(e)
+  }
+}
+
 function cmdRegras(raiz: string): string {
   const partes: string[] = []
   const rules = readRules(raiz)
@@ -191,6 +208,8 @@ export async function executarComandoChat(
       return { content: cmdSpec(raiz, parsed.arg) }
     case 'specs':
       return { content: cmdSpecs(raiz) }
+    case 'devin':
+      return { content: await cmdDevin(parsed.arg) }
     case 'ajuda':
       return {
         content:
@@ -203,6 +222,7 @@ export async function executarComandoChat(
           '- `/regras` — fontes de regras carregadas\n' +
           '- `/spec <titulo>` — cria spec em .dg-editor/specs (spec-driven)\n' +
           '- `/specs` — lista specs do projeto\n' +
+          '- `/devin <tarefa>` — delega tarefa para sessão cloud do Devin (requer DEVIN_API_KEY/ORG_ID)\n' +
           '- `/ajuda` — esta lista'
       }
     default:
