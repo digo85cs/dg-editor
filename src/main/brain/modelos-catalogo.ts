@@ -52,6 +52,9 @@ const DEFAULT_ROTEAMENTO: Record<string, Porte> = {
   analisar: 'pequeno',
   chat: 'pequeno',
   'chat-rapido': 'pequeno',
+  resumo: 'pequeno',
+  commit: 'pequeno',
+  classificar: 'pequeno',
   codigo: 'padrao'
 }
 
@@ -60,6 +63,9 @@ const DEFAULT_MODELOS_POR_TAREFA: Record<string, string> = {
   analisar: 'qwen2.5-coder:3b',
   chat: 'qwen2.5-coder:3b',
   'chat-rapido': 'qwen2.5-coder:1.5b',
+  resumo: 'qwen2.5-coder:1.5b',
+  commit: 'qwen2.5-coder:1.5b',
+  classificar: 'qwen2.5-coder:1.5b',
   codigo: 'qwen2.5-coder:7b'
 }
 

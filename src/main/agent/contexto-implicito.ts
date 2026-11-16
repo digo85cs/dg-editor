@@ -5,7 +5,8 @@ import { existsSync, readFileSync } from 'fs'
 import { relative } from 'path'
 import { gitStatus, gitDiff } from '../git'
 import { blocoDiagnosticosParaPrompt } from './diagnosticos'
-import { readRules, createRulesTemplate, rulesExist } from '../dgrules'
+import { readRules, readComplementaryRules, createRulesTemplate, rulesExist } from '../dgrules'
+import { mapaRepositorio } from './repo-mapa'
 
 export type AbaCtx = {
   path: string
@@ -34,6 +35,10 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
       const rules = readRules(opts.raiz)
       if (rules && rules.trim()) {
         partes.push('### Regras do projeto (.dgrules)\n' + rules.trim().slice(0, 12000))
+      }
+      const compativeis = readComplementaryRules(opts.raiz)
+      if (compativeis) {
+        partes.push('### Regras de outros agentes (AGENTS.md, CLAUDE.md, etc.)\n' + compativeis)
       }
     } catch {
       /* */
@@ -92,6 +97,16 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
         String(opts.errosEditor).trim().slice(0, 8000) +
         '\n```'
     )
+  }
+
+  try {
+    const prioritarios = (opts.abas || [])
+      .map((a) => a.path)
+      .filter(Boolean)
+    const mapa = mapaRepositorio(opts.raiz, prioritarios)
+    if (mapa) partes.push(mapa.trimEnd())
+  } catch {
+    /* mapa é contexto auxiliar — nunca quebra o turno */
   }
 
   let out = partes.join('\n\n')

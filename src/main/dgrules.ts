@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
 const RULES_FILE = '.dgrules'
@@ -46,4 +46,47 @@ export function writeRules(root: string, texto: string): { ok: boolean; erro?: s
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : String(e) }
   }
+}
+
+/**
+ * Arquivos de regras de outros ferramentas/agents que o ecossistema usa
+ * (padrão AGENTS.md, CLAUDE.md, .cursorrules, .clinerules, copilot).
+ * Lidos como contexto complementar — nunca sobrescrevem .dgrules.
+ */
+const RULES_COMPATIVEIS = [
+  'AGENTS.md',
+  'CLAUDE.md',
+  '.cursorrules',
+  '.clinerules',
+  '.windsurfrules',
+  '.github/copilot-instructions.md'
+]
+
+const MAX_POR_ARQUIVO = 6000
+const MAX_TOTAL_COMPATIVEIS = 16000
+
+/**
+ * Regras complementares de outros agentes/ferramentas presentes na raiz.
+ * Retorna texto rotulado por arquivo, ou '' se nenhum existir.
+ */
+export function readComplementaryRules(root: string): string {
+  const partes: string[] = []
+  let total = 0
+  for (const rel of RULES_COMPATIVEIS) {
+    if (total >= MAX_TOTAL_COMPATIVEIS) break
+    const p = join(root, rel)
+    if (!existsSync(p)) continue
+    try {
+      const st = statSync(p)
+      if (!st.isFile() || st.size > 100_000) continue
+      const body = readFileSync(p, 'utf-8').trim()
+      if (!body) continue
+      const fatia = body.slice(0, MAX_POR_ARQUIVO)
+      partes.push('### ' + rel + '\n' + fatia)
+      total += fatia.length
+    } catch {
+      /* */
+    }
+  }
+  return partes.join('\n\n')
 }

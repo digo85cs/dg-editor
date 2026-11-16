@@ -10,6 +10,9 @@
     "analisar": "pequeno",
     "chat": "pequeno",
     "chat-rapido": "pequeno",
+    "resumo": "pequeno",
+    "commit": "pequeno",
+    "classificar": "pequeno",
     "codigo": "padrao"
   },
   "modelosPorTarefa": {
@@ -17,6 +20,9 @@
     "analisar": "qwen2.5-coder:3b",
     "chat": "qwen2.5-coder:3b",
     "chat-rapido": "qwen2.5-coder:1.5b",
+    "resumo": "qwen2.5-coder:1.5b",
+    "commit": "qwen2.5-coder:1.5b",
+    "classificar": "qwen2.5-coder:1.5b",
     "codigo": "qwen2.5-coder:7b"
   },
   "modelos": [

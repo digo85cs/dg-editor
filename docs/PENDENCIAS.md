@@ -21,6 +21,22 @@
 >
 > **Pendente:** `dist:win:installer`; smoke visual manual; investigar `ui.editor.aba-orfa` + 3 falhas a11y do qa:e2e; `app.js` (~7k linhas) segue sendo o maior risco de regressão.
 
+## Melhorias aplicadas (pesquisa GitHub — aider/opencode/Cline/Roo/Continue)
+
+- [x] **Regras multi-formato**: `readComplementaryRules()` lê `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md` e injeta no contexto do agente (`contexto-implicito`) e do chat (`regras-escopo`).
+- [x] **Weak-model para tarefas baratas**: `resumo`, `commit`, `classificar` → `qwen2.5-coder:1.5b` no catálogo (`modelos-catalogo.ts` + `modelos.default.json`).
+- [x] **Repo map estilo aider**: `src/main/agent/repo-mapa.ts` — símbolos exportados por arquivo, cache por assinatura, prioridades por abas, ~7KB, injetado no contexto do agente e do chat.
+- [x] **Auto-aprovação**: já existia matriz de risco (`decidirAutoAprovacao` em `agent-router.ts`) — risco baixo/rota localizada/com ≤2 propostas.
+- [x] **Memória de projeto**: já existia — embeddings semânticos + vault + `proporMemoria` no chat.
+- [x] **Eval/autocorreção**: `qa:ia` (`autocorrigir.ts`) já cobre catálogo fechado de autocorreção.
+
+## Roadmap de melhorias (deferred — esforço > 1 sessão)
+
+- [ ] **LSP para contexto de símbolos** (crush): go-to-def/hover via tsserver — repo-mapa cobre nomes, não assinaturas.
+- [ ] **MCP clients externos / marketplace** (Cline): DG hoje só fala com o próprio servidor MCP (`mcp/client.ts`); catálogo de servidores stdio/http externos é feature nova.
+- [ ] **Spec-driven flow** (spec-kit/Kiro): spec.md → plan → tasks com checklist; plan mode existe, falta o artefato de spec.
+- [ ] **Git worktree checkpoints** (Cline shadow checkpoints): isolar edições do agente do working tree sujo.
+
 ---
 
 > **Status 2026-11-16 (histórico):** documento da missão `missao-conclusao`.
