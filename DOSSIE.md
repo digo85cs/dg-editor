@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **13/11/2026, 22:18:47** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: cf305fb 2026-11-13 release: v0.5.0
-> Alterações locais não commitadas: 13 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 10:23:20** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: e579020 2026-11-13 release: v0.6.0
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -220,7 +220,28 @@ Artefatos locais em `dist-apps/`:
 - Skills embutidas: **23** — editar-seguro.md, arvore-projeto.md, navegador-embutido.md, free-mode.md, prompt-melhorar.md, anexos.md, leitor-codigo.md, refatorador.md, testador.md, debugger.md, revisor-seguranca.md, documentador.md, analisador.md, terminal-local.md, inventario-disco.md, estilo-cursor.md, roteiro-shorts.md, thumbnail-design.md, legenda-automatica.md, publicacao-social.md, pacote-memes.md, dublagem-parodia.md, capa-video.md.
 - Agentes: **19** — Revisor, Arquiteto, Seguranca, Testador, DG Engenheiro, Hibrido Core, Auto Free, Coder Free, Assist Free, Architect Free, Debugger Free, Reviewer Free, Qoder, Devin (OpenHands), Trae, Roteirista, Thumbnail, Legendas, Publicador.
 
-## 11. Comandos npm
+## 11. Ecossistema externo (Qoder, MCP e utilitários)
+
+- Plugins Qoder instalados (5): Qoder Context (`qoder-context`, v1.0.97.fb328997), PPT (`Presentations`, v0.1.4), Excel (`office-excel`, v0.1.2), Word (`office-docx`, v0.4.0), 演示视频导演 (Demo Video Director) (`demo-video-agent`, v0.5.0).
+- Skills do usuário no Qoder (22): ai-video-script, alibabacloud-avatar-video, doubao-image, glm-image-gen, html-to-image, IMA-AI-Image-&-Photo-Generator-—-Poster,-Thumbnail,-Logo,-Art,-Illustration,-Product-&-Social-Media-Graphic-Design, image-enhancer, kling-video-generator, mermaid-image-generator, midjourney, minimax-image-gen, photo-to-video-ai-free, photo-video-maker-best, qwen-image, seedance-2-0-video, sih-ai-photo-changer, sora-2-futuristic-tech-showcase, veo-skill, video-clip-editor, video-editing, video-generation, wavespeed-veo-31-fast.
+- Skills internas do DG Editor em `.dg-editor/skills` (28): analisador, anexos, arquiteto-aux, arvore-projeto, capa-video, conector-codex, conector-cursor, debugger, documentador, dublagem-parodia, editar-seguro, editor-bloco-notas, estilo-cursor, free-mode, inventario-disco, legenda-automatica, leitor-codigo, navegador-embutido, orquestrador, pacote-memes, prompt-melhorar, publicacao-social, refatorador, revisor-seguranca, roteiro-shorts, terminal-local, testador, thumbnail-design.
+- MCPs externos configurados no Qoder (3): HeyGen (remoto), Cloudinary (remoto), Descript (remoto). HeyGen, Cloudinary e Descript são serviços pagos/freemium e permanecem desativados pela regra de custo zero.
+- Presets MCP opcionais do DG Editor (7): desktop-commander, docling, filesystem, git, markitdown, memory, sequential-thinking.
+
+Utilitários locais relevantes:
+
+- ffmpeg — mídia: **presente**
+- ImageMagick — imagem (ImageMagick): **presente**
+- pandoc — documentos: **presente**
+- yt-dlp — download de vídeo: **presente**
+- 7z — arquivos (7-Zip): ausente
+- tesseract — OCR: ausente
+- qemu-system-x86_64 — teste de boot (QEMU): ausente
+- soffice — LibreOffice: ausente
+
+- Ausências tratadas sem bloquear o app: o núcleo de mídia usa ffmpeg embutido; ISO usa pycdlib no Python portátil; a gravação USB não depende de ferramentas externas.
+
+## 12. Comandos npm
 
 <details><summary>Lista completa</summary>
 
@@ -291,21 +312,22 @@ Artefatos locais em `dist-apps/`:
 
 </details>
 
-## 12. Qualidade (QA)
+## 13. Qualidade (QA)
 
 - Cenários Playwright em `src/qa/cenarios`: **18 arquivos**, **182 verificações**.
 - Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.
 - Verificações estáticas no build: encoding, sintaxe e contraste.
 
-## 13. Limites e decisões
+## 14. Limites e decisões
 
 - Somente ferramentas gratuitas; nenhuma chave paga configurada.
 - GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.
 - Músicas: o catálogo é royalty-free com atribuição; o banco local não baixa nada sem ação explícita do usuário.
 - Editores completos de PDF/DOC não são incorporados; vídeo/áudio contam com um editor de linha do tempo embutido (ffmpeg) e o Estúdio cobre utilitários leves (imagem, áudio, vídeo, HTML → imagem).
 
-## 14. Histórico recente
+## 15. Histórico recente
 
+- e579020 2026-11-13 release: v0.6.0
 - cf305fb 2026-11-13 release: v0.5.0
 - 043e097 2026-11-13 release: v0.4.1
 - a0c2fa2 2026-11-13 release: v0.4.0
@@ -315,9 +337,8 @@ Artefatos locais em `dist-apps/`:
 - 8b18036 2026-11-13 release: v0.3.3
 - 720d286 2026-11-13 release: v0.3.2
 - d076e20 2026-11-13 release: v0.3.1
-- 6471e0e 2026-11-13 fix(publicar): empacotar em pasta temporaria e copiar artefatos para OneDrive
 
-## 15. Como atualizar este dossiê
+## 16. Como atualizar este dossiê
 
 ```bash
 npm run dossie     # regenera DOSSIE.md

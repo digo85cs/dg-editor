@@ -3,6 +3,7 @@
 const { readFileSync, writeFileSync, existsSync, readdirSync, statSync } = require('fs')
 const { join, relative } = require('path')
 const { execSync } = require('child_process')
+const { homedir } = require('os')
 
 const RAIZ = join(__dirname, '..')
 const pkg = JSON.parse(readFileSync(join(RAIZ, 'package.json'), 'utf8'))
@@ -78,6 +79,63 @@ const scripts = Object.entries(pkg.scripts || {}).sort(([a], [b]) => a.localeCom
 const catalogo = ler('src/main/midia/musicas-livres.ts')
 const estilos = [...catalogo.matchAll(/id:\s*'(alegre|epica|tensa|calma|misterio|infantil|jazz|eletronica|triste|corporativo)'/g)].map((m) => m[1])
 const faixas = [...catalogo.matchAll(/^\s*faixa\(/gm)].length
+
+// Inventário do ecossistema Qoder + utilitários do PC (tolerante a ausências)
+function lerFora(p) {
+  try {
+    return readFileSync(p, 'utf8')
+  } catch {
+    return ''
+  }
+}
+function listarFora(p) {
+  try {
+    return readdirSync(p)
+  } catch {
+    return []
+  }
+}
+function temComando(nome) {
+  try {
+    execSync(process.platform === 'win32' ? `where ${nome}` : `command -v ${nome}`, { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+const pluginsQoder = (() => {
+  try {
+    const j = JSON.parse(lerFora(join(homedir(), '.qoder', 'plugins', 'installed_plugins_v2.json')) || '{}')
+    return Object.entries(j.plugins || {}).map(([id, lista]) => {
+      const info = (Array.isArray(lista) && lista[0]) || {}
+      return `${info.displayName || id} (\`${id.split('@')[0]}\`, v${info.version || '?'})`
+    })
+  } catch {
+    return []
+  }
+})()
+const skillsUsuario = listarFora(join(homedir(), '.qoder', 'skills'))
+const skillsProjeto = listarFora(join(RAIZ, '.dg-editor', 'skills')).map((n) => n.replace(/\.md$/, ''))
+const mcpQoder = (() => {
+  try {
+    const j = JSON.parse(lerFora(join(homedir(), '.qoder', 'settings.json')) || '{}')
+    return Object.entries(j.mcpServers || {}).map(([nome, cfg]) => `${nome} (${cfg && cfg.url ? 'remoto' : 'local'})`)
+  } catch {
+    return []
+  }
+})()
+const presetsMcp = unicos(ler('src/main/mcp-presets.ts'), /id:\s*'([a-z0-9-]+)'/g)
+const utilitarios = [
+  ['ffmpeg', 'mídia'],
+  ['magick', 'imagem (ImageMagick)'],
+  ['pandoc', 'documentos'],
+  ['yt-dlp', 'download de vídeo'],
+  ['7z', 'arquivos (7-Zip)'],
+  ['tesseract', 'OCR'],
+  ['qemu-system-x86_64', 'teste de boot (QEMU)'],
+  ['soffice', 'LibreOffice']
+].map(([cmd, papel]) => `- ${cmd === 'magick' ? 'ImageMagick' : cmd} — ${papel}: ${temComando(cmd) ? '**presente**' : 'ausente'}`)
 
 function artefatos(dir) {
   const base = join(RAIZ, dir)
@@ -279,12 +337,27 @@ add(
   ''
 )
 
-add('## 11. Comandos npm', '')
+add('## 11. Ecossistema externo (Qoder, MCP e utilitários)', '')
+add(
+  `- Plugins Qoder instalados (${pluginsQoder.length}): ${pluginsQoder.length ? pluginsQoder.join(', ') : 'nenhum'}.`,
+  `- Skills do usuário no Qoder (${skillsUsuario.length}): ${skillsUsuario.length ? skillsUsuario.join(', ') : 'nenhuma'}.`,
+  `- Skills internas do DG Editor em \`.dg-editor/skills\` (${skillsProjeto.length}): ${skillsProjeto.join(', ')}.`,
+  `- MCPs externos configurados no Qoder (${mcpQoder.length}): ${mcpQoder.length ? mcpQoder.join(', ') : 'nenhum'}. HeyGen, Cloudinary e Descript são serviços pagos/freemium e permanecem desativados pela regra de custo zero.`,
+  `- Presets MCP opcionais do DG Editor (${presetsMcp.length}): ${presetsMcp.join(', ')}.`,
+  ''
+)
+add('Utilitários locais relevantes:', '', ...utilitarios, '')
+add(
+  '- Ausências tratadas sem bloquear o app: o núcleo de mídia usa ffmpeg embutido; ISO usa pycdlib no Python portátil; a gravação USB não depende de ferramentas externas.',
+  ''
+)
+
+add('## 12. Comandos npm', '')
 add('<details><summary>Lista completa</summary>', '')
 for (const [nome, cmd] of scripts) add(`- \`npm run ${nome}\` — \`${cmd}\``)
 add('', '</details>', '')
 
-add('## 12. Qualidade (QA)', '')
+add('## 13. Qualidade (QA)', '')
 add(
   `- Cenários Playwright em \`src/qa/cenarios\`: **${cenarios.length} arquivos**, **${idsQa.length} verificações**.`,
   '- Suites: `qa:ipc`, `qa:e2e`, `qa:perf`, `qa:visual`; relatório: `qa:report`; autocorreção assistida: `qa:ia`.',
@@ -292,7 +365,7 @@ add(
   ''
 )
 
-add('## 13. Limites e decisões', '')
+add('## 14. Limites e decisões', '')
 add(
   '- Somente ferramentas gratuitas; nenhuma chave paga configurada.',
   '- GPU do ambiente (GT 710, 2 GB) não suporta CUDA — geração local pesada fica desativada; TTS e Whisper rodam em CPU.',
@@ -301,10 +374,10 @@ add(
   ''
 )
 
-add('## 14. Histórico recente', '')
+add('## 15. Histórico recente', '')
 add(log || '- sem histórico', '')
 
-add('## 15. Como atualizar este dossiê', '')
+add('## 16. Como atualizar este dossiê', '')
 add(
   '```bash',
   'npm run dossie     # regenera DOSSIE.md',
