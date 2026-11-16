@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 19:45:28** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.1** · branch `integra-13-11` · último commit: 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
-> Alterações locais não commitadas: 4 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 20:05:55** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.1** · branch `integra-13-11` · último commit: 4fddeff 2026-11-16 release: v0.6.1
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -201,7 +201,7 @@ Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests_
 
 Artefatos locais em `dist-apps/`:
 
-  - DG-Apps-0.1.0.apk (4.167 KB)
+  - DG-Apps-0.1.0.apk (4.164 KB)
 
 ## 9. MCP
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 4fddeff 2026-11-16 release: v0.6.1
 - 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
 - fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
 - 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 - 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
 - ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
-- 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
 
 ## 16. Como atualizar este dossiê
 

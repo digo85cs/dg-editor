@@ -135,7 +135,8 @@ async function prepararMobile() {
       await executar('npm', ['install', '--no-audit', '--no-fund'], { cwd: APP_MOBILE });
     }
   }
-  if (!existsSync(ANDROID)) {
+  if (!existsSync(ANDROID) || !existsSync(GRADLE)) {
+    if (existsSync(ANDROID)) rmSync(ANDROID, { recursive: true, force: true });
     log('gerando projeto Android (Capacitor)...');
     await executar(process.execPath, [CAP_CLI, 'add', 'android'], { cwd: APP_MOBILE });
   }
