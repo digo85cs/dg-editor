@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 18:22:47** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
+> Gerado automaticamente em **16/11/2026, 18:52:58** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 > Alterações locais não commitadas: 7 arquivo(s).
 
 ## 1. O que é
@@ -328,6 +328,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
+- 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
 - ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
 - 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
 - fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
@@ -336,8 +338,6 @@ Utilitários locais relevantes:
 - 043e097 2026-11-13 release: v0.4.1
 - a0c2fa2 2026-11-13 release: v0.4.0
 - 98fe284 2026-11-13 release: v0.3.6
-- 1d9922a 2026-11-13 release: v0.3.5
-- a0586d6 2026-11-13 release: v0.3.4
 
 ## 16. Como atualizar este dossiê
 

@@ -1,0 +1,11 @@
+{
+  "servidores": [
+    {
+      "nome": "filesystem",
+      "comando": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/dev"],
+      "env": {},
+      "habilitado": true
+    }
+  ]
+}

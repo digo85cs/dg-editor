@@ -30,12 +30,15 @@
 - [x] **Memória de projeto**: já existia — embeddings semânticos + vault + `proporMemoria` no chat.
 - [x] **Eval/autocorreção**: `qa:ia` (`autocorrigir.ts`) já cobre catálogo fechado de autocorreção.
 
+- [x] **Comandos de chat estilo aider**: `/mapa`, `/diff`, `/commit`, `/limpar`, `/modelo`, `/regras`, `/spec`, `/specs`, `/ajuda` em `src/main/chat-comandos.ts` (intercepta `chat:send`).
+- [x] **Spec-driven (artefato)**: `/spec <titulo>` cria `.dg-editor/specs/<slug>.md` com template (objetivo/escopo/tarefas/aceite); specs entram no contexto implícito do agente.
+- [x] **MCP clients externos**: `.dg-editor/mcp-externos.json` (ver `mcp-externos.example.json`) — servidores stdio externos aparecem ao agente como `ext_<servidor>__<tool>` via `mcp/externos.ts`.
+
 ## Roadmap de melhorias (deferred — esforço > 1 sessão)
 
 - [ ] **LSP para contexto de símbolos** (crush): go-to-def/hover via tsserver — repo-mapa cobre nomes, não assinaturas.
-- [ ] **MCP clients externos / marketplace** (Cline): DG hoje só fala com o próprio servidor MCP (`mcp/client.ts`); catálogo de servidores stdio/http externos é feature nova.
-- [ ] **Spec-driven flow** (spec-kit/Kiro): spec.md → plan → tasks com checklist; plan mode existe, falta o artefato de spec.
 - [ ] **Git worktree checkpoints** (Cline shadow checkpoints): isolar edições do agente do working tree sujo.
+- [ ] **MCP marketplace/GUI**: hoje a config de MCPs externos é por arquivo; falta UI de instalação/status em Conectores.
 
 ---
 

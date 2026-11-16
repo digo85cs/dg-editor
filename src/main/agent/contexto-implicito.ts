@@ -1,8 +1,8 @@
 /**
  * Contexto automático (sem @): .dgrules, abas, git, diagnósticos, erros do editor.
  */
-import { existsSync, readFileSync } from 'fs'
-import { relative } from 'path'
+import { existsSync, readdirSync, readFileSync } from 'fs'
+import { join, relative } from 'path'
 import { gitStatus, gitDiff } from '../git'
 import { blocoDiagnosticosParaPrompt } from './diagnosticos'
 import { readRules, readComplementaryRules, createRulesTemplate, rulesExist } from '../dgrules'
@@ -107,6 +107,26 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
     if (mapa) partes.push(mapa.trimEnd())
   } catch {
     /* mapa é contexto auxiliar — nunca quebra o turno */
+  }
+
+  try {
+    const dirSpecs = join(opts.raiz, '.dg-editor', 'specs')
+    if (existsSync(dirSpecs)) {
+      const specs = readdirSync(dirSpecs).filter((n) => n.endsWith('.md'))
+      if (specs.length) {
+        partes.push('### Specs do projeto (.dg-editor/specs)\n' + specs.map((n) => '- ' + n).join('\n'))
+        for (const n of specs.slice(0, 3)) {
+          try {
+            const body = readFileSync(join(dirSpecs, n), 'utf8').slice(0, 2500)
+            partes.push('#### ' + n + '\n' + body)
+          } catch {
+            /* */
+          }
+        }
+      }
+    }
+  } catch {
+    /* opcional */
   }
 
   let out = partes.join('\n\n')

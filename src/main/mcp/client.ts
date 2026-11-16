@@ -6,6 +6,7 @@ import { join } from 'path'
 import { dglog } from '../dglog'
 import path from 'path'
 import { resolverRaizProjeto } from '../paths'
+import { obterRaizWorkspace } from '../workspace-raiz'
 
 /**
  * Cliente MCP interno do DG Editor.
@@ -113,11 +114,26 @@ export interface McpTool {
   inputSchema: unknown
 }
 
+function raizParaExternos(): string {
+  try {
+    return obterRaizWorkspace() || process.env.DG_ROOT || process.cwd()
+  } catch {
+    return process.env.DG_ROOT || process.cwd()
+  }
+}
+
 export async function listarTools(): Promise<McpTool[]> {
   if (!mcpHabilitado()) return []
   const c = await conectarMcp()
   const r = await c.listTools()
-  return (r.tools || []) as McpTool[]
+  const internas = (r.tools || []) as McpTool[]
+  try {
+    const { listarToolsExternos } = await import('./externos')
+    const externas = await listarToolsExternos(raizParaExternos())
+    return [...internas, ...(externas as McpTool[])]
+  } catch {
+    return internas
+  }
 }
 
 export async function chamarTool(
@@ -125,6 +141,11 @@ export async function chamarTool(
   args: Record<string, unknown>
 ): Promise<{ ok: boolean; texto: string; bruto?: unknown }> {
   try {
+    if (nome.startsWith('ext_')) {
+      const { chamarToolExterna } = await import('./externos')
+      const r = await chamarToolExterna(raizParaExternos(), nome, args)
+      if (r) return { ok: r.ok, texto: r.texto }
+    }
     if (!mcpHabilitado()) {
       return { ok: false, texto: 'MCP desabilitado na UI (ative em Conectores)' }
     }

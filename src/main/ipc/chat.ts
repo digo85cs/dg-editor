@@ -158,6 +158,20 @@ async function executarChatSend(
     return { ok: false, message: assistantMsg };
   }
 
+  // Comandos locais (/mapa, /diff, /commit, /limpar, /modelo, /regras, /ajuda)
+  try {
+    const { executarComandoChat } = await import('../chat-comandos');
+    const cmd = await executarComandoChat(rootOk, textoPedido);
+    if (cmd) {
+      return {
+        ok: true,
+        message: { ...assistantMsg, content: cmd.content, provider: 'comando' }
+      };
+    }
+  } catch (e) {
+    dglog('[chat:comando] erro: ' + String(e));
+  }
+
   // === DETECAO DE ANEXOS DE IMAGEM (sem suporte a visão) ===
   const options = opts && typeof opts === 'object' && !Array.isArray(opts)
     ? opts as Record<string, unknown>
