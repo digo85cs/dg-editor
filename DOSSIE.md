@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 19:09:40** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
-> Alterações locais não commitadas: 6 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 19:17:23** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -328,6 +328,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
 - 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
 - c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
 - 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
@@ -337,7 +338,6 @@ Utilitários locais relevantes:
 - ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
 - 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
 - fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
-- e579020 2026-11-13 release: v0.6.0
 
 ## 16. Como atualizar este dossiê
 

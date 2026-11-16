@@ -30,6 +30,14 @@ export function resolverRaizDGEditor(): string {
     return resolve(dgRoot);
   }
 
+  // 1b. App empacotado: estado vai para userData — NUNCA o diretorio de
+  // instalacao (Program Files nao e gravavel e quebrava o boot com EPERM).
+  // process.resourcesPath so existe no Electron empacotado; defaultApp e
+  // true em `electron .` (dev) — entao dispensa require('electron').
+  if (!process.defaultApp && typeof process.resourcesPath === 'string' && process.resourcesPath) {
+    return getUserDataPath();
+  }
+
   // 2. Padrao Windows: C:\\dev\\DGEditor, depois legado D:\\CURSOR\\DG Editor
   if (process.platform === 'win32') {
     if (existsSync(RAIZ_WINDOWS_CANONICA)) return resolve(RAIZ_WINDOWS_CANONICA)

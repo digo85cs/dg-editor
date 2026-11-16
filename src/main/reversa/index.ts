@@ -445,13 +445,28 @@ export function detectarFerramentasReversa(): Record<string, { ok: boolean; vers
     return { ok: true, versao: linha.trim().slice(0, 100) }
   }
   const ghidraHome = process.env.GHIDRA_HOME || process.env.GHIDRA_INSTALL_DIR
+  const rodarCmd = (bin: string, args: string[]) => {
+    const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 5000, windowsHide: true, shell: process.platform === 'win32' })
+    if (r.error || r.status !== 0) return { ok: false }
+    const linha = ((r.stdout || '') + (r.stderr || '')).split(/\r?\n/).find((l) => l.trim()) || ''
+    return { ok: true, versao: linha.trim().slice(0, 100) }
+  }
   const nucleo = {
     strings: rodar(process.platform === 'win32' ? 'strings.exe' : 'strings', ['--version']),
     objdump: rodar('objdump', ['--version']),
     java: rodar('java', ['-version']),
     python: rodar(process.platform === 'win32' ? 'python' : 'python3', ['--version']),
-    jadx: rodar('jadx', ['--version']),
-    radare2: rodar('radare2', ['-v'])
+    jadx: rodarCmd('jadx', ['--version']),
+    apktool: rodarCmd('apktool', ['--version']),
+    radare2: rodar('radare2', ['-v']),
+    rizin: rodarCmd('rizin', ['-v']),
+    cutter: rodarCmd('cutter', ['--version']),
+    tshark: rodarCmd('tshark', ['--version']),
+    volatility: rodarCmd('vol', ['--help']),
+    rea: rodarCmd('rea', ['--version']),
+    ghidra_cli: ghidraHome && existsSync(ghidraHome)
+      ? { ok: existsSync(join(ghidraHome, 'support', process.platform === 'win32' ? 'analyzeHeadless.bat' : 'analyzeHeadless')) }
+      : { ok: false }
   }
   return {
     ...nucleo,
