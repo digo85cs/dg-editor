@@ -63,6 +63,9 @@ const DEFAULT_MODELOS_POR_TAREFA: Record<string, string> = {
   codigo: 'qwen2.5-coder:7b'
 }
 
+/** Modelo de ultimo recurso quando o catalogo nao resolve nenhum candidato de chat. */
+export const MODELO_FALLBACK_CHAT = 'qwen2.5-coder:1.5b'
+
 const PORTE_RANK: Record<string, number> = {
   pequeno: 0,
   padrao: 1,

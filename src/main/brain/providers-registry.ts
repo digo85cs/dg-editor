@@ -117,7 +117,6 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
       ordem: 5,
       modelos: [
         { id: 'openrouter/free', contexto: 128_000, capacidades: ['chat', 'codigo', 'analise'] },
-        { id: 'thinkingmachines/inkling-2-small:free', contexto: 1_000_000, capacidades: ['chat', 'codigo', 'analise'] },
       ],
       preco: { entradaPor1M: 0, saidaPor1M: 0 },
     }

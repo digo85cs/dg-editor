@@ -18,6 +18,7 @@ import { aplicarIdentidadeDg, resolverIconeApp, DG_APP_NAME } from './branding';
 import { getAuthStore } from './auth';
 import { iniciarAutoUpdate } from './auto-update';
 import { agendarManutencaoNoBoot } from './deps-manutencao';
+import { applyCspToWindow } from './security';
 
 // ============================================================================
 // ESTADO GLOBAL
@@ -214,7 +215,7 @@ function createWindow(): void {
       preload: resolvePreload(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -246,6 +247,9 @@ function createWindow(): void {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // Apply CSP after window is created
+  applyCspToWindow(mainWindow.webContents);
 }
 
 // ============================================================================

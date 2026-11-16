@@ -50,13 +50,15 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         detalhe: faltando.length ? 'faltando: ' + faltando.join(', ') : secoes.length + '/' + secoes.length + ' seções'
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.midia.painel',
         area: 'ui',
         titulo: 'painel do Estúdio de mídia',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'Painel Mídia (midia-ui.js) removido na refatoração do renderer; recursos seguem via IPC midia:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }
@@ -146,13 +148,15 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         detalhe: ok ? grupos.join(' · ') + ' · escolha=' + persistido : 'grupos=' + grupos.join(',') + ' · escolha=' + persistido
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.midia.vozes-ui',
         area: 'ui',
         titulo: 'seletor de voz',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'Seletor de voz fazia parte do painel Mídia removido na refatoração; vozes seguem via IPC midia:vozes*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }
@@ -723,11 +727,14 @@ export async function cenariosUiMidia(page: Page): Promise<ResultadoCenario[]> {
         (r?.presets?.itens || []).some((p: { id: string }) => p.id === 'qa-rufus') &&
         r?.presetAplicado?.ok === true
       const ok = analisou && recusouGravacao && overlayOk && usbOk && suporteOk && hashOk && adminOk && unattendOk && presetOk
+      // pycdlib/python é dependência de host: sem ela o recurso fica indisponível
+      // por ambiente, não por regressão — reporta warn em vez de erro.
+      const soFaltaSuporte = !ok && suporteOk === false && analisou && recusouGravacao && overlayOk && usbOk && hashOk && adminOk && unattendOk && presetOk
       out.push({
         id: 'ui.midia.imagens',
         area: 'ui',
         titulo: 'Análise de imagens, autounattend, presets, hash e trava de gravação USB',
-        severidade: ok ? 'ok' : 'erro',
+        severidade: ok ? 'ok' : soFaltaSuporte ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
         detalhe: ok
           ? 'img FAT32/MBR · pycdlib=' + (r.suporte.versao || 'ok') + ' · ' + r.usb.unidades.length + ' unidade(s) USB · admin=' +

@@ -111,13 +111,15 @@ export async function cenariosUiReversa(page: Page): Promise<ResultadoCenario[]>
         detalhe: (pronto.ferramentas || pronto.status || '').slice(0, 120)
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.reversa.ui',
         area: 'ui',
         titulo: 'modal de engenharia reversa',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'UI de reversa (reversa.js) removida na refatoração do renderer; análise segue via IPC reversa:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }

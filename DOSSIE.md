@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 11:00:02** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.0** · branch `integra-13-11` · último commit: fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
-> Alterações locais não commitadas: 10 arquivo(s).
+> Gerado automaticamente em **16/11/2026, 18:11:55** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.0** · branch `integra-13-11` · último commit: 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
+> Alterações locais não commitadas: 60 arquivo(s).
 
 ## 1. O que é
 
@@ -25,7 +25,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `src/preload` — ponte sandbox com allowlist de canais (`invokeChannels`).
 - `src/renderer` — UI (HTML/CSS/JS + painéis), sem acesso direto ao Node.
 - `src/shared` — tipos compartilhados; `src/qa` — cenários Playwright de validação.
-- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, imagens, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, vault, __tests__.
+- Módulos em `src/main`: agent, apps, auth, auto-improvement, automation, brain, clipboard, compartilhar, deploy, gravacao, imagens, ipc, mapas, mcp, memory, midia, navegador, onboarding, openclaw, provisionamento, radar, reversa, security, vault, __tests__.
 
 ## 4. IPC
 
@@ -231,9 +231,9 @@ Artefatos locais em `dist-apps/`:
 Utilitários locais relevantes:
 
 - ffmpeg — mídia: **presente**
-- ImageMagick — imagem (ImageMagick): **presente**
-- pandoc — documentos: **presente**
-- yt-dlp — download de vídeo: **presente**
+- ImageMagick — imagem (ImageMagick): ausente
+- pandoc — documentos: ausente
+- yt-dlp — download de vídeo: ausente
 - 7z — arquivos (7-Zip): ausente
 - tesseract — OCR: ausente
 - qemu-system-x86_64 — teste de boot (QEMU): ausente
@@ -328,6 +328,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 45309f3 2026-11-16 feat: resiliencia radar, skills sync, apk signing, provider cascata, limpeza
 - fc2b76c 2026-11-16 docs: inventário do ecossistema Qoder e utilitários no dossiê
 - e579020 2026-11-13 release: v0.6.0
 - cf305fb 2026-11-13 release: v0.5.0
@@ -337,7 +338,6 @@ Utilitários locais relevantes:
 - 1d9922a 2026-11-13 release: v0.3.5
 - a0586d6 2026-11-13 release: v0.3.4
 - 8b18036 2026-11-13 release: v0.3.3
-- 720d286 2026-11-13 release: v0.3.2
 
 ## 16. Como atualizar este dossiê
 

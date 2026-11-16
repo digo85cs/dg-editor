@@ -288,7 +288,7 @@ function auditarDisco() {
   assert('automation local windows', fs.readFileSync(path.join(ROOT, 'src', 'main', 'automation', 'dispatch.ts'), 'utf8').includes('windows.sistema.info') && fs.readFileSync(path.join(ROOT, 'src', 'main', 'automation', 'dispatch.ts'), 'utf8').includes('windows.arquivo.listar'))
   assert('ensureOllama auto-start', fs.readFileSync(path.join(ROOT,'src','main','ollama-keeper.ts'),'utf8').includes('auto-start'))
   assert('modeloParaTarefa fallback hard', fs.readFileSync(path.join(ROOT,'src','main','brain','modelos-catalogo.ts'),'utf8').includes('FALLBACKS_CHAT'))
-  assert('askOllama retry 1.5b', fs.readFileSync(path.join(ROOT,'src','main','brain','ollama.ts'),'utf8').includes('retry 1.5b'))
+  assert('askOllama retry 1.5b', /retry[\s\S]{0,120}1\.5b/.test(fs.readFileSync(path.join(ROOT,'src','main','brain','ollama.ts'),'utf8')))
   assert('analise ensureOllama', fs.readFileSync(path.join(ROOT,'src','main','ipc','analise.ts'),'utf8').includes('ensureOllama'))
   assert('chat menu fixed', fs.readFileSync(path.join(ROOT,'src','renderer','styles','polish.css'),'utf8').includes('position: fixed') && fs.readFileSync(path.join(ROOT,'src','renderer','chat.js'),'utf8').includes('posicionarMenuChat'))
   assert('chats agrupados por pasta', fs.readFileSync(path.join(ROOT,'src','renderer','chat.js'),'utf8').includes('pintarListaSidebarAgrupada') && fs.readFileSync(path.join(ROOT,'src','renderer','chat.js'),'utf8').includes('onTrocarPasta'))
@@ -300,7 +300,7 @@ function auditarDisco() {
   assert('sintetizarDeTools limpo', fs.readFileSync(path.join(ROOT,'src','main','brain','agent.ts'),'utf8').includes('pareceDumpTool') && fs.readFileSync(path.join(ROOT,'src','main','brain','agent.ts'),'utf8').includes('extrairTextoUtilTool'))
   assert('ollama ordem ultimo', fs.readFileSync(path.join(ROOT,'src','main','brain','providers-registry.ts'),'utf8').includes('ordem: 99') && fs.readFileSync(path.join(ROOT,'src','main','brain','providers-registry.ts'),'utf8').includes('LOCAL por ultimo'))
   assert('fila online antes local', fs.readFileSync(path.join(ROOT,'src','main','brain','registry.ts'),'utf8').includes('Online/CLI primeiro') || fs.readFileSync(path.join(ROOT,'src','main','brain','registry.ts'),'utf8').includes('online/CLI primeiro'))
-  assert('rota auto dg-engenheiro', fs.readFileSync(path.join(ROOT,'src','main','agent-router.ts'),'utf8').includes("agente: 'dg-engenheiro'"))
+  assert('rota auto dg-engenheiro', fs.readFileSync(path.join(ROOT,'src','main','agent-router.ts'),'utf8').includes("agente: intencao === 'codigo' ? 'dg-engenheiro' : 'hibrido-core'"))
   assert('context menu dg', fs.readFileSync(path.join(ROOT,'src','renderer','features','ui','context-menu.js'),'utf8').includes('ligarContextMenuDg'))
   assert('cartao um status', fs.readFileSync(path.join(ROOT,'src','renderer','features','chat','progresso-humano.js'),'utf8').includes('chat-work-step-one'))
   assert('whereis oculto analise', fs.readFileSync(path.join(ROOT,'src','renderer','index.html'),'utf8').includes('id="whereis-bar" hidden'))
@@ -392,7 +392,7 @@ assert('backup onedrive script', fs.existsSync(path.join(ROOT, 'scripts', 'backu
   assert('backup onedrive setup', fs.existsSync(path.join(ROOT, 'scripts', 'setup-backup-onedrive.ps1')))
   assert('backup:onedrive ipc', ferrIpc.includes("ipcMain.handle('backup:onedrive'") && preload.includes("'backup:onedrive'"))
   assert('backup onedrive ui', html.includes('id="btn-backup-onedrive"') && appJs.includes('rodarBackupOneDrive'))
-  assert('tema config persistente', fs.readFileSync(path.join(ROOT, 'src', 'main', 'config.ts'), 'utf8').includes('lerTema'))
+  assert('tema config persistente', fs.readFileSync(path.join(ROOT, 'src', 'main', 'tema.ts'), 'utf8').includes('lerTema'))
   assert('assistente novo modal', html.includes('id="modal-assistente-novo"') && html.includes('data-novo="sistema"'))
   assert('sem agent-input-bar', !html.includes('class="agent-input-bar"'))
   assert(
@@ -464,7 +464,7 @@ assert('backup onedrive script', fs.existsSync(path.join(ROOT, 'scripts', 'backu
   assert('MCP tem tools', tools.length >= 8)
   console.log('MCP TOOLS ' + tools.length + ': ' + tools.join(', '))
   const fila = fs.readFileSync(path.join(ROOT, 'src', 'main', 'agent', 'fila.ts'), 'utf8')
-  assert('fila serial sem paralelismo', fila.includes('if (rodando) return') && fila.includes('while (fila.length)'))
+  assert('fila serial sem paralelismo', fila.includes('if (f.rodando) return') && fila.includes('while (f.fila.length)'))
 }
 
 function ollamaTags() {

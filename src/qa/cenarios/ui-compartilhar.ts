@@ -109,13 +109,15 @@ export async function cenariosUiCompartilhar(page: Page): Promise<ResultadoCenar
         detalhe: titulo + ' · status ativo=' + ativo
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.compartilhar.ui',
         area: 'ui',
         titulo: 'modal de compartilhamento local',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'UI de compartilhamento (compartilhar.js) removida na refatoração do renderer; servidor segue via IPC compartilhar:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }

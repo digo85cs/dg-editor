@@ -188,12 +188,16 @@ async function main() {
   const corpoSel = mSel ? mSel[1] : ''
   // anti-regressão A: NÃO deve chamar renderizarPastas (a causa do lag de 220ms)
   assert('selecionarPasta NAO chama renderizarPastas', !/renderizarPastas\s*\(/.test(corpoSel))
-  // anti-regressão B: deve usar Promise.all (as 3 chamadas IPC em paralelo)
-  assert('selecionarPasta usa Promise.all', /Promise\.all\s*\(/.test(corpoSel))
-  // anti-regressão C: as 3 chamadas IPC estão DENTRO do Promise.all
-  assert('selecionarPasta chama chat:load dentro de Promise.all', /Promise\.all\s*\([\s\S]*chat:load/.test(corpoSel))
-  assert('renderizarChat aceita envelope IPC mensagens', /Array\.isArray\(msgs\?\.mensagens\)/.test(appSrc))
-  assert('selecionarPasta chama analysis:cached dentro de Promise.all', /Promise\.all\s*\([\s\S]*analysis:cached/.test(corpoSel))
+  // anti-regressão B: sincronizarContextoPasta deve usar Promise.all (carregamentos em paralelo)
+  const mSync = appSrc.match(/async function sincronizarContextoPasta\([^)]*\)\s*\{([\s\S]*?)\n\}/)
+  assert('sincronizarContextoPasta existe em app.js', !!mSync)
+  const corpoSync = mSync ? mSync[1] : ''
+  assert('sincronizarContextoPasta usa Promise.all', /Promise\.all\s*\(/.test(corpoSync))
+  const chatJsVal = fs6.readFileSync(path6.join(__dirname, '..', 'src', 'renderer', 'chat.js'), 'utf-8')
+  // chat:load foi substituído por chat:listar/chat:carregar dentro de iniciarHistoricoChat (chat.js)
+  assert('historico de chat carrega via chat:listar na cadeia do Promise.all', /chat:(listar|load)/.test(chatJsVal) && /ligarHistoricoChat\(p\)/.test(corpoSync))
+  assert('renderizarChat aceita envelope IPC mensagens', /Array\.isArray\(r\.chat\.mensagens\)/.test(chatJsVal))
+  assert('sincronizarContextoPasta chama analysis:cached junto do Promise.all', /analysis:cached/.test(corpoSync) && /Promise\.all\s*\(/.test(corpoSync))
   // anti-regressão D: carregarFilhos só é chamado condicionalmente (childElementCount === 0)
   const temCarregarFilhos = /carregarFilhos\s*\(/.test(corpoSel)
   const temGuard = /childElementCount\s*===\s*0/.test(corpoSel)
@@ -349,9 +353,11 @@ async function main() {
     'IPC de arquivo valida caminhos com caminhoSeguro',
     /caminhoSeguro/.test(arquivoIpc10) && /handleArquivoLer/.test(arquivoIpc10)
   )
+  const ipcDirVal = pathT.join(rootT, 'src', 'main', 'ipc')
+  const temExigirString = fsT.readdirSync(ipcDirVal).filter((f) => f.endsWith('.ts')).some((f) => /exigirString/.test(fsT.readFileSync(pathT.join(ipcDirVal, f), 'utf-8')))
   assert(
-    'index.ts valida payload com exigirString',
-    /exigirString/.test(indexMain)
+    'handlers IPC validam payload com exigirString',
+    temExigirString
   )
   const cspMatch = htmlRend.match(/Content-Security-Policy[^>]*content="([^"]+)"/i)
   const csp = cspMatch ? cspMatch[1] : ''
@@ -704,7 +710,7 @@ async function main() {
     )
     assert(
       'analise rapida usa escopo explicito sem forcar cache',
-      /rodarAnalise\(pastaAtual,\s*'rapida'\)/.test(app30)
+      /rodarAnalise\(state\.pastaAtual,\s*'rapida'\)/.test(app30)
     )
     assert(
       'analise completa confirma antes de rodar',
@@ -712,7 +718,7 @@ async function main() {
     )
     assert(
       'analise generica oferece dialogo com tres opcoes',
-      /buttons:\s*\['Analise rapida',\s*'Analise completa',\s*'Cancelar'\]/.test(main30) &&
+      /buttons:\s*\['Análise rápida',\s*'Análise completa',\s*'Cancelar'\]/.test(main30) &&
         /choose-scope/.test(main30) && /choose-scope/.test(app30)
     )
     assert(
@@ -781,11 +787,11 @@ async function main() {
     )
     assert(
       'cat.ativo exige porte compativel',
-      /porteCompativel|a\.porte === porte/.test(cat31)
+      /a\.porte !== porteChat|porteCompativel/.test(cat31)
     )
     const chatFila = (() => {
-      const m = reg31.match(/if\s*\(\s*t\s*===\s*['"]chat['"]\s*\)\s*\{[\s\S]*?return\s*\[[\s\S]*?\]/)
-      return m ? m[0] : ''
+      const m = reg31.match(/if\s*\(\s*t\s*===\s*['"]chat['"]\s*\)\s*\{[\s\S]*?return\s+comPrefixoGlobal\(\[([\s\S]*?)\n\s*\]\s*\)/)
+      return m ? m[1] : ''
     })()
     assert(
       'fila chat comeca com 3b',
@@ -1011,8 +1017,9 @@ async function main() {
 
     assert('html tem #menubar', /id="menubar"/.test(html))
     assert('html menus Arquivo..Ajuda', /data-menu="arquivo"/.test(html) && /data-menu="ajuda"/.test(html))
-    assert('html Contas no sidebar-footer', /sidebar-footer[\s\S]*id="btn-contas"/.test(html))
-    assert('html Config no sidebar-footer', /sidebar-footer[\s\S]*id="btn-config"/.test(html))
+    // Contas/Config migraram do sidebar-footer para a statusbar (.sb-actions)
+    assert('html Contas na statusbar', /id="statusbar"[\s\S]*id="btn-contas"/.test(html))
+    assert('html Config na statusbar', /id="statusbar"[\s\S]*id="btn-config"/.test(html))
     assert(
       'html config fora da activity-bar',
       !/<nav id="activity-bar"[\s\S]*?data-action="config"[\s\S]*?<\/nav>/.test(html)
@@ -1024,9 +1031,10 @@ async function main() {
     assert('css titlebar no-drag', /#titlebar[\s\S]{0,400}-webkit-app-region:\s*no-drag/.test(css))
     assert('css tb-drag-fill', /\.tb-drag-fill[\s\S]{0,120}-webkit-app-region:\s*drag/.test(css))
     assert('css sidebar grid footer', /#sidebar\s*\{[\s\S]{0,200}grid-template-rows:/.test(css))
+    const cssPolish = fs.readFileSync(path.join(ROOT, 'src/renderer/styles/polish.css'), 'utf8')
     assert(
-      'css Contas/Config empilhados (column)',
-      /\.sidebar-footer\s*\{[\s\S]{0,180}flex-direction:\s*column/.test(css)
+      'css Contas/Config na statusbar (flex)',
+      /#statusbar \.sb-actions\s*\{[\s\S]{0,160}display:\s*flex/.test(cssPolish)
     )
     assert('css modal-float', /\.modal\.modal-float/.test(css))
     assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
@@ -1327,12 +1335,12 @@ async function main() {
         /janela:zoom/.test(preA) &&
         /janela:recarregar/.test(preA)
     )
-    assert('Contas/Config no footer da sidebar', /class="sidebar-footer"/.test(htmlA) && /id="btn-contas"/.test(htmlA) && /id="btn-config"/.test(htmlA))
+    assert('Contas/Config na statusbar', /id="statusbar"[\s\S]*id="btn-contas"[\s\S]*id="btn-config"/.test(htmlA))
     assert(
-      'CSS sidebar Contas na base (grid)',
-      /grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\)\s+auto/.test(
+      'CSS statusbar reserva linha na base',
+      /--dg-statusbar-h/.test(
         fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')
-      ) && /\.sidebar-footer/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
+      ) && /#statusbar/.test(fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8'))
     )
     assert('docs adapta.md', fs.existsSync(path.join(ROOT, 'docs/adapta.md')))
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
@@ -1351,13 +1359,13 @@ async function main() {
     const st0 = fila.statusFilaAgente()
     assert('fila inicia vazia', st0.tamanho === 0 && st0.ocupado === false)
     let ordem = ''
-    const p1 = fila.enfileirarAgente(async () => {
+    const p1 = fila.enfileirarAgente('teste', async () => {
       ordem += 'a'
       await new Promise((r) => setTimeout(r, 20))
       ordem += 'b'
       return 1
     })
-    const p2 = fila.enfileirarAgente(async () => {
+    const p2 = fila.enfileirarAgente('teste', async () => {
       ordem += 'c'
       return 2
     })
@@ -1368,7 +1376,7 @@ async function main() {
     {
       const fila2 = loadModule('main/agent/fila.ts')
       let viuAbort = false
-      const slow = fila2.enfileirarAgente(async (signal) => {
+      const slow = fila2.enfileirarAgente('teste', async (signal) => {
         await new Promise((resolve, reject) => {
           const t = setTimeout(resolve, 5000)
           signal.addEventListener('abort', () => {
@@ -1379,7 +1387,7 @@ async function main() {
         })
         return 'done'
       })
-      const queued = fila2.enfileirarAgente(async () => 'never')
+      const queued = fila2.enfileirarAgente('teste', async () => 'never')
       await new Promise((r) => setTimeout(r, 15))
       const can = fila2.cancelarFilaAgente('teste')
       assert('cancelar retorna ok', can.ok === true && can.cancelados >= 1)
@@ -1499,11 +1507,11 @@ async function main() {
       fs.writeFileSync(fC, 'antes', 'utf8')
       const meta = await ck.criarCheckpoint([fC], 'teste')
       assert('checkpoint criado', !!meta.id)
+      assert('ultimoCheckpoint', ck.ultimoCheckpoint()?.id === meta.id)
       fs.writeFileSync(fC, 'depois', 'utf8')
       const rest = await ck.restaurarCheckpoint(meta.id)
       assert('checkpoint restaurar', rest.ok === true && rest.restaurados === 1)
       assert('conteudo restaurado', fs.readFileSync(fC, 'utf8') === 'antes')
-      assert('ultimoCheckpoint', ck.ultimoCheckpoint()?.id === meta.id)
     }
 
     const pre = fs.readFileSync(path.join(SRC, 'preload/index.ts'), 'utf8')
@@ -1532,7 +1540,7 @@ async function main() {
     }
     assert('handlers de ferramentas registrados no boot', /registrarHandlersFerramentas\(\)/.test(ipcRegistry))
     const ipcChat = fs.readFileSync(path.join(SRC, 'main/ipc/chat.ts'), 'utf8')
-    assert('chat:send usa stream Ollama e fallback de modelo', /streamOllamaChat/.test(ipcChat) && /askOllama\(textoPedido, context, 'chat'\)/.test(ipcChat))
+    assert('chat:send usa stream Ollama e fallback de modelo', /streamOllamaChat/.test(ipcChat) && /askOllama\(textoPedido, context, 'chat'/.test(ipcChat))
     assert('chat envia deltas pelo canal liberado', /send\('chat:delta'/.test(ipcChat) && /'chat:delta'/.test(pre))
     assert('chat:send nao retorna texto placeholder', !/Handler de chat:send refatorado/.test(ipcChat))
     const idxMain = fs.readFileSync(path.join(SRC, 'main/index.ts'), 'utf8')
@@ -1570,7 +1578,8 @@ async function main() {
     const auditIntegracao = fs.readFileSync(path.join(SRC, 'main/auditoria-integracao.ts'), 'utf8')
     assert('auditoria de completar segue o modulo IPC', /integracao:tab-ipc[^\n]*src\/main\/ipc\/editor\.ts/.test(auditIntegracao))
     assert('auditoria de regras/memoria segue o modulo chat', /integracao:regras[^\n]*src\/main\/ipc\/chat\.ts/.test(auditIntegracao) && /integracao:memoria[^\n]*src\/main\/ipc\/chat\.ts/.test(auditIntegracao))
-    assert('statusEmbedNavegador exportado no index', /statusEmbedNavegador/.test(idxMain))
+    const navJanela = fs.readFileSync(path.join(SRC, 'main/navegador/janela.ts'), 'utf8')
+    assert('statusEmbedNavegador exportado no módulo navegador', /export function statusEmbedNavegador/.test(navJanela))
     assert('smoke embed injeta BrowserWindow pai', /DG_NAV_SMOKE_EMBED/.test(idxMain))
     const agentTs = fs.readFileSync(path.join(SRC, 'main/brain/agent.ts'), 'utf8')
     assert('modo plan no agent', /modo === 'plan'/.test(agentTs) || /modo\?: 'plan'/.test(agentTs))
@@ -1578,7 +1587,7 @@ async function main() {
     assert('checkpoint em write direto', /criarCheckpoint/.test(agentTs))
     assert('AbortSignal no agent', /signal\?\.aborted|opts\?\.signal/.test(agentTs))
     const html = fs.readFileSync(path.join(SRC, 'renderer/index.html'), 'utf8')
-    assert('aba Agent no HTML', /data-center-pane="agent"/.test(html))
+    assert('aba Agent no HTML', /data-center="agent"|id="center-pane-agent"/.test(html))
     assert('plan mode checkbox', /agent-plan-mode/.test(html))
     assert('btn Parar agente', /btn-agent-stop/.test(html))
     assert('btn Executar plano', /btn-agent-exec-plano/.test(html))
@@ -1594,8 +1603,9 @@ async function main() {
     assert('a11y region agent', /aria-label="Painel do agente"/.test(html))
     const appJs = fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8')
     assert('host dos seletores de chat existe', /id="chat-header-actions"/.test(html))
-    assert('seletores dinamicos de chat usam o host', /getElementById\('chat-header-actions'\)/.test(appJs) && /chat-agent-select/.test(appJs) && /chat-mode-select/.test(appJs))
-    assert('opcoes de agente recarregam ao trocar de pasta', /void carregarOpcoesAgenteChat\(path\)/.test(appJs) && /function carregarOpcoesAgenteChat/.test(appJs))
+    const modesUi = fs.readFileSync(path.join(SRC, 'renderer/modes-ui.js'), 'utf8')
+    assert('seletores dinamicos de chat usam o host', /getElementById\('chat-mode-select'\)/.test(appJs) && /chat-agent-select/.test(modesUi))
+    assert('opcoes de agente recarregam ao trocar de pasta', /void carregarOpcoesAgenteChat\(p\)/.test(appJs) && /function carregarOpcoesAgenteChat/.test(appJs))
     assert('menu de opcoes do chat expoe estado acessivel', /aria-expanded/.test(appJs) && /aria-checked/.test(appJs) && /chat-mais-menu/.test(appJs))
     assert('toolbar do agente separa execucao e fila', /agent-header-main/.test(html) && /agent-header-actions/.test(html))
     const rendererCss = fs.readFileSync(path.join(SRC, 'renderer/styles.css'), 'utf8')

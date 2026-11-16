@@ -21,11 +21,6 @@ import {
   animarEntradaMsg
 } from './chat.js'
 import { ligarFerramentas } from './ferramentas-ui.js'
-import { abrirGrafoVault } from './grafo-vault.js'
-import { abrirMapaMental } from './mapa-mental.js'
-import { abrirGravador } from './gravador.js'
-import { abrirCompartilhamento } from './compartilhar.js'
-import { abrirReversa } from './reversa.js'
 import { tempoRelativoCommit } from './utils/format.js'
 import { escapar } from './utils/dom.js'
 import { instalarTrapFocoModais } from './utils/focus-trap.js'
@@ -41,7 +36,6 @@ import { iniciarGuardian } from './features/guardian/index.js'
 import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivos/git-helpers.js'
 import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
-import { CHAVE_ABAS, CHAVE_SEM_PROJETO, normalizarMapaAbas, podarMapaAbas, podarProjetosInexistentes } from './features/editor/abas-mapa.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
 import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
@@ -282,12 +276,6 @@ function initResizers() {
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       salvarLayout()
-      // Larguras mudaram: remede o CodeMirror e reajuste o xterm.
-      editor?.requestMeasure?.()
-      requestAnimationFrame(() => {
-        editor?.requestMeasure?.()
-        window.dgTerminal?.fit?.()
-      })
       if (typeof enviarBoundsBrowser === 'function') enviarBoundsBrowser()
     }
     el.addEventListener('mousedown', (e) => {
@@ -678,6 +666,20 @@ document.querySelectorAll('.center-tab').forEach((t) => {
 
 // Bridge para terminal.js (toggle Ctrl+` / icon-bar) sem import circular
 window.abrirArquivoNaAba = abrirArquivoNaAba
+// Hook de QA: zera abas de forma determinística (a limpeza via DOM trava
+// quando há abas dirty órfãs acumuladas pela suíte e2e).
+window.__dgTestLimparAbas = () => {
+  state.abas = []
+  state.abaAtiva = null
+  editor?.limpar?.()
+  histAbas = []
+  histIdx = -1
+  atualizarBotoesHist?.()
+  atualizarBreadcrumb?.()
+  atualizarEmpty?.()
+  renderizarAbas()
+  persistirAbas()
+}
 window.dgUi = {
   toggleRight,
   ativarAbaDireita,
@@ -784,28 +786,6 @@ async function abrirWikiLink(alvo) {
   }
   await abrirArquivoNaAba(r.path)
   void atualizarPainelVault(r.path)
-}
-
-async function colarComoMarkdown() {
-  try {
-    const r = await window.api.invoke('clipboard:colar-markdown')
-    if (!r?.ok) {
-      mostrarToast(r?.erro || 'Área de transferência vazia', 'erro')
-      return
-    }
-    const painelEditor = $('center-pane-editor')
-    const editorAtivo = painelEditor?.classList.contains('active')
-    if (editorAtivo && editor && state.abaAtiva && typeof editor.inserirTexto === 'function') {
-      editor.inserirTexto(r.markdown)
-      mostrarToast('Markdown colado · ' + r.caracteres + ' caracteres', 'ok')
-      anunciar('Conteúdo colado como Markdown no editor')
-      return
-    }
-    const { abrirColarMarkdown } = await import('./colar-markdown.js')
-    abrirColarMarkdown(r.markdown, r.origem)
-  } catch (e) {
-    mostrarToast('Falha ao colar Markdown: ' + String(e), 'erro')
-  }
 }
 
 function adicionarPasta(path) {
@@ -1341,7 +1321,7 @@ function anunciarEtapaAgente(etapa) {
   if (lerPreferenciasA11y().anuncioStreaming === 'silencioso') return
   ultimoStatusAgente = etapa
   ultimoStatusAgenteEm = agora
-  anunciar('Agente: ' + etapa)
+  anunciar('Agente: ' + etapa, { prioridade: true })
 }
 
 function fecharPainelDiff() {
@@ -1936,43 +1916,18 @@ setInterval(() => {
 }, 5000)
 
 // ---------- Abas + editor ----------
-function chaveProjetoAbas() {
-  const p = String(state.pastaAtual || '').trim()
-  return p ? p.toLowerCase() : CHAVE_SEM_PROJETO
-}
-
-function lerMapaAbas() {
-  try {
-    return normalizarMapaAbas(JSON.parse(localStorage.getItem(CHAVE_ABAS) || '{}'), chaveProjetoAbas())
-  } catch {
-    return {}
-  }
-}
-
-function salvarMapaAbas(mapa) {
-  try {
-    localStorage.setItem(CHAVE_ABAS, JSON.stringify(mapa))
-  } catch {
-    /* armazenamento cheio */
-  }
-}
-
 function persistirAbas() {
-  const mapa = lerMapaAbas()
-  mapa[chaveProjetoAbas()] = {
-    abas: state.abas.map((a) => a.caminho),
-    ativa: state.abaAtiva,
-    raiz: String(state.pastaAtual || ''),
-    em: Date.now()
-  }
-  salvarMapaAbas(podarMapaAbas(mapa))
+  localStorage.setItem(
+    'dg-state.abas',
+    JSON.stringify({ abas: state.abas.map((a) => a.caminho), ativa: state.abaAtiva })
+  )
 }
 
 async function restaurarAbas() {
   try {
-    const mapa = await podarProjetosInexistentes(lerMapaAbas(), existeRaizProjeto)
-    salvarMapaAbas(mapa)
-    const data = mapa[chaveProjetoAbas()] || {}
+    const raw = localStorage.getItem('dg-state.abas')
+    if (!raw) return
+    const data = JSON.parse(raw)
     const lista = Array.isArray(data.abas) ? data.abas : []
     for (const c of lista) {
       const existe = await window.api.invoke('arquivo:existe', c, pastasPermitidas())
@@ -1992,11 +1947,6 @@ async function restaurarAbas() {
   } catch (e) {
     console.warn('[state.abas] restaurar:', e)
   }
-}
-
-async function existeRaizProjeto(raiz) {
-  const r = await window.api.invoke('arquivo:existe', raiz, [raiz])
-  return r?.ok === true && r.existe === true
 }
 
 function renderizarAbas() {
@@ -2619,14 +2569,7 @@ async function fecharAba(caminho) {
     state.abaAtiva = null
     if (state.abas.length) {
       const next = state.abas[Math.min(idx, state.abas.length - 1)]
-      const abriu = await ativarAba(next.caminho)
-      if (!abriu) {
-        // Próxima aba não abriu (arquivo removido): sem re-render a barra
-        // continuaria mostrando a aba recém-fechada como elemento fantasma.
-        renderizarAbas()
-        atualizarBreadcrumb()
-        atualizarEmpty()
-      }
+      await ativarAba(next.caminho)
     } else {
       editor?.limpar()
       histAbas = []
@@ -3226,7 +3169,6 @@ async function enviarMensagem() {
   let anuncioAte = 0
   let offProg = null
   const jobInicio = Date.now()
-  ultimoStatusAgente = ''
   const agentStats = criarStatsVazios()
   registrarJob({
     pasta: pastaChat,
@@ -4533,12 +4475,6 @@ function bootstrapComandos() {
   const defs = [
     { id: 'abrir-pasta', titulo: 'Abrir pasta de trabalho', atalho: 'Ctrl+O', fn: () => abrirPasta() },
     { id: 'abrir-vault', titulo: 'Abrir vault Markdown', fn: () => abrirVault() },
-    { id: 'grafo-vault', titulo: 'Grafo do vault', fn: () => void abrirGrafoVault({ abrirNota: (p) => void abrirArquivoNaAba(p) }) },
-    { id: 'mapa-mental', titulo: 'Mapa mental (MindNode)', fn: () => void abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
-    { id: 'gravar-tela', titulo: 'Gravar tela (janela ou monitor)', fn: () => void abrirGravador({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
-    { id: 'receber-lan', titulo: 'Receber arquivos do celular (LAN)', fn: () => void abrirCompartilhamento({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
-    { id: 'reversa', titulo: 'Engenharia reversa local (REA)', fn: () => void abrirReversa({ raiz: state.pastaAtual || state.vaultRaiz || '' }) },
-    { id: 'colar-markdown', titulo: 'Colar como Markdown', atalho: 'Ctrl+Shift+V', fn: () => void colarComoMarkdown() },
     { id: 'fechar-vault', titulo: 'Fechar vault', fn: () => fecharVault() },
     { id: 'quick-open', titulo: 'Quick Open', atalho: 'Ctrl+P', fn: () => abrirPaletaArquivos() },
     { id: 'busca-global', titulo: 'Busca no projeto', atalho: 'Ctrl+Shift+F', fn: () => abrirBuscaGlobal() },
@@ -4597,11 +4533,6 @@ function bootstrapComandos() {
       titulo: 'Navegador embutido',
       atalho: 'Ctrl+Shift+N',
       fn: () => abrirNavegadorNoBloco3()
-    },
-    {
-      id: 'estudio-midia',
-      titulo: 'Estúdio de mídia (imagem, vídeo, áudio)',
-      fn: () => window.dgEstudioMidia?.()
     },
     {
       id: 'adapta-copiar',
@@ -5280,12 +5211,6 @@ $('btn-sidebar-nova-chat')?.addEventListener('click', () => {
 })
 $('btn-desktop-use')?.addEventListener('click', () => pedirPermissaoDesktop())
 $('btn-open-vault')?.addEventListener('click', () => void abrirVault())
-$('btn-vault-grafo')?.addEventListener('click', () =>
-  void abrirGrafoVault({ abrirNota: (p) => void abrirArquivoNaAba(p) })
-)
-$('btn-mapa-mental')?.addEventListener('click', () =>
-  void abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' })
-)
 $('btn-close-vault')?.addEventListener('click', () => void fecharVault())
 $('md-preview')?.addEventListener('click', (ev) => {
   const a = ev.target?.closest?.('a.wiki-link')
@@ -6354,25 +6279,6 @@ $('palette-input').addEventListener('keydown', (e) => {
   }
 })
 
-// Ctrl+Shift+V em captura: no editor vira "colar como Markdown";
-// fora de campos de texto abre a prévia. Terminal e inputs mantêm o padrão.
-document.addEventListener(
-  'keydown',
-  (e) => {
-    const mod = e.ctrlKey || e.metaKey
-    if (!mod || !e.shiftKey || e.altKey || e.key.toLowerCase() !== 'v') return
-    const el = document.activeElement
-    if (el instanceof Element && !el.closest('.cm-editor')) {
-      const tag = el.tagName
-      if (el.closest('.xterm') || tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable) return
-    }
-    e.preventDefault()
-    e.stopPropagation()
-    void colarComoMarkdown()
-  },
-  true
-)
-
 document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey
   const key = e.key.toLowerCase()
@@ -7147,7 +7053,6 @@ const MENUS_BARRA = {
     { id: 'auditar', label: 'Auto auditoria' },
     { id: 'regras-projeto', label: 'Regras do projeto (.dgrules)' },
     { sep: true },
-    { id: 'estudio-midia', label: 'Estúdio de mídia' },
     { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
   ],
   ajuda: [{ id: 'sobre', label: 'Sobre o DG Editor' }]
@@ -7386,7 +7291,7 @@ document.addEventListener(
         ajustarFontePainelUi('terminal', 0)
         return
       }
-      if ((e.key === '0' || e.code === 'Digit0') && !e.shiftKey) {
+      if (e.key === '0' && !e.shiftKey) {
         e.preventDefault()
         ajustarZoomUi(0)
         return

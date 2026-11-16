@@ -4,7 +4,6 @@
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { lerPreferenciasA11y } from './features/ui/acessibilidade.js'
 import '@xterm/xterm/css/xterm.css'
 
 const LS_HEIGHT = 'dg-terminal-height'
@@ -262,22 +261,6 @@ export function initTerminalPanel() {
 
   function fitTodos() {
     for (const g of grupos.values()) fitEResize(g, g.ativoId)
-  }
-
-  /** Aplica o tamanho de fonte preferido em todas as abas abertas. */
-  function aplicarFonte(px) {
-    const n = Math.max(10, Math.min(18, Math.round(Number(px) || 13)))
-    for (const g of grupos.values()) {
-      for (const a of g.abas.values()) {
-        try {
-          a.xterm.options.fontSize = n
-        } catch {
-          /* xterm já descartado */
-        }
-      }
-      fitEResize(g, g.ativoId)
-    }
-    return n
   }
 
   function marcarGrupoAtivo(key) {
@@ -539,7 +522,7 @@ export function initTerminalPanel() {
     const xterm = new Terminal({
       cursorBlink: true,
       fontFamily: 'Cascadia Code, Consolas, monospace',
-      fontSize: lerPreferenciasA11y().tamanhoTerminal,
+      fontSize: 13,
       scrollback: scrollbackCfg,
       theme: temaXterm(),
       allowProposedApi: true
@@ -1221,7 +1204,6 @@ export function initTerminalPanel() {
     },
     fechar: () => fecharPainel(true),
     fit: fitTodos,
-    aplicarFonte,
     isOpen: () => aberto
   }
 

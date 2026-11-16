@@ -22,7 +22,9 @@ function run(name, cmd, args) {
     encoding: 'utf8',
     env: { ...process.env, DG_QA_SEM_PTY: '1' },
     maxBuffer: 20 * 1024 * 1024,
-    windowsHide: true
+    windowsHide: true,
+    // .cmd/.bat/.ps1 precisam de shell no Windows; .exe roda direto (evita quebrar paths com espaço)
+    shell: process.platform === 'win32' && /\.(cmd|bat|ps1)$/i.test(cmd)
   })
   return {
     name,
@@ -85,6 +87,7 @@ const node = process.execPath
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 if (missing.length === 0) {
+  steps.push(run('deps', node, [path.join('scripts', 'verificar-deps.cjs')]))
   steps.push(run('typecheck', npm, ['run', 'typecheck']))
   steps.push(run('test', npm, ['test']))
   steps.push(run('build', npm, ['run', 'build']))

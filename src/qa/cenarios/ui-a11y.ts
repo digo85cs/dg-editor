@@ -627,8 +627,13 @@ export async function cenariosUiA11y(page: Page, raiz: string): Promise<Resultad
         const base = r?.raiz || r
         if (!base) return { base: '', a: '', b: '', limpas: 0 }
         // Zera abas herdadas das telas anteriores (descarta alterações pendentes).
+        // Hook direto é determinístico; o loop via DOM fica como fallback.
+        if (typeof (window as any).__dgTestLimparAbas === 'function') {
+          ;(window as any).__dgTestLimparAbas()
+          await espera(150)
+        }
         let limpas = 0
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 200; i++) {
           const btn = document.querySelector<HTMLElement>('#editor-tabs .editor-tab')
           if (!btn) break
           btn

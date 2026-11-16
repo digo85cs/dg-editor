@@ -839,10 +839,7 @@ body.tema-escuro .msg.user {
   white-space: nowrap;
 }
 .right-tab-close {
-  position: absolute;
-  right: 1px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
   flex: 0 0 auto;
   opacity: 0;
   font-size: 12px;

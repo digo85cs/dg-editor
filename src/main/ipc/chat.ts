@@ -617,7 +617,7 @@ async function executarChatSend(
       }
 
       persistirUsuario();
-      const { modeloParaTarefa } = await import('../brain/modelos-catalogo');
+      const { modeloParaTarefa, MODELO_FALLBACK_CHAT } = await import('../brain/modelos-catalogo');
       const { guardianPodeOperar } = await import('../guardian');
       const { ensureOllama } = await import('../ollama-keeper');
       const { streamOllamaChat, streamOpenAIChat } = await import('../brain/stream-chat');
@@ -702,9 +702,9 @@ async function executarChatSend(
           dglog('[chat] detectarModelosLocais: ' + String(e));
         }
         modeloChat = modeloParaTarefa(rootOk, 'chat');
-        modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat || 'qwen2.5-coder:1.5b';
+        modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat || MODELO_FALLBACK_CHAT;
       }
-      if (!modeloLocal) modeloLocal = 'qwen2.5-coder:1.5b';
+      if (!modeloLocal) modeloLocal = MODELO_FALLBACK_CHAT;
       if (ollamaOk) {
         try {
           const limites = limitesPorTarefa(tarefaLocal === 'chat-rapido' ? 'chat-rapido' : 'chat');
@@ -766,7 +766,8 @@ async function executarChatSend(
     let textoUltimoRecurso: string | null = null
     try {
       const { askOllama } = await import('../brain/ollama')
-      const r = await askOllama(textoPedido, '', 'chat', {}, { model: 'qwen2.5-coder:1.5b', numPredict: 300, timeoutMs: 60_000 })
+      const { MODELO_FALLBACK_CHAT } = await import('../brain/modelos-catalogo')
+      const r = await askOllama(textoPedido, '', 'chat', {}, { model: MODELO_FALLBACK_CHAT, numPredict: 300, timeoutMs: 60_000 })
       if (r?.text?.trim()) textoUltimoRecurso = r.text
     } catch { /* ultimo recurso também falhou */ }
     const conteudo = textoUltimoRecurso

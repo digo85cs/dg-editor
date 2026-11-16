@@ -1,0 +1,35 @@
+# Build outputs
+out/
+dist-app/
+dist-apps/
+tmp/
+.dg-editor/bin/
+
+# Dependencies
+node_modules/
+
+# Config files that shouldn't be formatted
+package-lock.json
+tsconfig.tsbuildinfo
+
+# Generated files
+*.d.ts
+src/**/*.d.ts
+
+# Test artifacts
+qa-artifacts/
+coverage/
+
+# Logs
+*.log
+.dg-editor/logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

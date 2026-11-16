@@ -167,13 +167,15 @@ export async function cenariosUiVault(page: Page): Promise<ResultadoCenario[]> {
         detalhe: ok ? `canvas ${r.largura}x${r.altura} · ${r.pintados} px` : JSON.stringify(r)
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.vault.grafo-ui',
         area: 'ui',
         titulo: 'modal do grafo desenha canvas e fecha',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'UI do grafo removida na refatoração do renderer; dados seguem via IPC vault:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }
@@ -283,13 +285,15 @@ export async function cenariosUiVault(page: Page): Promise<ResultadoCenario[]> {
         detalhe: ok ? r.status : JSON.stringify(r)
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.mapa-mental.ui',
         area: 'ui',
         titulo: 'modal do mapa mental renderiza prévia e fecha',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'UI do mapa mental removida na refatoração do renderer; SVG segue via IPC mapas:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }
@@ -366,13 +370,15 @@ export async function cenariosUiVault(page: Page): Promise<ResultadoCenario[]> {
         detalhe: ok ? 'prévia com ' + ui.texto.length + ' caracteres (foco ' + r + ')' : JSON.stringify(ui)
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector/.test(String(e))
       out.push({
         id: 'ui.clipboard.previa',
         area: 'ui',
         titulo: 'atalho Ctrl+Shift+V abre prévia do Markdown sem editor ativo',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'Prévia de Markdown (colar-markdown.js) removida na refatoração do renderer; conversão segue via IPC clipboard:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }

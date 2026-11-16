@@ -128,8 +128,10 @@ function ligarOnboarding() {
   const api = window.api
   if (!api?.invoke) return
   api
-    .invoke('onboarding:status')
+    .invoke('app:qa-mode')
+    .then((qa) => (qa?.e2e ? null : api.invoke('onboarding:status')))
     .then((st) => {
+      if (!st) return
       if (st?.temContasOuIas || (st?.completed && !st?.resetadoEm)) return
       if (!st?.primeiroAcesso && st?.completed) return
       criarOnboarding()

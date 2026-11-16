@@ -442,8 +442,7 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
         '&': { height: '100%', position: 'relative' },
         '.cm-scroller': {
           overflow: 'auto',
-          fontFamily: "var(--dg-editor-fonte, var(--fonte-mono, 'Cascadia Code', Consolas, monospace))",
-          fontSize: 'var(--dg-editor-fs, 13px)',
+          fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)",
           paddingRight: 'var(--dg-editor-pad-right, 14px)'
         },
         '.cm-content': { wordBreak: 'break-word' },
@@ -528,8 +527,7 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
           '&': { height: '100%' },
           '.cm-scroller': {
             overflow: 'auto',
-            fontFamily: "var(--dg-editor-fonte, var(--fonte-mono, 'Cascadia Code', Consolas, monospace))",
-            fontSize: 'var(--dg-editor-fs, 13px)'
+            fontFamily: "var(--fonte-mono, 'Cascadia Code', Consolas, monospace)"
           },
           '.cm-diff-add-line': {
             backgroundColor: 'rgba(61, 214, 140, 0.16)'
@@ -647,17 +645,6 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
     },
     minimapaAlternar: (mostrar) => minimapa.alternar(mostrar),
     minimapaVisivel: () => minimapa.visivel(),
-    inserirTexto: (texto) => {
-      const t = String(texto || '')
-      if (!t) return
-      const sel = view.state.selection.main
-      view.dispatch({
-        changes: { from: sel.from, to: sel.to, insert: t },
-        selection: { anchor: sel.from + t.length },
-        scrollIntoView: true
-      })
-      view.focus()
-    },
     focar: () => view.focus(),
     requestMeasure: () => view.requestMeasure(),
     overviewRefresh: () => overview?.refresh(),

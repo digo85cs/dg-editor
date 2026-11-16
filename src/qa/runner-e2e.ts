@@ -74,14 +74,22 @@ export async function executarSuiteE2e(
     app = await _electron.launch({
       executablePath,
       args: [mainJs],
-      env: {
-        ...process.env,
-        DG_NAV_SMOKE: '',
-        DG_QA_E2E: '1',
-        DG_FAKE_LLM: '1',
-        DG_QA_USERDATA: userDataQa,
-        ELECTRON_DISABLE_SECURITY_WARNINGS: '1'
-      },
+      env: (() => {
+        const env: Record<string, string> = {}
+        for (const [k, v] of Object.entries(process.env)) {
+          if (typeof v === 'string') env[k] = v
+        }
+        Object.assign(env, {
+          DG_NAV_SMOKE: '',
+          DG_QA_E2E: '1',
+          DG_FAKE_LLM: '1',
+          DG_QA_USERDATA: userDataQa,
+          ELECTRON_DISABLE_SECURITY_WARNINGS: '1'
+        })
+        // ELECTRON_RUN_AS_NODE=1 no ambiente faz o Electron subir como Node puro e o launch falha
+        delete env.ELECTRON_RUN_AS_NODE
+        return env
+      })(),
       timeout: 30000
     })
     const window = await app.firstWindow({ timeout: 20000 })

@@ -5,10 +5,12 @@ export async function bootSaudeIAs(): Promise<{ ollama: boolean; modelos: number
   // Herda User env no Windows (Electron às vezes sobe sem elas)
   try {
     if (process.platform === 'win32') {
-      const { execSync } = await import('child_process')
-      const raw = execSync(
-        "[Environment]::GetEnvironmentVariables('User') | ConvertTo-Json -Compress",
-        { shell: 'powershell.exe', encoding: 'utf8', windowsHide: true, timeout: 8000 }
+      const { execFile } = await import('child_process')
+      const { promisify } = await import('util')
+      const { stdout: raw } = await promisify(execFile)(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', "[Environment]::GetEnvironmentVariables('User') | ConvertTo-Json -Compress"],
+        { encoding: 'utf8', windowsHide: true, timeout: 8000, maxBuffer: 4 * 1024 * 1024 }
       )
       const mapa = JSON.parse(raw) as Record<string, string>
       for (const [k, v] of Object.entries(mapa || {})) {

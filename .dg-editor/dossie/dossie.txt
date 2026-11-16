@@ -1,0 +1,9 @@
+=== DOSSIE DG EDITOR ===
+Atualizado em: 2026-01-01
+Raiz: /proj
+Total de mensagens no chat: 1
+Provedor mais recente: ollama
+
+--- ULTIMAS MENSAGENS ---
+[2026-01-01T00:00:00.000Z] DONO: oi
+=== FIM DO DOSSIE ===

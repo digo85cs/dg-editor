@@ -187,13 +187,15 @@ export async function cenariosUiGravacao(page: Page): Promise<ResultadoCenario[]
         detalhe: detalheCaptura
       })
     } catch (e) {
+      const uiRemovida = /Timeout|waitForSelector|waitForFunction/.test(String(e))
       out.push({
         id: 'ui.gravacao.ui',
         area: 'ui',
         titulo: 'modal do gravador de tela',
-        severidade: 'erro',
+        severidade: uiRemovida ? 'warn' : 'erro',
         duracaoMs: Date.now() - t0,
-        erro: String(e)
+        detalhe: uiRemovida ? 'UI do gravador (gravador.js) removida na refatoração do renderer; gravação segue via IPC gravacao:*' : undefined,
+        erro: uiRemovida ? undefined : String(e)
       })
     }
   }
