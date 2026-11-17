@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 12:17:43** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 12:21:38** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 30930c2 2026-11-17 refactor: extrai seletor de agente do chat para features/chat/agente-seletor.js
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 30930c2 2026-11-17 refactor: extrai seletor de agente do chat para features/chat/agente-seletor.js
 - 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
 - 261d926 2026-11-17 refactor: extrai modais Config/Contas (~500 linhas) p/ features/ui/config-contas.js
 - c669787 2026-11-17 refactor: extrai imagem, historico-abas, chat context-menu, diff-bar e skill-chip do app.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
 - 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
 - c067b37 2026-11-17 refactor: extrai MENUS_BARRA para features/ui/menubar-dados.js
-- b4a0004 2026-11-17 refactor: extrai mostrarToast para features/ui/toast.js
 
 ## 16. Como atualizar este dossiê
 

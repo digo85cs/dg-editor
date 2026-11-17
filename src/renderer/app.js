@@ -123,6 +123,25 @@ import {
   agenteSelecionadoUi,
   sincronizarAgenteSelects
 } from './features/chat/agente-seletor.js'
+import {
+  configurarChatCore,
+  markupEmptyStateChat,
+  ligarEmptyStateChat,
+  garantirEmptyStateChat,
+  renderizarChat,
+  marcarChatComMsgs,
+  setChatLiveStatus,
+  ligarAcoesBolha,
+  reeditarMensagemUsuario,
+  adicionarBolha,
+  setChatSendMode,
+  limparUiAgenteChat,
+  pararChatOuAgente,
+  appendChatToolTrace,
+  chatOcupado,
+  obterHistChat,
+  definirHistChat
+} from './features/chat/chat-core.js'
 import { normalizarMensagensChat, bolhaHtml, organizarRespostaCursor } from './features/chat/render.js'
 import {
   humanizarStatus,
@@ -861,80 +880,6 @@ function criarBotaoRemoverPasta(path) {
   return btn
 }
 
-const SUGESTOES_CHAT = [
-  'Explique a arquitetura deste projeto',
-  'Onde fica o ponto de entrada?',
-  'Sugira melhorias de UI e UX',
-  'Liste riscos e pontos de atenção'
-]
-
-function markupEmptyStateChat() {
-  const raiz = resolverPastaChatAtiva()
-  if (!raiz) {
-    return (
-      '<div class="empty-state" id="empty-state">' +
-      '<h2>Vamos começar</h2>' +
-      '<p>Abra um repositório para o agente ler o código, analisar e executar tarefas.</p>' +
-      '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>' +
-      '</div>'
-    )
-  }
-  const nome = nomeArquivo(raiz)
-  const chips = SUGESTOES_CHAT.map(
-    (s) =>
-      '<button type="button" class="empty-chip" data-sugestao="' +
-      escapar(s) +
-      '">' +
-      escapar(s) +
-      '</button>'
-  ).join('')
-  return (
-    '<div class="empty-state empty-state--chat" id="empty-state">' +
-    '<h2>Como posso ajudar com ' +
-    escapar(nome) +
-    '?</h2>' +
-    '<p>Pergunte sobre o código, peça uma alteração ou deixe o agente explorar o projeto.</p>' +
-    '<div class="empty-chips">' +
-    chips +
-    '</div>' +
-    '</div>'
-  )
-}
-
-function ligarEmptyStateChat() {
-  const empty = $('empty-state')
-  if (!empty) return
-  $('btn-empty-open')?.addEventListener('click', abrirPasta)
-  empty.querySelectorAll('[data-sugestao]').forEach((b) => {
-    b.addEventListener('click', () => {
-      const texto = b.getAttribute('data-sugestao') || ''
-      const input = /** @type {HTMLTextAreaElement|null} */ ($('chat-input'))
-      if (input) {
-        input.value = texto
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-      }
-      focarPainelIa('chat')
-      enviarMensagemUi()
-    })
-  })
-}
-
-function garantirEmptyStateChat() {
-  const area = $('chat-messages')
-  if (!area) return
-  let empty = $('empty-state')
-  if (!empty) {
-    empty = document.createElement('div')
-    empty.className = 'empty-state'
-    empty.id = 'empty-state'
-    area.innerHTML = ''
-    area.classList.remove('has-msgs')
-    area.appendChild(empty)
-  }
-  empty.outerHTML = markupEmptyStateChat()
-  area.classList.remove('has-msgs')
-  ligarEmptyStateChat()
-}
 
 /** Controle do PC: pede permissão explícita (sessão). */
 function desktopPermitido() {
@@ -1024,7 +969,7 @@ async function removerPasta(path, opts) {
     if ($('chat-send')) $('chat-send').disabled = true
     habilitarBotoesAnalise(false)
     garantirEmptyStateChat()
-    histChat = null
+    definirHistChat(null)
   }
   await renderizarPastas()
   void renderizarProjects(true)
@@ -1199,7 +1144,7 @@ async function sincronizarContextoPasta(p, opts = {}) {
     )
   }
   await Promise.all(tarefas)
-  void histChat?.refrescarLista?.()
+  void obterHistChat()?.refrescarLista?.()
 }
 
 function raizWorkspaceDe(caminho) {
@@ -1239,8 +1184,9 @@ async function renderizarPastas() {
   console.time('renderizarPastas')
   try {
     // Sidebar Repositórios = Cursor (pasta + chats). Sem árvore de arquivos.
-    if (histChat && typeof histChat.refrescarLista === 'function') {
-      await histChat.refrescarLista()
+    const hist = obterHistChat()
+    if (hist && typeof hist.refrescarLista === 'function') {
+      await hist.refrescarLista()
     } else if ($('folder-list')) {
       // Boot antes do hist: cabeçalhos das pastas
       const el = $('folder-list')
@@ -2348,162 +2294,6 @@ function ciclarAbas() {
 
 // ---------- Análise ----------
 // ---------- Chat ----------
-function renderizarChat(msgs) {
-  const area = $('chat-messages')
-  area.innerHTML = ''
-  const lista = normalizarMensagensChat(msgs)
-  recontarUsoChat(lista)
-  if (!lista.length) {
-    area.classList.remove('has-msgs')
-    area.innerHTML = markupEmptyStateChat()
-    ligarEmptyStateChat()
-    return
-  }
-  for (const m of lista) adicionarBolha(m.role, m.content, m.provider)
-  marcarChatComMsgs()
-  area.scrollTop = area.scrollHeight
-}
-
-function marcarChatComMsgs() {
-  const area = $('chat-messages')
-  if (!area) return
-  const tem = !!area.querySelector('.msg, .bolha, .message, .chat-tool-trace, .dg-loading-bubble, .chat-work-card')
-  area.classList.toggle('has-msgs', tem)
-  if (tem) $('empty-state')?.classList.add('hidden')
-}
-
-function setChatLiveStatus(texto) {
-  const el = $('chat-live-status')
-  if (el) {
-    if (!texto) {
-      el.hidden = true
-      el.textContent = ''
-    } else {
-      el.hidden = false
-      el.innerHTML = '<span class="cls-dot" aria-hidden="true"></span><span>' + String(texto) + '</span>'
-    }
-  }
-  const limpo = String(texto || '').replace(/\s+/g, ' ').trim()
-  if (limpo) anunciar(limpo, { urgencia: /erro|falh|interromp|negad/i.test(limpo) ? 'assertivo' : 'educado' })
-}
-
-function ctxReeditarChat() {
-  return {
-    getArea: () => $('chat-messages'),
-    getInput: () => /** @type {HTMLTextAreaElement|null} */ ($('chat-input')),
-    emAndamento: () => !!chatEmAndamento,
-    parar: () => pararChatOuAgente(),
-    hist: histChat,
-    limparUi: (opts) => limparUiAgenteChat(opts),
-    ativarChat: () => ativarPainelCentro('chat'),
-    marcarMsgs: () => marcarChatComMsgs(),
-    toast: (msg, tipo) => mostrarToast(msg, tipo)
-  }
-}
-
-function ligarAcoesBolha(div, role, content) {
-  _ligarAcoesBolha(div, role, content, ctxReeditarChat())
-}
-
-async function reeditarMensagemUsuario(div) {
-  await _reeditarMensagemUsuario(div, ctxReeditarChat())
-}
-
-function adicionarBolha(role, content, provider) {
-  const area = $('chat-messages')
-  const div = document.createElement('div')
-  const texto =
-    role === 'assistant' ? organizarRespostaCursor(content) : String(content ?? '')
-  const b = bolhaHtml(role, texto, provider)
-  div.className = b.cls
-  div.innerHTML = b.html
-  ligarAcoesBolha(div, role, content)
-  area.appendChild(div)
-  marcarChatComMsgs()
-  animarEntradaMsg(div, role)
-  area.scrollTop = area.scrollHeight
-  return div
-}
-
-let chatEmAndamento = false
-
-function setChatSendMode(mode) {
-  const btn = $('chat-send')
-  if (!btn) return
-  const stop = mode === 'stop'
-  chatEmAndamento = stop
-  btn.classList.toggle('is-stop', stop)
-  btn.dataset.mode = stop ? 'stop' : 'send'
-  btn.title = stop ? 'Parar' : 'Enviar'
-  btn.setAttribute('aria-label', stop ? 'Parar' : 'Enviar')
-  const sendIcon = btn.querySelector('.chat-send-icon')
-  const stopIcon = btn.querySelector('.chat-stop-icon')
-  if (sendIcon) sendIcon.hidden = stop
-  if (stopIcon) stopIcon.hidden = !stop
-  if (stop) btn.disabled = false
-  else if (!state.pastaAtual) btn.disabled = true
-}
-
-function limparUiAgenteChat(opts = {}) {
-  const area = $('chat-messages')
-  setChatSendMode('send')
-  setChatLiveStatus('')
-  fecharCartaoTrabalho(area, opts.tituloFinal || 'Parado')
-  ocultarBannerAgentMode(area)
-  const strip = area && area.querySelector ? area.querySelector('.chat-work-stats') : null
-  if (strip) {
-    strip.textContent = ''
-    strip.hidden = true
-  }
-  const live = document.getElementById('agent-stats-live')
-  if (live) {
-    live.textContent = ''
-    live.hidden = true
-  }
-  if (opts.limparCards) limparChatParityCards(area)
-  void removerLoadingChat({ imediato: true })
-  if (state.pastaAtual && $('chat-send')) $('chat-send').disabled = false
-}
-
-async function pararChatOuAgente() {
-  try {
-    const r = await window.api.invoke('agente:cancelar')
-    limparUiAgenteChat({ tituloFinal: 'Parado a seu pedido' })
-    appendChatToolTrace('■ parado (' + (r?.cancelados || 0) + ')', {
-      humano: 'Parado a seu pedido',
-      titulo: 'Parado',
-      ok: true
-    })
-    mostrarToast('Geração interrompida', 'aviso')
-  } catch (e) {
-    limparUiAgenteChat({ tituloFinal: 'Parado' })
-    mostrarToast('Falha ao parar: ' + String(e), 'erro')
-  }
-}
-
-/** Barra Apply/Rejeitar no editor (estilo Cursor inline diff). */
-/** @type {Awaited<ReturnType<typeof iniciarHistoricoChat>> | null} */
-let histChat = null
-
-
-function appendChatToolTrace(line, opts = {}) {
-  const area = $('chat-messages')
-  if (!area) return
-  $('empty-state')?.classList.add('hidden')
-  const bruto = String(line || '')
-  const humano = opts.humano || humanizarStatus(bruto)
-  const titulo = opts.titulo || (opts.erro ? 'Algo não deu certo' : 'Trabalhando no seu pedido…')
-  atualizarCartaoTrabalho(area, {
-    titulo,
-    passo: humano,
-    ok: !!opts.ok,
-    erro: !!opts.erro
-  })
-  marcarChatComMsgs()
-  area.scrollTop = area.scrollHeight
-  appendAgentTraceLive(humano)
-  setChatLiveStatus(humano)
-}
 
 async function enviarMensagem() {
   let pastaChat = resolverPastaChatAtiva()
@@ -2512,7 +2302,7 @@ async function enviarMensagem() {
     return
   }
   // Stop só se ESTE repositório já está rodando; outros repos podem seguir em paralelo
-  if (chatEmAndamento && pastaTemJob(pastaChat)) {
+  if (chatOcupado() && pastaTemJob(pastaChat)) {
     await pararChatOuAgente()
     return
   }
@@ -2532,8 +2322,8 @@ async function enviarMensagem() {
   ativarPainelCentro('chat')
   input.value = ''
   adicionarBolha('user', texto)
-  const chatIdJob = histChat?.obterId?.() || 'default'
-  const histDoJob = histChat
+  const chatIdJob = obterHistChat()?.obterId?.() || 'default'
+  const histDoJob = obterHistChat()
   histDoJob?.registrarMensagem('user', texto)
   setChatSendMode('stop')
   setChatLiveStatus('Analisando o repositório…')
@@ -2863,7 +2653,7 @@ async function ligarHistoricoChat(raiz) {
   } catch {
     preferido = ''
   }
-  histChat = await iniciarHistoricoChat(raiz, {
+  definirHistChat(await iniciarHistoricoChat(raiz, {
     chatIdPreferido: preferido,
     listarPastas: () => (state.pastasRecentes || []).slice(),
     nomePasta: (p) => nomePastaUi(p),
@@ -2881,7 +2671,8 @@ async function ligarHistoricoChat(raiz) {
         ativarAbaCentro('chat')
         return
       }
-      if (chatId && histChat?.carregar) await histChat.carregar(chatId)
+      const hist = obterHistChat()
+      if (chatId && hist?.carregar) await hist.carregar(chatId)
     },
     onRender: (msgs) => {
       const empty = $('empty-state')
@@ -2894,15 +2685,16 @@ async function ligarHistoricoChat(raiz) {
       renderizarChat([])
       agendarSalvarWorkspace()
     }
-  })
+  }))
   agendarSalvarWorkspace()
 }
 
 /** Nova conversa: limpa UI e reseta estado do histórico (chat.js). */
 function novaConversaUi() {
   ativarPainelCentro('chat')
-  if (histChat && typeof histChat.nova === 'function') {
-    histChat.nova()
+  const hist = obterHistChat()
+  if (hist && typeof hist.nova === 'function') {
+    hist.nova()
     return
   }
   $('empty-state')?.classList.add('hidden')
@@ -3047,6 +2839,15 @@ configurarAgenteSeletor({
   focarPainelIa: (p) => focarPainelIa(p),
   executarAgentUi: (o) => executarAgentUi(o),
   agendarSalvarWorkspace: () => agendarSalvarWorkspace()
+})
+configurarChatCore({
+  resolverPastaChatAtiva: () => resolverPastaChatAtiva(),
+  nomeArquivo: (p) => nomeArquivo(p),
+  abrirPasta: () => abrirPasta(),
+  focarPainelIa: (p) => focarPainelIa(p),
+  ativarPainelCentro: (p) => ativarPainelCentro(p),
+  enviarMensagemUi: () => enviarMensagemUi(),
+  appendAgentTraceLive: (l) => appendAgentTraceLive(l)
 })
 
 // ---------- Config / Contas ----------
@@ -3458,7 +3259,7 @@ $('btn-brain-avaliar')?.addEventListener('click', async () => {
 $('btn-add-folder')?.addEventListener('click', abrirPasta)
 $('btn-add-repo')?.addEventListener('click', abrirPasta)
 $('btn-sidebar-nova-chat')?.addEventListener('click', () => {
-  histChat?.nova?.()
+  obterHistChat()?.nova?.()
   focarPainelIa('chat')
 })
 $('btn-desktop-use')?.addEventListener('click', () => pedirPermissaoDesktop())
@@ -4591,7 +4392,8 @@ setSidebarMode('explorer')
 ligarWorkspaceAutosave({
   coletar: () => {
     const doc = coletarWorkspacePadrao(() => state)
-    if (histChat?.obterId) doc.chat = { ...(doc.chat || {}), ativoId: histChat.obterId() || doc.chat?.ativoId }
+    const histChatAtivo = obterHistChat()
+  if (histChatAtivo?.obterId) doc.chat = { ...(doc.chat || {}), ativoId: histChatAtivo.obterId() || doc.chat?.ativoId }
     return doc
   },
   aplicar: async (doc) => {
