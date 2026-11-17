@@ -424,6 +424,13 @@ async function executarChatSend(
       const arquivoAtivo = typeof options.arquivo === 'string' ? options.arquivo : '';
       let perguntaAgente = textoPedido;
       let contextoAgente = context;
+      if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(textoPedido)) {
+        contextoAgente +=
+          '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA ' +
+          '(midia_comfyui_imagem para imagem, midia_imagem_gerar como alternativa, midia_comfyui_video para video, ' +
+          'midia_meme_gerar para meme, midia_narrar para narracao). NUNCA responda com placeholder ' +
+          'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';
+      }
       try {
         const { expandirMencoes } = await import('../agent/mencoes');
         const expansao = await expandirMencoes({

@@ -119,17 +119,27 @@ export async function orquestrarAgentes(
       if (raceTimer) clearTimeout(raceTimer)
 
       ultimoTexto = r.texto || ''
+      // Pedido de midia respondido com placeholder ("[Insira a imagem]") sem chamar
+      // nenhuma tool = falha disfarçada; segue para o próximo agente da fila.
+      const pediuMidia = /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(prompt)
+      const usouTool = (r.passos || []).some((p) => p.tipo === 'tool')
+      const placeholder =
+        /\[\s*(insira|insiro|imagem|aqui|v[ií]deo)|aqui est[áa]\s+(a|sua)\s+(imagem|v[ií]deo|m[uú]sica)/i.test(
+          ultimoTexto
+        )
+      const respostaFake = pediuMidia && !usouTool && placeholder
       out.push({
         agente: id,
-        ok: r.ok !== false,
+        ok: r.ok !== false && !respostaFake,
         texto: ultimoTexto,
         modelo: r.modelo,
         passos: r.passos,
-        duracaoMs: r.duracaoMs || Date.now() - t0
+        duracaoMs: r.duracaoMs || Date.now() - t0,
+        ...(respostaFake ? { erro: 'respondeu placeholder sem chamar tool de midia' } : {})
       })
-      registrarMetricaAgente(raiz, id, { ok: r.ok !== false, duracaoMs: Date.now() - t0, foiTimeout: false })
+      registrarMetricaAgente(raiz, id, { ok: r.ok !== false && !respostaFake, duracaoMs: Date.now() - t0, foiTimeout: false })
 
-      if (opts?.pararNoPrimeiroSucesso && r.ok !== false) {
+      if (opts?.pararNoPrimeiroSucesso && r.ok !== false && !respostaFake) {
         break
       }
     } catch (e) {

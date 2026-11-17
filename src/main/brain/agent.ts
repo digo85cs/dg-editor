@@ -1073,7 +1073,10 @@ export async function executarAgente(
       'todos gratuitos, com o comando de instalacao quando faltarem. As personas QCoder, Devin e Trae seguem o estilo ' +
       'desses agentes sem depender de nada pago. ' +
       '\nAPPS: apps_status mostra SDK Android/artefatos; apps_setup instala o toolchain; apps_build gera APK ' +
-      'Android e/ou instalador Windows e copia para OneDrive/APP. Rode apps_status antes e depois do build.'
+      'Android e/ou instalador Windows e copia para OneDrive/APP. Rode apps_status antes e depois do build.\n' +
+      'REGRA OBRIGATORIA: pedido de imagem/video/audio/meme SEMPRE executa a tool midia_* correspondente no primeiro turno. ' +
+      'NUNCA escreva placeholders como "[Insira a imagem]" ou "aqui está a imagem" — a midia e gerada pela tool ' +
+      'e o caminho do arquivo vem na resposta.'
     const blocoPropose = proposeWrites
       ? '\n\n### MODO PROPOSTA\nEdicoes (codigo_editar/vault_write/dossie_write) NAO gravam no disco: ' +
         'viram propostas para o usuario aprovar. Voce pode chamar essas tools normalmente; ' +
