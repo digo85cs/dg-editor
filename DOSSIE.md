@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 15:09:17** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 17:09:19** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: 773b10d 2026-11-17 fix(midia): fallback Pollinations quando ComfyUI nao instalado
+> Árvore de trabalho limpa.
 
 ## 1. O que é
 
@@ -336,6 +336,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 773b10d 2026-11-17 fix(midia): fallback Pollinations quando ComfyUI nao instalado
+- 59a5968 2026-11-17 chore: release v0.6.5
 - c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
 - 34ab538 2026-11-17 chore: release v0.6.4
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
@@ -344,8 +346,6 @@ Utilitários locais relevantes:
 - cfd83d7 2026-11-17 refactor: extrai restauracao de workspace para workspace-restaurar.js
 - af3778c 2026-11-17 refactor: extrai lazy-load do terminal e botoes do painel direito
 - 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
-- 22553e9 2026-11-17 refactor: extrai titlebar e listeners da diff-bar
-- 01caadf 2026-11-17 refactor: extrai atalhos de teclado, auditoria UI e rotulos de arquivo
 
 ## 16. Como atualizar este dossiê
 
