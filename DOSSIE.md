@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:46:41** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 13c7d00 2026-11-17 refactor: extrai contexto de pasta (selecionar/sincronizar/analise cache)
+> Gerado automaticamente em **17/11/2026, 13:49:18** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 526c2d7 2026-11-17 refactor: extrai nucleo de abas do editor (ativar/fechar/autosave/init)
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 526c2d7 2026-11-17 refactor: extrai nucleo de abas do editor (ativar/fechar/autosave/init)
 - 13c7d00 2026-11-17 refactor: extrai contexto de pasta (selecionar/sincronizar/analise cache)
 - b0b0bdf 2026-11-17 refactor: extrai CRUD de pastas (adicionar/remover/selecionar helpers)
 - 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - ec6a7a3 2026-11-17 refactor: extrai executarAgentUi e listeners do painel Agente para agente-cards.js
 - f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
 - cbb7284 2026-11-17 refactor: extrai troca de panes (centro/direita) para features/layout/panes.js
-- 08533f1 2026-11-17 refactor: extrai layout/paineis (resizers, toggles, terminal bloco3) para features/layout/paineis.js
 
 ## 16. Como atualizar este dossiê
 
