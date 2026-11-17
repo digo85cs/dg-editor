@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:31:30** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: ec6a7a3 2026-11-17 refactor: extrai executarAgentUi e listeners do painel Agente para agente-cards.js
+> Gerado automaticamente em **17/11/2026, 13:33:46** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
 - ec6a7a3 2026-11-17 refactor: extrai executarAgentUi e listeners do painel Agente para agente-cards.js
 - f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
 - cbb7284 2026-11-17 refactor: extrai troca de panes (centro/direita) para features/layout/panes.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 02a2198 2026-11-17 refactor: extrai chat-core (bolhas, empty state, send mode, tool trace) do app.js
 - 30930c2 2026-11-17 refactor: extrai seletor de agente do chat para features/chat/agente-seletor.js
 - 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
-- 261d926 2026-11-17 refactor: extrai modais Config/Contas (~500 linhas) p/ features/ui/config-contas.js
 
 ## 16. Como atualizar este dossiê
 
