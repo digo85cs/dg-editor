@@ -60,6 +60,17 @@ export async function removerWorktreeCheckpoint(
   return { ok: true }
 }
 
+export async function mergeWorktreeCheckpoint(
+  raiz: string,
+  nome: string
+): Promise<{ ok: boolean; erro?: string; saida?: string }> {
+  const s = slug(nome)
+  const branch = 'dg/wt-' + s
+  const r = await git(raiz, ['merge', '--no-edit', branch])
+  if (!r.ok) return { ok: false, erro: r.erro }
+  return { ok: true, saida: r.stdout.slice(0, 500) }
+}
+
 export async function listarWorktrees(raiz: string): Promise<WorktreeCheckpoint[]> {
   const r = await git(raiz, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return []

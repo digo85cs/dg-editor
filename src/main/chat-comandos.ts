@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge'])
 
 function parse(texto: string): { cmd: string; arg: string } | null {
   const m = texto.trim().match(/^\/([a-zA-Z-]+)(?:\s+([\s\S]*))?$/)
@@ -342,6 +342,45 @@ async function cmdParalelo(arg: string, raiz: string): Promise<string> {
   }
 }
 
+async function cmdParaleloMerge(arg: string, raiz: string): Promise<string> {
+  const nome = arg.trim().split(/\s+/)[0]
+  if (!nome) return 'Uso: `/paralelo-merge <nome>` — mergeia a branch dg/wt-<nome> na atual.'
+  try {
+    const { mergeWorktreeCheckpoint, removerWorktreeCheckpoint } = await import('./git-worktree')
+    const r = await mergeWorktreeCheckpoint(raiz, nome)
+    if (!r.ok) return 'Merge falhou: ' + (r.erro || 'erro') + '\nResolva conflitos e tente de novo, ou `/worktree remover ' + nome + '` para descartar.'
+    const rm = await removerWorktreeCheckpoint(raiz, nome)
+    return 'Merge de "' + nome + '" concluído na branch atual.' +
+      (rm.ok ? ' Worktree removido.' : ' (worktree mantido: ' + (rm.erro || '') + ')') +
+      '\nRevisão: `/diff` ou `git log -1`.'
+  } catch (e) {
+    return 'Paralelo-merge erro: ' + String(e)
+  }
+}
+
+async function cmdDevinSync(): Promise<string> {
+  try {
+    const { devinListarSessoes } = await import('./devin-api')
+    const r = await devinListarSessoes(20)
+    if (!r.ok) return 'Falha: ' + (r.erro || 'erro')
+    const lista = r.sessoes || []
+    if (!lista.length) return 'Nenhuma sessão Devin.'
+    const linhas = lista.map((s) => {
+      const o = s as Record<string, unknown>
+      const id = String(o.session_id || o.id || '?')
+      const status = String(o.status || o.state || '?')
+      const prs = Array.isArray(o.pull_requests) ? (o.pull_requests as unknown[]).length : 0
+      const prTxt = prs ? ' [' + prs + ' PR' + (prs > 1 ? 's' : '') + ']' : ''
+      const titulo = String(o.title || '').slice(0, 55)
+      return '• ' + id + ' [' + status + ']' + prTxt + ' ' + titulo +
+        '\n  status: `/devin-status ' + id + '`'
+    })
+    return 'Sessões Devin — prontos para merge quando status=finished/blocked:\n\n' + linhas.join('\n')
+  } catch (e) {
+    return 'Devin sync erro: ' + String(e)
+  }
+}
+
 function cmdRegras(raiz: string): string {
   const partes: string[] = []
   const rules = readRules(raiz)
@@ -413,6 +452,10 @@ export async function executarComandoChat(
       return { content: await cmdAgendar('listar', raiz) }
     case 'paralelo':
       return { content: await cmdParalelo(parsed.arg, raiz) }
+    case 'paralelo-merge':
+      return { content: await cmdParaleloMerge(parsed.arg, raiz) }
+    case 'devin-sync':
+      return { content: await cmdDevinSync() }
     case 'worktree':
       return { content: await cmdWorktree(parsed.arg, raiz) }
     case 'mcps':
@@ -437,6 +480,8 @@ export async function executarComandoChat(
           '- `/credenciais [id valor|remover id]` — vault de chaves (devin, openrouter...)\n' +
           '- `/agendar <min> <prompt>` — job recorrente; `/agendar` lista; `off/on/remover <id>`\n' +
           '- `/paralelo <nome> [tarefa]` — agente isolado em git worktree\n' +
+          '- `/paralelo-merge <nome>` — mergeia o worktree na branch atual\n' +
+          '- `/devin-sync` — sessões Devin com status/PRs para merge\n' +
           '- `/ajuda` — esta lista'
       }
     default:

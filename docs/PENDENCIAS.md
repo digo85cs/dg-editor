@@ -34,11 +34,26 @@
 - [x] **Spec-driven (artefato)**: `/spec <titulo>` cria `.dg-editor/specs/<slug>.md` com template (objetivo/escopo/tarefas/aceite); specs entram no contexto implícito do agente.
 - [x] **MCP clients externos**: `.dg-editor/mcp-externos.json` (ver `mcp-externos.example.json`) — servidores stdio externos aparecem ao agente como `ext_<servidor>__<tool>` via `mcp/externos.ts`.
 
-## Roadmap de melhorias (deferred — esforço > 1 sessão)
+## Melhorias aplicadas — rodada Devin-parity (v0.6.3+)
 
-- [ ] **LSP para contexto de símbolos** (crush): go-to-def/hover via tsserver — repo-mapa cobre nomes, não assinaturas.
-- [ ] **Git worktree checkpoints** (Cline shadow checkpoints): isolar edições do agente do working tree sujo.
-- [ ] **MCP marketplace/GUI**: hoje a config de MCPs externos é por arquivo; falta UI de instalação/status em Conectores.
+- [x] **Devin API v3**: `src/main/devin-api.ts` — status/criar/status/listar sessões; IPC `devin:*`; comandos `/devin`, `/devin-status`, `/devin-listar`, `/devin-sync`; auth via env ou vault (`/credenciais devin cog_...` + `devin-org`).
+- [x] **LSP-lite**: `src/main/lsp/ts-servico.ts` — `ts.LanguageService` por workspace: hover, go-to-def, diagnósticos sintáticos+semânticos; IPC `lsp:*`; diagnósticos injetados no contexto do agente. **Escopo: TypeScript/JavaScript apenas** (checkJs off).
+- [x] **Worktree checkpoints**: `src/main/git-worktree.ts` + `/worktree`, `/paralelo <nome> [tarefa]` (agente isolado), `/paralelo-merge <nome>` (merge + limpeza).
+- [x] **Marketplace MCP**: `src/main/mcp/mercado.ts` (7 servidores curados) + `/mcps` lista e `/mcps <id>` instala em `mcp-externos.json`.
+- [x] **Vault de credenciais**: IPC `credenciais:*` sobre `segredos-providers` (safeStorage); comando `/credenciais`.
+- [x] **Agendador de prompts**: `src/main/agendador.ts` + IPC `agendador:*` + evento `agendador:disparo` → renderer injeta no chat; `/agendar <min> <prompt>`, `off|on|remover`.
+- [x] **Skill triggers**: `src/main/agent/skill-triggers.ts` — frontmatter `triggers:` em `.dg-editor/skills`, `.agents/skills`, `.kilo/skills` injeta skills no contexto do agente.
+- [x] **Fix EPERM packaged**: `resolverRaizDGEditor()` retorna `userData` quando `process.resourcesPath` existe (app instalado não escreve mais em Program Files). Release v0.6.2.
+- [x] **Branch main**: `main` agora aponta para `integra-13-11` (v0.6.3); histórico antigo preservado em `legacy-main-2026-10`.
+
+## Roadmap restante (deferred)
+
+- [ ] **Refatoração `app.js`** (~7k linhas): segue o maior risco de regressão; extração incremental por blocos.
+- [ ] **LSP multi-linguagem**: Python (pyright) e outros; hoje só TS/JS.
+- [ ] **UI do agendador/credenciais/MCP marketplace**: comandos de chat funcionais; falta painel visual (app.js).
+- [ ] **Devin PR handoff completo**: detectar PR da sessão cloud e mergear localmente — depende de credencial real para validar payload.
+- [ ] **Smoke manual**: abrir app instalado, testar chat/terminal/agente.
+- [ ] **qa:e2e warnings**: 10 warns intencionais (features migradas p/ painel + deps de host: ComfyUI, pycdlib).
 
 ---
 
