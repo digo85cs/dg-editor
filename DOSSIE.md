@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 09:11:58** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.2** · branch `integra-13-11` · último commit: f5c0b48 2026-11-17 release: v0.6.2
-> Alterações locais não commitadas: 12 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 09:14:46** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
 - f5c0b48 2026-11-17 release: v0.6.2
 - d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 - 4fddeff 2026-11-16 release: v0.6.1
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
 - 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
 - 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
-- a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 
 ## 16. Como atualizar este dossiê
 
