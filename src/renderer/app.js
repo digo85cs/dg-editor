@@ -74,7 +74,7 @@ import {
   irHistAbas
 } from './features/editor/historico-abas.js'
 import { configurarChatCtx, initChatIconContext } from './features/chat/context-menu.js'
-import { mostrarEditorDiffBar, ocultarEditorDiffBar } from './features/ui/diff-bar.js'
+import { mostrarEditorDiffBar, ocultarEditorDiffBar, ligarDiffBar, configurarDiffBar } from './features/ui/diff-bar.js'
 import {
   configurarSkillChip,
   skillAtivaChat,
@@ -117,6 +117,7 @@ import { ligarEventosBotoes } from './features/ui/eventos-botoes.js'
 import { ligarIpcOuvintes, verificarEReiniciarDg } from './features/ui/ipc-ouvinte.js'
 import { ligarBotaoPainel, rodarAutoAuditoria, atualizarIconeMax } from './features/ui/auditoria-ui.js'
 import { ligarAtalhosTeclado } from './features/ui/atalhos-teclado.js'
+import { ligarTituloBarra } from './features/ui/titulo-barra.js'
 import { caminhoNoVault, nomeArquivo, nomePastaUi, caminhoRelativo, extIcon } from './utils/rotulos-arquivo.js'
 import {
   configurarComandos,
@@ -392,26 +393,8 @@ window.dgUi = {
 }
 
 // ---------- Pastas ----------
-$('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
-$('editor-diff-bar-apply')?.addEventListener('click', async () => {
-  const id = $('editor-diff-bar')?.dataset?.propostaId
-  if (!id) return
-  await aplicarUmaPropostaAgent(id)
-  if (editor && editor.limparDiff) editor.limparDiff()
-  ocultarEditorDiffBar()
-})
-$('editor-diff-bar-reject')?.addEventListener('click', async () => {
-  const id = $('editor-diff-bar')?.dataset?.propostaId
-  if (!id) return
-  window.__dgApplyViaAgente = true
-  await window.api.invoke('agente:rejeitar-proposta', id)
-  const rest = await window.api.invoke('agente:propostas')
-  mostrarPropostasAgent(rest?.pendentes || [])
-  if (editor && editor.limparDiff) editor.limparDiff()
-  ocultarEditorDiffBar()
-  fecharPainelDiff()
-  if (window.dgToast) window.dgToast('Proposta rejeitada', 'aviso')
-})
+ligarDiffBar()
+
 setInterval(() => {
   if (document.hidden || !state.pastaAtual) return
   void atualizarGitStatusArvore()
@@ -433,6 +416,12 @@ ligarDownloadUi()
 configurarPreviewMd({ getEditor: () => editor })
 configurarDiagnosticos({ getEditor: () => editor })
 configurarHistoricoAbas({ abrirArquivo: (c) => abrirArquivoNaAba(c) })
+configurarDiffBar({
+  getEditor: () => editor,
+  fecharPainelDiff: () => fecharPainelDiff(),
+  aplicarUmaPropostaAgent: (id) => aplicarUmaPropostaAgent(id),
+  mostrarPropostasAgent: (p) => mostrarPropostasAgent(p)
+})
 configurarComandos({
   verificarEReiniciarDg: () => verificarEReiniciarDg(),
   rodarAutoAuditoria: () => rodarAutoAuditoria(),
@@ -806,47 +795,8 @@ initTooltipsRicos()
 iniciarStatusProviders(qaModoPromessa)
 ligarBotaoOllama()
 
-document.addEventListener('DOMContentLoaded', function () {
-  var btn = document.getElementById('btn-auditar')
-  if (btn) btn.addEventListener('click', rodarAutoAuditoria)
-  var bMin = document.getElementById('tb-min')
-  var bMax = document.getElementById('tb-max')
-  var bClose = document.getElementById('tb-close')
-  var bVoltar = document.getElementById('tb-voltar')
-  var bAvancar = document.getElementById('tb-avancar')
-  if (bVoltar) bVoltar.addEventListener('click', function () {
-    void irHistAbas(-1)
-  })
-  if (bAvancar) bAvancar.addEventListener('click', function () {
-    void irHistAbas(1)
-  })
-  atualizarBotoesHist()
-  if (bMin) bMin.addEventListener('click', function () {
-    window.api.invoke('janela:minimizar')
-  })
-  if (bMax)
-    bMax.addEventListener('click', async function () {
-      try {
-        await window.api.invoke('janela:maximizar')
-      } catch (e) {
-        console.warn('[janela] maximizar:', e)
-      }
-      setTimeout(atualizarIconeMax, 120)
-    })
-  if (bClose) bClose.addEventListener('click', function () {
-    window.api.invoke('janela:fechar')
-  })
-  var bAgora = document.getElementById('btn-reinicio-agora')
-  var bDepois = document.getElementById('btn-reinicio-depois')
-  if (bDepois) bDepois.addEventListener('click', fecharModalReinicio)
-  if (bAgora)
-    bAgora.addEventListener('click', function () {
-      fecharModalReinicio()
-      window.api.invoke('auditoria:rodar', { autoAtualizar: false, reiniciarAoFim: true })
-    })
-  atualizarIconeMax()
-  initMenubar()
-})
+ligarTituloBarra()
+
 
 
 

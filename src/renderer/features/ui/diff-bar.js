@@ -25,3 +25,35 @@ export function ocultarEditorDiffBar() {
   bar.hidden = true
   delete bar.dataset.propostaId
 }
+
+let depsBar = { getEditor: () => null }
+
+export function configurarDiffBar(d) {
+  depsBar = { ...depsBar, ...d }
+}
+
+export function ligarDiffBar() {
+  const $id = (id) => document.getElementById(id)
+  $id('diff-panel-close')?.addEventListener('click', () => depsBar.fecharPainelDiff())
+  $id('editor-diff-bar-apply')?.addEventListener('click', async () => {
+    const id = $id('editor-diff-bar')?.dataset?.propostaId
+    if (!id) return
+    await depsBar.aplicarUmaPropostaAgent(id)
+    const ed = depsBar.getEditor()
+    if (ed && ed.limparDiff) ed.limparDiff()
+    ocultarEditorDiffBar()
+  })
+  $id('editor-diff-bar-reject')?.addEventListener('click', async () => {
+    const id = $id('editor-diff-bar')?.dataset?.propostaId
+    if (!id) return
+    window.__dgApplyViaAgente = true
+    await window.api.invoke('agente:rejeitar-proposta', id)
+    const rest = await window.api.invoke('agente:propostas')
+    depsBar.mostrarPropostasAgent(rest?.pendentes || [])
+    const ed = depsBar.getEditor()
+    if (ed && ed.limparDiff) ed.limparDiff()
+    ocultarEditorDiffBar()
+    depsBar.fecharPainelDiff()
+    if (window.dgToast) window.dgToast('Proposta rejeitada', 'aviso')
+  })
+}
