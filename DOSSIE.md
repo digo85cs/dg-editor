@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 14:34:06** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: cfd83d7 2026-11-17 refactor: extrai restauracao de workspace para workspace-restaurar.js
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 14:37:42** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
 - cfd83d7 2026-11-17 refactor: extrai restauracao de workspace para workspace-restaurar.js
 - af3778c 2026-11-17 refactor: extrai lazy-load do terminal e botoes do painel direito
 - 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - d622897 2026-11-17 refactor: extrai listeners de botoes para eventos-botoes.js
 - c93aac9 2026-11-17 refactor: move listeners da paleta/busca para paleta.js
 - 07a47b9 2026-11-17 refactor: extrai activity bar, abas de paineis e navegador bloco 3
-- 95c5ac1 2026-11-17 refactor: extrai tooltips ricos e status de boot (providers/ollama)
 
 ## 16. Como atualizar este dossiê
 

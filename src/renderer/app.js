@@ -133,6 +133,7 @@ import {
 import { initTooltipsRicos } from './features/ui/tooltips.js'
 import { iniciarStatusProviders, ligarBotaoOllama, avisarStatusDepsBoot } from './features/ui/boot-status.js'
 import { ligarPaineisBoot } from './features/ui/boot-paineis.js'
+import { executarBootFinal } from './features/ui/boot-final.js'
 import {
   atualizarIndicadorDeps,
   atualizarBadgeProvedor,
@@ -603,24 +604,8 @@ setSidebarMode('explorer')
 ligarRestauracaoWorkspace()
 ligarPaineisBoot({ enviarMensagemUi })
 
-ligarContextMenuDg()
-renderizarPastas()
-  .then(() => garantirPastaRaizProjeto())
-  .then(() => restaurarAbas())
-void renderizarProjects().then(() => atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null))
-void atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null)
-iniciarGuardian()
-void atualizarBadgeProvedorReal()
-avisarStatusDepsBoot(qaModoPromessa)
+executarBootFinal()
 
-/** Tooltips ricos (balão) para ícones e botões com title/data-tip. */
-
-initTooltipsRicos()
-
-iniciarStatusProviders(qaModoPromessa)
-ligarBotaoOllama()
-
-ligarTituloBarra()
 
 
 
