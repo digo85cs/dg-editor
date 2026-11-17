@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:39:18** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 33636e4 2026-11-17 refactor: extrai render da arvore e lista de projetos
+> Gerado automaticamente em **17/11/2026, 13:41:12** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
 - 33636e4 2026-11-17 refactor: extrai render da arvore e lista de projetos
 - f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
 - ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 08533f1 2026-11-17 refactor: extrai layout/paineis (resizers, toggles, terminal bloco3) para features/layout/paineis.js
 - 063ed7f 2026-11-17 refactor: extrai pendentes OpenClaw/diff/hunks do app.js para features/editor/diff-pendentes.js
 - a30d519 2026-11-17 refactor: extrai cards/propostas do agente e estado compartilhado (agente-cards, agente-estado)
-- 02a2198 2026-11-17 refactor: extrai chat-core (bolhas, empty state, send mode, tool trace) do app.js
 
 ## 16. Como atualizar este dossiê
 

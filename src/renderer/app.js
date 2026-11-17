@@ -143,6 +143,15 @@ import {
   abrirWikiLink
 } from './features/arquivos/desktop-vault.js'
 import {
+  configurarPastasCrud,
+  abrirPasta,
+  adicionarPasta,
+  escolherNovoCaminhoPasta,
+  criarBotaoRemoverPasta,
+  removerPasta,
+  garantirPastaRaizProjeto
+} from './features/arquivos/pastas-crud.js'
+import {
   configurarAnalise,
   habilitarBotoesAnalise,
   analisarCompleta,
@@ -485,123 +494,6 @@ window.dgUi = {
 }
 
 // ---------- Pastas ----------
-async function abrirPasta() {
-  const r = await window.api.invoke('folder:select')
-  if (r.canceled) return
-  adicionarPasta(r.path)
-  await selecionarPasta(r.path)
-}
-
-function adicionarPasta(path) {
-  adicionarPastaState(path)
-  renderizarPastas()
-  void renderizarProjects(true)
-  void atualizarStatusBar(path)
-}
-
-async function escolherNovoCaminhoPasta(antigo) {
-  try {
-    const r = await window.api.invoke('folder:select')
-    if (!r || r.canceled || !r.path) return
-    const novo = r.path
-    if (novo === antigo) return
-    if (state.pastasRecentes.includes(novo)) {
-      await removerPasta(antigo, { skipConfirm: true })
-      await selecionarPasta(novo)
-      return
-    }
-    reapontarPastaState(antigo, novo)
-    await renderizarPastas()
-    void renderizarProjects(true)
-    await selecionarPasta(novo)
-  } catch (e) {
-    mostrarToast('Não foi possível alterar o caminho: ' + String(e), 'erro')
-  }
-}
-
-function criarBotaoRemoverPasta(path) {
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.className = 'pasta-remover'
-  btn.title = 'Remover da lista'
-  btn.setAttribute('aria-label', 'Remover pasta ' + nomeArquivo(path))
-  btn.textContent = '\u00D7'
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    e.preventDefault()
-    void removerPasta(path)
-  })
-  return btn
-}
-
-
-async function removerPasta(path, opts) {
-  if (!path || !state.pastasRecentes.includes(path)) return
-  const nome = nomeArquivo(path)
-  const confirmar = !(opts && opts.skipConfirm)
-  if (
-    confirmar &&
-    !(await dgConfirm(
-      "Remover '" + nome + "' da lista?\n\nA pasta não será apagada do disco.",
-      'Remover da lista'
-    ))
-  ) return
-  const res = removerPastaDoState(path)
-  if (!res) return
-  if (res.abaAtivaPerdida) {
-    editor?.limpar()
-    limparHistoricoAbas()
-  }
-  if (res.abasFechadas.length) {
-    renderizarAbas()
-    atualizarBreadcrumb()
-    atualizarEmpty()
-    persistirAbas()
-  }
-  if (res.eraPastaAtual) {
-    const titulo = $('chat-title')
-    if (titulo) titulo.textContent = 'DG Editor'
-    setChatSendMode('send')
-    if ($('chat-send')) $('chat-send').disabled = true
-    habilitarBotoesAnalise(false)
-    garantirEmptyStateChat()
-    definirHistChat(null)
-  }
-  await renderizarPastas()
-  void renderizarProjects(true)
-  if (typeof atualizarStatusBar === 'function') void atualizarStatusBar(state.pastaAtual)
-}
-
-/** Garante a raiz do projeto no Explorer (evita "Nenhuma pasta" no primeiro boot). */
-async function garantirPastaRaizProjeto() {
-  try {
-    const r = await window.api.invoke('app:raiz-projeto')
-    if (!r?.ok || !r.raiz) return
-    const raiz = String(r.raiz)
-    // Remove caminhos truncados por bug de espaco (ex.: "D:\\CURSOR\\DG Edi")
-    for (let i = state.pastasRecentes.length - 1; i >= 0; i--) {
-      const p = String(state.pastasRecentes[i] || '')
-      if (!p) {
-        state.pastasRecentes.splice(i, 1)
-        continue
-      }
-      if (p !== raiz && raiz.toLowerCase().startsWith(p.toLowerCase())) {
-        state.pastasRecentes.splice(i, 1)
-      }
-    }
-    if (!state.pastasRecentes.includes(raiz)) {
-      state.pastasRecentes.unshift(raiz)
-    }
-    salvarPastas()
-    await renderizarPastas()
-    if (!state.pastaAtual) {
-      await selecionarPasta(raiz)
-    }
-  } catch (e) {
-    console.warn('[pastas] raiz projeto:', e)
-  }
-}
-
 async function selecionarPasta(path) {
   console.time('selecionarPasta')
   ativarAbaCentro('chat')
@@ -1120,6 +1012,12 @@ configurarAnalise({
 configurarMenubar({
   executarComando: (id) => executarComando(id),
   acaoEditar: (cmd) => acaoEditar(cmd)
+})
+configurarPastasCrud({
+  nomeArquivo: (p) => nomeArquivo(p),
+  selecionarPasta: (p) => selecionarPasta(p),
+  getEditor: () => editor,
+  habilitarBotoesAnalise: (v) => habilitarBotoesAnalise(v)
 })
 configurarDesktopVault({
   nomeArquivo: (p) => nomeArquivo(p),
