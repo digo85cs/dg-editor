@@ -1038,7 +1038,13 @@ async function main() {
     )
     assert('css modal-float', /\.modal\.modal-float/.test(css))
     assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
-    assert('app ligarJanelaFlutuante', /function ligarJanelaFlutuante\s*\(/.test(appJs))
+    assert(
+      'app ligarJanelaFlutuante',
+      /janelas-flutuantes/.test(appJs) &&
+        /function ligarJanelaFlutuante\s*\(/.test(
+          fs.readFileSync(path.join(SRC, 'renderer/features/ui/janelas-flutuantes.js'), 'utf8')
+        )
+    )
     assert('tabs do centro sem inicializador inexistente', !/\binitAgentModes\s*\(/.test(appJs))
     assert(
       'regras gerais entram no bundle do renderer',
@@ -1316,7 +1322,13 @@ async function main() {
     assert('modal contas flutuante', /id="modal-contas"[^>]*modal-float/.test(htmlA))
     assert(
       'UI arrastar janela float',
-      /ligarJanelaFlutuante/.test(appJsA) && /trazerJanelaFrente/.test(appJsA)
+      /janelas-flutuantes/.test(appJsA) &&
+        /ligarJanelaFlutuante/.test(
+          fs.readFileSync(path.join(SRC, 'renderer/features/ui/janelas-flutuantes.js'), 'utf8')
+        ) &&
+        /trazerJanelaFrente/.test(
+          fs.readFileSync(path.join(SRC, 'renderer/features/ui/janelas-flutuantes.js'), 'utf8')
+        )
     )
     assert(
       'CSS modal-float',

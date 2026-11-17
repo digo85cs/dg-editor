@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 09:37:47** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 2078080 2026-11-17 release: v0.6.3
+> Gerado automaticamente em **17/11/2026, 09:42:52** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: b3c8bba 2026-11-17 feat: /paralelo-merge, /devin-sync e docs atualizadas; main -> integra-13-11
 > Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- b3c8bba 2026-11-17 feat: /paralelo-merge, /devin-sync e docs atualizadas; main -> integra-13-11
 - 2078080 2026-11-17 release: v0.6.3
 - 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
 - f5c0b48 2026-11-17 release: v0.6.2
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
 - 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
 - c6ec083 2026-11-16 test: cobertura mock da Devin API v3 (8 cenarios)
-- 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
 
 ## 16. Como atualizar este dossiê
 
