@@ -115,6 +115,9 @@ import {
 } from './features/ui/paleta.js'
 import { ligarEventosBotoes } from './features/ui/eventos-botoes.js'
 import { ligarIpcOuvintes, verificarEReiniciarDg } from './features/ui/ipc-ouvinte.js'
+import { ligarBotaoPainel, rodarAutoAuditoria, atualizarIconeMax } from './features/ui/auditoria-ui.js'
+import { ligarAtalhosTeclado } from './features/ui/atalhos-teclado.js'
+import { caminhoNoVault, nomeArquivo, nomePastaUi, caminhoRelativo, extIcon } from './utils/rotulos-arquivo.js'
 import {
   configurarComandos,
   bootstrapComandos,
@@ -363,43 +366,6 @@ let filesListaSuja = false
 // state.vaultRaiz migrado para state/app-state.js
 
 
-function caminhoNoVault(caminho) {
-  if (!state.vaultRaiz || !caminho) return false
-  return caminhoSobPasta(caminho, state.vaultRaiz)
-}
-
-function nomeArquivo(p) {
-  const s = String(p || '').replace(/\//g, '\\')
-  const i = s.lastIndexOf('\\')
-  return i >= 0 ? s.slice(i + 1) : s
-}
-
-/** Nome amigável na UI (DGEditor → DG Editor). */
-function nomePastaUi(p) {
-  return formatNomePastaUi(p) || nomeArquivo(p)
-}
-
-function caminhoRelativo(abs) {
-  const a = String(abs || '')
-  for (const raiz of state.pastasRecentes) {
-    const r = String(raiz)
-    if (a === r) return nomeArquivo(r)
-    const sep = r.endsWith('\\') || r.endsWith('/') ? '' : '\\'
-    if (a.toLowerCase().startsWith((r + sep).toLowerCase())) {
-      return a.slice(r.length + sep.length).replace(/\//g, '\\')
-    }
-  }
-  return nomeArquivo(a)
-}
-
-function extIcon(nome) {
-  const m = String(nome).toLowerCase().match(/\.([a-z0-9]+)$/)
-  const ext = m ? m[1] : ''
-  const label = (ext || '·').slice(0, 3).toUpperCase()
-  return `<span class="file-icon ext-${ext || 'txt'}">${label}</span>`
-}
-
-
 ligarNavegadorBloco3()
 ligarAbasPaineis()
 
@@ -607,87 +573,7 @@ ligarPaletaEventos()
 ligarEventosBotoes()
 
 // Config/Contas flutuantes: não fecham ao clicar no fundo (só no ×)
-function alternarPainel() {
-  toggleRight()
-}
-$('btn-painel')?.addEventListener('click', alternarPainel)
-
-async function rodarAutoAuditoria() {
-  const btn = document.getElementById('btn-auditar')
-  if (btn) {
-    btn.disabled = true
-    btn.textContent = 'Auditando...'
-  }
-  try {
-    // Mesma regua do boot (autoAtualizar=false) — numeros OK/warn/erro identicos
-    const r = await window.api.invoke('auditoria:rodar', {
-      autoAtualizar: false,
-      reiniciarAoFim: false
-    })
-    if (!r || r.erro) {
-      console.warn('[auditoria] erro:', r && r.erro)
-    } else {
-      const falhas = (r.achados || []).filter(function (a) {
-        return a.status === 'falhou'
-      })
-      const pend = (r.resumo && r.resumo.pendencias) || []
-      var msg =
-        'Auditoria concluida\n' +
-        'OK: ' +
-        r.resumo.ok +
-        ' | Avisos: ' +
-        r.resumo.warn +
-        ' | Erros: ' +
-        r.resumo.erro +
-        '\n' +
-        'Corrigidos: ' +
-        r.resumo.corrigidos +
-        ' | Falhas: ' +
-        r.resumo.falhas
-      if (pend.length) {
-        msg +=
-          '\n\nPendencias:\n' +
-          pend
-            .map(function (p) {
-              return '- [' + p.severidade + '] ' + p.id + ' — ' + p.titulo
-            })
-            .join('\n')
-      }
-      if (falhas.length) {
-        msg +=
-          '\n\nFalhas:\n' +
-          falhas
-            .map(function (a) {
-              return '- ' + a.titulo
-            })
-            .join('\n')
-      }
-      if (!r.reiniciarPendente) {
-        alert(msg)
-      }
-      if (r.reiniciarPendente) {
-        abrirModalReinicio(r.motivoReinicio)
-      }
-    }
-  } catch (e) {
-    console.warn('[auditoria] excecao:', e)
-  } finally {
-    if (btn) {
-      btn.disabled = false
-      btn.textContent = 'Auditar'
-    }
-  }
-}
-
-/** Diretório pai de um caminho (arquivo → pasta). */
-async function atualizarIconeMax() {
-  try {
-    const st = await window.api.invoke('janela:estado')
-    const b = document.getElementById('tb-max')
-    if (!b) return
-    b.title = st && st.maximizado ? 'Restaurar' : 'Maximizar'
-  } catch {}
-}
+ligarBotaoPainel()
 
 // Menubar (titlebar frameless): features/ui/menubar.js
 
@@ -770,93 +656,8 @@ function garantirTerminal() {
   terminalIniciado ??= carregarModuloTerminal().then((m) => m.initTerminalPanel())
   return terminalIniciado
 }
-document.addEventListener(
-  'keydown',
-  (e) => {
-    if (e.key === 'Escape' && atalhosTecladoAbertos()) {
-      e.preventDefault()
-      fecharAtalhosTeclado()
-      return
-    }
-    const alvoTecla = e.target
-    const digitando =
-      alvoTecla instanceof HTMLElement &&
-      (alvoTecla.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvoTecla.tagName))
-    const naArvore = alvoTecla instanceof HTMLElement && !!alvoTecla.closest?.('#files-list')
-    if (!digitando && !naArvore && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === '?') {
-      e.preventDefault()
-      abrirAtalhosTeclado()
-      return
-    }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === '/') {
-      e.preventDefault()
-      if (atalhosTecladoAbertos()) fecharAtalhosTeclado()
-      else abrirAtalhosTeclado()
-      return
-    }
-    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
-      if (e.key === '=' || e.key === '+') {
-        e.preventDefault()
-        if (e.shiftKey) ajustarFontePainelUi('editor', 1)
-        else ajustarZoomUi(1)
-        return
-      }
-      if (e.key === '-' || e.key === '_') {
-        e.preventDefault()
-        if (e.shiftKey) ajustarFontePainelUi('editor', -1)
-        else ajustarZoomUi(-1)
-        return
-      }
-      if ((e.key === '0' || e.code === 'Digit0') && e.shiftKey) {
-        e.preventDefault()
-        ajustarFontePainelUi('editor', 0)
-        ajustarFontePainelUi('terminal', 0)
-        return
-      }
-      if (e.key === '0' && !e.shiftKey) {
-        e.preventDefault()
-        ajustarZoomUi(0)
-        return
-      }
-    }
-    if ((e.ctrlKey || e.metaKey) && e.altKey) {
-      if (e.key === '=' || e.key === '+') {
-        e.preventDefault()
-        ajustarFontePainelUi('terminal', 1)
-        return
-      }
-      if (e.key === '-' || e.key === '_') {
-        e.preventDefault()
-        ajustarFontePainelUi('terminal', -1)
-        return
-      }
-    }
-    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
-      e.preventDefault()
-      if (e.key === '1') focarRegiao('sidebar', 'Barra lateral')
-      else if (e.key === '2') focarRegiao('center-panel', 'Conteúdo principal')
-      else focarRegiao('exec-panel', 'Painel direito')
-      return
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === '`') {
-      e.preventDefault()
-      alternarTerminalNoBloco3()
-    }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
-      e.preventDefault()
-      if (!desktopPermitido()) {
-        pedirPermissaoDesktop()
-        return
-      }
-      abrirNavegadorNoBloco3()
-    }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
-      e.preventDefault()
-      focarPainelIa('chat')
-    }
-  },
-  true
-)
+ligarAtalhosTeclado()
+
 // placeholder até primeiro uso
 const termPanel = document.getElementById('terminal-panel')
 if (termPanel && !termPanel.dataset.lazyReady) {

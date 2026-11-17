@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:59:49** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: d622897 2026-11-17 refactor: extrai listeners de botoes para eventos-botoes.js
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 14:02:24** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 4409890 2026-11-17 refactor: extrai ouvintes IPC globais para ipc-ouvinte.js
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 4409890 2026-11-17 refactor: extrai ouvintes IPC globais para ipc-ouvinte.js
 - d622897 2026-11-17 refactor: extrai listeners de botoes para eventos-botoes.js
 - c93aac9 2026-11-17 refactor: move listeners da paleta/busca para paleta.js
 - 07a47b9 2026-11-17 refactor: extrai activity bar, abas de paineis e navegador bloco 3
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 13c7d00 2026-11-17 refactor: extrai contexto de pasta (selecionar/sincronizar/analise cache)
 - b0b0bdf 2026-11-17 refactor: extrai CRUD de pastas (adicionar/remover/selecionar helpers)
 - 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
-- 33636e4 2026-11-17 refactor: extrai render da arvore e lista de projetos
 
 ## 16. Como atualizar este dossiê
 
