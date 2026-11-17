@@ -97,6 +97,13 @@ export function ligarIpcOuvintes() {
         }
       }).catch(() => {})
     })
+    window.api.on('devin:sessao-mudou', (_e, p) => {
+      const s = p || {}
+      mostrarToast(
+        'Sessão Devin ' + String(s.sessionId || '').slice(0, 8) + ': ' + String(s.de || '?') + ' → ' + String(s.para || '?'),
+        'info'
+      )
+    })
   }
 
   $('btn-brain-avaliar')?.addEventListener('click', async () => {

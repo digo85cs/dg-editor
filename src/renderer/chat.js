@@ -125,6 +125,21 @@ export async function iniciarHistoricoChat(
     }
   }
 
+  async function exportarChat(id, raizOverride) {
+    const raiz = raizOverride || raizChats
+    if (!raiz || !id) return
+    try {
+      const r = await window.api.invoke('chat:exportar-md', raiz, id)
+      if (r?.ok && r.caminho && window.dgToast) {
+        window.dgToast('Conversa exportada: ' + r.caminho, 'ok')
+      } else if (window.dgToast) {
+        window.dgToast('Exportar falhou: ' + (r?.erro || 'erro'), 'erro')
+      }
+    } catch (e) {
+      if (window.dgToast) window.dgToast('Exportar falhou: ' + String(e), 'erro')
+    }
+  }
+
   async function duplicarChat(id, raizOverride) {
     const raiz = raizOverride || raizChats
     if (!raiz || !id) return
@@ -196,6 +211,7 @@ export async function iniciarHistoricoChat(
     menu.innerHTML =
       '<button type="button" role="menuitem" data-chat-act="rename">Renomear</button>' +
       '<button type="button" role="menuitem" data-chat-act="dup">Duplicar</button>' +
+      '<button type="button" role="menuitem" data-chat-act="export">Exportar .md</button>' +
       '<button type="button" role="menuitem" data-chat-act="delete" class="danger">Excluir</button>'
 
     more.addEventListener('click', (e) => {
@@ -216,6 +232,7 @@ export async function iniciarHistoricoChat(
       fecharMenusChat()
       if (act === 'rename') void renomearChat(c.id, c.titulo || '', pastaDoChat)
       else if (act === 'dup') void duplicarChat(c.id, pastaDoChat)
+      else if (act === 'export') void exportarChat(c.id, pastaDoChat)
       else if (act === 'delete') void excluirChat(c.id, pastaDoChat)
     })
 

@@ -11,6 +11,54 @@ export interface McpServidorCatalogo {
   config: Record<string, unknown>
 }
 
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+
+function caminhoExternos(raiz: string): string {
+  return join(raiz, '.dg-editor', 'mcp-externos.json')
+}
+
+export function lerExternosMcp(raiz: string): { servidores: Array<Record<string, unknown>> } {
+  try {
+    const cfg = JSON.parse(readFileSync(caminhoExternos(raiz), 'utf8'))
+    return { servidores: Array.isArray(cfg?.servidores) ? cfg.servidores : [] }
+  } catch {
+    return { servidores: [] }
+  }
+}
+
+export function idsExternosAtivos(raiz: string): Set<string> {
+  const s = new Set<string>()
+  for (const srv of lerExternosMcp(raiz).servidores) {
+    const nome = String((srv as Record<string, unknown>).nome || '')
+    if (nome) s.add(nome)
+  }
+  return s
+}
+
+export function instalarMcpCatalogo(
+  raiz: string,
+  id: string
+): { ok: boolean; erro?: string; item?: McpServidorCatalogo } {
+  const item = lerCatalogoMcp().find((s) => s.id === id)
+  if (!item) return { ok: false, erro: 'MCP desconhecido: ' + id }
+  const { servidores } = lerExternosMcp(raiz)
+  if (servidores.some((s) => String(s.nome || '') === item.id)) {
+    return { ok: false, erro: item.id + ' já está ativo em mcp-externos.json.' }
+  }
+  const c = item.config as { command?: string; args?: string[]; env?: Record<string, string> }
+  servidores.push({
+    nome: item.id,
+    comando: c.command,
+    args: c.args || [],
+    env: c.env || {},
+    habilitado: true
+  })
+  mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+  writeFileSync(caminhoExternos(raiz), JSON.stringify({ servidores }, null, 2) + '\n', 'utf8')
+  return { ok: true, item }
+}
+
 export function lerCatalogoMcp(): McpServidorCatalogo[] {
   return [
     {

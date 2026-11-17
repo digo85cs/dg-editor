@@ -343,10 +343,20 @@ async function cmdParalelo(arg: string, raiz: string): Promise<string> {
 }
 
 async function cmdParaleloMerge(arg: string, raiz: string): Promise<string> {
-  const nome = arg.trim().split(/\s+/)[0]
-  if (!nome) return 'Uso: `/paralelo-merge <nome>` — mergeia a branch dg/wt-<nome> na atual.'
+  const partes = arg.trim().split(/\s+/).filter(Boolean)
+  const nome = partes[0]
+  const revisar = partes.includes('--revisar') || partes.includes('-n')
+  if (!nome) return 'Uso: `/paralelo-merge <nome> [--revisar]` — mergeia a branch dg/wt-<nome> na atual. `--revisar` só mostra o diff.'
   try {
-    const { mergeWorktreeCheckpoint, removerWorktreeCheckpoint } = await import('./git-worktree')
+    const { mergeWorktreeCheckpoint, removerWorktreeCheckpoint, diffWorktreeCheckpoint } = await import('./git-worktree')
+    if (revisar) {
+      const d = await diffWorktreeCheckpoint(raiz, nome)
+      if (!d.ok) return 'Revisão falhou: ' + (d.erro || 'erro')
+      return 'Diff de "' + nome + '" (dg/wt-' + nome + ' → atual):\n\n' +
+        (d.commits ? 'Commits:\n' + d.commits + '\n\n' : '') +
+        'Arquivos:\n' + d.diff +
+        '\n\nPara mergear: `/paralelo-merge ' + nome + '`'
+    }
     const r = await mergeWorktreeCheckpoint(raiz, nome)
     if (!r.ok) return 'Merge falhou: ' + (r.erro || 'erro') + '\nResolva conflitos e tente de novo, ou `/worktree remover ' + nome + '` para descartar.'
     const rm = await removerWorktreeCheckpoint(raiz, nome)
@@ -480,7 +490,7 @@ export async function executarComandoChat(
           '- `/credenciais [id valor|remover id]` — vault de chaves (devin, openrouter...)\n' +
           '- `/agendar <min> <prompt>` — job recorrente; `/agendar` lista; `off/on/remover <id>`\n' +
           '- `/paralelo <nome> [tarefa]` — agente isolado em git worktree\n' +
-          '- `/paralelo-merge <nome>` — mergeia o worktree na branch atual\n' +
+          '- `/paralelo-merge <nome> [--revisar]` — mergeia o worktree na branch atual (--revisar mostra o diff)\n' +
           '- `/devin-sync` — sessões Devin com status/PRs para merge\n' +
           '- `/ajuda` — esta lista'
       }

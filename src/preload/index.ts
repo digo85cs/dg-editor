@@ -17,12 +17,12 @@ const invokeChannels = [
   'whereis:ask',
   'rules:exists', 'rules:read', 'rules:create-template', 'rules:write',
   'chat:load', 'chat:send', 'chat:cancelar', 'chat:clear', 'orientar:prompt', 'chat:anexar',
-  'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar',
+  'chat:salvar', 'chat:listar', 'chat:carregar', 'chat:apagar', 'chat:exportar-md',
   'git:status', 'git:diff', 'git:repos', 'git:commit',
   'accounts:get-state', 'guardian:snapshot', 'guardian:resumo',
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
-  'skills:listar', 'skills:criar', 'mcp:tools', 'mcp:status', 'mcp:set-habilitado', 'mcp:smoke', 'memoria:status',
+  'skills:listar', 'skills:criar', 'mcp:tools', 'mcp:status', 'mcp:set-habilitado', 'mcp:smoke', 'mcp:catalogo', 'mcp:instalar', 'memoria:status',
   'memoria:listar', 'memoria:propor', 'memoria:decidir', 'editor:completar',
   'adapta:status', 'adapta:gerar', 'adapta:ler-continuidade', 'adapta:abrir',
   'roteador:planejar',
@@ -148,7 +148,8 @@ const eventOnChannels = [
   'prov:progresso',
   'midia:linha-tempo-progresso',
   'imagens:usb-progresso',
-  'agendador:disparo'
+  'agendador:disparo',
+  'devin:sessao-mudou'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */

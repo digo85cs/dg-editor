@@ -493,6 +493,133 @@ function ligarDepsManutencaoUi() {
   }, 600_000)
 }
 
+async function pintarMcps() {
+  const sec = garantirSecao('mcps-marketplace-section', 'Marketplace MCP')
+  const corpo = sec.querySelector('.extras-corpo') || sec
+  corpo.innerHTML = '<div id="mcps-market-list" class="lista muted">Carregando…</div>'
+  const list = document.getElementById('mcps-market-list')
+  if (!list) return
+  const raiz = state.pastaAtual || state.pastasRecentes?.[0] || ''
+  try {
+    const r = await window.api.invoke('mcp:catalogo', raiz)
+    const itens = r?.itens || []
+    list.innerHTML = ''
+    if (!itens.length) {
+      list.textContent = 'Catálogo vazio'
+      return
+    }
+    for (const it of itens) {
+      const row = document.createElement('div')
+      row.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border, #30363d)'
+      const head = document.createElement('div')
+      head.style.cssText = 'display:flex;gap:8px;align-items:center'
+      const nome = document.createElement('strong')
+      nome.textContent = it.nome || it.id
+      const badge = document.createElement('span')
+      badge.className = 'muted'
+      badge.style.cssText = 'font-size:10px;border:1px solid currentColor;border-radius:8px;padding:0 6px'
+      badge.textContent = it.ativo ? 'ativo' : 'disponível'
+      head.appendChild(nome); head.appendChild(badge)
+      const desc = document.createElement('div')
+      desc.className = 'muted'
+      desc.style.cssText = 'font-size:11px;margin:2px 0 4px'
+      desc.textContent = it.descricao || ''
+      const cmd = document.createElement('code')
+      cmd.className = 'muted'
+      cmd.style.cssText = 'font-size:10px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+      cmd.textContent = it.comando || ''
+      const btn = document.createElement('button')
+      btn.className = 'btn-mini'
+      btn.textContent = it.ativo ? 'Instalado' : 'Instalar'
+      btn.disabled = !!it.ativo
+      btn.addEventListener('click', async () => {
+        btn.disabled = true
+        btn.textContent = 'Instalando…'
+        const res = await window.api.invoke('mcp:instalar', { raiz, id: it.id })
+        if (res?.ok) {
+          btn.textContent = 'Instalado'
+          badge.textContent = 'ativo'
+          if (window.dgToast) window.dgToast('MCP ' + it.id + ' instalado — recarregue para carregar tools', 'ok')
+        } else {
+          btn.disabled = false
+          btn.textContent = 'Instalar'
+          if (window.dgToast) window.dgToast('Falha: ' + (res?.erro || ''), 'erro')
+        }
+      })
+      head.appendChild(btn)
+      row.appendChild(head); row.appendChild(desc); row.appendChild(cmd)
+      list.appendChild(row)
+    }
+  } catch (e) {
+    list.textContent = 'Marketplace indisponível'
+    console.warn('[mcps-ui]', e)
+  }
+}
+
+async function pintarProviders() {
+  const sec = garantirSecao('providers-section', 'Provedores de IA')
+  const corpo = sec.querySelector('.extras-corpo') || sec
+  corpo.innerHTML =
+    '<div id="providers-resumo" class="muted" style="font-size:11px;margin-bottom:6px">Carregando…</div>' +
+    '<div id="providers-list" class="lista"></div>' +
+    '<div style="margin-top:6px"><button id="providers-testar-todos" class="btn-mini">Testar todos</button></div>'
+  const resumo = document.getElementById('providers-resumo')
+  const list = document.getElementById('providers-list')
+  if (!list) return
+  try {
+    const [r, gasto] = await Promise.all([
+      window.api.invoke('providers:listar'),
+      window.api.invoke('providers:gasto').catch(() => null)
+    ])
+    const itens = r?.providers || []
+    if (resumo) {
+      const usd = gasto?.usd
+      resumo.textContent = itens.length + ' provedores' +
+        (typeof usd === 'number' ? ' · gasto hoje: $' + usd.toFixed(4) : '')
+    }
+    list.innerHTML = ''
+    for (const p of itens.slice(0, 20)) {
+      const row = document.createElement('div')
+      row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border, #30363d)'
+      const nome = document.createElement('span')
+      nome.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+      nome.textContent = (p.label || p.id) + (p.tier ? ' · ' + p.tier : '')
+      const badges = document.createElement('span')
+      badges.className = 'muted'
+      badges.style.cssText = 'font-size:10px;display:flex;gap:6px'
+      const bAtivo = document.createElement('span')
+      bAtivo.textContent = p.ativo ? 'ativo' : 'inativo'
+      const bKey = document.createElement('span')
+      bKey.textContent = p.chaveConfigurada ? 'chave ok' : 'sem chave'
+      const bEsg = document.createElement('span')
+      bEsg.textContent = p.esgotadoAte ? 'cota esgotada' : ''
+      badges.appendChild(bAtivo); badges.appendChild(bKey); badges.appendChild(bEsg)
+      row.appendChild(nome); row.appendChild(badges)
+      list.appendChild(row)
+    }
+    if (!itens.length) list.innerHTML = '<div class="muted">Nenhum provider</div>'
+  } catch (e) {
+    if (list) list.innerHTML = '<div class="muted">Providers indisponíveis</div>'
+    console.warn('[providers-ui]', e)
+  }
+  const btn = document.getElementById('providers-testar-todos')
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true
+      btn.textContent = 'Testando…'
+      try {
+        const r = await window.api.invoke('providers:testar-todos')
+        if (window.dgToast) {
+          window.dgToast('Testes: ' + (r?.okN ?? 0) + ' ok / ' + (r?.falhas ?? 0) + ' falhas', r?.falhas ? 'aviso' : 'ok')
+        }
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Testar todos'
+      }
+    })
+  }
+}
+
 async function pintarAutomacoes() {
   const sec = garantirSecao('automacoes-section', 'Automações')
   const corpo = sec.querySelector('.extras-corpo') || sec
@@ -642,6 +769,8 @@ export function ligarExtrasUi() {
   void pintarSimbolos()
   void pintarRota()
   void pintarPlanilha()
+  void pintarMcps()
+  void pintarProviders()
   void pintarAutomacoes()
   ligarOnboarding()
   ligarAutoUpdateUi()
@@ -656,6 +785,8 @@ export function ligarExtrasUi() {
       void pintarSimbolos()
       void pintarRota()
       void pintarPlanilha()
+      void pintarMcps()
+      void pintarProviders()
       void pintarAutomacoes()
       void window.api?.invoke?.('deps:manutencao-status').then(pintarDepsManutencao).catch(() => {})
     }, 200)

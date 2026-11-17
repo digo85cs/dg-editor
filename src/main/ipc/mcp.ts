@@ -98,5 +98,36 @@ export function registrarHandlersMcp(): void {
   ipcMain.handle('mcp:smoke', handleMcpSmoke);
   ipcMain.handle('conectores:listar', handleConectoresListar);
 
+  // Marketplace de MCP servers (catálogo curado + instalação no projeto)
+  ipcMain.handle('mcp:catalogo', async (_e: Electron.IpcMainInvokeEvent, raiz: unknown) => {
+    try {
+      const { lerCatalogoMcp, idsExternosAtivos } = await import('../mcp/mercado');
+      const r = typeof raiz === 'string' && raiz ? raiz : '';
+      const ativos = r ? idsExternosAtivos(r) : new Set<string>();
+      return {
+        ok: true,
+        itens: lerCatalogoMcp().map((s) => ({ ...s, ativo: ativos.has(s.id) }))
+      };
+    } catch (e: unknown) {
+      return { ok: false, erro: e instanceof Error ? e.message : String(e), itens: [] };
+    }
+  });
+
+  ipcMain.handle('mcp:instalar', async (_e: Electron.IpcMainInvokeEvent, payload: unknown) => {
+    try {
+      const o = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>;
+      const raiz = typeof o.raiz === 'string' ? o.raiz : '';
+      const id = typeof o.id === 'string' ? o.id.trim().toLowerCase() : '';
+      if (!raiz || !id) return { ok: false, erro: 'payload invalido' };
+      const { instalarMcpCatalogo } = await import('../mcp/mercado');
+      const r = instalarMcpCatalogo(raiz, id);
+      return r.ok
+        ? { ok: true, item: r.item }
+        : { ok: false, erro: r.erro };
+    } catch (e: unknown) {
+      return { ok: false, erro: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
   dglog('[ipc:mcp] handlers registrados!');
 }

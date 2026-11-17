@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 14:44:37** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.4** · branch `integra-13-11` · último commit: 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 15:05:46** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.4** · branch `integra-13-11` · último commit: 34ab538 2026-11-17 chore: release v0.6.4
+> Alterações locais não commitadas: 11 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **383**.
-- Canais expostos pelo preload: **365**.
+- Canais registrados no main: **386**.
+- Canais expostos pelo preload: **369**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 34ab538 2026-11-17 chore: release v0.6.4
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
 - 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
 - f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 22553e9 2026-11-17 refactor: extrai titlebar e listeners da diff-bar
 - 01caadf 2026-11-17 refactor: extrai atalhos de teclado, auditoria UI e rotulos de arquivo
 - 4409890 2026-11-17 refactor: extrai ouvintes IPC globais para ipc-ouvinte.js
-- d622897 2026-11-17 refactor: extrai listeners de botoes para eventos-botoes.js
 
 ## 16. Como atualizar este dossiê
 

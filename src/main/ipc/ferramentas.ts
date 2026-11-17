@@ -16,6 +16,8 @@ import { definirRaizWorkspace, obterRaizWorkspace } from '../workspace-raiz'
 import { caminhoSeguro } from '../ipc-seguro'
 import { askOllama } from '../brain/ollama'
 import { modeloParaTarefa } from '../brain/modelos-catalogo'
+import { mkdirSync, writeFileSync } from 'fs'
+import { join } from 'path'
 
 const PROMPT_ORIENTADOR_SYSTEM =
   'Você é um engenheiro de prompt. Receba a ideia do usuário e devolva um prompt mais claro, específico e acionável, mantendo a intenção original. Devolva apenas o prompt refinado, sem preâmbulo nem explicações. Preserve o idioma do usuário.'
@@ -156,6 +158,38 @@ export function registrarHandlersFerramentas(): void {
     if (isErroPayload(i)) return i
     if (!idChatValido(i)) return { ok: false, erro: 'id de chat invalido' }
     return { ok: true, apagado: apagarChat(r, i) }
+  })
+
+  ipcMain.handle('chat:exportar-md', (_event, raiz: unknown, id: unknown) => {
+    const r = validarRaiz(raiz)
+    if (typeof r !== 'string') return r
+    const i = exigirString(id, 'id')
+    if (isErroPayload(i)) return i
+    if (!idChatValido(i)) return { ok: false, erro: 'id de chat invalido' }
+    const chat = carregarChat(r, i)
+    if (!chat) return { ok: false, erro: 'chat nao encontrado' }
+    const linhas: string[] = [
+      '# ' + String(chat.titulo || 'Conversa'),
+      '',
+      '_Exportado do DG Editor em ' + new Date().toISOString() + '_',
+      ''
+    ]
+    for (const m of chat.mensagens || []) {
+      const quem = m.role === 'user' ? '## Usuário' : m.role === 'assistant' ? '## Assistente' : '## ' + String(m.role)
+      linhas.push(quem, '', String(m.content || ''), '')
+    }
+    const slug = String(chat.titulo || 'conversa')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'conversa'
+    const dir = join(r, '.dg-editor', 'exports')
+    mkdirSync(dir, { recursive: true })
+    const caminho = join(dir, slug + '-' + chat.id + '.md')
+    try {
+      writeFileSync(caminho, linhas.join('\n'), 'utf8')
+      return { ok: true, caminho }
+    } catch (e) {
+      return { ok: false, erro: e instanceof Error ? e.message : String(e) }
+    }
   })
 
   ipcMain.handle('orientar:prompt', async (_event, raiz: unknown, prompt: unknown) => {

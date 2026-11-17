@@ -71,6 +71,22 @@ export async function mergeWorktreeCheckpoint(
   return { ok: true, saida: r.stdout.slice(0, 500) }
 }
 
+export async function diffWorktreeCheckpoint(
+  raiz: string,
+  nome: string
+): Promise<{ ok: boolean; diff?: string; commits?: string; erro?: string }> {
+  const s = slug(nome)
+  const branch = 'dg/wt-' + s
+  const stat = await git(raiz, ['diff', '--stat', 'HEAD...' + branch])
+  if (!stat.ok) return { ok: false, erro: stat.erro }
+  const log = await git(raiz, ['log', '--oneline', 'HEAD..' + branch])
+  return {
+    ok: true,
+    diff: stat.stdout.trim() || '(sem diferenças)',
+    commits: log.ok ? log.stdout.trim() : ''
+  }
+}
+
 export async function listarWorktrees(raiz: string): Promise<WorktreeCheckpoint[]> {
   const r = await git(raiz, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return []
