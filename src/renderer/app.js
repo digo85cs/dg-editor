@@ -134,6 +134,15 @@ import {
   ligarArvoreRender
 } from './features/arquivos/arvore-render.js'
 import {
+  configurarDesktopVault,
+  desktopPermitido,
+  pedirPermissaoDesktop,
+  abrirVault,
+  fecharVault,
+  atualizarPainelVault,
+  abrirWikiLink
+} from './features/arquivos/desktop-vault.js'
+import {
   configurarAnalise,
   habilitarBotoesAnalise,
   analisarCompleta,
@@ -483,98 +492,6 @@ async function abrirPasta() {
   await selecionarPasta(r.path)
 }
 
-async function abrirVault() {
-  const r = await window.api.invoke('vault:abrir')
-  if (r?.canceled) return
-  if (!r?.ok) {
-    alert('Não foi possível abrir o vault: ' + (r?.erro || 'erro'))
-    return
-  }
-  state.vaultRaiz = r.raiz
-  adicionarPasta(r.raiz)
-  await selecionarPasta(r.raiz)
-  const sec = $('vault-section')
-  if (sec) sec.hidden = false
-  const st = $('vault-status')
-  if (st) st.textContent = nomeArquivo(r.raiz) + ' · ' + (r.total || 0) + ' notas'
-  await atualizarPainelVault(state.abaAtiva)
-}
-
-async function fecharVault() {
-  await window.api.invoke('vault:fechar')
-  state.vaultRaiz = null
-  const sec = $('vault-section')
-  if (sec) sec.hidden = true
-  const st = $('vault-status')
-  if (st) st.textContent = 'Nenhum vault'
-  const bl = $('vault-backlinks')
-  if (bl) bl.innerHTML = ''
-  const tg = $('vault-tags')
-  if (tg) tg.innerHTML = ''
-}
-
-async function atualizarPainelVault(caminho) {
-  if (!state.vaultRaiz) return
-  const bl = $('vault-backlinks')
-  const tg = $('vault-tags')
-  if (bl) {
-    bl.innerHTML = ''
-    if (caminho && caminhoNoVault(caminho) && ehMarkdown(caminho)) {
-      const r = await window.api.invoke('vault:backlinks', caminho)
-      const itens = r?.backlinks || []
-      if (!itens.length) {
-        bl.innerHTML = '<span class="muted">Nenhum backlink</span>'
-      } else {
-        for (const n of itens) {
-          const b = document.createElement('button')
-          b.type = 'button'
-          b.textContent = n.titulo || n.rel
-          b.title = n.rel
-          b.addEventListener('click', () => void abrirArquivoNaAba(n.path))
-          bl.appendChild(b)
-        }
-      }
-    } else {
-      bl.innerHTML = '<span class="muted">Abra uma nota do vault</span>'
-    }
-  }
-  if (tg) {
-    tg.innerHTML = ''
-    const r = await window.api.invoke('vault:tags')
-    const tags = r?.tags || {}
-    const keys = Object.keys(tags).sort((a, b) => a.localeCompare(b))
-    if (!keys.length) {
-      tg.innerHTML = '<span class="muted">Sem tags</span>'
-    } else {
-      for (const k of keys.slice(0, 40)) {
-        const b = document.createElement('button')
-        b.type = 'button'
-        b.textContent = '#' + k + ' (' + tags[k].length + ')'
-        b.title = tags[k].map((x) => x.rel).join(', ')
-        b.addEventListener('click', () => {
-          const first = tags[k][0]
-          if (first) void abrirArquivoNaAba(first.path)
-        })
-        tg.appendChild(b)
-      }
-    }
-  }
-}
-
-async function abrirWikiLink(alvo) {
-  if (!state.vaultRaiz) {
-    alert('Abra um vault para resolver [[links]].')
-    return
-  }
-  const r = await window.api.invoke('vault:resolver-link', alvo, state.abaAtiva || undefined)
-  if (!r?.path) {
-    alert('Nota não encontrada: [[' + alvo + ']]')
-    return
-  }
-  await abrirArquivoNaAba(r.path)
-  void atualizarPainelVault(r.path)
-}
-
 function adicionarPasta(path) {
   adicionarPastaState(path)
   renderizarPastas()
@@ -617,64 +534,6 @@ function criarBotaoRemoverPasta(path) {
   return btn
 }
 
-
-/** Controle do PC: pede permissão explícita (sessão). */
-function desktopPermitido() {
-  try {
-    return sessionStorage.getItem('dg-desktop-use') === '1'
-  } catch {
-    return false
-  }
-}
-
-function pedirPermissaoDesktop() {
-  let modal = $('modal-desktop-use')
-  if (!modal) {
-    modal = document.createElement('div')
-    modal.id = 'modal-desktop-use'
-    modal.className = 'modal hidden'
-    modal.setAttribute('role', 'dialog')
-    modal.setAttribute('aria-modal', 'true')
-    modal.innerHTML =
-      '<div class="modal-box modal-desktop-box">' +
-      '<h3>Controle do computador</h3>' +
-      '<p class="muted">O Agent pode abrir o navegador embutido, terminal e testar navegação. ' +
-      'Ele <strong>pede antes</strong> de agir fora do editor. Conceder só nesta sessão?</p>' +
-      '<div class="desktop-perm-actions">' +
-      '<button type="button" class="btn-ghost" id="desktop-use-negar">Agora não</button>' +
-      '<button type="button" class="btn-primary" id="desktop-use-ok">Permitir nesta sessão</button>' +
-      '</div></div>'
-    document.body.appendChild(modal)
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.classList.add('hidden')
-    })
-    modal.querySelector('#desktop-use-negar')?.addEventListener('click', () => {
-      try { sessionStorage.setItem('dg-desktop-use', '0') } catch {}
-      modal.classList.add('hidden')
-      mostrarToast('Controle do PC negado nesta sessão', 'aviso')
-      $('btn-desktop-use')?.classList.remove('active')
-    })
-    modal.querySelector('#desktop-use-ok')?.addEventListener('click', () => {
-      try { sessionStorage.setItem('dg-desktop-use', '1') } catch {}
-      modal.classList.add('hidden')
-      mostrarToast('Controle do PC permitido nesta sessão', 'ok')
-      $('btn-desktop-use')?.classList.add('active')
-      toggleRight(true)
-      ativarAbaDireita('browser')
-      appendChatToolTrace('… Controle do PC autorizado — posso usar Navegador/Terminal no bloco 3')
-      setChatLiveStatus('Controle do PC ativo')
-    })
-  }
-  if (desktopPermitido()) {
-    mostrarToast('Controle do PC já está ativo nesta sessão', 'ok')
-    $('btn-desktop-use')?.classList.add('active')
-    return
-  }
-  modal.classList.remove('hidden')
-}
-
-window.dgDesktopPedir = pedirPermissaoDesktop
-window.dgDesktopPermitido = desktopPermitido
 
 async function removerPasta(path, opts) {
   if (!path || !state.pastasRecentes.includes(path)) return
@@ -1261,6 +1120,18 @@ configurarAnalise({
 configurarMenubar({
   executarComando: (id) => executarComando(id),
   acaoEditar: (cmd) => acaoEditar(cmd)
+})
+configurarDesktopVault({
+  nomeArquivo: (p) => nomeArquivo(p),
+  caminhoNoVault: (c) => caminhoNoVault(c),
+  ehMarkdown: (c) => ehMarkdown(c),
+  abrirArquivoNaAba: (c, l) => abrirArquivoNaAba(c, l),
+  adicionarPasta: (p) => adicionarPasta(p),
+  selecionarPasta: (p) => selecionarPasta(p),
+  toggleRight: (v) => toggleRight(v),
+  ativarAbaDireita: (p) => ativarAbaDireita(p),
+  appendChatToolTrace: (t) => appendChatToolTrace(t),
+  setChatLiveStatus: (t) => setChatLiveStatus(t)
 })
 configurarArvoreRender({
   nomeArquivo: (p) => nomeArquivo(p),
