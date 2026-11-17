@@ -28,6 +28,8 @@ import {
   rejeitarPendenteOc
 } from '../editor/diff-pendentes.js'
 import { salvarArquivoAtivo } from '../editor/abas-core.js'
+import { toggleRight } from '../layout/paineis.js'
+import { setBrowserVisivel, setBrowserStatus } from './activity-browser.js'
 import { enviarMensagem } from '../chat/enviar.js'
 import { iniciarComposer } from '../chat/composer.js'
 import { atualizarGitStatusArvore } from '../arquivos/arvore-render.js'
@@ -120,4 +122,28 @@ export function ligarComposerEGitPoll() {
   function enviarMensagemUi() { void enviarMensagem() }
   $id('chat-send')?.addEventListener('click', enviarMensagemUi)
   iniciarComposer($id('chat-input'), { onEnviar: enviarMensagemUi })
+}
+
+export function ligarBotoesPainelDireito() {
+  const $id = (id) => document.getElementById(id)
+  $id('btn-right-collapse')?.addEventListener('click', () => toggleRight())
+  $id('bloco3-edge')?.addEventListener('click', () => toggleRight(true))
+  $id('btn-right-expand')?.addEventListener('click', () => toggleRight(true))
+  $id('btn-right-toggle')?.addEventListener('click', () => toggleRight())
+  document.querySelectorAll('[data-right-close]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const pane = btn.getAttribute('data-right-close')
+      if (pane === 'terminal') {
+        try { window.dgTerminal?.fechar?.() } catch {}
+      }
+      if (pane === 'browser') {
+        try { window.api.invoke('navegador:fechar') } catch {}
+        setBrowserVisivel(false)
+        setBrowserStatus(false)
+      }
+      toggleRight(false)
+    })
+  })
 }

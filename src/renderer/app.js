@@ -2,11 +2,6 @@
 import { mostrarRegrasUI } from './regras-ui.js'
 // Editor (CodeMirror) e terminal (xterm) carregam sob demanda: pesam no boot
 // e so sao necessarios quando o usuario abre um arquivo/painel.
-let moduloTerminalPromise = null
-function carregarModuloTerminal() {
-  moduloTerminalPromise ??= import('./terminal.js')
-  return moduloTerminalPromise
-}
 import { registrarComando, listarComandosLocais, executarComandoLocal } from './comandos.js'
 import {
   ligarHistoricoChat,
@@ -113,12 +108,13 @@ import {
 ,
   ligarPaletaEventos
 } from './features/ui/paleta.js'
-import { ligarEventosBotoes, ligarComposerEGitPoll } from './features/ui/eventos-botoes.js'
+import { ligarEventosBotoes, ligarComposerEGitPoll, ligarBotoesPainelDireito } from './features/ui/eventos-botoes.js'
 import { ligarIpcOuvintes, verificarEReiniciarDg } from './features/ui/ipc-ouvinte.js'
 import { ligarBotaoPainel, rodarAutoAuditoria, atualizarIconeMax } from './features/ui/auditoria-ui.js'
 import { ligarAtalhosTeclado } from './features/ui/atalhos-teclado.js'
 import { ligarTituloBarra } from './features/ui/titulo-barra.js'
 import { ligarStatusWorkspace } from './features/ui/status-workspace.js'
+import { garantirTerminal, prepararTerminalLazy } from './features/ui/terminal-lazy.js'
 import { caminhoNoVault, nomeArquivo, nomePastaUi, caminhoRelativo, extIcon } from './utils/rotulos-arquivo.js'
 import {
   configurarComandos,
@@ -564,26 +560,7 @@ ligarBotaoPainel()
 // ---------- Boot ----------
 carregarLayout()
 sincronizarBotoesPainelDireito()
-$('btn-right-collapse')?.addEventListener('click', () => toggleRight())
-$('bloco3-edge')?.addEventListener('click', () => toggleRight(true))
-$('btn-right-expand')?.addEventListener('click', () => toggleRight(true))
-$('btn-right-toggle')?.addEventListener('click', () => toggleRight())
-document.querySelectorAll('[data-right-close]').forEach((btn) => {
-  btn.addEventListener('click', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const pane = btn.getAttribute('data-right-close')
-    if (pane === 'terminal') {
-      try { window.dgTerminal?.fechar?.() } catch {}
-    }
-    if (pane === 'browser') {
-      try { window.api.invoke('navegador:fechar') } catch {}
-      setBrowserVisivel(false)
-      setBrowserStatus(false)
-    }
-    toggleRight(false)
-  })
-})
+ligarBotoesPainelDireito()
 carregarPastas()
 initResizers()
 initActivityBar()
@@ -609,11 +586,8 @@ window.alert = (msg) => {
 }
 ligarStatusWorkspace()
 // Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
-let terminalIniciado = null
-function garantirTerminal() {
-  terminalIniciado ??= carregarModuloTerminal().then((m) => m.initTerminalPanel())
-  return terminalIniciado
-}
+prepararTerminalLazy()
+
 ligarAtalhosTeclado()
 
 // placeholder até primeiro uso
