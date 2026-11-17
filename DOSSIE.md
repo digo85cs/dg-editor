@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 15:05:46** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.4** · branch `integra-13-11` · último commit: 34ab538 2026-11-17 chore: release v0.6.4
-> Alterações locais não commitadas: 11 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 15:09:17** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
 - 34ab538 2026-11-17 chore: release v0.6.4
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
 - 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
 - 22553e9 2026-11-17 refactor: extrai titlebar e listeners da diff-bar
 - 01caadf 2026-11-17 refactor: extrai atalhos de teclado, auditoria UI e rotulos de arquivo
-- 4409890 2026-11-17 refactor: extrai ouvintes IPC globais para ipc-ouvinte.js
 
 ## 16. Como atualizar este dossiê
 
