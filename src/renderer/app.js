@@ -30,6 +30,18 @@ import { mostrarToast } from './features/ui/toast.js'
 import { MENUS_BARRA } from './features/ui/menubar-dados.js'
 import { dgNormalizarErro, mostrarErroTipado } from './features/ui/erros.js'
 import {
+  configurarPaleta,
+  abrirPaletaComandos,
+  abrirPaletaArquivos,
+  fecharPaleta,
+  abrirBuscaGlobal,
+  fecharBuscaGlobal,
+  renderizarPaleta,
+  executarItemPaleta,
+  rodarBuscaGlobal,
+  destacarPaleta
+} from './features/ui/paleta.js'
+import {
   lerPreferenciasA11y,
   salvarPreferenciasA11y,
   aplicarPreferenciasA11y,
@@ -102,12 +114,13 @@ const $ = (id) => document.getElementById(id)
 
 import { state, setPastaAtual } from './state/app-state.js'
 ligarFerramentas(() => state.pastaAtual)
+configurarPaleta({ abrirArquivoNaAba, executarComando })
 /** @type {{ caminho: string, nome: string, dirty: boolean }[]} initialized in state */
 state.abas = state.abas || []
 state.abaAtiva = state.abaAtiva ?? null
 /** @type {any} */
 let editor = null
-let modoPaleta = 'comandos' // 'comandos' | 'arquivos'
+// modoPaleta movido para features/ui/paleta.js
 let dirtyResolver = null
 /** #files-list precisa re-render quando a aba Files for ativada. */
 let filesListaSuja = false
@@ -4396,9 +4409,7 @@ async function carregarTema() {
 }
 
 // ---------- Paleta / Quick Open / Busca ----------
-let paletaItens = []
-let paletaSel = 0
-let buscaAbortId = null
+// paletaItens/paletaSel/buscaAbortId movidos para features/ui/paleta.js
 
 function bootstrapComandos() {
   const defs = [
@@ -4650,129 +4661,10 @@ function acaoEditar(cmd) {
   }
 }
 
-function abrirPaletaComandos() {
-  modoPaleta = 'comandos'
-  fecharBuscaGlobal()
-  $('palette').classList.remove('hidden')
-  $('palette-input').value = ''
-  $('palette-input').placeholder = 'Digite um comando...'
-  renderizarPaleta('')
-  $('palette-input').focus()
-}
-
-function abrirPaletaArquivos() {
-  modoPaleta = 'arquivos'
-  fecharBuscaGlobal()
-  $('palette').classList.remove('hidden')
-  $('palette-input').value = ''
-  $('palette-input').placeholder = 'Abrir arquivo — digite o nome…'
-  renderizarPaleta('')
-  $('palette-input').focus()
-}
-
-
-function fecharPaleta() {
-  $('palette').classList.add('hidden')
-}
-
-function abrirBuscaGlobal() {
-  fecharPaleta()
-  $('busca-global')?.classList.remove('hidden')
-  const inp = $('busca-input')
-  if (inp) {
-    inp.value = ''
-    inp.focus()
-  }
-  const box = $('busca-resultados')
-  if (box) box.innerHTML = '<div class="palette-item muted">Digite para buscar no projeto</div>'
-}
-
-function fecharBuscaGlobal() {
-  $('busca-global')?.classList.add('hidden')
-  if (buscaAbortId) {
-    window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
-    buscaAbortId = null
-  }
-}
-
-async function renderizarPaleta(filtro) {
-  const lista = $('palette-list')
-  lista.innerHTML = ''
-  paletaSel = 0
-  const f = (filtro || '').trim()
-  paletaItens = []
-
-  if (modoPaleta === 'comandos') {
-    let cmds = listarComandosLocais()
-    try {
-      const remoto = await window.api.invoke('comandos:listar')
-      if (remoto?.ok && Array.isArray(remoto.comandos)) {
-        for (const c of remoto.comandos) {
-          const existente = cmds.find((x) => x.id === c.id)
-          if (existente) {
-            existente.hint = existente.hint || c.descricao || c.atalho || ''
-          } else {
-            cmds.push({ id: c.id, titulo: c.titulo, atalho: c.atalho, hint: c.descricao })
-          }
-        }
-      }
-    } catch {
-      /* offline meta */
-    }
-    const fl = f.toLowerCase()
-    cmds = cmds.filter((c) => !fl || (c.titulo || '').toLowerCase().includes(fl) || c.id.includes(fl))
-    for (const c of cmds) {
-        paletaItens.push({ tipo: 'cmd', id: c.id, label: c.titulo, hint: c.hint || c.atalho || '' })
-      }
-  } else {
-    const raiz = state.pastaAtual || state.pastasRecentes[0]
-    if (raiz) {
-      try {
-        const r = await window.api.invoke('busca:arquivos', raiz, f, 80)
-        if (r?.ok && Array.isArray(r.itens)) {
-          for (const e of r.itens) {
-            const nome = e.nome || ''
-            const rel = e.rel || nome
-            const pasta = String(rel).replace(/[\\/][^\\/]+$/, '') || '.'
-            paletaItens.push({
-              tipo: 'file',
-              caminho: e.caminho,
-              label: nomeAmigavelArquivo(nome, rel),
-              hint: pasta === '.' ? rel : pasta
-            })
-          }
-        }
-      } catch {
-        /* fallback vazio */
-      }
-    }
-  }
-
-  if (paletaItens.length === 0) {
-    lista.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
-    return
-  }
-  for (let i = 0; i < paletaItens.length; i++) {
-    const c = paletaItens[i]
-    const div = document.createElement('div')
-    div.className = 'palette-item' + (i === 0 ? ' selecionado' : '')
-    div.innerHTML =
-      '<span class="palette-label">' +
-      escapar(c.label) +
-      '</span>' +
-      (c.hint ? '<span class="palette-hint">' + escapar(c.hint) + '</span>' : '')
-    div.addEventListener('click', () => {
-      fecharPaleta()
-      executarItemPaleta(c)
-    })
-    lista.appendChild(div)
-  }
-}
-
-function executarItemPaleta(c) {
-  if (c.tipo === 'file') abrirArquivoNaAba(c.caminho)
-  else executarComando(c.id)
-}
+// Paleta/Quick Open/Busca movidos para features/ui/paleta.js
+// (abrirPaletaComandos, abrirPaletaArquivos, fecharPaleta, abrirBuscaGlobal,
+//  fecharBuscaGlobal, renderizarPaleta, executarItemPaleta, rodarBuscaGlobal,
+//  destacarPaleta — importados no topo; executarComando permanece aqui)
 
 function executarComando(id) {
   if (executarComandoLocal(id)) return
@@ -4815,84 +4707,7 @@ function executarComando(id) {
     if (state.pastaAtual) void mostrarRegrasUI(state.pastaAtual)
   }
 }
-async function rodarBuscaGlobal() {
-  const raiz = state.pastaAtual || state.pastasRecentes[0]
-  const q = ($('busca-input')?.value || '').trim()
-  const box = $('busca-resultados')
-  if (!box) return
-  if (!raiz) {
-    box.innerHTML = '<div class="palette-item muted">Abra uma pasta primeiro</div>'
-    return
-  }
-  if (!q) {
-    box.innerHTML = '<div class="palette-item muted">Digite para buscar</div>'
-    return
-  }
-  if (buscaAbortId) await window.api.invoke('busca:cancelar', buscaAbortId).catch(() => {})
-  buscaAbortId = 'ui-' + Date.now()
-  box.innerHTML = '<div class="palette-item muted">Buscando...</div>'
-  const regex = !!$('busca-regex')?.checked
-  try {
-    const r = await window.api.invoke('busca:conteudo', raiz, q, {
-      regex,
-      limite: 50,
-      id: buscaAbortId
-    })
-    box.innerHTML = ''
-    if (!r?.ok) {
-      box.innerHTML = '<div class="palette-item muted">' + escapar(r?.erro || 'falha') + '</div>'
-      return
-    }
-    if (r.cancelado) {
-      box.innerHTML = '<div class="palette-item muted">Cancelado</div>'
-      return
-    }
-    const itens = Array.isArray(r.itens) ? r.itens : []
-    if (!itens.length) {
-      box.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
-      return
-    }
-    const grupos = new Map()
-    for (const it of itens) {
-      const rel = it.rel || it.caminho || ''
-      if (!grupos.has(rel)) grupos.set(rel, { rel, arquivo: it.caminho || rel, hits: [] })
-      grupos.get(rel).hits.push({ linha: Number(it.linha) || 1, texto: it.trecho || '' })
-    }
-    for (const g of grupos.values()) {
-      const head = document.createElement('div')
-      head.className = 'palette-item'
-      head.innerHTML =
-        '<span class="palette-label">' +
-        escapar(g.rel) +
-        '</span><span class="palette-hint">' +
-        g.hits.length +
-        '</span>'
-      head.addEventListener('click', () => {
-        fecharBuscaGlobal()
-        abrirArquivoNaAba(g.arquivo, g.hits[0]?.linha)
-      })
-      box.appendChild(head)
-      for (const h of g.hits) {
-        const hit = document.createElement('div')
-        hit.className = 'busca-hit'
-        hit.textContent = h.linha + ': ' + h.texto
-        hit.title = h.texto
-        hit.addEventListener('click', () => {
-          fecharBuscaGlobal()
-          abrirArquivoNaAba(g.arquivo, h.linha)
-        })
-        box.appendChild(hit)
-      }
-    }
-  } catch (e) {
-    box.innerHTML = '<div class="palette-item muted">' + escapar(String(e)) + '</div>'
-  }
-}
-
-function destacarPaleta(itens) {
-  itens.forEach((el, i) => el.classList.toggle('selecionado', i === paletaSel))
-  itens[paletaSel]?.scrollIntoView({ block: 'nearest' })
-}
+// rodarBuscaGlobal/destacarPaleta movidos para features/ui/paleta.js
 
 // ---------- Guardião ----------
 window.__dgAtualizarAba = window.__dgAtualizarAba || function () {}
