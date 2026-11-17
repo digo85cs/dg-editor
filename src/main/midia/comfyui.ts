@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import {
   caminhoRelativo,
   destinoArquivo,
+  gerarImagem as gerarImagemPollinations,
   nomeArquivo,
   pastaMidia,
   previewDe,
@@ -531,6 +532,20 @@ export async function gerarImagemComfy(
 ): Promise<RespostaMidia> {
   const prompt = String(opts.prompt || '').trim()
   if (!prompt) return { ok: false, erro: 'informe o prompt da imagem' }
+  if (!comfyInstalado()) {
+    const r = await gerarImagemPollinations(raiz, {
+      prompt,
+      largura: opts.largura,
+      altura: opts.altura,
+      seed: opts.seed,
+      saida: opts.saida
+    })
+    if (r.ok) {
+      r.aviso = (r.aviso ? r.aviso + ' ' : '') + 'ComfyUI não instalado — use midia_gerenciar_midia instalar comfyui para geração local ilimitada.'
+      r.detalhes = { ...(r.detalhes || {}), motor: 'pollinations-fallback' }
+    }
+    return r
+  }
   const on = await garantirOnline()
   if (!on.ok) return { ok: false, erro: on.erro || 'ComfyUI offline' }
   if (!modelosDisponiveis().checkpoints.length) {
