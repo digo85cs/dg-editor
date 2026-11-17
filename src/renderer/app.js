@@ -113,11 +113,12 @@ import {
 ,
   ligarPaletaEventos
 } from './features/ui/paleta.js'
-import { ligarEventosBotoes } from './features/ui/eventos-botoes.js'
+import { ligarEventosBotoes, ligarComposerEGitPoll } from './features/ui/eventos-botoes.js'
 import { ligarIpcOuvintes, verificarEReiniciarDg } from './features/ui/ipc-ouvinte.js'
 import { ligarBotaoPainel, rodarAutoAuditoria, atualizarIconeMax } from './features/ui/auditoria-ui.js'
 import { ligarAtalhosTeclado } from './features/ui/atalhos-teclado.js'
 import { ligarTituloBarra } from './features/ui/titulo-barra.js'
+import { ligarStatusWorkspace } from './features/ui/status-workspace.js'
 import { caminhoNoVault, nomeArquivo, nomePastaUi, caminhoRelativo, extIcon } from './utils/rotulos-arquivo.js'
 import {
   configurarComandos,
@@ -395,14 +396,8 @@ window.dgUi = {
 // ---------- Pastas ----------
 ligarDiffBar()
 
-setInterval(() => {
-  if (document.hidden || !state.pastaAtual) return
-  void atualizarGitStatusArvore()
-}, 5000)
-
 function enviarMensagemUi() { void enviarMensagem() }
-$('chat-send')?.addEventListener('click', enviarMensagemUi)
-iniciarComposer($('chat-input'), { onEnviar: enviarMensagemUi })
+ligarComposerEGitPoll()
 
 /** Popover de contexto dos ícones do chat (clique → contexto → ação). */
 initChatIconContext()
@@ -612,33 +607,7 @@ window.dgConfirm = dgConfirm
 window.alert = (msg) => {
   void dgAlert(String(msg ?? ''), 'DG Editor')
 }
-window.addEventListener('dg:workspace-sujo', () => agendarSalvarWorkspace())
-;(() => {
-  const el = $('sb-workspace')
-  const mark = (t) => {
-    if (el) el.textContent = 'WS: ' + t
-  }
-  const _flush = flushWorkspace
-  window.__dgFlushWorkspace = async () => {
-    mark('salvando…')
-    const r = await _flush()
-    mark(r?.ok ? 'salvo' : 'local')
-    setTimeout(() => mark('auto'), 2500)
-  }
-  const _agendar = agendarSalvarWorkspace
-  // reexport visual: wrap via event after flush
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) mark('salvo')
-  })
-  mark('auto')
-  void window.api.invoke('app:is-safe-mode').then((r) => {
-    const s = $('sb-safe')
-    if (s && (r === true || r?.safeMode || r?.ok && r.safeMode)) {
-      s.classList.remove('hidden')
-      s.textContent = 'Safe'
-    }
-  }).catch(() => {})
-})()
+ligarStatusWorkspace()
 // Lazy: terminal só no primeiro uso (botão / atalho / abrirEm)
 let terminalIniciado = null
 function garantirTerminal() {
@@ -653,14 +622,6 @@ if (termPanel && !termPanel.dataset.lazyReady) {
   termPanel.dataset.lazyReady = '0'
 }
 initMenuCtxArvore()
-$('dg-skip-link')?.addEventListener('click', (e) => {
-  e.preventDefault()
-  focarRegiao('center-panel', 'Conteúdo principal')
-})
-$('btn-atalhos-fechar')?.addEventListener('click', fecharAtalhosTeclado)
-$('modal-atalhos')?.addEventListener('click', (e) => {
-  if (e.target === $('modal-atalhos')) fecharAtalhosTeclado()
-})
 instalarTrapFocoModais()
 setSidebarMode('explorer')
 // Área de trabalho: autosave + restauração (layout, chats, panes, draft)

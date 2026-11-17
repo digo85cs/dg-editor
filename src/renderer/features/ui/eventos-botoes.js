@@ -28,6 +28,9 @@ import {
   rejeitarPendenteOc
 } from '../editor/diff-pendentes.js'
 import { salvarArquivoAtivo } from '../editor/abas-core.js'
+import { enviarMensagem } from '../chat/enviar.js'
+import { iniciarComposer } from '../chat/composer.js'
+import { atualizarGitStatusArvore } from '../arquivos/arvore-render.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -105,4 +108,16 @@ export function ligarEventosBotoes() {
   $('btn-adapta-maestro-cfg')?.addEventListener('click', () =>
     void window.api.invoke('adapta:abrir', 'maestro')
   )
+}
+
+export function ligarComposerEGitPoll() {
+  const $id = (id) => document.getElementById(id)
+  setInterval(() => {
+    if (document.hidden || !state.pastaAtual) return
+    void atualizarGitStatusArvore()
+  }, 5000)
+
+  function enviarMensagemUi() { void enviarMensagem() }
+  $id('chat-send')?.addEventListener('click', enviarMensagemUi)
+  iniciarComposer($id('chat-input'), { onEnviar: enviarMensagemUi })
 }

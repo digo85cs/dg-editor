@@ -98,4 +98,13 @@ export function ligarAtalhosTeclado() {
     },
     true
   )
+
+  document.getElementById('dg-skip-link')?.addEventListener('click', (e) => {
+    e.preventDefault()
+    focarRegiao('center-panel', 'Conteúdo principal')
+  })
+  document.getElementById('btn-atalhos-fechar')?.addEventListener('click', fecharAtalhosTeclado)
+  document.getElementById('modal-atalhos')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-atalhos')) fecharAtalhosTeclado()
+  })
 }
