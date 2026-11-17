@@ -124,6 +124,8 @@ import {
   atalhosTecladoAbertos,
   ligarComandosUi
 } from './features/ui/comandos.js'
+import { initTooltipsRicos } from './features/ui/tooltips.js'
+import { iniciarStatusProviders, ligarBotaoOllama } from './features/ui/boot-status.js'
 import {
   atualizarIndicadorDeps,
   atualizarBadgeProvedor,
@@ -1444,118 +1446,11 @@ void (async () => {
 })()
 
 /** Tooltips ricos (balão) para ícones e botões com title/data-tip. */
-function initTooltipsRicos() {
-  if (document.body.dataset.tipsWired === '1') return
-  document.body.dataset.tipsWired = '1'
-  let tip = document.getElementById('dg-rich-tip')
-  if (!tip) {
-    tip = document.createElement('div')
-    tip.id = 'dg-rich-tip'
-    tip.className = 'dg-tip'
-    tip.setAttribute('role', 'tooltip')
-    document.body.appendChild(tip)
-  }
-  let timer = 0
-  const esconder = () => {
-    tip.classList.remove('is-show')
-  }
-  const mostrar = (el, texto) => {
-    if (!texto) return
-    const r = el.getBoundingClientRect()
-    tip.textContent = texto
-    tip.classList.add('is-show')
-    const naRail = !!el.closest('#activity-bar')
-    requestAnimationFrame(() => {
-      const h = tip.offsetHeight || 28
-      const w = tip.offsetWidth || 120
-      if (naRail) {
-        tip.style.left = Math.min(window.innerWidth - w - 8, r.right + 10) + 'px'
-        tip.style.top = Math.max(8, r.top + (r.height - h) / 2) + 'px'
-      } else {
-        tip.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, r.left)) + 'px'
-        let top = r.top - 8 - h
-        if (top < 8) top = r.bottom + 8
-        tip.style.top = top + 'px'
-      }
-    })
-  }
-  document.addEventListener(
-    'mouseover',
-    (e) => {
-      const t = e.target
-      if (!(t instanceof Element)) return
-      const el = t.closest(
-        'button[title], .btn-icon[title], .ab-btn[data-tip], .tool-nav-btn[title], .chat-ctx-btn[title], .mb-btn[title], .right-tab[title]'
-      )
-      if (!el) return
-      const texto = el.getAttribute('data-tip') || el.getAttribute('title') || ''
-      if (!texto) return
-      clearTimeout(timer)
-      timer = window.setTimeout(() => mostrar(el, texto), 380)
-    },
-    true
-  )
-  document.addEventListener('mouseout', (e) => {
-    const t = e.target
-    if (!(t instanceof Element)) return
-    if (t.closest('button[title], .btn-icon[title], .ab-btn[data-tip], .tool-nav-btn[title], .chat-ctx-btn[title]')) {
-      clearTimeout(timer)
-      esconder()
-    }
-  }, true)
-  document.addEventListener('scroll', esconder, true)
-}
 
 initTooltipsRicos()
 
-/** Boot: OpenClaw token + OpenRouter (env/cofre) + status. */
-void (async () => {
-  const emQa = await qaModoPromessa
-  try {
-    const oc = await window.api.invoke('openclaw:token-ensure')
-    if (oc?.criado && !emQa) mostrarToast('Token OpenClaw criado automaticamente', 'ok')
-  } catch { /* */ }
-  try {
-    await window.api.invoke('providers:sincronizar-env')
-    let r = await window.api.invoke('providers:testar', { id: 'openrouter-north' })
-    if (!r || r.ok === false) {
-      r = await window.api.invoke('providers:testar', { id: 'openrouter-inkling' })
-    }
-    if (r && r.ok) {
-      if (!emQa) mostrarToast('OpenRouter OK (' + (r.latenciaMs || '?') + ' ms)', 'ok')
-      const sb = document.getElementById('sb-ia')
-      if (sb) {
-        sb.textContent = 'IA: OpenRouter'
-        sb.title = 'OpenRouter online'
-      }
-    } else if (!emQa) {
-      const motivo = (r && r.erro) || 'chave inválida ou ausente'
-      mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
-    }
-  } catch (e) {
-    /* silencioso se canal indisponível */
-  }
-})()
-
-document.getElementById('btn-ollama-start')?.addEventListener('click', async (e) => {
-  const btn = e.currentTarget
-  if (btn) { btn.disabled = true; btn.textContent = 'Iniciando…' }
-  try {
-    const r = await window.api.invoke('deps:ollama:start')
-    if (r && r.ativo) {
-      mostrarToast('Ollama iniciado.', 'ok')
-    } else if (r && !r.instalado) {
-      mostrarToast('Ollama não está instalado. Instale em ollama.com.', 'aviso')
-    } else {
-      mostrarToast('Não foi possível iniciar o Ollama. Tente "ollama serve" no terminal.', 'erro')
-    }
-  } catch (err) {
-    mostrarToast('Falha ao iniciar Ollama: ' + String(err), 'erro')
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Iniciar Ollama' }
-    try { atualizarIndicadorDeps(await window.api.invoke('deps:status')) } catch { /* */ }
-  }
-})
+iniciarStatusProviders(qaModoPromessa)
+ligarBotaoOllama()
 
 document.addEventListener('DOMContentLoaded', function () {
   var btn = document.getElementById('btn-auditar')

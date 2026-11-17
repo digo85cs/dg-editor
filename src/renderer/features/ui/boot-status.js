@@ -1,0 +1,58 @@
+// Boot: token OpenClaw, sync de providers (OpenRouter) e botão "Iniciar Ollama".
+import { mostrarToast } from './toast.js'
+import { atualizarIndicadorDeps } from './deps-status.js'
+
+const $ = (id) => document.getElementById(id)
+
+/** Boot: OpenClaw token + OpenRouter (env/cofre) + status. */
+export function iniciarStatusProviders(qaModoPromise) {
+  void (async () => {
+    const emQa = await qaModoPromise
+    try {
+      const oc = await window.api.invoke('openclaw:token-ensure')
+      if (oc?.criado && !emQa) mostrarToast('Token OpenClaw criado automaticamente', 'ok')
+    } catch { /* */ }
+    try {
+      await window.api.invoke('providers:sincronizar-env')
+      let r = await window.api.invoke('providers:testar', { id: 'openrouter-north' })
+      if (!r || r.ok === false) {
+        r = await window.api.invoke('providers:testar', { id: 'openrouter-inkling' })
+      }
+      if (r && r.ok) {
+        if (!emQa) mostrarToast('OpenRouter OK (' + (r.latenciaMs || '?') + ' ms)', 'ok')
+        const sb = $('sb-ia')
+        if (sb) {
+          sb.textContent = 'IA: OpenRouter'
+          sb.title = 'OpenRouter online'
+        }
+      } else if (!emQa) {
+        const motivo = (r && r.erro) || 'chave inválida ou ausente'
+        mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
+      }
+    } catch (e) {
+      /* silencioso se canal indisponível */
+    }
+  })()
+}
+
+export function ligarBotaoOllama() {
+  $('btn-ollama-start')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget
+    if (btn) { btn.disabled = true; btn.textContent = 'Iniciando…' }
+    try {
+      const r = await window.api.invoke('deps:ollama:start')
+      if (r && r.ativo) {
+        mostrarToast('Ollama iniciado.', 'ok')
+      } else if (r && !r.instalado) {
+        mostrarToast('Ollama não está instalado. Instale em ollama.com.', 'aviso')
+      } else {
+        mostrarToast('Não foi possível iniciar o Ollama. Tente "ollama serve" no terminal.', 'erro')
+      }
+    } catch (err) {
+      mostrarToast('Falha ao iniciar Ollama: ' + String(err), 'erro')
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Iniciar Ollama' }
+      try { atualizarIndicadorDeps(await window.api.invoke('deps:status')) } catch { /* */ }
+    }
+  })
+}
