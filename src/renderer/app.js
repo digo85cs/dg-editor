@@ -26,6 +26,7 @@ import { escapar } from './utils/dom.js'
 import { instalarTrapFocoModais } from './utils/focus-trap.js'
 import { anunciar } from './features/ui/live-region.js'
 import { abrirJanelaFlutuante, iniciarJanelasFlutuantes } from './features/ui/janelas-flutuantes.js'
+import { mostrarToast } from './features/ui/toast.js'
 import {
   lerPreferenciasA11y,
   salvarPreferenciasA11y,
@@ -4951,29 +4952,7 @@ function atualizarBadgeProvedor(nome) {
   }
 }
 
-/** Toast DOM simples (acima do composer, auto-dismiss 5s). */
-function mostrarToast(mensagem, tipo = 'aviso') {
-  let host = document.getElementById('dg-toast-host')
-  if (!host) {
-    host = document.createElement('div')
-    host.id = 'dg-toast-host'
-    host.setAttribute('aria-live', 'polite')
-    document.body.appendChild(host)
-  }
-  const el = document.createElement('div')
-  el.className = 'dg-toast ' + (tipo === 'erro' ? 'erro' : tipo === 'ok' ? 'ok' : 'aviso')
-  el.setAttribute('role', tipo === 'erro' ? 'alert' : 'status')
-  el.textContent = String(mensagem || '')
-  host.appendChild(el)
-  requestAnimationFrame(() => {
-    el.classList.add('is-show')
-  })
-  setTimeout(() => {
-    el.classList.remove('is-show')
-    setTimeout(() => el.remove(), 250)
-  }, 5000)
-  return el
-}
+// mostrarToast extraído para features/ui/toast.js (import no topo)
 window.dgToast = mostrarToast
 
 async function atualizarChipMemoria() {
