@@ -1637,7 +1637,9 @@ async function main() {
     assert('a11y region agent', /aria-label="Painel do agente"/.test(html))
     const appJs =
       fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8') +
-      fs.readFileSync(path.join(SRC, 'renderer/features/chat/agente-seletor.js'), 'utf8')
+      fs.readFileSync(path.join(SRC, 'renderer/features/chat/agente-seletor.js'), 'utf8') +
+      fs.readFileSync(path.join(SRC, 'renderer/features/chat/agente-cards.js'), 'utf8') +
+      fs.readFileSync(path.join(SRC, 'renderer/features/editor/diff-pendentes.js'), 'utf8')
     assert('host dos seletores de chat existe', /id="chat-header-actions"/.test(html))
     const modesUi = fs.readFileSync(path.join(SRC, 'renderer/modes-ui.js'), 'utf8')
     assert('seletores dinamicos de chat usam o host', /getElementById\('chat-mode-select'\)/.test(appJs) && /chat-agent-select/.test(modesUi))

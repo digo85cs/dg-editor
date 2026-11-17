@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 12:52:56** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 02a2198 2026-11-17 refactor: extrai chat-core (bolhas, empty state, send mode, tool trace) do app.js
+> Gerado automaticamente em **17/11/2026, 13:05:07** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: a30d519 2026-11-17 refactor: extrai cards/propostas do agente e estado compartilhado (agente-cards, agente-estado)
 > Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- a30d519 2026-11-17 refactor: extrai cards/propostas do agente e estado compartilhado (agente-cards, agente-estado)
 - 02a2198 2026-11-17 refactor: extrai chat-core (bolhas, empty state, send mode, tool trace) do app.js
 - 30930c2 2026-11-17 refactor: extrai seletor de agente do chat para features/chat/agente-seletor.js
 - 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - c10151d 2026-11-17 refactor: extrai deps-status/provider badge p/ features/ui/deps-status.js (4a extracao app.js)
 - bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
 - 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
-- 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
 
 ## 16. Como atualizar este dossiê
 
