@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:55:27** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 07a47b9 2026-11-17 refactor: extrai activity bar, abas de paineis e navegador bloco 3
+> Gerado automaticamente em **17/11/2026, 13:57:57** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: c93aac9 2026-11-17 refactor: move listeners da paleta/busca para paleta.js
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c93aac9 2026-11-17 refactor: move listeners da paleta/busca para paleta.js
 - 07a47b9 2026-11-17 refactor: extrai activity bar, abas de paineis e navegador bloco 3
 - 95c5ac1 2026-11-17 refactor: extrai tooltips ricos e status de boot (providers/ollama)
 - b85208a 2026-11-17 refactor: extrai comandos, tema, atalhos e preferencias a11y
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
 - 33636e4 2026-11-17 refactor: extrai render da arvore e lista de projetos
 - f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
-- ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
 
 ## 16. Como atualizar este dossiê
 
