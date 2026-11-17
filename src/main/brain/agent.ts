@@ -1048,9 +1048,10 @@ export async function executarAgente(
       'Vozes locais (Supertonic/Kokoro/Piper) sao gratuitas, naturais e nao precisam de internet; ' +
       'edge-tts e apenas alternativa em nuvem. As vozes infantis sao derivadas de vozes naturais. ' +
       'Para gerar imagem nao pergunte voz. ' +
-      'Para geracao ILIMITADA e gratuita de imagem ou video, use midia_comfyui_imagem / midia_comfyui_video ' +
-      '(ComfyUI local em CPU; inicia sozinho). Pollinations tem limite de 1 imagem/45s; o ComfyUI nao tem limite, ' +
-      'mas video na CPU demora varios minutos — avise o usuario e prefira 8 a 16 quadros em 512x512. ' +
+      'Para imagem, prefira midia_imagem_gerar (Pollinations, rapido — segundos) para pedidos simples. ' +
+      'Use midia_comfyui_imagem (ComfyUI local em CPU, ilimitado) quando o usuario pedir lote/ilimitado/local ' +
+      'ou quando Pollinations falhar por limite — avise que na CPU demora alguns minutos. ' +
+      'Para video use midia_comfyui_video (CPU, varios minutos — avise e prefira 8 a 16 quadros em 512x512). ' +
       '\nMEMES: use midia_memes_listar (sincroniza na primeira vez), escolha template por id/nome e chame ' +
       'midia_meme_gerar com topo/baixo. Banco gratuito do Imgflip; templates ficam locais. ' +
       '\nPARODIAS: as vozes da categoria "parodia" sao arquetipos (locutor, ancora, trailer etc.), NAO imitam ' +

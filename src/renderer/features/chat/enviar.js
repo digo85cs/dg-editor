@@ -160,6 +160,28 @@ export async function enviarMensagem() {
     if (area) area.scrollTop = area.scrollHeight
     anunciarTrechoStream()
   })
+  const offMidia = window.api.on?.('chat:midia', (_e, m) => {
+    const area = $('chat-messages')
+    if (!area || !m) return
+    const bolha = adicionarBolha('assistant', m.aviso || 'Mídia gerada:')
+    const wrap = bolha.querySelector('.msg-text') || bolha
+    const fig = document.createElement('figure')
+    fig.className = 'chat-midia'
+    if (typeof m.preview === 'string' && /^data:image\//.test(m.preview)) {
+      const img = document.createElement('img')
+      img.src = m.preview
+      img.alt = m.nome || 'mídia gerada'
+      img.loading = 'lazy'
+      fig.appendChild(img)
+    }
+    if (m.caminho) {
+      const cap = document.createElement('figcaption')
+      cap.textContent = String(m.caminho)
+      fig.appendChild(cap)
+    }
+    wrap.appendChild(fig)
+    area.scrollTop = area.scrollHeight
+  })
   try {
     const agenteSel = document.getElementById('chat-agent-select')
     const modoSel = document.getElementById('chat-mode-select')
@@ -393,6 +415,7 @@ export async function enviarMensagem() {
   } finally {
     if (typeof offDelta === 'function') offDelta()
     if (typeof offProg === 'function') offProg()
+    if (typeof offMidia === 'function') offMidia()
     removerJob(pastaDesteJob, chatIdJob)
     pintarSidebarJobs(() => state.pastaAtual)
     if (visivelNesteJob()) {

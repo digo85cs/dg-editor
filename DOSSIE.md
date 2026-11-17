@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 17:17:45** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 17:24:33** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
+> Alterações locais não commitadas: 5 arquivo(s).
 
 ## 1. O que é
 
@@ -30,7 +30,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 ## 4. IPC
 
 - Canais registrados no main: **386**.
-- Canais expostos pelo preload: **369**.
+- Canais expostos pelo preload: **370**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
 - df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
 - db4c3a1 2026-11-17 docs: regenera DOSSIE v0.6.5
 - 773b10d 2026-11-17 fix(midia): fallback Pollinations quando ComfyUI nao instalado
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
 - 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
 - f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
-- cfd83d7 2026-11-17 refactor: extrai restauracao de workspace para workspace-restaurar.js
 
 ## 16. Como atualizar este dossiê
 

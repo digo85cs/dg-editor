@@ -140,6 +140,7 @@ const eventOnChannels = [
   'menu:acao',
   'chat:delta',
   'chat:fallback',
+  'chat:midia',
   'brain:cota',
   'update:status',
   'ui:dialog-pedir',

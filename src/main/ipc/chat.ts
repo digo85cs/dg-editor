@@ -427,8 +427,9 @@ async function executarChatSend(
       if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(textoPedido)) {
         contextoAgente +=
           '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA ' +
-          '(midia_comfyui_imagem para imagem, midia_imagem_gerar como alternativa, midia_comfyui_video para video, ' +
-          'midia_meme_gerar para meme, midia_narrar para narracao). NUNCA responda com placeholder ' +
+          '(midia_imagem_gerar para imagem — rapido, Pollinations; midia_comfyui_imagem so se pedir ' +
+          'ilimitado/local ou se Pollinations falhar; midia_comfyui_video para video; ' +
+          'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';
       }
       try {
@@ -467,6 +468,25 @@ async function executarChatSend(
       });
       let diagnostico: unknown;
       let contentOut = resposta?.texto || 'Sem resposta do agente.';
+      // Mídia gerada por tools (imagem/vídeo/meme/áudio) → envia preview ao chat
+      // para exibir inline, estilo Nano Banana.
+      try {
+        for (const p of resposta?.passos || []) {
+          if (p.tipo !== 'tool' || !/midia_|comfyui|meme|narrar|musica/i.test(String(p.nome))) continue;
+          let j: { ok?: boolean; caminho?: string; previewBase64?: string; mime?: string; aviso?: string } | null = null;
+          try { j = JSON.parse(String(p.resultado || '')); } catch { continue; }
+          if (!j || j.ok !== true || !j.caminho) continue;
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('chat:midia', {
+              nome: String(p.nome),
+              caminho: j.caminho,
+              preview: typeof j.previewBase64 === 'string' ? j.previewBase64 : undefined,
+              mime: j.mime,
+              aviso: j.aviso
+            });
+          }
+        }
+      } catch { /* midia inline é best-effort */ }
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
       if (
