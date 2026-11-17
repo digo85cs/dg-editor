@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 09:44:41** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 71b997a 2026-11-17 refactor: extrai janelas flutuantes de app.js para features/ui
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 09:59:49** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
+> Árvore de trabalho limpa.
 
 ## 1. O que é
 
@@ -336,6 +336,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
+- c067b37 2026-11-17 refactor: extrai MENUS_BARRA para features/ui/menubar-dados.js
+- b4a0004 2026-11-17 refactor: extrai mostrarToast para features/ui/toast.js
 - 71b997a 2026-11-17 refactor: extrai janelas flutuantes de app.js para features/ui
 - b3c8bba 2026-11-17 feat: /paralelo-merge, /devin-sync e docs atualizadas; main -> integra-13-11
 - 2078080 2026-11-17 release: v0.6.3
@@ -343,9 +346,6 @@ Utilitários locais relevantes:
 - f5c0b48 2026-11-17 release: v0.6.2
 - d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 - 4fddeff 2026-11-16 release: v0.6.1
-- 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
-- fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
-- 388e1d4 2026-11-16 feat: /devin-status, worktree checkpoints e marketplace MCP (/mcps)
 
 ## 16. Como atualizar este dossiê
 
