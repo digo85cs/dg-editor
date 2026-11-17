@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **16/11/2026, 20:05:55** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.1** · branch `integra-13-11` · último commit: 4fddeff 2026-11-16 release: v0.6.1
+> Gerado automaticamente em **17/11/2026, 08:45:42** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.2** · branch `integra-13-11` · último commit: d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -238,12 +238,12 @@ Utilitários locais relevantes:
 - tesseract — OCR: ausente
 - qemu-system-x86_64 — teste de boot (QEMU): ausente
 - soffice — LibreOffice: ausente
-- ghidra — engenharia reversa (via GHIDRA_INSTALL_DIR): ausente
-- rizin — engenharia reversa (CLI): ausente
-- cutter — engenharia reversa (GUI Rizin): ausente
-- jadx — decompilador Android: ausente
-- apktool — descompilador APK/resources: ausente
-- tshark — análise de pacotes: ausente
+- ghidra — engenharia reversa (via GHIDRA_INSTALL_DIR): **presente**
+- rizin — engenharia reversa (CLI): **presente**
+- cutter — engenharia reversa (GUI Rizin): **presente**
+- jadx — decompilador Android: **presente**
+- apktool — descompilador APK/resources: **presente**
+- tshark — análise de pacotes: **presente**
 - vol — forense de memória: **presente**
 - rea — REA — engenharia reversa com IA: **presente**
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 - 4fddeff 2026-11-16 release: v0.6.1
 - 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
 - fbc2e94 2026-11-16 feat: LSP-lite (hover/definicao/diagnosticos TS) + /mcps instalar
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
 - a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
 - 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
-- ab3581c 2026-11-16 ﻿fix: estabiliza auditoria — sandbox, a11y, abas órfãs, deps e QA
 
 ## 16. Como atualizar este dossiê
 
