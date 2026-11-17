@@ -33,6 +33,9 @@ const invokeChannels = [
   'app:get-version', 'app:qa-mode',
   'devin:status', 'devin:sessao-criar', 'devin:sessao-status',
   'lsp:abrir', 'lsp:fechar', 'lsp:hover', 'lsp:definicao', 'lsp:diagnosticos',
+  'credenciais:listar', 'credenciais:definir', 'credenciais:remover', 'credenciais:tem',
+  'agendador:listar', 'agendador:adicionar', 'agendador:remover', 'agendador:alternar',
+  'agente:paralelo-criar', 'agente:paralelo-remover',
   'app:raiz-projeto',
   'arquivo:ler', 'arquivo:ler-base64', 'arquivo:salvar', 'arquivo:listar', 'arquivo:existe',
   'arquivo:criar', 'arquivo:renomear', 'arquivo:mover', 'arquivo:excluir',
@@ -144,7 +147,8 @@ const eventOnChannels = [
   'ollama:pull-progresso',
   'prov:progresso',
   'midia:linha-tempo-progresso',
-  'imagens:usb-progresso'
+  'imagens:usb-progresso',
+  'agendador:disparo'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */

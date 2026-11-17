@@ -4068,6 +4068,21 @@ async function renderizarConfigOllama() {
 
 window.api.on('ollama:pull-progresso', (_e, p) => atualizarProgressoOllama(p))
 
+// Agendador: injeta o prompt no chat quando um job vence
+window.api.on('agendador:disparo', (_e, p) => {
+  try {
+    if (!p || !p.prompt) return
+    const input = $('chat-input')
+    if (input) {
+      input.value = String(p.prompt)
+      mostrarToast('Job agendado disparou: ' + String(p.prompt).slice(0, 60), 'info')
+      void enviarMensagem()
+    }
+  } catch {
+    /* */
+  }
+})
+
 /** @type {object | null} */
 let adaptaStatusCache = null
 

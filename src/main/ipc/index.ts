@@ -61,6 +61,7 @@ import { registrarHandlersPortabilidade } from './portabilidade';
 import { registrarHandlersProvisionamento } from './provisionamento';
 import { registrarHandlersDevin } from './devin';
 import { registrarHandlersLsp } from './lsp';
+import { registrarHandlersIntegracoes } from './integracoes';
 import { registrarComfyUIIpc } from '../comfyui-mcp';
 
 // ============================================================================
@@ -150,6 +151,15 @@ export function registrarTodosHandlers(): void {
     registrarHandlersProvisionamento();
 registrarHandlersDevin();
 registrarHandlersLsp();
+registrarHandlersIntegracoes();
+
+// Agendador de prompts — dispara 'agendador:disparo' para a janela
+try {
+  const { iniciarAgendador } = require('../agendador') as typeof import('../agendador');
+  iniciarAgendador();
+} catch (e) {
+  dglog('[agendador] falha ao iniciar: ' + String(e));
+}
     registrarComfyUIIpc();
     registrarHubExtras();
     registrarHandlersPerfil();

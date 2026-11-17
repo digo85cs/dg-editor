@@ -7,9 +7,29 @@
 const BASE = 'https://api.devin.ai/v3'
 
 function cfg(): { key: string; org: string | null } | null {
-  const key = process.env.DEVIN_API_KEY || ''
+  let key = process.env.DEVIN_API_KEY || ''
+  if (!key) {
+    try {
+      // vault safeStorage — credencial definida via /credenciais ou IPC
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { lerChave } = require('./brain/segredos-providers') as typeof import('./brain/segredos-providers')
+      key = lerChave('devin') || ''
+    } catch {
+      /* vault indisponível */
+    }
+  }
   if (!key) return null
-  return { key, org: process.env.DEVIN_ORG_ID || null }
+  let org = process.env.DEVIN_ORG_ID || ''
+  if (!org) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { lerChave } = require('./brain/segredos-providers') as typeof import('./brain/segredos-providers')
+      org = lerChave('devin-org') || ''
+    } catch {
+      /* */
+    }
+  }
+  return { key, org: org || null }
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<{ ok: boolean; dados?: T; erro?: string; status?: number }> {
@@ -63,6 +83,20 @@ export async function devinCriarSessao(
     sessionId: (d?.session_id || d?.id) as string | undefined,
     url: (d?.url || (d?.session_id ? 'https://app.devin.ai/sessions/' + d.session_id : undefined)) as string | undefined
   }
+}
+
+export async function devinListarSessoes(
+  limite = 20
+): Promise<{ ok: boolean; sessoes?: Array<Record<string, unknown>>; erro?: string }> {
+  const c = cfg()
+  if (!c?.org) return { ok: false, erro: 'DEVIN_ORG_ID não configurada' }
+  const r = await api<Record<string, unknown> | unknown[]>(
+    '/organizations/' + c.org + '/sessions?limit=' + Math.min(50, Math.max(1, limite))
+  )
+  if (!r.ok) return { ok: false, erro: r.erro }
+  const d = r.dados
+  const lista = Array.isArray(d) ? d : Array.isArray((d as Record<string, unknown>)?.sessions) ? ((d as Record<string, unknown>).sessions as unknown[]) : []
+  return { ok: true, sessoes: lista as Array<Record<string, unknown>> }
 }
 
 export async function devinStatusSessao(

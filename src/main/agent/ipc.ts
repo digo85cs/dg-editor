@@ -238,7 +238,8 @@ export function registerAgentExtrasIpc(): void {
       abas,
       incluirGit,
       incluirDiagnosticos: true,
-      errosEditor
+      errosEditor,
+      tarefa: expansao.perguntaLimpa
     })
     const contextoExtra = [expansao.contextoExtra, contextoImplicito].filter(Boolean).join('\n\n')
     const agente = typeof o.agente === 'string' && o.agente.trim() ? o.agente.trim() : undefined

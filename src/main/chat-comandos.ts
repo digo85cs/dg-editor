@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'worktree', 'mcps'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo'])
 
 function parse(texto: string): { cmd: string; arg: string } | null {
   const m = texto.trim().match(/^\/([a-zA-Z-]+)(?:\s+([\s\S]*))?$/)
@@ -236,6 +236,112 @@ function cmdMcps(raiz: string, arg: string): string {
   }
 }
 
+async function cmdCredenciais(arg: string): Promise<string> {
+  try {
+    const { listarChavesConfiguradas, salvarChave, removerChave } = await import('./brain/segredos-providers')
+    const partes = arg.trim().split(/\s+/)
+    const sub = (partes[0] || '').toLowerCase()
+    if (sub === 'remover' || sub === 'rm') {
+      const id = partes[1]
+      if (!id) return 'Uso: `/credenciais remover <id>`'
+      const r = removerChave(id)
+      return r.ok ? 'Credencial "' + id + '" removida.' : 'Falha ao remover.'
+    }
+    if (sub && partes.length >= 3) {
+      const id = sub
+      const valor = partes.slice(2).join(' ')
+      const r = salvarChave(id, valor)
+      return r.ok ? 'Credencial "' + id + '" salva no vault.' : 'Falha: ' + (r.erro || 'erro')
+    }
+    const lista = listarChavesConfiguradas().sort()
+    return lista.length
+      ? 'Credenciais configuradas (vault):\n' + lista.map((c) => '• ' + c).join('\n') +
+        '\n\nDefinir: `/credenciais <id> <valor>` · Remover: `/credenciais remover <id>`\n' +
+        'IDs úteis: `devin` (DEVIN_API_KEY), `devin-org` (DEVIN_ORG_ID), `openrouter`, `github`, etc.'
+      : 'Nenhuma credencial no vault.\nDefinir: `/credenciais <id> <valor>` — ex.: `/credenciais devin cog_...`'
+  } catch (e) {
+    return 'Credenciais erro: ' + String(e)
+  }
+}
+
+async function cmdAgendar(arg: string, raiz: string): Promise<string> {
+  try {
+    const ag = await import('./agendador')
+    const partes = arg.trim().split(/\s+/)
+    const sub = (partes[0] || '').toLowerCase()
+    if (sub === 'remover' || sub === 'rm') {
+      const id = partes[1]
+      if (!id) return 'Uso: `/agendar remover <id>`'
+      return ag.removerJob(id) ? 'Job ' + id + ' removido.' : 'Job não encontrado.'
+    }
+    if (sub === 'off' || sub === 'on' || sub === 'toggle') {
+      const id = partes[1]
+      if (!id) return 'Uso: `/agendar ' + sub + ' <id>`'
+      const j = ag.alternarJob(id)
+      return j ? 'Job ' + j.id + ' agora ' + (j.ativo ? 'ATIVO' : 'pausado') + '.' : 'Job não encontrado.'
+    }
+    // formato: /agendar <minutos> <prompt...>
+    const min = Number(partes[0])
+    const prompt = partes.slice(1).join(' ').trim()
+    if (!Number.isFinite(min) || min < 5 || !prompt) {
+      const jobs = ag.listarJobs()
+      const linhas = jobs.map((j) =>
+        (j.ativo ? '[on] ' : '[off] ') + j.id + ' — a cada ' + j.cadaMin + 'min — ' + j.prompt.slice(0, 70)
+      )
+      return 'Uso: `/agendar <minutos> <prompt>` (mín. 5)\n' +
+        'Controle: `/agendar off|on|remover <id>`\n\n' +
+        (linhas.length ? 'Jobs:\n' + linhas.join('\n') : 'Nenhum job agendado.')
+    }
+    const j = ag.adicionarJob({ prompt, cadaMin: min, raiz })
+    return 'Job agendado: ' + j.id + ' — a cada ' + j.cadaMin + 'min.\nPrompt: ' + j.prompt.slice(0, 100)
+  } catch (e) {
+    return 'Agendador erro: ' + String(e)
+  }
+}
+
+async function cmdDevinListar(): Promise<string> {
+  try {
+    const { devinListarSessoes } = await import('./devin-api')
+    const r = await devinListarSessoes(15)
+    if (!r.ok) return 'Falha ao listar sessões: ' + (r.erro || 'erro')
+    const lista = r.sessoes || []
+    if (!lista.length) return 'Nenhuma sessão Devin encontrada.'
+    const linhas = lista.map((s) => {
+      const o = s as Record<string, unknown>
+      const id = String(o.session_id || o.id || '?')
+      const status = String(o.status || o.state || '?')
+      const titulo = String(o.title || o.prompt || '').slice(0, 60)
+      return '• ' + id + ' [' + status + '] ' + titulo
+    })
+    return 'Sessões Devin (use `/devin-status <id>` para detalhes):\n' + linhas.join('\n')
+  } catch (e) {
+    return 'Devin API erro: ' + String(e)
+  }
+}
+
+async function cmdParalelo(arg: string, raiz: string): Promise<string> {
+  try {
+    const partes = arg.trim().split(/\s+/).filter(Boolean)
+    const nome = partes[0] || 'paralelo-' + Date.now().toString(36)
+    const tarefa = partes.slice(1).join(' ').trim()
+    const { criarWorktreeCheckpoint } = await import('./git-worktree')
+    const wt = await criarWorktreeCheckpoint(raiz, nome)
+    if (!wt.ok || !wt.caminho) return 'Falha ao criar worktree: ' + (wt.erro || 'erro')
+    if (!tarefa) {
+      return 'Worktree criado para agente paralelo:\n' + wt.caminho + '\nBranch: ' + wt.branch +
+        '\n\nUso: `/paralelo ' + nome + ' <tarefa>` para rodar o agente isolado, ou abra a pasta no chat.'
+    }
+    const { executarAgente } = await import('./brain/agent')
+    const r = await executarAgente(wt.caminho, tarefa, {})
+    const resumo = String(r.texto || '').slice(0, 1500) || '(sem texto)'
+    return 'Agente paralelo concluído no worktree:\n' + wt.caminho + '\nBranch: ' + wt.branch +
+      '\n\nResultado:\n' + resumo +
+      '\n\nPara incorporar: `git merge ' + wt.branch + '` ou `/worktree remover ' + nome + ' após revisar.'
+  } catch (e) {
+    return 'Paralelo erro: ' + String(e)
+  }
+}
+
 function cmdRegras(raiz: string): string {
   const partes: string[] = []
   const rules = readRules(raiz)
@@ -297,6 +403,16 @@ export async function executarComandoChat(
       return { content: await cmdDevin(parsed.arg) }
     case 'devin-status':
       return { content: await cmdDevinStatus(parsed.arg) }
+    case 'devin-listar':
+      return { content: await cmdDevinListar() }
+    case 'credenciais':
+      return { content: await cmdCredenciais(parsed.arg) }
+    case 'agendar':
+      return { content: await cmdAgendar(parsed.arg, raiz) }
+    case 'agendados':
+      return { content: await cmdAgendar('listar', raiz) }
+    case 'paralelo':
+      return { content: await cmdParalelo(parsed.arg, raiz) }
     case 'worktree':
       return { content: await cmdWorktree(parsed.arg, raiz) }
     case 'mcps':
@@ -317,6 +433,10 @@ export async function executarComandoChat(
           '- `/devin-status <id>` — status e últimas mensagens de uma sessão Devin\n' +
           '- `/worktree [criar|remover <nome>]` — checkpoints isolados via git worktree\n' +
           '- `/mcps` — catálogo de MCP servers; `/mcps <id>` instala no projeto\n' +
+          '- `/devin-listar` — lista sessões Devin; `/devin-status <id>` detalha\n' +
+          '- `/credenciais [id valor|remover id]` — vault de chaves (devin, openrouter...)\n' +
+          '- `/agendar <min> <prompt>` — job recorrente; `/agendar` lista; `off/on/remover <id>`\n' +
+          '- `/paralelo <nome> [tarefa]` — agente isolado em git worktree\n' +
           '- `/ajuda` — esta lista'
       }
     default:

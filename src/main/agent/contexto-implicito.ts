@@ -23,6 +23,8 @@ export type ContextoImplicitoOpts = {
   errosEditor?: string
   incluirRegras?: boolean
   maxBytes?: number
+  /** Texto da tarefa/pergunta — usado para ativar skills por trigger */
+  tarefa?: string
 }
 
 export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Promise<string> {
@@ -107,6 +109,16 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
     if (mapa) partes.push(mapa.trimEnd())
   } catch {
     /* mapa é contexto auxiliar — nunca quebra o turno */
+  }
+
+  try {
+    if (opts.tarefa) {
+      const { blocoSkillsContexto } = await import('./skill-triggers')
+      const skills = blocoSkillsContexto(opts.raiz, opts.tarefa)
+      if (skills) partes.push(skills)
+    }
+  } catch {
+    /* skills são contexto auxiliar */
   }
 
   try {

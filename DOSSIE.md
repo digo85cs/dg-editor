@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 08:45:42** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.2** · branch `integra-13-11` · último commit: d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 09:11:58** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.2** · branch `integra-13-11` · último commit: f5c0b48 2026-11-17 release: v0.6.2
+> Alterações locais não commitadas: 12 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **373**.
-- Canais expostos pelo preload: **354**.
+- Canais registrados no main: **383**.
+- Canais expostos pelo preload: **365**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f5c0b48 2026-11-17 release: v0.6.2
 - d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 - 4fddeff 2026-11-16 release: v0.6.1
 - 280ba57 2026-11-16 fix: app empacotado usava cwd (Program Files) como raiz - EPERM no boot
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 4858e9a 2026-11-16 feat: integracao Devin API v3 (sessoes cloud) via /devin e IPC
 - 297eaf8 2026-11-16 ﻿feat: comandos de chat, specs e MCPs externos
 - a53071c 2026-11-16 docs: atualiza pendencias pos-melhorias
-- 856b0c0 2026-11-16 ﻿feat: melhorias de contexto do agente (pesquisa GitHub)
 
 ## 16. Como atualizar este dossiê
 
