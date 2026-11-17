@@ -2,11 +2,6 @@
 import { mostrarRegrasUI } from './regras-ui.js'
 // Editor (CodeMirror) e terminal (xterm) carregam sob demanda: pesam no boot
 // e so sao necessarios quando o usuario abre um arquivo/painel.
-let moduloEditorPromise = null
-function carregarModuloEditor() {
-  moduloEditorPromise ??= import('./editor-cm.js')
-  return moduloEditorPromise
-}
 let moduloTerminalPromise = null
 function carregarModuloTerminal() {
   moduloTerminalPromise ??= import('./terminal.js')
@@ -58,6 +53,19 @@ import {
   fecharDirtyModal,
   ligarAbasUi
 } from './features/editor/abas-ui.js'
+import {
+  configurarAbasCore,
+  abrirArquivoNaAba,
+  ativarAba,
+  fecharAba,
+  salvarArquivoAtivo,
+  initEditor,
+  ciclarAbas,
+  agendarAutosave,
+  cancelarAutosave,
+  sincronizarOverviewGit,
+  ligarAbasCore
+} from './features/editor/abas-core.js'
 import {
   configurarHistoricoAbas,
   limparHistoricoAbas,
@@ -527,305 +535,6 @@ setInterval(() => {
   void atualizarGitStatusArvore()
 }, 5000)
 
-// ---------- Abas + editor ----------
-async function abrirArquivoNaAba(caminho, linha) {
-  // exportada para ferramentas-ui
-  ativarAbaCentro('editor')
-  const existente = state.abas.find((a) => a.caminho === caminho)
-  if (existente) {
-    await ativarAba(caminho)
-    if (linha) {
-      if (!editor) await initEditor()
-      editor?.irParaLinha?.(linha)
-    }
-    return
-  }
-  if (ehImagemExt(caminho)) {
-    syncDirtyAtiva()
-    state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false, imagem: true })
-    state.abaAtiva = caminho
-    registrarHistAba(caminho)
-    if (!editor) await initEditor()
-    esconderImagem()
-    await mostrarImagem(caminho)
-    renderizarAbas()
-    atualizarBreadcrumb()
-    atualizarEmpty()
-    atualizarToolbarPreview(caminho)
-    persistirAbas()
-    return
-  }
-  const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
-  if (!r.ok) {
-    mostrarToast('Não foi possível abrir: ' + (r.erro || 'erro'), 'erro')
-    return
-  }
-  // sincronizar dirty da aba atual antes de trocar
-  syncDirtyAtiva()
-  state.abas.push({ caminho, nome: nomeArquivo(caminho), dirty: false })
-  await ativarAba(caminho, r.conteudo)
-  persistirAbas()
-  if (linha) {
-    if (!editor) await initEditor()
-    editor?.irParaLinha?.(linha)
-  }
-}
-
-function syncDirtyAtiva() {
-  if (!state.abaAtiva || !editor) return
-  const a = state.abas.find((x) => x.caminho === state.abaAtiva)
-  if (a) a.dirty = editor.isDirty()
-}
-
-async function ativarAba(caminho, conteudoPrevio) {
-  cancelarAutosave()
-  syncDirtyAtiva()
-  let conteudo = conteudoPrevio
-  const imagem = ehImagemExt(caminho)
-  if (!imagem && conteudo == null) {
-    const r = await window.api.invoke('arquivo:ler', caminho, pastasPermitidas())
-    if (!r.ok) {
-      // Aba órfã (arquivo removido): fecha a aba limpa; se suja, preserva.
-      const idx = state.abas.findIndex((x) => x.caminho === caminho)
-      const aba = idx >= 0 ? state.abas[idx] : null
-      if (aba && !aba.dirty && caminho !== state.abaAtiva) {
-        state.abas.splice(idx, 1)
-        renderizarAbas()
-        persistirAbas()
-        mostrarToast('Aba fechada: "' + nomeArquivo(caminho) + '" não existe mais.', 'aviso')
-      } else {
-        mostrarToast('Não foi possível abrir: ' + (r.erro || 'erro'), 'erro')
-      }
-      $('editor-tabs')?.querySelector('.editor-tab.active')?.focus()
-      return false
-    }
-    conteudo = r.conteudo
-  }
-  state.abaAtiva = caminho
-  registrarHistAba(caminho)
-  ativarAbaCentro('editor')
-  if (imagem) {
-    if (!editor) await initEditor()
-    await mostrarImagem(caminho)
-    renderizarAbas()
-    atualizarBreadcrumb()
-    atualizarEmpty()
-    atualizarToolbarPreview(caminho)
-    persistirAbas()
-    return true
-  }
-  esconderImagem()
-  if (!editor) await initEditor()
-  editor.abrir(caminho, conteudo)
-  const a = state.abas.find((x) => x.caminho === caminho)
-  if (a) a.dirty = false
-  renderizarAbas()
-  atualizarBreadcrumb()
-  atualizarEmpty()
-  atualizarToolbarPreview(caminho)
-  sincronizarPreviewMdAba(caminho, conteudo)
-  editor.focar()
-  persistirAbas()
-  void atualizarPainelVault(caminho)
-  void sincronizarOverviewGit(caminho)
-  return true
-}
-
-/** Extrai linhas +/- do unified diff para a overview ruler. */
-function parseDiffLinhasOverview(diffText) {
-  const add = []
-  const del = []
-  let newLine = 0
-  let oldLine = 0
-  for (const ln of String(diffText || '').split(/\n/)) {
-    const h = ln.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-    if (h) {
-      oldLine = Number(h[1])
-      newLine = Number(h[2])
-      continue
-    }
-    if (ln.startsWith('+') && !ln.startsWith('+++')) {
-      add.push(newLine)
-      newLine++
-      continue
-    }
-    if (ln.startsWith('-') && !ln.startsWith('---')) {
-      del.push(Math.max(1, newLine))
-      oldLine++
-      continue
-    }
-    if (ln.startsWith('\\')) continue
-    oldLine++
-    newLine++
-  }
-  return { add, del }
-}
-
-async function sincronizarOverviewGit(caminho) {
-  if (!editor?.overviewDiff || !caminho) return
-  try {
-    const raiz = raizWorkspaceDe(caminho) || state.pastaAtual
-    if (!raiz) {
-      editor.overviewDiff({ del: [], add: [], ia: [] })
-      return
-    }
-    const rel = relPosix(caminho, raiz)
-    const r = await window.api.invoke('git:diff', raiz, rel)
-    const { add, del } = parseDiffLinhasOverview(r?.diff || '')
-    editor.overviewDiff({ del, add, ia: [] })
-    editor.overviewRefresh?.()
-  } catch {
-    editor.overviewDiff({ del: [], add: [], ia: [] })
-  }
-}
-
-async function fecharAba(caminho) {
-  cancelarAutosave()
-  const barAbas = $('editor-tabs')
-  const focoEmAbas = !!barAbas && barAbas.contains(document.activeElement)
-  const a = state.abas.find((x) => x.caminho === caminho)
-  if (!a) return
-  if (caminho === state.abaAtiva && editor) a.dirty = editor.isDirty()
-  if (a.dirty) {
-    const resp = await perguntarDirty(caminho)
-    if (resp === 'cancelar') return
-    if (resp === 'salvar') {
-      if (caminho === state.abaAtiva) {
-        const ok = await salvarArquivoAtivo()
-        if (!ok) return
-      } else {
-        // precisa ativar para salvar conteúdo atual no editor — se não é ativa e dirty, conteúdo perdido
-        // state.abas dirty só se estavam ativas e editadas; ao trocar syncamos. OK.
-        await ativarAba(caminho)
-        const ok = await salvarArquivoAtivo()
-        if (!ok) return
-      }
-    }
-  }
-  const idx = state.abas.findIndex((x) => x.caminho === caminho)
-  state.abas.splice(idx, 1)
-  if (state.abaAtiva === caminho) {
-    state.abaAtiva = null
-    if (state.abas.length) {
-      const next = state.abas[Math.min(idx, state.abas.length - 1)]
-      await ativarAba(next.caminho)
-    } else {
-      editor?.limpar()
-      limparHistoricoAbas()
-      atualizarBreadcrumb()
-      atualizarEmpty()
-      renderizarAbas()
-    }
-  } else {
-    renderizarAbas()
-  }
-  if (focoEmAbas && state.abas.length) {
-    barAbas.querySelector('.editor-tab.active')?.focus()
-  }
-  persistirAbas()
-}
-
-const LS_AUTOSAVE_MS = 'dg.editor.autosave.ms'
-let autosaveTimer = null
-function autosaveMs() {
-  const n = Number(localStorage.getItem(LS_AUTOSAVE_MS) || 0)
-  return Number.isFinite(n) && n > 0 ? n : 0
-}
-function cancelarAutosave() {
-  if (autosaveTimer) {
-    clearTimeout(autosaveTimer)
-    autosaveTimer = null
-  }
-}
-function agendarAutosave() {
-  cancelarAutosave()
-  const ms = autosaveMs()
-  if (!ms || !state.abaAtiva || !editor) return
-  if (!editor.isDirty()) return
-  autosaveTimer = setTimeout(() => {
-    autosaveTimer = null
-    if (!state.abaAtiva || !editor?.isDirty()) return
-    void salvarArquivoAtivo({ silencioso: true })
-  }, ms)
-}
-
-async function salvarArquivoAtivo(opcoes = {}) {
-  if (!state.abaAtiva || !editor) return false
-  cancelarAutosave()
-  if (/.json$/i.test(state.abaAtiva)) await editor.formatar?.()
-  const conteudo = editor.getConteudo()
-  let r
-  if (state.vaultRaiz && caminhoNoVault(state.abaAtiva) && ehMarkdown(state.abaAtiva)) {
-    r = await window.api.invoke('vault:salvar', state.abaAtiva, conteudo, pastasPermitidas())
-    if (r?.ok) void atualizarPainelVault(state.abaAtiva)
-  } else {
-    r = await window.api.invoke('arquivo:salvar', state.abaAtiva, conteudo, pastasPermitidas())
-  }
-  if (!r || !r.ok) {
-    const msg = 'Erro ao salvar: ' + ((r && r.erro) || 'erro')
-    mostrarToast(msg, 'erro')
-    return false
-  }
-  editor.marcarSalvo()
-  const a = state.abas.find((x) => x.caminho === state.abaAtiva)
-  if (a) a.dirty = false
-  renderizarAbas()
-  if (!opcoes.silencioso) mostrarToast('Salvo: ' + nomeArquivo(state.abaAtiva), 'ok')
-  return true
-}
-
-{
-  const sel = $('editor-autosave')
-  if (sel) {
-    const atual = String(autosaveMs())
-    if (![...sel.options].some((o) => o.value === atual)) sel.value = '0'
-    else sel.value = atual
-    sel.addEventListener('change', () => {
-      localStorage.setItem(LS_AUTOSAVE_MS, String(Number(sel.value) || 0))
-      cancelarAutosave()
-      agendarAutosave()
-    })
-  }
-}
-
-async function initEditor() {
-  const { criarEditor } = await carregarModuloEditor()
-  if (editor) return editor
-  const mount = $('editor-mount')
-  editor = criarEditor(mount, {
-    onDiagnostics: (lista) => atualizarDiagEditor(lista),
-    onChange: () => {
-      const a = state.abas.find((x) => x.caminho === state.abaAtiva)
-      if (!a || !editor) return
-      const dirty = editor.isDirty()
-      if (a.dirty !== dirty) {
-        a.dirty = dirty
-        renderizarAbas()
-      }
-      editor.overviewRefresh?.()
-      agendarAutosave()
-    },
-    onSave: () => {
-      salvarArquivoAtivo()
-    }
-  })
-  aplicarMinimapa(localStorage.getItem(LS_MINIMAP) !== '0')
-  return editor
-}
-
-function ciclarAbas() {
-  if (state.abas.length < 2) return
-  const idx = state.abas.findIndex((a) => a.caminho === state.abaAtiva)
-  const next = state.abas[(idx + 1) % state.abas.length]
-  ativarAba(next.caminho)
-}
-
-// ---------- Erros tipados (Block 7) ----------
-// Implementação em features/ui/erros.js
-
-// ---------- Análise ----------
-// ---------- Chat ----------
-
 function enviarMensagemUi() { void enviarMensagem() }
 $('chat-send')?.addEventListener('click', enviarMensagemUi)
 iniciarComposer($('chat-input'), { onEnviar: enviarMensagemUi })
@@ -842,6 +551,12 @@ ligarDownloadUi()
 configurarPreviewMd({ getEditor: () => editor })
 configurarDiagnosticos({ getEditor: () => editor })
 configurarHistoricoAbas({ abrirArquivo: (c) => abrirArquivoNaAba(c) })
+configurarAbasCore({
+  nomeArquivo: (p) => nomeArquivo(p),
+  caminhoNoVault: (c) => caminhoNoVault(c),
+  getEditor: () => editor,
+  setEditor: (e) => { editor = e }
+})
 configurarAbasUi({
   nomeArquivo: (p) => nomeArquivo(p),
   caminhoRelativo: (p) => caminhoRelativo(p),
@@ -1733,6 +1448,7 @@ initChatAgentSelector()
 ligarPainelAgente()
 ligarPainelOrientador()
 ligarAbasUi()
+ligarAbasCore()
 ligarArvoreRender()
 ligarExtrasUi()
 ligarDialogosDoMain()
