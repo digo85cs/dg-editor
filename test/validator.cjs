@@ -267,7 +267,13 @@ async function main() {
     'sem drag vertical legado (startH/limiar 3px)',
     !/startH\s*=/.test(termJs7) && !/dx\s*\+\s*dy[\s\S]{0,40}<=\s*3/.test(termJs7)
   )
-  assert('app.js registra menu de contexto', /contextmenu/.test(appJs7))
+  assert(
+    'app.js registra menu de contexto',
+    /contextmenu/.test(
+      appJs7 +
+        fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'arquivos', 'arvore-acoes.js'), 'utf-8')
+    )
+  )
 
   // ---------- 8. Agente de QA: estrutura e contrato ----------
   section('8. Agente de QA: estrutura e contrato')
@@ -705,7 +711,9 @@ async function main() {
   // ---------- 30. Analise: primeiro clique e agente ----------
   section('30. Analise: primeiro clique e agente')
   {
-    const app30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const app30 =
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8') +
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'analise', 'acoes.js'), 'utf-8')
     const html30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
     const main30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'analise.ts'), 'utf-8')
     const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
@@ -1043,7 +1051,10 @@ async function main() {
       /#statusbar \.sb-actions\s*\{[\s\S]{0,160}display:\s*flex/.test(cssPolish)
     )
     assert('css modal-float', /\.modal\.modal-float/.test(css))
-    assert('app initMenubar', /function initMenubar\s*\(/.test(appJs) && /initMenubar\(\)/.test(appJs))
+    const appJsMb =
+      appJs +
+      fs.readFileSync(path.join(ROOT, 'src/renderer/features/ui/menubar.js'), 'utf8')
+    assert('app initMenubar', /function initMenubar\s*\(/.test(appJsMb) && /initMenubar\(\)/.test(appJs))
     assert(
       'app ligarJanelaFlutuante',
       /janelas-flutuantes/.test(appJs) &&
@@ -1348,8 +1359,13 @@ async function main() {
     )
     assert(
       'menubar init + IPC',
-      /function initMenubar/.test(appJsA) &&
-        /menu:acao/.test(appJsA) &&
+      /function initMenubar/.test(
+        appJsA + fs.readFileSync(path.join(SRC, 'renderer/features/ui/menubar.js'), 'utf8')
+      ) &&
+        (/menu:acao/.test(appJsA) ||
+          /menu:acao/.test(
+            fs.readFileSync(path.join(SRC, 'renderer/features/ui/menubar.js'), 'utf8')
+          )) &&
         /janela:zoom/.test(preA) &&
         /janela:recarregar/.test(preA)
     )

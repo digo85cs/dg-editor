@@ -27,7 +27,6 @@ import { instalarTrapFocoModais } from './utils/focus-trap.js'
 import { anunciar } from './features/ui/live-region.js'
 import { abrirJanelaFlutuante, iniciarJanelasFlutuantes } from './features/ui/janelas-flutuantes.js'
 import { mostrarToast } from './features/ui/toast.js'
-import { MENUS_BARRA } from './features/ui/menubar-dados.js'
 import { dgNormalizarErro, mostrarErroTipado } from './features/ui/erros.js'
 import { recontarUsoChat, registrarUsoTurno } from './features/chat/uso.js'
 import { obterReposGit, atualizarStatusBar } from './features/ui/repos-status.js'
@@ -55,6 +54,15 @@ import {
   skillAtivaChat,
   definirSkillChat
 } from './features/chat/skill-chip.js'
+import { obterAnexosChat, limparAnexosChat, ligarAnexosChat } from './features/chat/anexos.js'
+import { abrirModalReinicio, fecharModalReinicio, perguntarEscolha } from './features/ui/escolha-modal.js'
+import {
+  configurarDiagnosticos,
+  atualizarDiagEditor,
+  aplicarMinimapa,
+  ligarMinimapa,
+  LS_MINIMAP
+} from './features/editor/diagnosticos.js'
 import {
   configurarConfigContas,
   abrirConfig,
@@ -95,8 +103,17 @@ import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivo
 import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNoDir, criarNoFile as _criarNoFile } from './features/arquivos/tree-render.js'
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
-import { renderizarAnaliseHtml, renderizarErroHtml } from './features/analise/render.js'
-import { renderizarWhereisMatchesHtml, renderizarWhereisVazioHtml, renderizarWhereisErroHtml } from './features/analise/whereis.js'
+import {
+  configurarAnalise,
+  habilitarBotoesAnalise,
+  analisarCompleta,
+  escolherEscopoAnalise,
+  rodarAnalise,
+  renderizarAnalise,
+  buscarOndeEsta
+} from './features/analise/acoes.js'
+import { configurarMenubar, initMenubar } from './features/ui/menubar.js'
+import { configurarArvore, initMenuCtxArvore } from './features/arquivos/arvore-acoes.js'
 import { normalizarMensagensChat, bolhaHtml, organizarRespostaCursor } from './features/chat/render.js'
 import {
   humanizarStatus,
@@ -2271,46 +2288,6 @@ async function salvarArquivoAtivo(opcoes = {}) {
   return true
 }
 
-function atualizarDiagEditor(lista) {
-  const el = $('editor-diag')
-  if (!el) return
-  if (!state.abaAtiva) {
-    el.classList.add('hidden')
-    return
-  }
-  const diags = Array.isArray(lista) ? lista : []
-  const erros = diags.filter((d) => d.severidade === 'erro')
-  const avisos = diags.filter((d) => d.severidade !== 'erro')
-  el.classList.remove('hidden', 'tem-erro', 'tem-aviso', 'ok')
-  if (erros.length) {
-    el.classList.add('tem-erro')
-    el.textContent =
-      erros.length + ' erro' + (erros.length > 1 ? 's' : '') +
-      (avisos.length ? ' · ' + avisos.length + ' aviso' + (avisos.length > 1 ? 's' : '') : '')
-  } else if (avisos.length) {
-    el.classList.add('tem-aviso')
-    el.textContent = avisos.length + ' aviso' + (avisos.length > 1 ? 's' : '')
-  } else {
-    el.classList.add('ok')
-    el.textContent = 'Sem problemas'
-  }
-  el.title = diags.slice(0, 8).map((d) => 'L' + d.linha + ': ' + d.mensagem).join('\n') || 'Sem diagnosticos'
-}
-
-const LS_MINIMAP = 'dg.editor.minimapa.ativo'
-function aplicarMinimapa(ligado) {
-  const btn = $('btn-editor-minimapa')
-  if (btn) {
-    btn.setAttribute('aria-pressed', ligado ? 'true' : 'false')
-    btn.classList.toggle('ativo', ligado)
-  }
-  editor?.minimapaAlternar?.(ligado)
-}
-$('btn-editor-minimapa')?.addEventListener('click', () => {
-  const ligado = !(editor?.minimapaVisivel?.() ?? false)
-  localStorage.setItem(LS_MINIMAP, ligado ? '1' : '0')
-  aplicarMinimapa(ligado)
-})
 {
   const sel = $('editor-autosave')
   if (sel) {
@@ -2361,107 +2338,6 @@ function ciclarAbas() {
 // Implementação em features/ui/erros.js
 
 // ---------- Análise ----------
-function habilitarBotoesAnalise(habilitar) {
-  const rapida = $('btn-analise-rapida')
-  const completa = $('btn-analise-completa')
-  const disabled = !habilitar
-  if (rapida) rapida.disabled = disabled
-  if (completa) completa.disabled = disabled
-  const whereisQ = $('whereis-query')
-  const whereisBtn = $('btn-whereis')
-  if (whereisQ) whereisQ.disabled = disabled
-  if (whereisBtn) whereisBtn.disabled = disabled
-}
-
-async function solicitarDialogoEscopoAnalise(modo) {
-  const resposta = await window.api.invoke('analysis:choose-scope', modo)
-  if (resposta?.ok !== true || !Number.isInteger(resposta.response)) {
-    throw new Error(resposta?.erro || 'Não foi possível abrir a escolha de escopo.')
-  }
-  return resposta.response
-}
-
-async function analisarCompleta(root, force = false) {
-  try {
-    const resposta = await solicitarDialogoEscopoAnalise('confirm-complete')
-    if (resposta === 0) await rodarAnalise(root, 'completa', force)
-  } catch (err) {
-    mostrarToast('Não foi possível confirmar a análise completa: ' + String(err), 'erro')
-  }
-}
-
-async function escolherEscopoAnalise(root, force = false) {
-  try {
-    const resposta = await solicitarDialogoEscopoAnalise('choose-scope')
-    if (resposta === 0) await rodarAnalise(root, 'rapida', force)
-    else if (resposta === 1) await analisarCompleta(root, force)
-  } catch (err) {
-    mostrarToast('Não foi possível escolher o escopo da análise: ' + String(err), 'erro')
-  }
-}
-
-async function rodarAnalise(root, escopo = 'rapida', force = false) {
-  $('analysis-progress').classList.remove('hidden')
-  $('progress-text').textContent = force ? 'Analisando novamente...' : (escopo === 'completa' ? 'Analisando projeto inteiro...' : 'Analisando arquivos-chave...')
-  $('analysis-content').innerHTML =
-    '<p class="muted">' + (escopo === 'completa' ? 'Lendo o projeto inteiro' : 'Lendo os arquivos-chave') + ' e perguntando à IA...</p>'
-  ativarAbaDireita('analise')
-  try {
-    const r = await window.api.analysisRun(root, force, escopo)
-    if (!r || r.ok === false) {
-      mostrarErroTipado(r || { codigo: 'ERR_UNKNOWN', mensagem: 'Falha na análise.' })
-      return
-    }
-    const payload = (r.result && typeof r.result === 'object') ? r.result : r
-    const report = payload && payload.report && typeof payload.report === 'object'
-      ? payload.report
-      : (payload && typeof payload === 'object' ? payload : null)
-    if (!report || typeof report !== 'object') {
-      mostrarErroTipado({ codigo: 'ERR_ANALYSIS_EMPTY', mensagem: 'A análise não retornou dados suficientes para exibir.', acao: 'Tente novamente com análise rápida.' })
-      return
-    }
-    renderizarAnalise(report, !!payload.fromCache)
-    $('analysis-content').dataset.escopo = escopo
-    $('analysis-content').dataset.jaAnalisou = '1'
-  } catch (err) {
-    mostrarErroTipado(err)
-  } finally {
-    $('analysis-progress').classList.add('hidden')
-  }
-}
-
-function renderizarAnalise(report, fromCache) {
-  $('analysis-content').innerHTML = renderizarAnaliseHtml(report, fromCache)
-}
-
-// ---------- Onde está (whereis) ----------
-async function buscarOndeEsta() {
-  if (!state.pastaAtual) { mostrarToast('Abra uma pasta para buscar.', 'aviso'); return }
-  const input = $('whereis-query')
-  const q = (input?.value || '').trim()
-  if (q.length < 2) { mostrarToast('Digite ao menos 2 caracteres.', 'aviso'); input?.focus(); return }
-  const alvo = $('whereis-result')
-  if (alvo) alvo.innerHTML = '<p class="muted">Buscando…</p>'
-  try {
-    const r = await window.api.invoke('whereis:ask', state.pastaAtual, q)
-    if (!r || r.ok === false) {
-      if (alvo) alvo.innerHTML = renderizarWhereisErroHtml(dgNormalizarErro(r, 'Falha na busca.'))
-      return
-    }
-    const result = r.result || {}
-    if (!alvo) return
-    alvo.innerHTML = renderizarWhereisMatchesHtml(result, q)
-    alvo.querySelectorAll('.whereis-hit-file').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const file = btn.getAttribute('data-file')
-        if (file) void abrirArquivoNoEditor(file)
-      })
-    })
-  } catch (err) {
-    if (alvo) alvo.innerHTML = renderizarWhereisErroHtml(dgNormalizarErro(err, 'Busca falhou.'))
-  }
-}
-
 // ---------- Chat ----------
 function renderizarChat(msgs) {
   const area = $('chat-messages')
@@ -2867,7 +2743,7 @@ async function enviarMensagem() {
       agente,
       modo,
       autoAprovar,
-      anexos: chatAnexos,
+      anexos: obterAnexosChat(),
       arquivo: state.abaAtiva || '',
       skill,
       verificarApos:
@@ -2875,8 +2751,7 @@ async function enviarMensagem() {
         modo !== 'ask' &&
         (document.getElementById('agent-verify-loop')?.checked !== false)
     })
-    chatAnexos = []
-    renderizarAnexosChat()
+    limparAnexosChat()
     const ok = r && r.ok !== false && r.message && r.message.content
     let conteudo = organizarRespostaCursor(
       ok ? r.message.content : r?.message?.content || 'Não consegui responder.'
@@ -3127,12 +3002,15 @@ $('btn-prompt-copiar')?.addEventListener('click', () => void copiarPromptOrienta
 
 /** Popover de contexto dos ícones do chat (clique → contexto → ação). */
 initChatIconContext()
+ligarAnexosChat()
+ligarMinimapa()
 
 // ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------
 // Implementação em features/ui/janelas-flutuantes.js
 iniciarJanelasFlutuantes()
 ligarDownloadUi()
 configurarPreviewMd({ getEditor: () => editor })
+configurarDiagnosticos({ getEditor: () => editor })
 configurarHistoricoAbas({ abrirArquivo: (c) => abrirArquivoNaAba(c) })
 configurarChatCtx({
   novaConversa: () => novaConversaUi(),
@@ -3140,6 +3018,21 @@ configurarChatCtx({
 })
 configurarSkillChip({ focarPainelIa: (p) => focarPainelIa(p) })
 configurarConfigContas({ carregarOpenClaw: () => carregarConfigOpenClawUi() })
+configurarAnalise({
+  ativarAbaDireita: (p) => ativarAbaDireita(p),
+  abrirArquivo: (c) => abrirArquivoNaAba(c)
+})
+configurarMenubar({
+  executarComando: (id) => executarComando(id),
+  acaoEditar: (cmd) => acaoEditar(cmd)
+})
+configurarArvore({
+  recarregarArvore: async () => {
+    await renderizarPastas()
+    await atualizarGitStatusArvore()
+  },
+  garantirTerminal: () => garantirTerminal()
+})
 
 // ---------- Config / Contas ----------
 // Agendador: injeta o prompt no chat quando um job vence
@@ -4544,61 +4437,6 @@ $('btn-adapta-one-cfg')?.addEventListener('click', () => void window.api.invoke(
 $('btn-adapta-maestro-cfg')?.addEventListener('click', () =>
   void window.api.invoke('adapta:abrir', 'maestro')
 )
-let chatAnexos = []
-function renderizarAnexosChat() {
-  const bar = document.getElementById('chat-anexos-preview')
-  if (!bar) return
-  if (!chatAnexos.length) {
-    bar.style.display = 'none'
-    bar.innerHTML = ''
-    return
-  }
-  bar.style.display = 'flex'
-  bar.innerHTML = ''
-  for (let i = 0; i < chatAnexos.length; i++) {
-    const a = chatAnexos[i]
-    const el = document.createElement('div')
-    el.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);padding:4px 6px;border-radius:6px'
-    const txt = document.createElement('span')
-    txt.textContent = a.nome + (a.tamanho ? ' (' + Math.round(a.tamanho / 1024) + 'KB)' : '')
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'btn-ghost'
-    btn.textContent = '×'
-    btn.onclick = () => {
-      chatAnexos.splice(i, 1)
-      renderizarAnexosChat()
-    }
-    el.appendChild(txt)
-    el.appendChild(btn)
-    bar.appendChild(el)
-  }
-}
-// Anexar: abre via popover de contexto (initChatIconContext)
-document.getElementById('chat-anexos-input')?.addEventListener('change', async (e) => {
-  const input = e.target
-  const files = Array.from(input.files || [])
-  for (const f of files) {
-    try {
-      const buf = await f.arrayBuffer()
-      const bytes = new Uint8Array(buf)
-      let bin = ''
-      const passo = 8192
-      for (let i = 0; i < bytes.length; i += passo) {
-        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + passo))
-      }
-      const base64 = btoa(bin)
-      chatAnexos.push({
-        nome: f.name,
-        tipo: f.type || '',
-        tamanho: f.size,
-        data: base64
-      })
-    } catch {}
-  }
-  input.value = ''
-  renderizarAnexosChat()
-})
 $('palette-input').addEventListener('input', (e) => {
   renderizarPaleta(e.target.value)
 })
@@ -4839,500 +4677,7 @@ async function rodarAutoAuditoria() {
   }
 }
 
-function abrirModalReinicio(motivo) {
-  var m = document.getElementById('modal-reinicio')
-  if (!m) return
-  var p = document.getElementById('reinicio-motivo')
-  if (p)
-    p.textContent =
-      (motivo || 'Algumas alteracoes precisam de reinicio para serem aplicadas') +
-      '. Deseja reiniciar agora?'
-  m.classList.remove('hidden')
-}
-function fecharModalReinicio() {
-  var m = document.getElementById('modal-reinicio')
-  if (m) m.classList.add('hidden')
-}
-
-function perguntarEscolha(titulo, opcoes, config) {
-  const multiplo = !!(config && config.multiplo)
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div')
-    overlay.className = 'escolha-overlay'
-    const caixa = document.createElement('div')
-    caixa.className = 'escolha-caixa'
-    const h = document.createElement('h3')
-    h.textContent = titulo
-    h.style.cssText = 'margin:0 0 12px;font-size:15px;'
-    caixa.appendChild(h)
-    const selecionadas = new Set()
-    opcoes.forEach((op) => {
-      const btn = document.createElement('button')
-      btn.textContent = op
-      btn.className = 'btn-ghost'
-      btn.style.cssText = 'display:block;width:100%;margin:6px 0;'
-      if (multiplo) {
-        btn.addEventListener('click', () => {
-          if (selecionadas.has(op)) selecionadas.delete(op)
-          else selecionadas.add(op)
-          btn.style.background = selecionadas.has(op) ? 'var(--dg-active)' : ''
-        })
-      } else {
-        btn.addEventListener('click', () => {
-          overlay.remove()
-          resolve([op])
-        })
-      }
-      caixa.appendChild(btn)
-    })
-    if (multiplo) {
-      const ok = document.createElement('button')
-      ok.textContent = 'Confirmar'
-      ok.className = 'btn-primary'
-      ok.style.width = '100%'
-      ok.style.marginTop = '12px'
-      ok.addEventListener('click', () => {
-        overlay.remove()
-        resolve(Array.from(selecionadas))
-      })
-      caixa.appendChild(ok)
-    }
-    const cancelar = document.createElement('button')
-    cancelar.textContent = 'Cancelar'
-    cancelar.className = 'btn-ghost'
-    cancelar.style.width = '100%'
-    cancelar.addEventListener('click', () => {
-      overlay.remove()
-      resolve(null)
-    })
-    caixa.appendChild(cancelar)
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        overlay.remove()
-        resolve(null)
-      }
-    })
-    overlay.appendChild(caixa)
-    document.body.appendChild(overlay)
-  })
-}
-window.perguntarEscolha = perguntarEscolha
-
 /** Diretório pai de um caminho (arquivo → pasta). */
-function dirPaiDe(caminho) {
-  const n = String(caminho || '').replace(/[/\\]+$/, '')
-  const i = Math.max(n.lastIndexOf('\\'), n.lastIndexOf('/'))
-  return i > 0 ? n.slice(0, i) : n
-}
-
-let menuCtxArvore = null
-let menuCtxFocoAnterior = null
-
-/**
- * @param {boolean} [restaurarFoco] devolve o foco à linha que abriu o menu
- */
-function fecharMenuCtxArvore(restaurarFoco = false) {
-  const menu = menuCtxArvore
-  const foco = menuCtxFocoAnterior
-  menuCtxArvore = null
-  menuCtxFocoAnterior = null
-  if (menu) menu.remove()
-  if (restaurarFoco && foco && foco.isConnected) {
-    try {
-      foco.focus()
-    } catch {
-      /* */
-    }
-  }
-}
-
-function juntarCaminho(base, nome) {
-  const b = String(base || '').replace(/[/\\]+$/, '')
-  const sep = b.includes('\\') ? '\\' : '/'
-  return b + sep + String(nome || '').replace(/^[/\\]+/, '')
-}
-
-async function recarregarArvoreExplorer() {
-  await renderizarPastas()
-  await atualizarGitStatusArvore()
-}
-
-function erroOperacao(titulo, r) {
-  alert(titulo + ': ' + ((r && r.erro) || 'erro desconhecido'))
-}
-
-async function criarNoExplorer(baseDir, tipo) {
-  const nome = window.prompt(tipo === 'dir' ? 'Nome da nova pasta:' : 'Nome do novo arquivo:')
-  if (nome == null) return
-  const limpo = String(nome).trim()
-  if (!limpo) return
-  const r = await window.api.invoke(
-    'arquivo:criar',
-    juntarCaminho(baseDir, limpo),
-    tipo,
-    pastasPermitidas()
-  )
-  if (!r || !r.ok) return erroOperacao('Falha ao criar', r)
-  await recarregarArvoreExplorer()
-}
-
-async function renomearExplorer(alvoPath) {
-  const linha = Array.from(document.querySelectorAll('.tree-item[data-path]')).find(
-    (el) => el.dataset.path === alvoPath
-  )
-  if (linha) return renomearInlineNaArvore(linha)
-  await dgAlert('Abra a árvore de arquivos e use F2 sobre o item para renomear.', 'Renomear')
-}
-
-function renomearInlineNaArvore(linha) {
-  const alvoPath = linha.dataset.path || ''
-  if (!alvoPath || (linha.dataset.tipo !== 'file' && linha.dataset.tipo !== 'dir')) return
-  const atual = alvoPath.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || ''
-  const htmlOriginal = linha.innerHTML
-  linha.innerHTML = ''
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.className = 'tree-rename-input'
-  input.value = atual
-  input.setAttribute('aria-label', 'Novo nome para ' + atual)
-  linha.appendChild(input)
-  input.focus()
-  input.select()
-  let concluido = false
-  const finalizar = async (salvar) => {
-    if (concluido) return
-    concluido = true
-    const limpo = input.value.trim()
-    linha.innerHTML = htmlOriginal
-    if (!salvar || !limpo || limpo === atual) return
-    const r = await window.api.invoke('arquivo:renomear', alvoPath, limpo, pastasPermitidas())
-    if (!r || !r.ok) return erroOperacao('Falha ao renomear', r)
-    await recarregarArvoreExplorer()
-  }
-  input.addEventListener('keydown', (ev) => {
-    ev.stopPropagation()
-    if (ev.key === 'Enter') {
-      ev.preventDefault()
-      void finalizar(true)
-    } else if (ev.key === 'Escape') {
-      ev.preventDefault()
-      void finalizar(false)
-    }
-  })
-  input.addEventListener('blur', () => void finalizar(true))
-}
-
-const SELETOR_LINHA_ARVORE = '.tree-root-header[data-path], .tree-item[data-path]'
-
-function linhasArvore(lista) {
-  return Array.from(lista.querySelectorAll(SELETOR_LINHA_ARVORE)).filter((el) => el.getClientRects().length > 0)
-}
-
-function garantirLinhaFocavel(lista) {
-  if (!lista) return
-  const linhas = lista.querySelectorAll(SELETOR_LINHA_ARVORE)
-  if (!linhas.length) return
-  if (Array.from(linhas).some((l) => l.tabIndex === 0)) return
-  linhas[0].tabIndex = 0
-}
-
-function focarLinhaArvore(lista, linha) {
-  if (!linha || !lista.contains(linha)) return
-  for (const l of lista.querySelectorAll(SELETOR_LINHA_ARVORE)) l.tabIndex = -1
-  linha.tabIndex = 0
-  try {
-    linha.focus()
-  } catch {
-    /* */
-  }
-}
-
-function linhaAncestralArvore(linhas, indice) {
-  const alvo = (linhas[indice]?.dataset.path || '').toLowerCase()
-  for (let i = indice - 1; i >= 0; i--) {
-    const l = linhas[i]
-    if (l.dataset.tipo !== 'dir') continue
-    const base = (l.dataset.path || '').toLowerCase()
-    if (alvo.startsWith(base + '\\') || alvo.startsWith(base + '/')) return l
-  }
-  return null
-}
-
-function nomeBaseArvore(linha) {
-  return String(linha.dataset.path || '')
-    .replace(/[/\\]+$/, '')
-    .split(/[/\\]/)
-    .pop()
-    .toLowerCase()
-}
-
-/** Próxima linha (com wrap) cujo nome começa pelo termo digitado. */
-function indiceTypeaheadArvore(linhas, inicio, termo) {
-  const t = String(termo || '').toLowerCase()
-  if (!t) return -1
-  for (let k = 1; k <= linhas.length; k++) {
-    const idx = (inicio + k) % linhas.length
-    if (nomeBaseArvore(linhas[idx]).startsWith(t)) return idx
-  }
-  return -1
-}
-
-function ligarTecladoArvore(lista) {
-  if (!lista || lista.dataset.tecladoPronto) return
-  lista.dataset.tecladoPronto = '1'
-  lista.setAttribute('role', 'tree')
-  lista.setAttribute('aria-label', 'Arquivos do repositório')
-  lista.tabIndex = -1
-  let bufferTypeahead = ''
-  let timerTypeahead = null
-  lista.addEventListener('focus', () => {
-    if (document.activeElement !== lista) return
-    const linhas = linhasArvore(lista)
-    const alvo = linhas.find((l) => l.tabIndex === 0) || linhas[0]
-    if (alvo) focarLinhaArvore(lista, alvo)
-  })
-  lista.addEventListener(
-    'click',
-    (e) => {
-      const linha = e.target.closest?.(SELETOR_LINHA_ARVORE)
-      if (linha && !e.target.closest('.pasta-remover')) focarLinhaArvore(lista, linha)
-    },
-    true
-  )
-  lista.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return
-    const atual = e.target.closest?.(SELETOR_LINHA_ARVORE)
-    if (!atual) return
-    const linhas = linhasArvore(lista)
-    const i = linhas.indexOf(atual)
-    if (i < 0) return
-    const dir = atual.dataset.tipo === 'dir'
-    const chevron = atual.querySelector('.chevron')
-    const aberto = !!chevron?.classList.contains('open')
-    if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
-      e.preventDefault()
-      const r = atual.getBoundingClientRect()
-      const tipo = atual.dataset.tipo || (atual.classList.contains('tree-root-header') ? 'dir' : 'file')
-      abrirMenuCtxArvore(r.left + 24, r.bottom, { path: atual.dataset.path || '', tipo }, atual)
-      return
-    }
-    if (e.key.length === 1 && !/[\u0000-\u001f]/.test(e.key)) {
-      e.preventDefault()
-      bufferTypeahead += e.key.toLowerCase()
-      clearTimeout(timerTypeahead)
-      timerTypeahead = setTimeout(() => {
-        bufferTypeahead = ''
-      }, 800)
-      const alvoIdx = indiceTypeaheadArvore(linhas, i, bufferTypeahead)
-      if (alvoIdx >= 0) focarLinhaArvore(lista, linhas[alvoIdx])
-      return
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      focarLinhaArvore(lista, linhas[Math.min(i + 1, linhas.length - 1)])
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      focarLinhaArvore(lista, linhas[Math.max(i - 1, 0)])
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      if (dir && chevron && !aberto) chevron.click()
-      else focarLinhaArvore(lista, linhas[Math.min(i + 1, linhas.length - 1)])
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      if (dir && chevron && aberto) chevron.click()
-      else focarLinhaArvore(lista, linhaAncestralArvore(linhas, i) || atual)
-    } else if (e.key === 'Home') {
-      e.preventDefault()
-      focarLinhaArvore(lista, linhas[0])
-    } else if (e.key === 'End') {
-      e.preventDefault()
-      focarLinhaArvore(lista, linhas[linhas.length - 1])
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      if (dir && chevron) chevron.click()
-      else atual.click()
-    } else if (e.key === 'F2') {
-      e.preventDefault()
-      if (atual.classList.contains('tree-item')) void renomearInlineNaArvore(atual)
-      else mostrarToast('A raiz não pode ser renomeada aqui', 'aviso')
-    }
-  })
-}
-
-async function excluirExplorer(alvoPath) {
-  const nome = String(alvoPath).replace(/[/\\]+$/, '').split(/[/\\]/).pop() || alvoPath
-  if (!window.confirm('Excluir "' + nome + '"? O item vai para a lixeira do sistema.')) return
-  const r = await window.api.invoke('arquivo:excluir', alvoPath, pastasPermitidas())
-  if (!r || !r.ok) return erroOperacao('Falha ao excluir', r)
-  await recarregarArvoreExplorer()
-}
-
-function abrirMenuCtxArvore(x, y, alvo, focoRetorno = null) {
-  fecharMenuCtxArvore()
-  const alvoPath = String(alvo.path || '')
-  const tipo = alvo.tipo === 'file' ? 'file' : 'dir'
-  const pastaBase = tipo === 'file' ? dirPaiDe(alvoPath) : alvoPath
-  const ehRaiz = (state.pastasRecentes || []).some((p) => String(p) === alvoPath)
-  const menu = document.createElement('div')
-  menu.className = 'tree-ctx-menu'
-  menu.setAttribute('role', 'menu')
-  menuCtxFocoAnterior = focoRetorno || document.activeElement
-  const add = (label, fn, opts = {}) => {
-    const item = document.createElement('button')
-    item.type = 'button'
-    item.className = 'tree-ctx-item' + (opts.perigo ? ' is-perigo' : '')
-    item.setAttribute('role', 'menuitem')
-    item.textContent = label
-    item.addEventListener('click', (e) => {
-      e.stopPropagation()
-      fecharMenuCtxArvore()
-      fn()
-    })
-    menu.appendChild(item)
-  }
-  const sep = () => {
-    const d = document.createElement('div')
-    d.className = 'tree-ctx-sep'
-    d.setAttribute('role', 'separator')
-    menu.appendChild(d)
-  }
-  add('Novo arquivo…', () => void criarNoExplorer(pastaBase, 'file'))
-  add('Nova pasta…', () => void criarNoExplorer(pastaBase, 'dir'))
-  if (!ehRaiz) {
-    sep()
-    add('Renomear…', () => void renomearExplorer(alvoPath))
-    add('Excluir…', () => void excluirExplorer(alvoPath), { perigo: true })
-  }
-  sep()
-  add('Abrir terminal nesta pasta', () => {
-    void garantirTerminal().then(() => {
-      const api = window.dgTerminal
-      if (api && typeof api.abrirEm === 'function') {
-        void api.abrirEm(pastaBase)
-      } else {
-        console.warn('[arvore] dgTerminal.abrirEm indisponivel')
-      }
-    })
-  })
-  document.body.appendChild(menu)
-  const pad = 4
-  const rect = menu.getBoundingClientRect()
-  let left = x
-  let top = y
-  if (left + rect.width > window.innerWidth - pad) left = window.innerWidth - rect.width - pad
-  if (top + rect.height > window.innerHeight - pad) top = window.innerHeight - rect.height - pad
-  menu.style.left = Math.max(pad, left) + 'px'
-  menu.style.top = Math.max(pad, top) + 'px'
-  menu.addEventListener('keydown', (e) => {
-    const itens = Array.from(menu.querySelectorAll('.tree-ctx-item'))
-    if (!itens.length) return
-    const i = itens.indexOf(document.activeElement)
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      itens[(i + 1) % itens.length].focus()
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      itens[(i - 1 + itens.length) % itens.length].focus()
-    } else if (e.key === 'Home') {
-      e.preventDefault()
-      itens[0].focus()
-    } else if (e.key === 'End') {
-      e.preventDefault()
-      itens[itens.length - 1].focus()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      e.stopPropagation()
-      fecharMenuCtxArvore(true)
-    } else if (e.key === 'Tab') {
-      e.preventDefault()
-      fecharMenuCtxArvore(true)
-    }
-  })
-  menuCtxArvore = menu
-  const primeiro = menu.querySelector('.tree-ctx-item')
-  try {
-    primeiro?.focus()
-  } catch {
-    /* */
-  }
-}
-
-function limparDropArvore() {
-  document.querySelectorAll('.tree-item.drag-over, .tree-root-header.drag-over').forEach((el) =>
-    el.classList.remove('drag-over')
-  )
-  document.querySelectorAll('.tree-item.dragging').forEach((el) => el.classList.remove('dragging'))
-}
-
-async function moverArvore(origem, destinoPasta) {
-  if (!origem || !destinoPasta) return
-  if (String(origem).toLowerCase() === String(destinoPasta).toLowerCase()) return
-  const r = await window.api.invoke('arquivo:mover', origem, destinoPasta, pastasPermitidas())
-  if (!r || !r.ok) return erroOperacao('Falha ao mover', r)
-  await recarregarArvoreExplorer()
-}
-
-function initMenuCtxArvore() {
-  ligarTecladoArvore($('files-list'))
-  for (const id of ['folder-list', 'files-list']) {
-    const lista = $(id)
-    if (!lista) continue
-    lista.addEventListener('contextmenu', (e) => {
-      const alvo =
-        e.target.closest('.tree-item[data-path]') || e.target.closest('.tree-root-header[data-path]')
-      if (!alvo) return
-      e.preventDefault()
-      e.stopPropagation()
-      const path = alvo.dataset.path
-      if (!path) return
-      const tipo = alvo.dataset.tipo || (alvo.classList.contains('tree-root-header') ? 'dir' : 'file')
-      abrirMenuCtxArvore(e.clientX, e.clientY, { path, tipo }, alvo)
-    })
-  }
-  const listas = ['folder-list', 'files-list'].map((id) => $(id)).filter(Boolean)
-  for (const lista of listas) {
-    lista.addEventListener('dragstart', (e) => {
-      const alvo = e.target.closest?.('.tree-item[data-path], .tree-root-header[data-path]')
-      if (!alvo) return
-      if (alvo.classList.contains('tree-root-header')) return
-      e.dataTransfer.setData('text/plain', alvo.dataset.path || '')
-      e.dataTransfer.effectAllowed = 'move'
-      alvo.classList.add('dragging')
-    })
-    lista.addEventListener('dragend', limparDropArvore)
-    lista.addEventListener('dragover', (e) => {
-      const destino = e.target.closest?.('.tree-root-header[data-path], .tree-item[data-tipo="dir"][data-path]')
-      if (!destino) return
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-      if (!destino.classList.contains('drag-over')) {
-        document.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'))
-        destino.classList.add('drag-over')
-      }
-    })
-    lista.addEventListener('dragleave', (e) => {
-      const destino = e.target.closest?.('.drag-over')
-      if (destino && !destino.contains(e.relatedTarget)) destino.classList.remove('drag-over')
-    })
-    lista.addEventListener('drop', (e) => {
-      const destino = e.target.closest?.('.tree-root-header[data-path], .tree-item[data-tipo="dir"][data-path]')
-      if (!destino) return
-      e.preventDefault()
-      const origem = e.dataTransfer.getData('text/plain')
-      const pastaDestino = destino.dataset.path || ''
-      limparDropArvore()
-      void moverArvore(origem, pastaDestino)
-    })
-  }
-  document.addEventListener('click', (e) => {
-    if (menuCtxArvore && !menuCtxArvore.contains(e.target)) fecharMenuCtxArvore()
-  })
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') fecharMenuCtxArvore()
-  })
-  window.addEventListener('blur', () => fecharMenuCtxArvore())
-}
-
 async function atualizarIconeMax() {
   try {
     const st = await window.api.invoke('janela:estado')
@@ -5342,124 +4687,7 @@ async function atualizarIconeMax() {
   } catch {}
 }
 
-// ---------- Menubar (titlebar frameless) ----------
-// MENUS_BARRA importado de features/ui/menubar-dados.js
-
-function fecharMenubar() {
-  const bar = document.getElementById('menubar')
-  if (!bar) return
-  bar.dataset.open = ''
-  bar.querySelectorAll('.mb-btn').forEach((b) => b.setAttribute('aria-expanded', 'false'))
-  bar.querySelectorAll('.mb-dropdown').forEach((p) => {
-    p.hidden = true
-  })
-}
-
-function abrirMenuPainel(nome) {
-  const bar = document.getElementById('menubar')
-  if (!bar) return
-  bar.dataset.open = nome
-  bar.querySelectorAll('.mb-btn').forEach((b) => {
-    const on = b.getAttribute('data-menu') === nome
-    b.setAttribute('aria-expanded', on ? 'true' : 'false')
-  })
-  bar.querySelectorAll('.mb-dropdown').forEach((p) => {
-    p.hidden = p.getAttribute('data-menu-panel') !== nome
-  })
-}
-
-function executarAcaoMenu(id, editCmd) {
-  if (editCmd) {
-    acaoEditar(editCmd)
-    return
-  }
-  if (executarComandoLocal(id)) return
-  executarComando(id)
-}
-
-function popularPainelMenu(panel, itens) {
-  panel.textContent = ''
-  for (const it of itens) {
-    if (it.sep) {
-      const hr = document.createElement('div')
-      hr.className = 'mb-sep'
-      hr.setAttribute('role', 'separator')
-      panel.appendChild(hr)
-      continue
-    }
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'mb-option'
-    btn.setAttribute('role', 'menuitem')
-    btn.dataset.acao = it.id
-    if (it.edit) btn.dataset.edit = it.edit
-    const lab = document.createElement('span')
-    lab.textContent = it.label
-    btn.appendChild(lab)
-    if (it.accel) {
-      const acc = document.createElement('span')
-      acc.className = 'mb-accel'
-      acc.textContent = it.accel
-      btn.appendChild(acc)
-    }
-    btn.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      fecharMenubar()
-      executarAcaoMenu(it.id, it.edit)
-    })
-    panel.appendChild(btn)
-  }
-}
-
-function initMenubar() {
-  const bar = document.getElementById('menubar')
-  if (!bar || bar.dataset.ready === '1') return
-  bar.dataset.ready = '1'
-
-  for (const [nome, itens] of Object.entries(MENUS_BARRA)) {
-    const panel = bar.querySelector('[data-menu-panel="' + nome + '"]')
-    if (panel) popularPainelMenu(panel, itens)
-  }
-
-  bar.querySelectorAll('.mb-btn').forEach((btn) => {
-    const nome = btn.getAttribute('data-menu')
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-    })
-    btn.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (bar.dataset.open === nome) fecharMenubar()
-      else abrirMenuPainel(nome)
-    })
-    btn.addEventListener('mouseenter', () => {
-      if (bar.dataset.open && bar.dataset.open !== nome) abrirMenuPainel(nome)
-    })
-  })
-
-  document.addEventListener('mousedown', (e) => {
-    if (!bar.dataset.open) return
-    if (bar.contains(e.target)) return
-    fecharMenubar()
-  })
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && bar.dataset.open) {
-      fecharMenubar()
-      e.stopPropagation()
-    }
-  })
-
-  try {
-    window.api.on('menu:acao', (_ev, id) => {
-      if (!id) return
-      executarAcaoMenu(String(id))
-    })
-  } catch (e) {
-    console.warn('[menubar] menu:acao:', e)
-  }
-}
+// Menubar (titlebar frameless): features/ui/menubar.js
 
 // ---------- Boot ----------
 carregarLayout()
