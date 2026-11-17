@@ -56,3 +56,21 @@ export function ligarBotaoOllama() {
     }
   })
 }
+
+/** Avisos transitórios de deps no boot (suprimidos em modo QA/e2e). */
+export function avisarStatusDepsBoot(qaModoPromise) {
+  void (async () => {
+    try {
+      const emQa = await qaModoPromise
+      const st = await window.api.invoke('deps:status')
+      if (st) {
+        atualizarIndicadorDeps(st)
+        if (!emQa && st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
+          mostrarToast('Ollama instalado, mas offline. Use "Iniciar Ollama" na barra de status ou rode "ollama serve".', 'aviso')
+        } else if (!emQa && st.ollama === 'nao-instalado' && !st.llmApiKey) {
+          mostrarToast('IA local: Ollama não instalado. Instale em ollama.com ou configure LLM_API_KEY.', 'aviso')
+        }
+      }
+    } catch { /* ignora */ }
+  })()
+}

@@ -131,7 +131,8 @@ import {
   ligarComandosUi
 } from './features/ui/comandos.js'
 import { initTooltipsRicos } from './features/ui/tooltips.js'
-import { iniciarStatusProviders, ligarBotaoOllama } from './features/ui/boot-status.js'
+import { iniciarStatusProviders, ligarBotaoOllama, avisarStatusDepsBoot } from './features/ui/boot-status.js'
+import { ligarPaineisBoot } from './features/ui/boot-paineis.js'
 import {
   atualizarIndicadorDeps,
   atualizarBadgeProvedor,
@@ -600,33 +601,8 @@ initMenuCtxArvore()
 instalarTrapFocoModais()
 setSidebarMode('explorer')
 ligarRestauracaoWorkspace()
-{
-  if (desktopPermitido()) $('btn-desktop-use')?.classList.add('active')
-  ligarRightRail({
-    toggleRight,
-    ativarAba: ativarAbaDireita,
-    abrirBrowser: () => void abrirNavegadorUi(),
-    garantirTerminal: () => {
-      try { garantirTerminal() } catch { /* */ }
-    }
-  })
-  ligarAssistenteNovo({
-    focarChat: () => focarPainelIa('chat'),
-    setChatText: (t) => {
-      const input = $('chat-input')
-      if (input) input.value = t || ''
-    },
-    enviarChat: () => enviarMensagemUi(),
-    toggleRight,
-    ativarAba: ativarAbaDireita,
-    abrirFerramentas: (id) => {
-      try {
-        document.querySelector('.tool-nav-btn[data-tool="' + id + '"]')?.click()
-      } catch { /* */ }
-    },
-    toast: (m, t) => mostrarToast(m, t || 'ok')
-  })
-}
+ligarPaineisBoot({ enviarMensagemUi })
+
 ligarContextMenuDg()
 renderizarPastas()
   .then(() => garantirPastaRaizProjeto())
@@ -635,25 +611,7 @@ void renderizarProjects().then(() => atualizarStatusBar(state.pastaAtual || stat
 void atualizarStatusBar(state.pastaAtual || state.pastasRecentes[0] || null)
 iniciarGuardian()
 void atualizarBadgeProvedorReal()
-/** Modo QA (e2e/mock): suprime avisos transitórios de boot nas capturas. */
-const qaModoPromessa = window.api
-  .invoke('app:qa-mode')
-  .then((r) => !!r?.e2e)
-  .catch(() => false)
-void (async () => {
-  try {
-    const emQa = await qaModoPromessa
-    const st = await window.api.invoke('deps:status')
-    if (st) {
-      atualizarIndicadorDeps(st)
-      if (!emQa && st.ollama === 'offline' && !st.llmApiKey && st.instalado) {
-        mostrarToast('Ollama instalado, mas offline. Use "Iniciar Ollama" na barra de status ou rode "ollama serve".', 'aviso')
-      } else if (!emQa && st.ollama === 'nao-instalado' && !st.llmApiKey) {
-        mostrarToast('IA local: Ollama não instalado. Instale em ollama.com ou configure LLM_API_KEY.', 'aviso')
-      }
-    }
-  } catch { /* ignora */ }
-})()
+avisarStatusDepsBoot(qaModoPromessa)
 
 /** Tooltips ricos (balão) para ícones e botões com title/data-tip. */
 
