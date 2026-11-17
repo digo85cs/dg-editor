@@ -188,6 +188,14 @@ import {
   abrirTerminalNoBloco3,
   alternarTerminalNoBloco3
 } from './features/layout/paineis.js'
+import {
+  configurarPanes,
+  ativarPainelCentro,
+  focarPainelIa,
+  focarRegiao,
+  ativarAbaDireita,
+  ativarAbaCentro
+} from './features/layout/panes.js'
 import { normalizarMensagensChat, bolhaHtml, organizarRespostaCursor } from './features/chat/render.js'
 import {
   humanizarStatus,
@@ -331,102 +339,6 @@ function initActivityBar() {
   $('btn-tema')?.addEventListener('click', () => void alternarTema())
 }
 
-/** Alterna Chat | Editor no bloco central (estilo Cursor Agent). */
-function ativarPainelCentro(pane) {
-  const alvo = pane === 'editor' ? 'editor' : 'chat'
-  document.querySelectorAll('.center-tab').forEach((t) => {
-    const on = t.dataset.center === alvo
-    t.classList.toggle('active', on)
-    t.setAttribute('aria-selected', on ? 'true' : 'false')
-  })
-  const chat = $('center-pane-chat')
-  const ed = $('center-pane-editor')
-  if (chat) chat.classList.toggle('active', alvo === 'chat')
-  if (ed) ed.classList.toggle('active', alvo === 'editor')
-  if (alvo === 'chat') {
-    try { initChatAgentSelector() } catch (_) { /* ok */ }
-  }
-  return alvo
-}
-
-function focarPainelIa(pane) {
-  const alvo = pane === 'agent' ? 'agent' : 'chat'
-  if (alvo === 'chat') {
-    ativarPainelCentro('chat')
-    setActivityActive('chat', true)
-    setTimeout(() => $('chat-input')?.focus(), 0)
-    return
-  }
-  toggleRight(true)
-  ativarAbaDireita('agent')
-  setActivityActive('chat', true)
-  setTimeout(() => $('chat-input')?.focus(), 0)
-}
-
-/** Move o foco para um bloco (skip link e Alt+1/2/3). */
-function focarRegiao(id, rotulo) {
-  const el = $(id)
-  if (!el) return
-  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
-  try {
-    el.focus()
-  } catch {
-    /* */
-  }
-  if (rotulo) anunciar(rotulo)
-}
-
-function ativarAbaDireita(pane) {
-  let p = pane
-  if (p === 'chat') {
-    ativarPainelCentro('chat')
-    return
-  }
-  const eraBrowser = $('pane-browser')?.classList.contains('active')
-  document.querySelectorAll('.right-tab').forEach((t) => {
-    const on = t.dataset.pane === p
-    t.classList.toggle('active', on)
-    if (on) t.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  })
-  document.querySelectorAll('.right-pane').forEach((el) => {
-    el.classList.toggle('active', el.id === 'pane-' + p)
-  })
-  if (p === 'agent') void carregarAgentesUi()
-  if (p === 'browser') {
-    if (browserBloco3.isAberto()) setBrowserVisivel(true)
-    else {
-      // Aba do navegador ativa = navegador pronto para uso (about:blank se nao houver URL).
-      const url = /** @type {HTMLInputElement|null} */ ($('browser-url'))?.value
-      void abrirNavegadorUi(url || undefined)
-    }
-  } else if (eraBrowser || p !== 'browser') {
-    setBrowserVisivel(false)
-  }
-  if (p === 'terminal') {
-    void garantirTerminal().then(() => {
-      const fit = () => {
-        window.dgTerminal?.fit?.()
-      }
-      const open = window.dgTerminal?.abrir
-      if (typeof open === 'function') {
-        Promise.resolve(open()).then(() => {
-          requestAnimationFrame(() => {
-            fit()
-            requestAnimationFrame(fit)
-          })
-        })
-      } else {
-        requestAnimationFrame(() => {
-          fit()
-          requestAnimationFrame(fit)
-        })
-      }
-    })
-  } else if (p === 'files' && filesListaSuja) {
-    filesListaSuja = false
-    void renderizarArvoreEm($('files-list'))
-  }
-}
 
 $('browser-abrir')?.addEventListener('click', () => {
   toggleRight(true)
@@ -498,17 +410,6 @@ window.addEventListener('resize', () => {
   browserMountObserver.observe(m)
 })()
 
-function ativarAbaCentro(pane) {
-  if (pane === 'agent') {
-    focarPainelIa('agent')
-    return
-  }
-  if (pane === 'chat') {
-    ativarPainelCentro('chat')
-    return
-  }
-  ativarPainelCentro(pane === 'editor' ? 'editor' : 'chat')
-}
 
 document.querySelectorAll('.right-tab').forEach((t) => {
   t.addEventListener('click', () => ativarAbaDireita(t.dataset.pane))
@@ -2248,6 +2149,15 @@ configurarDiffPendentes({
 configurarPaineis({
   enviarBoundsBrowser: () => enviarBoundsBrowser(),
   ativarAbaDireita: (p) => ativarAbaDireita(p)
+})
+configurarPanes({
+  browserBloco3,
+  setBrowserVisivel: (m) => setBrowserVisivel(m),
+  abrirNavegadorUi: (u) => abrirNavegadorUi(u),
+  garantirTerminal: () => garantirTerminal(),
+  getFilesListaSuja: () => filesListaSuja,
+  setFilesListaSuja: (v) => { filesListaSuja = v },
+  renderizarArvoreEm: (l) => renderizarArvoreEm(l)
 })
 
 // ---------- Config / Contas ----------
