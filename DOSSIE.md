@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:41:12** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 13:44:25** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: b0b0bdf 2026-11-17 refactor: extrai CRUD de pastas (adicionar/remover/selecionar helpers)
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- b0b0bdf 2026-11-17 refactor: extrai CRUD de pastas (adicionar/remover/selecionar helpers)
 - 5f0c8df 2026-11-17 refactor: extrai vault e permissao de controle do PC
 - 33636e4 2026-11-17 refactor: extrai render da arvore e lista de projetos
 - f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - cbb7284 2026-11-17 refactor: extrai troca de panes (centro/direita) para features/layout/panes.js
 - 08533f1 2026-11-17 refactor: extrai layout/paineis (resizers, toggles, terminal bloco3) para features/layout/paineis.js
 - 063ed7f 2026-11-17 refactor: extrai pendentes OpenClaw/diff/hunks do app.js para features/editor/diff-pendentes.js
-- a30d519 2026-11-17 refactor: extrai cards/propostas do agente e estado compartilhado (agente-cards, agente-estado)
 
 ## 16. Como atualizar este dossiê
 

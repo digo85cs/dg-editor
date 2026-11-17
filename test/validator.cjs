@@ -181,7 +181,7 @@ async function main() {
   section('5. Renderer: selecionarPasta (assertion estática)')
   const path6 = require('path')
   const fs6 = require('fs')
-  const appSrc = fs6.readFileSync(path6.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf-8')
+  const appSrc = fs6.readFileSync(path6.join(__dirname, '..', 'src', 'renderer', 'features', 'arquivos', 'contexto-pasta.js'), 'utf-8')
   // extrai o corpo de selecionarPasta (da declaração até o fechamento da função)
   const mSel = appSrc.match(/async function selecionarPasta\([^)]*\)\s*\{([\s\S]*?)\n\}/)
   assert('selecionarPasta existe em app.js', !!mSel)
@@ -713,7 +713,8 @@ async function main() {
   {
     const app30 =
       fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8') +
-      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'analise', 'acoes.js'), 'utf-8')
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'analise', 'acoes.js'), 'utf-8') +
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'arquivos', 'contexto-pasta.js'), 'utf-8')
     const html30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
     const main30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'analise.ts'), 'utf-8')
     const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')
@@ -1639,7 +1640,8 @@ async function main() {
       fs.readFileSync(path.join(SRC, 'renderer/app.js'), 'utf8') +
       fs.readFileSync(path.join(SRC, 'renderer/features/chat/agente-seletor.js'), 'utf8') +
       fs.readFileSync(path.join(SRC, 'renderer/features/chat/agente-cards.js'), 'utf8') +
-      fs.readFileSync(path.join(SRC, 'renderer/features/editor/diff-pendentes.js'), 'utf8')
+      fs.readFileSync(path.join(SRC, 'renderer/features/editor/diff-pendentes.js'), 'utf8') +
+      fs.readFileSync(path.join(SRC, 'renderer/features/arquivos/contexto-pasta.js'), 'utf8')
     assert('host dos seletores de chat existe', /id="chat-header-actions"/.test(html))
     const modesUi = fs.readFileSync(path.join(SRC, 'renderer/modes-ui.js'), 'utf8')
     assert('seletores dinamicos de chat usam o host', /getElementById\('chat-mode-select'\)/.test(appJs) && /chat-agent-select/.test(modesUi))
