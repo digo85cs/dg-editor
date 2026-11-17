@@ -121,7 +121,7 @@ function linhasArvore(lista) {
   return Array.from(lista.querySelectorAll(SELETOR_LINHA_ARVORE)).filter((el) => el.getClientRects().length > 0)
 }
 
-function garantirLinhaFocavel(lista) {
+export function garantirLinhaFocavel(lista) {
   if (!lista) return
   const linhas = lista.querySelectorAll(SELETOR_LINHA_ARVORE)
   if (!linhas.length) return

@@ -122,6 +122,18 @@ import { CHEV, renderizarArvoreEm as _renderizarArvoreEm, criarNoDir as _criarNo
 import { caminhoSobPasta, salvarPastas, carregarPastas, adicionarPastaState, removerPastaDoState, reapontarPastaState } from './features/arquivos/recentes.js'
 import { pastasPermitidas, carregarFilhos as _carregarFilhos } from './features/arquivos/index.js'
 import {
+  configurarArvoreRender,
+  renderizarArvoreEm,
+  carregarFilhos,
+  criarNoDir,
+  criarNoFile,
+  atualizarGitStatusArvore,
+  renderizarPastas,
+  renderizarProjects,
+  setSidebarMode,
+  ligarArvoreRender
+} from './features/arquivos/arvore-render.js'
+import {
   configurarAnalise,
   habilitarBotoesAnalise,
   analisarCompleta,
@@ -883,235 +895,6 @@ function raizWorkspaceDe(caminho) {
   return state.pastaAtual
 }
 
-function treeDeps() {
-  return {
-    renderizarPastas,
-    carregarFilhos,
-    selecionarPasta,
-    definirContextoPasta,
-    raizWorkspaceDe,
-    criarBotaoRemoverPasta,
-    nomeArquivo,
-  }
-}
-
-async function renderizarArvoreEm(lista) {
-  const r = await _renderizarArvoreEm(lista, treeDeps())
-  garantirLinhaFocavel(lista)
-  return r
-}
-
-function abaFilesVisivel() {
-  return !!$('pane-files')?.classList.contains('active')
-}
-
-async function renderizarPastas() {
-  console.time('renderizarPastas')
-  try {
-    // Sidebar Repositórios = Cursor (pasta + chats). Sem árvore de arquivos.
-    const hist = obterHistChat()
-    if (hist && typeof hist.refrescarLista === 'function') {
-      await hist.refrescarLista()
-    } else if ($('folder-list')) {
-      // Boot antes do hist: cabeçalhos das pastas
-      const el = $('folder-list')
-      el.innerHTML = ''
-      for (const p of state.pastasRecentes || []) {
-        const g = document.createElement('div')
-        g.className = 'agent-chat-group' + (p === state.pastaAtual ? ' active' : '')
-        g.innerHTML =
-          '<div class="agent-chat-group-head-row"><button type="button" class="agent-chat-group-head" data-raiz="' +
-          String(p).replace(/"/g, '') +
-          '"><span class="agent-chat-folder-ico" aria-hidden="true">📁</span><span class="agent-chat-group-name"></span></button></div>' +
-          '<div class="agent-chat-group-body"><p class="agent-chats-empty agent-chats-empty-sm">Sem conversas</p></div>'
-        g.querySelector('.agent-chat-group-name').textContent = nomeArquivo(p)
-        g.querySelector('.agent-chat-group-head')?.addEventListener('click', () => {
-          void sincronizarContextoPasta(p, { forceAnalise: true })
-        })
-        el.appendChild(g)
-      }
-      if (!(state.pastasRecentes || []).length) {
-        el.innerHTML = '<p class="agent-chats-empty">Nenhum repositório. Clique em + para adicionar.</p>'
-      }
-    }
-    // Árvore de pastas/arquivos só no Bloco 3 → Arquivos
-    if (abaFilesVisivel()) {
-      await renderizarArvoreEm($('files-list'))
-      filesListaSuja = false
-    } else {
-      filesListaSuja = true
-    }
-  } finally {
-    console.timeEnd('renderizarPastas')
-  }
-}
-
-async function carregarFilhos(dir, container, nivel) {
-  const r = await _carregarFilhos(dir, container, nivel, {
-    removerPasta,
-    escolherNovoCaminhoPasta,
-    criarNoDir,
-    criarNoFile,
-  })
-  garantirLinhaFocavel($('files-list'))
-  return r
-}
-
-function criarNoDir(ent, nivel) {
-  return _criarNoDir(ent, nivel, { carregarFilhos })
-}
-
-
-
-
-async function atualizarGitStatusArvore() {
-  const raiz = state.pastaAtual
-  if (!raiz) return
-  try {
-    const r = await window.api.invoke('git:status', raiz)
-    gitStatusMap.clear()
-    if (r?.ok && Array.isArray(r.itens)) {
-      for (const it of r.itens) {
-        gitStatusMap.set(String(it.path).replace(/\\/g, '/'), it.status)
-      }
-    }
-    document.querySelectorAll('.tree-item[data-tipo="file"]').forEach((row) => {
-      const abs = row.dataset.path || ''
-      const rel = relPosix(abs, raiz)
-      const st = gitStatusMap.get(rel)
-      let badge = row.querySelector('.git-badge')
-      if (!st) {
-        badge?.remove()
-        return
-      }
-      if (!badge) {
-        badge = document.createElement('span')
-        badge.className = 'git-badge'
-        row.appendChild(badge)
-      }
-      badge.dataset.git = st
-      badge.textContent = st
-      badge.title = 'git ' + st
-      badge.style.color = corGit(st)
-    })
-  } catch {
-    /* */
-  }
-}
-
-function criarNoFile(ent, nivel) {
-  return _criarNoFile(ent, nivel, {
-    extIcon,
-    nomeAmigavelArquivo,
-    raizWorkspaceDe,
-    definirContextoPasta,
-    abrirArquivoNaAba,
-    abrirPainelDiff,
-  })
-}
-
-$('btn-refresh-tree')?.addEventListener('click', () => {
-  for (const [, st] of state.estadoArvore) st.filhosCarregados = false
-  renderizarPastas().then(() => atualizarGitStatusArvore())
-  void renderizarProjects(true)
-  void atualizarStatusBar(state.pastaAtual)
-})
-$('btn-git-refresh')?.addEventListener('click', () => {
-  void atualizarGitStatusArvore()
-  void renderizarProjects(true)
-  void atualizarStatusBar(state.pastaAtual)
-})
-
-// ---------- Sidebar modos: Projects / Explorer ----------
-let sidebarMode = 'explorer'
-
-function setSidebarMode(mode) {
-  sidebarMode = mode === 'projects' ? 'projects' : 'explorer'
-  const projects = $('projects-list')
-  const folders = $('folder-list')
-  const btnP = $('sidebar-mode-projects')
-  const btnE = $('sidebar-mode-explorer')
-  const isProjects = sidebarMode === 'projects'
-  if (projects) projects.hidden = !isProjects
-  if (folders) folders.hidden = isProjects
-  btnP?.classList.toggle('active', isProjects)
-  btnE?.classList.toggle('active', !isProjects)
-  btnP?.setAttribute('aria-selected', isProjects ? 'true' : 'false')
-  btnE?.setAttribute('aria-selected', isProjects ? 'false' : 'true')
-  if (isProjects) void renderizarProjects()
-}
-
-async function renderizarProjects(force) {
-  const lista = $('projects-list')
-  if (!lista) return
-  const t0 = performance.now()
-  const itens = await obterReposGit(!!force)
-  const ms = Math.round(performance.now() - t0)
-  // Deduplicar por nome de repo (basename do toplevel); pastas sem repo somem
-  const porRepo = new Map()
-  for (const it of itens) {
-    if (!it || !it.repo) continue
-    if (!porRepo.has(it.repo)) porRepo.set(it.repo, it)
-  }
-  const unicos = [...porRepo.values()]
-  lista.innerHTML = ''
-  if (unicos.length === 0) {
-    lista.innerHTML =
-      '<p class="projects-empty">Nenhum repositório git nas pastas abertas.</p>'
-    console.log('[projects] git:repos ' + ms + 'ms itens=0 pastas=' + state.pastasRecentes.length)
-    void atualizarStatusBar(state.pastaAtual)
-    return
-  }
-  for (const it of unicos) {
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'project-item' + (it.pasta === state.pastaAtual ? ' selected' : '')
-    btn.dataset.path = it.pasta
-    btn.title = it.pasta
-    const nome = document.createElement('span')
-    nome.className = 'project-name'
-    nome.textContent = it.repo
-    const branch = document.createElement('span')
-    branch.className = 'project-branch'
-    branch.textContent = '(' + (it.branch || '?') + ')'
-    btn.appendChild(nome)
-    btn.appendChild(branch)
-    if (it.dirty) {
-      const dot = document.createElement('span')
-      dot.className = 'project-dirty'
-      dot.title = 'Alterações não commitadas'
-      btn.appendChild(dot)
-    }
-    const tempo = tempoRelativoCommit(it.ultimoCommitTs)
-    if (tempo) {
-      const t = document.createElement('span')
-      t.className = 'project-time'
-      t.textContent = tempo
-      btn.appendChild(t)
-    }
-    btn.appendChild(criarBotaoRemoverPasta(it.pasta))
-    btn.addEventListener('click', (e) => {
-      if (e.target.closest('.pasta-remover')) return
-      void selecionarPasta(it.pasta)
-      setSidebarMode('explorer')
-    })
-    lista.appendChild(btn)
-  }
-  console.log(
-    '[projects] git:repos ' +
-      ms +
-      'ms repos=' +
-      unicos.length +
-      ' pastas=' +
-      state.pastasRecentes.length +
-      ' dedup=' +
-      (itens.filter((i) => i && i.repo).length - unicos.length)
-  )
-  void atualizarStatusBar(state.pastaAtual)
-}
-
-$('sidebar-mode-projects')?.addEventListener('click', () => setSidebarMode('projects'))
-$('sidebar-mode-explorer')?.addEventListener('click', () => setSidebarMode('explorer'))
 $('diff-panel-close')?.addEventListener('click', () => fecharPainelDiff())
 $('editor-diff-bar-apply')?.addEventListener('click', async () => {
   const id = $('editor-diff-bar')?.dataset?.propostaId
@@ -1478,6 +1261,19 @@ configurarAnalise({
 configurarMenubar({
   executarComando: (id) => executarComando(id),
   acaoEditar: (cmd) => acaoEditar(cmd)
+})
+configurarArvoreRender({
+  nomeArquivo: (p) => nomeArquivo(p),
+  extIcon: (n) => extIcon(n),
+  sincronizarContextoPasta: (p, o) => sincronizarContextoPasta(p, o),
+  selecionarPasta: (p) => selecionarPasta(p),
+  definirContextoPasta: (p) => definirContextoPasta(p),
+  criarBotaoRemoverPasta: (p) => criarBotaoRemoverPasta(p),
+  removerPasta: (p, o) => removerPasta(p, o),
+  escolherNovoCaminhoPasta: (p) => escolherNovoCaminhoPasta(p),
+  abrirArquivoNaAba: (c, l) => abrirArquivoNaAba(c, l),
+  raizWorkspaceDe: (c) => raizWorkspaceDe(c),
+  setFilesListaSuja: (v) => { filesListaSuja = v }
 })
 configurarArvore({
   recarregarArvore: async () => {
@@ -2308,6 +2104,7 @@ initChatAgentSelector()
 ligarPainelAgente()
 ligarPainelOrientador()
 ligarAbasUi()
+ligarArvoreRender()
 ligarExtrasUi()
 ligarDialogosDoMain()
 ligarAutomacaoAprovacao({ toast: (m, t) => mostrarToast(m, t) })

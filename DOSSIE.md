@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:33:46** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 13:37:38** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
 - ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
 - ec6a7a3 2026-11-17 refactor: extrai executarAgentUi e listeners do painel Agente para agente-cards.js
 - f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - a30d519 2026-11-17 refactor: extrai cards/propostas do agente e estado compartilhado (agente-cards, agente-estado)
 - 02a2198 2026-11-17 refactor: extrai chat-core (bolhas, empty state, send mode, tool trace) do app.js
 - 30930c2 2026-11-17 refactor: extrai seletor de agente do chat para features/chat/agente-seletor.js
-- 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
 
 ## 16. Como atualizar este dossiê
 
