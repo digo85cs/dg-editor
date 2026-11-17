@@ -1,8 +1,8 @@
 {
   "name": "dg-editor",
   "productName": "DG Editor",
-  "version": "0.6.3",
-  "description": "DG Editor — editor de sistemas com IA local",
+  "version": "0.6.4",
+  "description": "DG Editor â€” editor de sistemas com IA local",
   "author": {
     "name": "Rodrigo Soares",
     "email": "digo85cs@gmail.com"
@@ -78,7 +78,7 @@
   "build": {
     "appId": "com.dgeditor.app",
     "productName": "DG Editor",
-    "copyright": "Copyright © Rodrigo Soares",
+    "copyright": "Copyright Â© Rodrigo Soares",
     "directories": {
       "output": "dist-app",
       "buildResources": "resources"
