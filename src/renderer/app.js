@@ -29,6 +29,17 @@ import { abrirJanelaFlutuante, iniciarJanelasFlutuantes } from './features/ui/ja
 import { mostrarToast } from './features/ui/toast.js'
 import { MENUS_BARRA } from './features/ui/menubar-dados.js'
 import { dgNormalizarErro, mostrarErroTipado } from './features/ui/erros.js'
+import { recontarUsoChat, registrarUsoTurno } from './features/chat/uso.js'
+import { obterReposGit, atualizarStatusBar } from './features/ui/repos-status.js'
+import { atualizarDownloadUi, ligarDownloadUi } from './features/ui/download-status.js'
+import {
+  configurarPreviewMd,
+  ehMarkdown,
+  ehImagemExt,
+  atualizarToolbarPreview,
+  toggleMdPreview,
+  sincronizarPreviewMdAba
+} from './features/editor/preview-md.js'
 import {
   configurarPaleta,
   abrirPaletaComandos,
@@ -51,8 +62,8 @@ import {
   lerPreferenciasA11y,
   salvarPreferenciasA11y,
   aplicarPreferenciasA11y,
-  ajustarEscalaInterface,
-  ajustarTamanhoFonte
+  ajustarZoomUi,
+  ajustarFontePainelUi
 } from './features/ui/acessibilidade.js'
 import { iniciarGuardian } from './features/guardian/index.js'
 import { relPosix, badgeGitHtml, corGit, gitStatusMap } from './features/arquivos/git-helpers.js'
@@ -598,56 +609,6 @@ try {
 } catch {
   /* preload antigo */
 }
-
-const dlBox = $('browser-download')
-const dlNome = $('browser-download-nome')
-const dlPct = $('browser-download-pct')
-let downloadAtivoId = ''
-let timerDownloadFinal = null
-
-function rotuloFinalDownload(estado) {
-  if (estado === 'cancelado') return 'cancelado'
-  if (estado === 'interrompido') return 'falhou'
-  return 'ok'
-}
-
-function atualizarDownloadUi(p) {
-  if (!dlBox || !p || typeof p !== 'object' || !p.id) return
-  const ativo = p.estado === 'iniciado' || p.estado === 'andamento'
-  if (ativo) {
-    if (timerDownloadFinal) {
-      clearTimeout(timerDownloadFinal)
-      timerDownloadFinal = null
-    }
-    downloadAtivoId = p.id
-    dlBox.hidden = false
-    if (dlNome) dlNome.textContent = p.nomeOriginal || 'download'
-    if (dlPct) {
-      dlPct.textContent =
-        p.total > 0 ? p.percentual + '%' : Math.max(0, Math.round(p.recebido / 1024)) + ' KB'
-    }
-    return
-  }
-  if (p.id !== downloadAtivoId) return
-  downloadAtivoId = ''
-  if (dlPct) dlPct.textContent = rotuloFinalDownload(p.estado)
-  timerDownloadFinal = setTimeout(() => {
-    timerDownloadFinal = null
-    if (!downloadAtivoId && dlBox) dlBox.hidden = true
-  }, 2500)
-}
-
-$('browser-download-cancelar')?.addEventListener('click', async () => {
-  if (!downloadAtivoId) return
-  try {
-    const r = await window.api.invoke('navegador:download-cancelar', downloadAtivoId)
-    if (r?.ok) mostrarToast('Download cancelado', 'ok')
-    else mostrarToast('Não foi possível cancelar: ' + (r?.erro || 'desconhecido'), 'erro')
-  } catch (e) {
-    console.warn('[navegador] cancelar download', e)
-    mostrarToast('Falha ao cancelar download', 'erro')
-  }
-})
 
 window.addEventListener('resize', () => {
   if ($('pane-browser')?.classList.contains('active') && browserBloco3.isAberto()) {
@@ -1791,57 +1752,6 @@ function setSidebarMode(mode) {
   if (isProjects) void renderizarProjects()
 }
 
-/** Cache local do ultimo git:repos (main tambem cacheia 30s). */
-let reposCacheLocal = { ts: 0, itens: [] }
-const REPOS_CACHE_LOCAL_MS = 30000
-
-async function obterReposGit(force) {
-  if (
-    !force &&
-    reposCacheLocal.ts &&
-    Date.now() - reposCacheLocal.ts <= REPOS_CACHE_LOCAL_MS
-  ) {
-    return reposCacheLocal.itens
-  }
-  try {
-    const r = await window.api.invoke('git:repos', { pastas: [...state.pastasRecentes] })
-    reposCacheLocal = { ts: Date.now(), itens: Array.isArray(r) ? r : [] }
-  } catch (e) {
-    console.warn('[projects] git:repos', e)
-    reposCacheLocal = { ts: Date.now(), itens: [] }
-  }
-  return reposCacheLocal.itens
-}
-
-async function atualizarStatusBar(pasta) {
-  const elBranch = $('sb-branch')
-  const elPasta = $('sb-pasta')
-  if (!elBranch || !elPasta) return
-  if (!pasta) {
-    elBranch.textContent = '—'
-    elPasta.textContent = '—'
-    return
-  }
-  const itens = await obterReposGit(false)
-  const hit =
-    itens.find((it) => it && it.pasta === pasta) ||
-    itens.find(
-      (it) =>
-        it &&
-        it.repo &&
-        (pasta === it.pasta ||
-          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '\\') ||
-          pasta.toLowerCase().startsWith(String(it.pasta).toLowerCase() + '/'))
-    )
-  if (hit && hit.repo) {
-    elBranch.textContent = (hit.branch || 'HEAD') + (hit.dirty ? ' \u25CF' : '')
-    elPasta.textContent = hit.repo
-  } else {
-    elBranch.textContent = '—'
-    elPasta.textContent = nomeArquivo(pasta)
-  }
-}
-
 async function renderizarProjects(force) {
   const lista = $('projects-list')
   if (!lista) return
@@ -2052,116 +1962,6 @@ function atualizarBreadcrumb() {
   const bc = $('editor-breadcrumb')
   if (!bc) return
   bc.textContent = state.abaAtiva ? caminhoRelativo(state.abaAtiva) : ''
-}
-
-function extDe(caminho) {
-  const m = String(caminho || '')
-    .toLowerCase()
-    .match(/\.([a-z0-9]+)$/)
-  return m ? m[1] : ''
-}
-
-function ehMarkdown(caminho) {
-  const e = extDe(caminho)
-  return e === 'md' || e === 'markdown'
-}
-
-function ehImagemExt(caminho) {
-  return /^(png|jpe?g|gif|webp)$/.test(extDe(caminho))
-}
-
-/** Renderer markdown mínimo + sanitização (sem HTML arbitrário). */
-function sanitizarERenderMarkdown(src) {
-  let t = String(src || '')
-  t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  t = t.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>')
-  t = t.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>')
-  t = t.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>')
-  t = t.replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
-  t = t.replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
-  t = t.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>')
-  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<pre><code>' + code.trim() + '</code></pre>')
-  t = t.replace(/`([^`]+)`/g, '<code>$1</code>')
-  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-  t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>')
-  t = t.replace(/^\s*[-*]\s+(.+)$/gm, '<li>$1</li>')
-  t = t.replace(/(<li>.*<\/li>\n?)+/g, (m) => '<ul>' + m + '</ul>')
-  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" rel="noopener noreferrer">$1</a>')
-  t = t.replace(/\[\[([^\]]+)\]\]/g, (_, inner) => {
-    const parts = String(inner).split('|')
-    const alvo = parts[0].trim()
-    const label = (parts[1] || parts[0]).trim()
-    const esc = (s) =>
-      String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-    return (
-      '<a href="#" class="wiki-link" data-wiki-target="' +
-      esc(alvo) +
-      '">' +
-      esc(label) +
-      '</a>'
-    )
-  })
-  t = t.replace(/^\|(.+)\|$/gm, (line) => {
-    const cells = line
-      .slice(1, -1)
-      .split('|')
-      .map((c) => '<td>' + c.trim() + '</td>')
-      .join('')
-    return '<tr>' + cells + '</tr>'
-  })
-  t = t.replace(/(<tr>.*<\/tr>\n?)+/g, (m) => '<table>' + m + '</table>')
-  t = t.replace(/^(?!<[hupolt]|<li|<tr|<table|<pre)(.+)$/gm, '<p>$1</p>')
-  // remove on* / script / iframe mesmo se vazarem
-  t = t.replace(/on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-  t = t.replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, '')
-  return t
-}
-
-let mdPreviewOn = false
-
-function atualizarToolbarPreview(caminho) {
-  const bar = $('editor-toolbar')
-  const btn = $('btn-md-preview')
-  const mdBox = $('md-preview')
-  const imgBox = $('image-preview')
-  if (!bar) return
-  const md = ehMarkdown(caminho)
-  const img = ehImagemExt(caminho)
-  const temArquivo = !!caminho
-  bar.classList.toggle('hidden', !temArquivo)
-  if (btn) btn.classList.toggle('hidden', !md)
-  if (!md) {
-    mdPreviewOn = false
-    mdBox?.classList.add('hidden')
-    mdBox?.setAttribute('aria-hidden', 'true')
-    $('editor-host')?.classList.remove('split-preview')
-  }
-  if (!img) {
-    imgBox?.classList.add('hidden')
-    imgBox?.setAttribute('aria-hidden', 'true')
-  }
-}
-
-function toggleMdPreview() {
-  const caminho = state.abaAtiva
-  if (!ehMarkdown(caminho) || !editor) return
-  mdPreviewOn = !mdPreviewOn
-  const host = $('editor-host')
-  const box = $('md-preview')
-  if (!box || !host) return
-  if (mdPreviewOn) {
-    box.innerHTML = sanitizarERenderMarkdown(editor.getConteudo ? editor.getConteudo() : '')
-    box.classList.remove('hidden')
-    box.setAttribute('aria-hidden', 'false')
-    host.classList.add('split-preview')
-  } else {
-    box.classList.add('hidden')
-    box.setAttribute('aria-hidden', 'true')
-    host.classList.remove('split-preview')
-  }
 }
 
 /** @type {{ src: string, caminho: string } | null} */
@@ -2478,14 +2278,7 @@ async function ativarAba(caminho, conteudoPrevio) {
   atualizarBreadcrumb()
   atualizarEmpty()
   atualizarToolbarPreview(caminho)
-  if (mdPreviewOn && ehMarkdown(caminho)) {
-    const box = $('md-preview')
-    if (box) box.innerHTML = sanitizarERenderMarkdown(conteudo)
-  } else {
-    mdPreviewOn = false
-    $('md-preview')?.classList.add('hidden')
-    $('editor-host')?.classList.remove('split-preview')
-  }
+  sincronizarPreviewMdAba(caminho, conteudo)
   editor.focar()
   persistirAbas()
   void atualizarPainelVault(caminho)
@@ -2852,66 +2645,6 @@ async function buscarOndeEsta() {
 }
 
 // ---------- Chat ----------
-const usoChatSessao = { entrada: 0, saida: 0, custoUSD: null, turnos: 0 }
-
-function recontarUsoChat(msgs) {
-  usoChatSessao.entrada = 0
-  usoChatSessao.saida = 0
-  usoChatSessao.custoUSD = null
-  usoChatSessao.turnos = 0
-  for (const m of Array.isArray(msgs) ? msgs : []) {
-    const u = m?.usage
-    if (!u) continue
-    usoChatSessao.entrada += Number(u.entrada) || 0
-    usoChatSessao.saida += Number(u.saida) || 0
-    usoChatSessao.turnos++
-    if (typeof u.custoUSD === 'number' && Number.isFinite(u.custoUSD)) {
-      usoChatSessao.custoUSD = (usoChatSessao.custoUSD || 0) + u.custoUSD
-    }
-  }
-  atualizarUsoChatUi()
-}
-
-function registrarUsoTurno(usage) {
-  if (!usage || typeof usage !== 'object') return
-  usoChatSessao.entrada += Number(usage.entrada) || 0
-  usoChatSessao.saida += Number(usage.saida) || 0
-  usoChatSessao.turnos++
-  if (typeof usage.custoUSD === 'number' && Number.isFinite(usage.custoUSD)) {
-    usoChatSessao.custoUSD = (usoChatSessao.custoUSD || 0) + usage.custoUSD
-  }
-  atualizarUsoChatUi()
-}
-
-function formatarTokensChat(n) {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + ' M'
-  if (n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k'
-  return String(Math.round(n))
-}
-
-function atualizarUsoChatUi() {
-  const el = $('chat-usage')
-  if (!el) return
-  const total = usoChatSessao.entrada + usoChatSessao.saida
-  if (!usoChatSessao.turnos) {
-    el.textContent = '0 tok'
-    el.title = 'Tokens e custo estimados desta conversa'
-    return
-  }
-  const custo = usoChatSessao.custoUSD
-  const custoTxt =
-    custo == null ? 'custo n/d' : custo === 0 ? 'grátis' : 'US$ ' + custo.toFixed(4).replace('.', ',')
-  el.textContent = formatarTokensChat(total) + ' tok · ' + custoTxt
-  el.title =
-    'Entrada ' +
-    formatarTokensChat(usoChatSessao.entrada) +
-    ' · saída ' +
-    formatarTokensChat(usoChatSessao.saida) +
-    ' · ' +
-    usoChatSessao.turnos +
-    ' turno(s) — estimativa (~4 caracteres/token)'
-}
-
 function renderizarChat(msgs) {
   const area = $('chat-messages')
   area.innerHTML = ''
@@ -3838,6 +3571,8 @@ initChatIconContext()
 // ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------
 // Implementação em features/ui/janelas-flutuantes.js
 iniciarJanelasFlutuantes()
+ligarDownloadUi()
+configurarPreviewMd({ getEditor: () => editor })
 
 // ---------- Config / Contas ----------
 function formatarForcaPerfil(v) {
@@ -4618,8 +4353,6 @@ function ligarPreferenciasA11y() {
   }
 }
 
-let ultimoAjusteZoom = 0
-
 // A escala altera o zoom nativo do webContents; re-mede editor e terminal
 // para evitar medições antigas (sem aplicar o fator duas vezes).
 window.addEventListener('dg:escala-ui', () => {
@@ -4639,25 +4372,6 @@ window.addEventListener('dg:fonte-painel', (ev) => {
     window.dgTerminal?.aplicarFonte?.(d.terminal)
   })
 })
-
-function ajustarZoomUi(delta) {
-  // Debounce: menu nativo e keydown do renderer podem disparar o mesmo atalho.
-  const agora = Date.now()
-  if (agora - ultimoAjusteZoom < 150) return
-  ultimoAjusteZoom = agora
-  const p = ajustarEscalaInterface(delta)
-  const sel = $('a11y-escala')
-  if (sel) sel.value = String(p.escalaInterface)
-  mostrarToast('Escala da interface: ' + Math.round(p.escalaInterface * 100) + '%', 'ok')
-}
-
-function ajustarFontePainelUi(alvo, delta) {
-  const p = ajustarTamanhoFonte(alvo, delta)
-  const px = alvo === 'terminal' ? p.tamanhoTerminal : p.tamanhoEditor
-  const sel = $(alvo === 'terminal' ? 'a11y-fonte-terminal' : 'a11y-fonte-editor')
-  if (sel) sel.value = String(px)
-  mostrarToast('Fonte do ' + (alvo === 'terminal' ? 'terminal' : 'editor') + ': ' + px + ' px', 'ok')
-}
 
 function acaoEditar(cmd) {
   try {

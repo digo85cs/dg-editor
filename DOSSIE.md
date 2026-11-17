@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 10:28:59** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 10:58:15** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: c10151d 2026-11-17 refactor: extrai deps-status/provider badge p/ features/ui/deps-status.js (4a extracao app.js)
+> Alterações locais não commitadas: 6 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c10151d 2026-11-17 refactor: extrai deps-status/provider badge p/ features/ui/deps-status.js (4a extracao app.js)
 - bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
 - 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
 - 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - b3c8bba 2026-11-17 feat: /paralelo-merge, /devin-sync e docs atualizadas; main -> integra-13-11
 - 2078080 2026-11-17 release: v0.6.3
 - 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
-- f5c0b48 2026-11-17 release: v0.6.2
 
 ## 16. Como atualizar este dossiê
 

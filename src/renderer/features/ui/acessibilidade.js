@@ -4,6 +4,10 @@
  * escala usa o zoomFactor do Electron para reflow correto.
  */
 
+import { mostrarToast } from './toast.js'
+
+const $ = (id) => document.getElementById(id)
+
 const CHAVE = 'dg-a11y-prefs'
 const PADRAO = {
   movimento: 'sistema',
@@ -194,4 +198,26 @@ export function ajustarTamanhoFonte(alvo, delta, prefs = lerPreferenciasA11y()) 
   const p = salvarPreferenciasA11y({ ...prefs, [cfg.chave]: novo })
   aplicarPreferenciasA11y(p)
   return p
+}
+
+let ultimoAjusteZoom = 0
+
+/** Zoom da interface com debounce (menu nativo + keydown podem duplicar). */
+export function ajustarZoomUi(delta) {
+  const agora = Date.now()
+  if (agora - ultimoAjusteZoom < 150) return
+  ultimoAjusteZoom = agora
+  const p = ajustarEscalaInterface(delta)
+  const sel = $('a11y-escala')
+  if (sel) sel.value = String(p.escalaInterface)
+  mostrarToast('Escala da interface: ' + Math.round(p.escalaInterface * 100) + '%', 'ok')
+}
+
+/** Fonte/tamanho por painel com feedback. @param {'editor'|'terminal'} alvo */
+export function ajustarFontePainelUi(alvo, delta) {
+  const p = ajustarTamanhoFonte(alvo, delta)
+  const px = alvo === 'terminal' ? p.tamanhoTerminal : p.tamanhoEditor
+  const sel = $(alvo === 'terminal' ? 'a11y-fonte-terminal' : 'a11y-fonte-editor')
+  if (sel) sel.value = String(px)
+  mostrarToast('Fonte do ' + (alvo === 'terminal' ? 'terminal' : 'editor') + ': ' + px + ' px', 'ok')
 }
