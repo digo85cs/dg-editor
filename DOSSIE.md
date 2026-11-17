@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 17:09:19** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: 773b10d 2026-11-17 fix(midia): fallback Pollinations quando ComfyUI nao instalado
-> Árvore de trabalho limpa.
+> Gerado automaticamente em **17/11/2026, 17:17:45** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
+- db4c3a1 2026-11-17 docs: regenera DOSSIE v0.6.5
 - 773b10d 2026-11-17 fix(midia): fallback Pollinations quando ComfyUI nao instalado
 - 59a5968 2026-11-17 chore: release v0.6.5
 - c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
@@ -344,8 +346,6 @@ Utilitários locais relevantes:
 - 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
 - f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
 - cfd83d7 2026-11-17 refactor: extrai restauracao de workspace para workspace-restaurar.js
-- af3778c 2026-11-17 refactor: extrai lazy-load do terminal e botoes do painel direito
-- 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
 
 ## 16. Como atualizar este dossiê
 
