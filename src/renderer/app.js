@@ -157,7 +157,9 @@ import {
   coletarAbasCtx,
   coletarErrosEditor,
   renderPlanoChecklist,
-  refrescarPlanoUi
+  refrescarPlanoUi,
+  executarAgentUi,
+  ligarPainelAgente
 } from './features/chat/agente-cards.js'
 import {
   configurarDiffPendentes,
@@ -2268,194 +2270,6 @@ $('btn-oc-aplicar-hunks')?.addEventListener('click', () => void aplicarHunksSele
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 
 
-async function executarAgentUi(orquestrar) {
-  if (!state.pastaAtual) {
-    alert('Abra uma pasta primeiro.')
-    return
-  }
-  const input = $('agent-input')
-  const texto = input?.value?.trim()
-  if (!texto) return
-  const plan =
-    $('agent-plan-mode')?.checked ||
-    document.getElementById('chat-mode-select')?.value === 'plan'
-  const verify = $('agent-verify-loop')?.checked
-  const agente = agenteSelecionadoUi()
-  const out = $('agent-output')
-  const send = $('agent-send')
-  if (send) send.disabled = true
-  if (out) out.textContent = plan ? 'Gerando plano…' : 'Executando…'
-  renderAgentTrace([])
-  mostrarPropostasAgent([])
-  ligarProgressoAgent()
-  let selecao = ''
-  try {
-    if (editor && editor.getSelecao) selecao = editor.getSelecao() || ''
-  } catch {
-    /* */
-  }
-  try {
-    let r
-    if (orquestrar) {
-      r = await window.api.invoke('agente:orquestrar', state.pastaAtual, texto)
-      if (out) {
-        out.textContent = (r?.passos || [])
-          .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
-          .join('\n\n')
-      }
-      const todos = []
-      for (const p of r?.passos || []) {
-        if (p.passos) todos.push(...p.passos)
-      }
-      renderAgentTrace(todos)
-    } else {
-      const errosEditor = await coletarErrosEditor()
-      r = await window.api.invoke('agente:pedir', {
-        raiz: state.pastaAtual,
-        pergunta: texto,
-        modo: plan ? 'plan' : 'agent',
-        agente,
-        pastas: pastasPermitidas(),
-        selecao,
-        arquivoAtivo: state.abaAtiva || undefined,
-        proposeWrites: true,
-        verificarApos: !!verify && !plan,
-        abas: coletarAbasCtx(),
-        incluirGit: true,
-        errosEditor: errosEditor || undefined
-      })
-      if (!r?.ok) {
-        if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
-        return
-      }
-      if (out) {
-        out.textContent =
-          (plan ? '[PLAN]\n\n' : '') +
-          (r.texto || '') +
-          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
-      }
-      renderAgentTrace(r.passos || [])
-      mostrarPropostasAgent(r.propostas || [])
-      atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
-      if (plan || r.plano) renderPlanoChecklist(r.plano)
-      else await refrescarPlanoUi()
-    }
-    await carregarAgentesUi()
-  } catch (e) {
-    if (out) out.textContent = 'Erro: ' + String(e)
-  } finally {
-    if (send) send.disabled = false
-  }
-}
-
-$('agent-send')?.addEventListener('click', () => void executarAgentUi(false))
-$('btn-agent-orquestrar')?.addEventListener('click', () => void executarAgentUi(true))
-$('btn-agent-stop')?.addEventListener('click', async () => {
-  const r = await window.api.invoke('agente:cancelar')
-  appendAgentTraceLive('■ cancelado (' + (r?.cancelados || 0) + ')')
-  limparUiAgenteChat({ tituloFinal: 'Parado a seu pedido' })
-  await carregarAgentesUi()
-})
-;(function initAgentMoreMenu() {
-  const btn = $('btn-agent-mais')
-  const menu = $('agent-mais-menu')
-  const header = $('agent-header')
-  if (!btn || !menu) return
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    const open = menu.hidden
-    menu.hidden = !open
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false')
-    header?.classList.toggle('is-expanded', open)
-  })
-  menu.querySelectorAll('[data-agent-more]').forEach((item) => {
-    item.addEventListener('click', () => {
-      const a = item.getAttribute('data-agent-more')
-      menu.hidden = true
-      btn.setAttribute('aria-expanded', 'false')
-      header?.classList.remove('is-expanded')
-      if (a === 'passo') $('btn-agent-exec-passo')?.click()
-      else if (a === 'verificar') $('btn-agent-verificar')?.click()
-      else if (a === 'undo') $('btn-agent-undo')?.click()
-    })
-  })
-  document.addEventListener('click', () => {
-    if (!menu.hidden) {
-      menu.hidden = true
-      btn.setAttribute('aria-expanded', 'false')
-      header?.classList.remove('is-expanded')
-    }
-  })
-})()
-$('btn-agent-exec-plano')?.addEventListener('click', async () => {
-  if (!state.pastaAtual) return
-  ligarProgressoAgent()
-  const out = $('agent-output')
-  if (out) out.textContent = 'Executando plano salvo…'
-  const r = await window.api.invoke('agente:executar-plano', {
-    raiz: state.pastaAtual,
-    pastas: pastasPermitidas(),
-    soProximo: false
-  })
-  if (!r?.ok) {
-    alert(r?.erro || 'falha')
-    return
-  }
-  if (out) out.textContent = r.texto || ''
-  renderAgentTrace(r.passos || [])
-  mostrarPropostasAgent(r.propostas || [])
-  atualizarChatApplyCard(r.propostas || [])
-  atualizarStatusAgent(r.modelo, r.duracaoMs, null)
-  renderPlanoChecklist(r.plano)
-  mostrarBannerAgentMode($('chat-messages'), 'Plano executado pelo painel Agente')
-})
-$('btn-agent-exec-passo')?.addEventListener('click', async () => {
-  if (!state.pastaAtual) return
-  ligarProgressoAgent()
-  const out = $('agent-output')
-  if (out) out.textContent = 'Executando próximo passo…'
-  const r = await window.api.invoke('agente:executar-plano', {
-    raiz: state.pastaAtual,
-    pastas: pastasPermitidas(),
-    soProximo: true
-  })
-  if (!r?.ok) {
-    alert(r?.erro || 'falha')
-    return
-  }
-  if (out) {
-    out.textContent =
-      (r.passoExecutado ? '[Passo] ' + r.passoExecutado.texto + '\n\n' : '') + (r.texto || '')
-  }
-  renderAgentTrace(r.passos || [])
-  mostrarPropostasAgent(r.propostas || [])
-  atualizarChatApplyCard(r.propostas || [])
-  renderPlanoChecklist(r.plano)
-})
-$('btn-agent-verificar')?.addEventListener('click', async () => {
-  if (!state.pastaAtual) return
-  appendAgentTraceLive('… typecheck')
-  const r = await window.api.invoke('agente:verificar', {
-    raiz: state.pastaAtual,
-    pastas: pastasPermitidas(),
-    modo: 'typecheck'
-  })
-  const d = r?.diagnostico
-  appendAgentTraceLive(d?.ok ? 'âœ“ typecheck ok' : 'âœ— ' + (d?.resumo || 'falha'))
-  const out = $('agent-output')
-  if (out && d && !d.ok) out.textContent = (out.textContent || '') + '\n\n[typecheck]\n' + (d.saida || '')
-})
-$('btn-agent-undo')?.addEventListener('click', async () => {
-  const r = await window.api.invoke('agente:checkpoint-desfazer', pastasPermitidas())
-  alert(r?.ok ? 'Checkpoint restaurado (' + r.restaurados + ' arquivo(s)).' : 'Falha: ' + (r?.erro || ''))
-})
-$('agent-input')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    void executarAgentUi(false)
-  }
-})
-void refrescarPlanoUi()
 
 $('btn-contas').addEventListener('click', abrirContas)
 $('btn-contas-fechar')?.addEventListener('click', () => $('modal-contas').classList.add('hidden'))
@@ -2769,6 +2583,7 @@ ligarAnuncioEtapasAgente()
 aplicarPreferenciasA11y()
 carregarTema()
 initChatAgentSelector()
+ligarPainelAgente()
 ligarExtrasUi()
 ligarDialogosDoMain()
 ligarAutomacaoAprovacao({ toast: (m, t) => mostrarToast(m, t) })

@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:25:06** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: cbb7284 2026-11-17 refactor: extrai troca de panes (centro/direita) para features/layout/panes.js
+> Gerado automaticamente em **17/11/2026, 13:29:31** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
 - cbb7284 2026-11-17 refactor: extrai troca de panes (centro/direita) para features/layout/panes.js
 - 08533f1 2026-11-17 refactor: extrai layout/paineis (resizers, toggles, terminal bloco3) para features/layout/paineis.js
 - 063ed7f 2026-11-17 refactor: extrai pendentes OpenClaw/diff/hunks do app.js para features/editor/diff-pendentes.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 1e8c1a5 2026-11-17 refactor: extrai analise-acoes, menubar, anexos, modais e arvore-acoes do app.js
 - 261d926 2026-11-17 refactor: extrai modais Config/Contas (~500 linhas) p/ features/ui/config-contas.js
 - c669787 2026-11-17 refactor: extrai imagem, historico-abas, chat context-menu, diff-bar e skill-chip do app.js
-- 6d3c9c7 2026-11-17 refactor: extrai uso-chat, repos-status, download-ui, zoom/a11y e preview-md do app.js
 
 ## 16. Como atualizar este dossiê
 
