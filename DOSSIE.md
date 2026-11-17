@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 10:21:24** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 10:28:59** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
 - 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
 - 4aa8739 2026-11-17 refactor: extrai erros tipados para features/ui/erros.js
 - c067b37 2026-11-17 refactor: extrai MENUS_BARRA para features/ui/menubar-dados.js
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 2078080 2026-11-17 release: v0.6.3
 - 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
 - f5c0b48 2026-11-17 release: v0.6.2
-- d4f8256 2026-11-16 fix(apps): regenera projeto Android quando gradlew.bat ausente
 
 ## 16. Como atualizar este dossiê
 

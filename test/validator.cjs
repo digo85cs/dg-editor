@@ -663,7 +663,10 @@ async function main() {
     assert('modelo tem flag atualizadoDisponivel', /atualizadoDisponivel/.test(cat28))
     assert(
       'badge mostra atualizacao disponivel',
-      /atualiza[cç][aã]o dispon[ií]vel|atualizadoDisponivel/.test(app28)
+      /atualiza[cç][aã]o dispon[ií]vel|atualizadoDisponivel/.test(app28) ||
+        /atualiza[cç][aã]o dispon[ií]vel|atualizadoDisponivel/.test(
+          fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'ui', 'deps-status.js'), 'utf-8')
+        )
     )
   }
 
