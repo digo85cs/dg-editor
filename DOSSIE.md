@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 13:51:01** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: b85208a 2026-11-17 refactor: extrai comandos, tema, atalhos e preferencias a11y
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 13:53:06** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 95c5ac1 2026-11-17 refactor: extrai tooltips ricos e status de boot (providers/ollama)
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 95c5ac1 2026-11-17 refactor: extrai tooltips ricos e status de boot (providers/ollama)
 - b85208a 2026-11-17 refactor: extrai comandos, tema, atalhos e preferencias a11y
 - 526c2d7 2026-11-17 refactor: extrai nucleo de abas do editor (ativar/fechar/autosave/init)
 - 13c7d00 2026-11-17 refactor: extrai contexto de pasta (selecionar/sincronizar/analise cache)
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - f454fdd 2026-11-17 refactor: extrai UI de abas do editor (render, teclado, dirty-modal)
 - ae28a10 2026-11-17 refactor: extrai historico de chat e modal orientador de prompt
 - ec6a7a3 2026-11-17 refactor: extrai executarAgentUi e listeners do painel Agente para agente-cards.js
-- f2ad594 2026-11-17 refactor: extrai enviarMensagem do chat para features/chat/enviar.js
 
 ## 16. Como atualizar este dossiê
 
