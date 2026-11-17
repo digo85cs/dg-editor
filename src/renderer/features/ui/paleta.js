@@ -5,6 +5,7 @@ import { state } from '../../state/app-state.js'
 import { escapar } from '../../utils/dom.js'
 import { nomeAmigavelArquivo } from '../../utils/nomes-amigaveis.js'
 import { listarComandosLocais } from '../../comandos.js'
+import { mostrarToast } from './toast.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -220,4 +221,86 @@ export async function rodarBuscaGlobal() {
 export function destacarPaleta(itens) {
   itens.forEach((el, i) => el.classList.toggle('selecionado', i === paletaSel))
   itens[paletaSel]?.scrollIntoView({ block: 'nearest' })
+}
+
+export function ligarPaletaEventos() {
+  let buscaTimer = null
+  $('palette-input')?.addEventListener('input', (e) => {
+    renderizarPaleta(e.target.value)
+  })
+  $('palette-input')?.addEventListener('keydown', (e) => {
+    const itens = document.querySelectorAll('.palette-item')
+    if (e.key === 'Escape') fecharPaleta()
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      paletaSel = Math.min(paletaSel + 1, itens.length - 1)
+      destacarPaleta(itens)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      paletaSel = Math.max(paletaSel - 1, 0)
+      destacarPaleta(itens)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const alvo = paletaItens[paletaSel]
+      if (alvo) {
+        fecharPaleta()
+        executarItemPaleta(alvo)
+      }
+    }
+  })
+  $('palette')?.addEventListener('click', (e) => {
+    if (e.target === $('palette')) fecharPaleta()
+  })
+  $('busca-global')?.addEventListener('click', (e) => {
+    if (e.target === $('busca-global')) fecharBuscaGlobal()
+  })
+  $('busca-input')?.addEventListener('input', () => {
+    clearTimeout(buscaTimer)
+    buscaTimer = setTimeout(() => void rodarBuscaGlobal(), 280)
+  })
+  $('busca-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') fecharBuscaGlobal()
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void rodarBuscaGlobal()
+    }
+  })
+  $('busca-regex')?.addEventListener('change', () => void rodarBuscaGlobal())
+
+  $('busca-substituir')?.addEventListener('click', async () => {
+    const raiz = state.pastaAtual || state.pastasRecentes[0]
+    const q = ($('busca-input')?.value || '').trim()
+    const subst = $('busca-subst')?.value ?? ''
+    const regex = !!$('busca-regex')?.checked
+    if (!raiz) return mostrarToast('Abra uma pasta primeiro', 'aviso')
+    if (!q) return mostrarToast('Digite o texto a substituir', 'aviso')
+    const btn = $('busca-substituir')
+    if (btn) btn.disabled = true
+    try {
+      const prev = await window.api.invoke('busca:substituir', raiz, q, subst, { regex, previa: true })
+      if (!prev?.ok) return mostrarToast(prev?.erro || 'falha na prévia', 'erro')
+      if (!prev.ocorrencias) return mostrarToast('Nenhuma ocorrência encontrada', 'aviso')
+      const msg =
+        'Substituir ' +
+        prev.ocorrencias +
+        ' ocorrência(s) em ' +
+        prev.arquivos +
+        ' arquivo(s)?\n\nTexto: ' +
+        q +
+        '\nPor: ' +
+        (subst || '(vazio)')
+      if (!window.confirm(msg)) return
+      const r = await window.api.invoke('busca:substituir', raiz, q, subst, { regex, previa: false })
+      if (!r?.ok) return mostrarToast(r?.erro || 'falha ao substituir', 'erro')
+      mostrarToast(
+        r.ocorrencias + ' substituição(ões) em ' + (r.alterados ?? r.arquivos) + ' arquivo(s)',
+        'ok'
+      )
+      void rodarBuscaGlobal()
+    } catch (e) {
+      mostrarToast('Substituição falhou: ' + String(e?.message || e), 'erro')
+    } finally {
+      if (btn) btn.disabled = false
+    }
+  })
 }
