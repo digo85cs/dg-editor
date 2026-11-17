@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 10:58:15** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: c10151d 2026-11-17 refactor: extrai deps-status/provider badge p/ features/ui/deps-status.js (4a extracao app.js)
-> Alterações locais não commitadas: 6 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 11:19:23** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: 6d3c9c7 2026-11-17 refactor: extrai uso-chat, repos-status, download-ui, zoom/a11y e preview-md do app.js
+> Alterações locais não commitadas: 7 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 6d3c9c7 2026-11-17 refactor: extrai uso-chat, repos-status, download-ui, zoom/a11y e preview-md do app.js
 - c10151d 2026-11-17 refactor: extrai deps-status/provider badge p/ features/ui/deps-status.js (4a extracao app.js)
 - bc47ea0 2026-11-17 refactor: extrai paleta/quick-open/busca global p/ features/ui/paleta.js
 - 1db7239 2026-11-17 refactor: extrai erros tipados p/ features/ui/erros.js (3a extracao app.js)
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 71b997a 2026-11-17 refactor: extrai janelas flutuantes de app.js para features/ui
 - b3c8bba 2026-11-17 feat: /paralelo-merge, /devin-sync e docs atualizadas; main -> integra-13-11
 - 2078080 2026-11-17 release: v0.6.3
-- 4440d40 2026-11-17 feat: agentes paralelos, credenciais vault, agendador, skill triggers, devin listar
 
 ## 16. Como atualizar este dossiê
 

@@ -40,6 +40,21 @@ import {
   toggleMdPreview,
   sincronizarPreviewMdAba
 } from './features/editor/preview-md.js'
+import { mostrarImagem, esconderImagem } from './features/editor/imagem.js'
+import {
+  configurarHistoricoAbas,
+  limparHistoricoAbas,
+  atualizarBotoesHist,
+  registrarHistAba,
+  irHistAbas
+} from './features/editor/historico-abas.js'
+import { configurarChatCtx, initChatIconContext } from './features/chat/context-menu.js'
+import { mostrarEditorDiffBar, ocultarEditorDiffBar } from './features/ui/diff-bar.js'
+import {
+  configurarSkillChip,
+  skillAtivaChat,
+  definirSkillChat
+} from './features/chat/skill-chip.js'
 import {
   configurarPaleta,
   abrirPaletaComandos,
@@ -141,9 +156,7 @@ let editor = null
 let dirtyResolver = null
 /** #files-list precisa re-render quando a aba Files for ativada. */
 let filesListaSuja = false
-/** Histórico de navegação de state.abas (tb-voltar / tb-avancar). */
-let histAbas = []
-let histIdx = -1
+/** Histórico de navegação de abas: features/editor/historico-abas.js */
 // state.vaultRaiz migrado para state/app-state.js
 
 
@@ -656,9 +669,7 @@ window.__dgTestLimparAbas = () => {
   state.abas = []
   state.abaAtiva = null
   editor?.limpar?.()
-  histAbas = []
-  histIdx = -1
-  atualizarBotoesHist?.()
+  limparHistoricoAbas()
   atualizarBreadcrumb?.()
   atualizarEmpty?.()
   renderizarAbas()
@@ -962,9 +973,7 @@ async function removerPasta(path, opts) {
   if (!res) return
   if (res.abaAtivaPerdida) {
     editor?.limpar()
-    histAbas = []
-    histIdx = -1
-    atualizarBotoesHist()
+    limparHistoricoAbas()
   }
   if (res.abasFechadas.length) {
     renderizarAbas()
@@ -1964,151 +1973,6 @@ function atualizarBreadcrumb() {
   bc.textContent = state.abaAtiva ? caminhoRelativo(state.abaAtiva) : ''
 }
 
-/** @type {{ src: string, caminho: string } | null} */
-let imgEditEstado = null
-
-function imgEditInfo(msg) {
-  const el = $('img-edit-info')
-  if (el) el.textContent = msg || ''
-}
-
-function imgEditCanvas() {
-  return /** @type {HTMLCanvasElement|null} */ ($('img-edit-canvas'))
-}
-
-function imgEditMostrarCanvas(show) {
-  const canvas = imgEditCanvas()
-  const img = $('image-preview-img')
-  if (!canvas || !img) return
-  canvas.hidden = !show
-  img.style.display = show ? 'none' : ''
-}
-
-function imgEditSyncInputs() {
-  const canvas = imgEditCanvas()
-  const w = $('img-edit-w')
-  const h = $('img-edit-h')
-  if (!canvas || !w || !h) return
-  w.value = String(canvas.width || '')
-  h.value = String(canvas.height || '')
-  imgEditInfo(canvas.width + '×' + canvas.height + ' px')
-}
-
-function imgEditCarregarDataUrl(dataUrl) {
-  const canvas = imgEditCanvas()
-  const img = $('image-preview-img')
-  if (!canvas || !img) return
-  const im = new Image()
-  im.onload = () => {
-    canvas.width = im.naturalWidth
-    canvas.height = im.naturalHeight
-    const ctx = canvas.getContext('2d')
-    ctx?.clearRect(0, 0, canvas.width, canvas.height)
-    ctx?.drawImage(im, 0, 0)
-    img.src = dataUrl
-    imgEditMostrarCanvas(true)
-    imgEditSyncInputs()
-  }
-  im.src = dataUrl
-}
-
-function imgEditResize() {
-  const canvas = imgEditCanvas()
-  if (!canvas) return
-  const nw = Math.max(16, Math.min(8192, parseInt(String($('img-edit-w')?.value || '0'), 10) || 0))
-  const nh = Math.max(16, Math.min(8192, parseInt(String($('img-edit-h')?.value || '0'), 10) || 0))
-  if (!nw || !nh) {
-    mostrarToast('Informe largura e altura', 'aviso')
-    return
-  }
-  const tmp = document.createElement('canvas')
-  tmp.width = nw
-  tmp.height = nh
-  tmp.getContext('2d')?.drawImage(canvas, 0, 0, nw, nh)
-  canvas.width = nw
-  canvas.height = nh
-  canvas.getContext('2d')?.drawImage(tmp, 0, 0)
-  imgEditSyncInputs()
-  mostrarToast('Redimensionado para ' + nw + '×' + nh, 'ok')
-}
-
-function imgEditCropCentro() {
-  const canvas = imgEditCanvas()
-  if (!canvas) return
-  const fator = 0.8
-  const cw = Math.max(16, Math.floor(canvas.width * fator))
-  const ch = Math.max(16, Math.floor(canvas.height * fator))
-  const sx = Math.floor((canvas.width - cw) / 2)
-  const sy = Math.floor((canvas.height - ch) / 2)
-  const tmp = document.createElement('canvas')
-  tmp.width = cw
-  tmp.height = ch
-  tmp.getContext('2d')?.drawImage(canvas, sx, sy, cw, ch, 0, 0, cw, ch)
-  canvas.width = cw
-  canvas.height = ch
-  canvas.getContext('2d')?.drawImage(tmp, 0, 0)
-  imgEditSyncInputs()
-  mostrarToast('Recorte central aplicado', 'ok')
-}
-
-function imgEditReset() {
-  if (!imgEditEstado?.src) return
-  imgEditCarregarDataUrl(imgEditEstado.src)
-  mostrarToast('Imagem original restaurada', 'ok')
-}
-
-function imgEditDownload() {
-  const canvas = imgEditCanvas()
-  if (!canvas) return
-  const a = document.createElement('a')
-  const base = (imgEditEstado?.caminho || 'imagem').split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') || 'imagem'
-  a.download = base + '-edit.png'
-  a.href = canvas.toDataURL('image/png')
-  a.click()
-  mostrarToast('PNG baixado', 'ok')
-}
-
-function initEditorImagem() {
-  if (document.body.dataset.imgEditWired === '1') return
-  document.body.dataset.imgEditWired = '1'
-  $('img-edit-resize')?.addEventListener('click', () => imgEditResize())
-  $('img-edit-crop')?.addEventListener('click', () => imgEditCropCentro())
-  $('img-edit-reset')?.addEventListener('click', () => imgEditReset())
-  $('img-edit-download')?.addEventListener('click', () => imgEditDownload())
-}
-
-async function mostrarImagem(caminho) {
-  const host = $('editor-host')
-  const box = $('image-preview')
-  const img = $('image-preview-img')
-  const mount = $('editor-mount')
-  if (!box || !img) return
-  initEditorImagem()
-  const r = await window.api.invoke('arquivo:ler-base64', caminho, pastasPermitidas())
-  if (!r?.ok || !r.dataUrl) {
-    alert('Não foi possível abrir imagem: ' + (r?.erro || 'erro'))
-    return
-  }
-  imgEditEstado = { src: r.dataUrl, caminho: String(caminho || '') }
-  imgEditCarregarDataUrl(r.dataUrl)
-  box.classList.remove('hidden')
-  box.setAttribute('aria-hidden', 'false')
-  mount?.classList.add('hidden')
-  $('editor-empty')?.classList.add('hidden')
-  host?.classList.add('modo-imagem')
-}
-
-function esconderImagem() {
-  const box = $('image-preview')
-  const mount = $('editor-mount')
-  box?.classList.add('hidden')
-  box?.setAttribute('aria-hidden', 'true')
-  mount?.classList.remove('hidden')
-  $('editor-host')?.classList.remove('modo-imagem')
-  imgEditEstado = null
-  imgEditMostrarCanvas(false)
-}
-
 $('btn-md-preview')?.addEventListener('click', () => toggleMdPreview())
 
 async function formatarDocumentoAtivo() {
@@ -2128,60 +1992,6 @@ async function formatarDocumentoAtivo() {
   }
 }
 $('btn-editor-formatar')?.addEventListener('click', () => void formatarDocumentoAtivo())
-
-function atualizarBotoesHist() {
-  const v = document.getElementById('tb-voltar')
-  const a = document.getElementById('tb-avancar')
-  const canBack = histIdx > 0
-  const canFwd = histIdx >= 0 && histIdx < histAbas.length - 1
-  if (v) {
-    v.disabled = !canBack
-    v.setAttribute('aria-disabled', canBack ? 'false' : 'true')
-  }
-  if (a) {
-    a.disabled = !canFwd
-    a.setAttribute('aria-disabled', canFwd ? 'false' : 'true')
-  }
-}
-
-/** Empurra no histórico só se o caminho for diferente da posição atual (evita loop com irHistAbas). */
-function registrarHistAba(caminho) {
-  if (!caminho) return
-  if (histAbas[histIdx] === caminho) {
-    atualizarBotoesHist()
-    return
-  }
-  histAbas = histAbas.slice(0, histIdx + 1)
-  histAbas.push(caminho)
-  histIdx = histAbas.length - 1
-  if (histAbas.length > 100) {
-    histAbas.shift()
-    histIdx--
-  }
-  atualizarBotoesHist()
-}
-
-async function irHistAbas(delta) {
-  const novo = histIdx + delta
-  if (novo < 0 || novo >= histAbas.length) return
-  const alvo = histAbas[novo]
-  histIdx = novo
-  try {
-    await abrirArquivoNaAba(alvo)
-    // arquivo apagado / falha de IPC: não ficou em state.abas
-    if (!state.abas.some((a) => a.caminho === alvo)) {
-      histAbas.splice(novo, 1)
-      histIdx = Math.min(novo, histAbas.length - 1)
-      if (histAbas.length === 0) histIdx = -1
-    }
-  } catch (e) {
-    console.warn('[hist-state.abas]', e)
-    histAbas.splice(novo, 1)
-    histIdx = Math.min(novo, histAbas.length - 1)
-    if (histAbas.length === 0) histIdx = -1
-  }
-  atualizarBotoesHist()
-}
 
 async function abrirArquivoNaAba(caminho, linha) {
   // exportada para ferramentas-ui
@@ -2388,9 +2198,7 @@ async function fecharAba(caminho) {
       await ativarAba(next.caminho)
     } else {
       editor?.limpar()
-      histAbas = []
-      histIdx = -1
-      atualizarBotoesHist()
+      limparHistoricoAbas()
       atualizarBreadcrumb()
       atualizarEmpty()
       renderizarAbas()
@@ -2779,29 +2587,6 @@ async function pararChatOuAgente() {
 }
 
 /** Barra Apply/Rejeitar no editor (estilo Cursor inline diff). */
-function mostrarEditorDiffBar(pendente, meta) {
-  const bar = $('editor-diff-bar')
-  if (!bar || !pendente?.id) return
-  const pathEl = $('editor-diff-bar-path')
-  const metaEl = $('editor-diff-bar-meta')
-  if (pathEl) pathEl.textContent = pendente.path || pendente.absPath || 'proposta'
-  if (metaEl) {
-    const del = Array.isArray(meta?.linhasDel) ? meta.linhasDel.length : 0
-    const add = Array.isArray(meta?.linhasAdd) ? meta.linhasAdd.length : 0
-    metaEl.textContent = (del || add) ? ('−' + del + ' / +' + add) : ''
-  }
-  bar.dataset.propostaId = pendente.id
-  bar.hidden = false
-  window.__dgApplyViaAgente = true
-}
-
-function ocultarEditorDiffBar() {
-  const bar = $('editor-diff-bar')
-  if (!bar) return
-  bar.hidden = true
-  delete bar.dataset.propostaId
-}
-
 /** @type {Awaited<ReturnType<typeof iniciarHistoricoChat>> | null} */
 let histChat = null
 
@@ -2824,49 +2609,6 @@ function appendChatToolTrace(line, opts = {}) {
   appendAgentTraceLive(humano)
   setChatLiveStatus(humano)
 }
-
-function skillAtivaChat() {
-  try { return localStorage.getItem('dg-chat-skill') || '' } catch { return '' }
-}
-
-function definirSkillChat(id, titulo) {
-  try {
-    if (id) localStorage.setItem('dg-chat-skill', id)
-    else localStorage.removeItem('dg-chat-skill')
-    if (titulo) localStorage.setItem('dg-chat-skill-titulo', titulo)
-    else localStorage.removeItem('dg-chat-skill-titulo')
-  } catch {}
-  atualizarChipSkillChat()
-  if (id) {
-    focarPainelIa('chat')
-    mostrarToast('Skill ativa: ' + (titulo || id), 'ok')
-  }
-}
-
-function atualizarChipSkillChat() {
-  const meta = $('chat-header-meta')
-  if (!meta) return
-  let chip = document.getElementById('chat-skill-chip')
-  const id = skillAtivaChat()
-  let titulo = ''
-  try { titulo = localStorage.getItem('dg-chat-skill-titulo') || id } catch { titulo = id }
-  if (!id) {
-    if (chip) chip.remove()
-    return
-  }
-  if (!chip) {
-    chip = document.createElement('button')
-    chip.type = 'button'
-    chip.id = 'chat-skill-chip'
-    chip.className = 'chat-skill-chip'
-    chip.title = 'Clique para remover a skill do proximo turno'
-    chip.addEventListener('click', () => definirSkillChat('', ''))
-    meta.appendChild(chip)
-  }
-  chip.textContent = 'Skill: ' + titulo + ' ×'
-}
-
-window.dgChatUsarSkill = definirSkillChat
 
 async function enviarMensagem() {
   let pastaChat = resolverPastaChatAtiva()
@@ -3374,198 +3116,6 @@ $('btn-prompt-usar')?.addEventListener('click', () => usarPromptNoChat())
 $('btn-prompt-copiar')?.addEventListener('click', () => void copiarPromptOrientador())
 
 /** Popover de contexto dos ícones do chat (clique → contexto → ação). */
-function initChatIconContext() {
-  const pop = document.getElementById('chat-ctx-popover')
-  if (!pop || pop.dataset.wired === '1') return
-  pop.dataset.wired = '1'
-  let ativo = null
-
-  const fechar = () => {
-    pop.hidden = true
-    pop.replaceChildren()
-    if (ativo) {
-      ativo.setAttribute('aria-expanded', 'false')
-      ativo = null
-    }
-  }
-
-  const posicionar = (btn) => {
-    const host = btn.closest('#chat-panel') || document.body
-    if (pop.parentElement !== host) host.appendChild(pop)
-    pop.hidden = false
-    pop.style.maxHeight = ''
-    pop.classList.remove('chat-ctx-popover--up', 'chat-ctx-popover--down')
-    const br = btn.getBoundingClientRect()
-    const hr = host.getBoundingClientRect()
-    const gap = 6
-    const pw = Math.min(pop.offsetWidth || 240, hr.width - 16)
-    const ph = pop.offsetHeight || 160
-    const spaceAbove = br.top - hr.top
-    const spaceBelow = hr.bottom - br.bottom
-    // Preferir abrir para cima (composer fica na base)
-    const abrirCima = spaceAbove >= Math.min(ph + gap, 120) || spaceAbove >= spaceBelow
-    pop.classList.add(abrirCima ? 'chat-ctx-popover--up' : 'chat-ctx-popover--down')
-    const maxH = Math.max(120, (abrirCima ? spaceAbove : spaceBelow) - gap - 8)
-    pop.style.maxHeight = maxH + 'px'
-    let top
-    if (abrirCima) {
-      top = br.top - hr.top - Math.min(ph, maxH) - gap
-      if (top < 8) top = 8
-    } else {
-      top = br.bottom - hr.top + gap
-    }
-    let left = br.left - hr.left
-    const maxLeft = Math.max(8, hr.width - pw - 8)
-    if (left > maxLeft) left = maxLeft
-    if (left < 8) left = 8
-    pop.style.top = top + 'px'
-    pop.style.left = left + 'px'
-    pop.style.width = pw + 'px'
-  }
-
-  const mkBtn = (label, primary, onClick) => {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = primary ? 'btn-small btn-primary' : 'btn-small'
-    b.textContent = label
-    b.addEventListener('click', (e) => {
-      e.stopPropagation()
-      fechar()
-      onClick()
-    })
-    return b
-  }
-
-  const mkOption = (label, selected, onClick) => {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = 'chat-ctx-option chat-ctx-option--row'
-    b.textContent = label
-    if (selected) b.setAttribute('aria-selected', 'true')
-    b.addEventListener('click', (e) => {
-      e.stopPropagation()
-      fechar()
-      onClick()
-    })
-    return b
-  }
-
-  const abrir = (btn) => {
-    const id = btn.getAttribute('data-chat-ctx')
-    if (!id) return
-    if (ativo === btn && !pop.hidden) {
-      fechar()
-      return
-    }
-    // "Mais" já tem menu próprio
-    if (id === 'mais') return
-
-    fechar()
-    ativo = btn
-    btn.setAttribute('aria-expanded', 'true')
-
-    const title = document.createElement('p')
-    title.className = 'chat-ctx-popover-title'
-    const desc = document.createElement('p')
-    desc.className = 'chat-ctx-popover-desc'
-    const meta = document.createElement('p')
-    meta.className = 'chat-ctx-popover-meta'
-    const actions = document.createElement('div')
-    actions.className = 'chat-ctx-popover-actions'
-
-    if (id === 'nova') {
-      title.textContent = 'Nova conversa'
-      desc.textContent = 'Limpa o chat atual e começa outra sessão.'
-      actions.appendChild(mkBtn('Criar nova', true, () => novaConversaUi()))
-    } else if (id === 'anexar') {
-      title.textContent = 'Anexar arquivos'
-      desc.textContent = 'Os anexos entram no próximo envio do composer.'
-      actions.appendChild(mkBtn('Escolher arquivos', true, () => {
-        document.getElementById('chat-anexos-input')?.click()
-      }))
-    } else if (id === 'prompt') {
-      title.textContent = 'Melhorar prompt'
-      desc.textContent = 'Abre o assistente para refinar o texto do composer com o modelo local.'
-      meta.innerHTML = 'Atalho <kbd>Ctrl+Alt+P</kbd>'
-      actions.appendChild(mkBtn('Abrir assistente', true, () => abrirOrientadorPrompt()))
-    } else if (id === 'mode') {
-      const sel = document.getElementById('chat-mode-select')
-      title.textContent = 'Modo'
-      desc.textContent = 'Define como o Agent interpreta o pedido.'
-      const modos = [
-        ['auto', 'Auto'],
-        ['code', 'Agent'],
-        ['plan', 'Plan'],
-        ['ask', 'Ask'],
-        ['debug', 'Debug']
-      ]
-      actions.classList.add('chat-ctx-popover-actions--list')
-      for (const [val, label] of modos) {
-        actions.appendChild(mkOption(label, sel?.value === val, () => {
-          if (!sel) return
-          sel.value = val
-          sel.dispatchEvent(new Event('change', { bubbles: true }))
-          const modeBtn = document.getElementById('btn-chat-mode')
-          if (modeBtn) modeBtn.title = 'Modo: ' + label
-        }))
-      }
-    } else if (id === 'agent') {
-      const sel = document.getElementById('chat-agent-select')
-      title.textContent = 'Agente'
-      desc.textContent = 'Escolha um agente (lista). Auto escolhe sozinho.'
-      actions.classList.add('chat-ctx-popover-actions--list')
-      const opts = sel ? Array.from(sel.options) : []
-      const vistos = new Set()
-      for (const o of opts) {
-        if (!o.value) continue
-        const key = String(o.value).toLowerCase()
-        if (vistos.has(key)) continue
-        vistos.add(key)
-        actions.appendChild(mkOption(o.textContent || o.value, sel.value === o.value, () => {
-          sel.value = o.value
-          sel.dispatchEvent(new Event('change', { bubbles: true }))
-          const agentBtn = document.getElementById('btn-chat-agent')
-          if (agentBtn) agentBtn.title = 'Agente: ' + (o.textContent || o.value)
-        }))
-      }
-    } else {
-      return
-    }
-
-    pop.replaceChildren(title, desc)
-    if (meta.innerHTML) pop.appendChild(meta)
-    pop.appendChild(actions)
-    posicionar(btn)
-  }
-
-  document.querySelectorAll('.chat-ctx-btn[data-chat-ctx]').forEach((btn) => {
-    if (btn.dataset.ctxWired === '1') return
-    btn.dataset.ctxWired = '1'
-    btn.setAttribute('aria-expanded', 'false')
-    btn.addEventListener('click', (e) => {
-      const id = btn.getAttribute('data-chat-ctx')
-      if (id === 'mais') return
-      e.preventDefault()
-      e.stopPropagation()
-      abrir(btn)
-    })
-  })
-
-  document.addEventListener('click', (ev) => {
-    if (pop.hidden) return
-    const t = ev.target
-    if (pop.contains(t) || (ativo && ativo.contains(t))) return
-    fechar()
-  })
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && !pop.hidden) {
-      fechar()
-      ativo?.focus()
-    }
-  })
-  window.dgFecharChatCtx = fechar
-}
-
 initChatIconContext()
 
 // ---------- Janelas flutuantes (Config / Contas): arrastar + sempre à frente ----------
@@ -3573,6 +3123,12 @@ initChatIconContext()
 iniciarJanelasFlutuantes()
 ligarDownloadUi()
 configurarPreviewMd({ getEditor: () => editor })
+configurarHistoricoAbas({ abrirArquivo: (c) => abrirArquivoNaAba(c) })
+configurarChatCtx({
+  novaConversa: () => novaConversaUi(),
+  abrirOrientador: () => abrirOrientadorPrompt()
+})
+configurarSkillChip({ focarPainelIa: (p) => focarPainelIa(p) })
 
 // ---------- Config / Contas ----------
 function formatarForcaPerfil(v) {

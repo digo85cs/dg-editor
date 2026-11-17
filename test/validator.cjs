@@ -606,7 +606,10 @@ async function main() {
   section('25. Preview markdown e imagens')
   {
     const html25 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
-    const app25 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const app25 =
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8') +
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'editor', 'preview-md.js'), 'utf-8') +
+      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'editor', 'imagem.js'), 'utf-8')
     assert('renderer tem toggle preview', /btn-md-preview|Preview/.test(html25) && /toggleMdPreview|md-preview/.test(app25))
     assert(
       'preview sanitiza html (grep por sanitize/sanitizar/escape)',
