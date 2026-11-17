@@ -142,6 +142,23 @@ import {
   obterHistChat,
   definirHistChat
 } from './features/chat/chat-core.js'
+import { agenteEstado } from './features/chat/agente-estado.js'
+import {
+  configurarAgenteCards,
+  renderAgentTrace,
+  appendAgentTraceLive,
+  atualizarChatPlanoCard,
+  atualizarChatApplyCard,
+  mostrarChatRestoreAposApply,
+  aplicarUmaPropostaAgent,
+  mostrarPropostasAgent,
+  ligarProgressoAgent,
+  ligarAnuncioEtapasAgente,
+  coletarAbasCtx,
+  coletarErrosEditor,
+  renderPlanoChecklist,
+  refrescarPlanoUi
+} from './features/chat/agente-cards.js'
 import { normalizarMensagensChat, bolhaHtml, organizarRespostaCursor } from './features/chat/render.js'
 import {
   humanizarStatus,
@@ -1272,13 +1289,6 @@ async function abrirPainelDiff(absPath) {
   }
 }
 
-/** @type {{ id: string, path: string, unifiedDiff: string, absPath: string, origem?: string }[]} */
-let ocPendentes = []
-/** @type {string | null} */
-let ocPendenteAtivoId = null
-/** @type {{ id: string, path: string, absPath?: string, unifiedDiff: string, origem?: string }[]} */
-let agentPropostas = []
-let agentProgressUnsub = null
 let ultimoStatusAgente = ''
 let ultimoStatusAgenteEm = 0
 /** @type {Set<number>} */
@@ -1304,7 +1314,7 @@ function fecharPainelDiff() {
   if (!panel) return
   panel.classList.add('hidden')
   panel.setAttribute('aria-hidden', 'true')
-  ocPendenteAtivoId = null
+  agenteEstado.ocPendenteAtivoId = null
   window.__dgApplyViaAgente = false
   ocHunksAceitos = new Set()
   const acoes = $('diff-panel-actions')
@@ -1402,7 +1412,7 @@ function mostrarDiffOpenClaw(pendente) {
   const title = $('diff-panel-title')
   const acoes = $('diff-panel-actions')
   if (!panel || !body || !pendente) return
-  ocPendenteAtivoId = pendente.id
+  agenteEstado.ocPendenteAtivoId = pendente.id
   const origem = pendente.origem || (window.__dgApplyViaAgente ? 'agent' : 'openclaw')
   if (title) title.textContent = origem + ': ' + (pendente.path || pendente.absPath)
   body.innerHTML = renderDiffHtml(pendente.unifiedDiff)
@@ -1424,21 +1434,21 @@ function renderListaPendentesOc() {
   if (!lista) return
   const tinhaFoco = lista.contains(document.activeElement)
   lista.innerHTML = ''
-  if (!ocPendentes.length) {
+  if (!agenteEstado.ocPendentes.length) {
     lista.hidden = true
     return
   }
   lista.hidden = false
   lista.setAttribute('role', 'menu')
   lista.setAttribute('aria-label', 'Propostas pendentes')
-  for (const p of ocPendentes) {
+  for (const p of agenteEstado.ocPendentes) {
     const b = document.createElement('button')
     b.type = 'button'
     b.setAttribute('role', 'menuitem')
     b.dataset.id = p.id
     b.textContent = nomeArquivo(p.path || p.absPath)
     b.title = p.absPath || p.path
-    if (p.id === ocPendenteAtivoId) b.classList.add('active')
+    if (p.id === agenteEstado.ocPendenteAtivoId) b.classList.add('active')
     b.addEventListener('click', () => mostrarDiffOpenClaw(p))
     lista.appendChild(b)
   }
@@ -1490,16 +1500,16 @@ async function pedirOpenClawUi() {
     alert('OpenClaw: ' + (r?.erro || 'erro'))
     return
   }
-  ocPendentes = r.pendentes || []
+  agenteEstado.ocPendentes = r.pendentes || []
   if (r.rejeitados?.length) {
     console.warn('[openclaw] paths rejeitados:', r.rejeitados)
   }
-  if (!ocPendentes.length) {
+  if (!agenteEstado.ocPendentes.length) {
     alert(r.mensagem || 'Nenhum diff proposto.')
     return
   }
   renderListaPendentesOc()
-  mostrarDiffOpenClaw(ocPendentes[0])
+  mostrarDiffOpenClaw(agenteEstado.ocPendentes[0])
 }
 
 async function oferecerCommitAposApply(arquivos) {
@@ -1529,27 +1539,27 @@ async function oferecerCommitAposApply(arquivos) {
 async function finalizarApplyPendente(r, id) {
   const viaAgente = !!window.__dgApplyViaAgente
   const pathAplicado = r?.path || r?.absPath || ''
-  ocPendentes = ocPendentes.filter((p) => p.id !== id)
-  agentPropostas = agentPropostas.filter((p) => p.id !== id)
-  mostrarPropostasAgent(agentPropostas)
+  agenteEstado.ocPendentes = agenteEstado.ocPendentes.filter((p) => p.id !== id)
+  agenteEstado.propostas = agenteEstado.propostas.filter((p) => p.id !== id)
+  mostrarPropostasAgent(agenteEstado.propostas)
   if (r.absPath && state.abaAtiva === r.absPath && editor) {
     const ler = await window.api.invoke('arquivo:ler', r.absPath, pastasPermitidas())
     if (ler?.ok) editor.abrir(r.absPath, ler.conteudo)
   }
   // fila unificada
   const rest = await window.api.invoke('propostas:listar')
-  ocPendentes = (rest?.pendentes || []).map((p) => ({
+  agenteEstado.ocPendentes = (rest?.pendentes || []).map((p) => ({
     id: p.id,
     path: p.path,
     absPath: p.absPath,
     unifiedDiff: p.unifiedDiff,
     origem: p.origem
   }))
-  agentPropostas = ocPendentes.slice()
-  mostrarPropostasAgent(agentPropostas)
-  if (ocPendentes.length) {
+  agenteEstado.propostas = agenteEstado.ocPendentes.slice()
+  mostrarPropostasAgent(agenteEstado.propostas)
+  if (agenteEstado.ocPendentes.length) {
     renderListaPendentesOc()
-    mostrarDiffOpenClaw(ocPendentes[0])
+    mostrarDiffOpenClaw(agenteEstado.ocPendentes[0])
   } else {
     fecharPainelDiff()
     const base = viaAgente && r.checkpointId ? 'Diff aplicado (checkpoint ' + r.checkpointId + ').' : 'Diff aplicado.'
@@ -1561,11 +1571,11 @@ async function finalizarApplyPendente(r, id) {
 }
 
 async function aplicarPendenteOc() {
-  if (!ocPendenteAtivoId) return
+  if (!agenteEstado.ocPendenteAtivoId) return
   if (!(await dgConfirm('Aplicar este arquivo no disco?', 'Aplicar'))) return
   const viaAgente = !!window.__dgApplyViaAgente
   const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
-  const id = ocPendenteAtivoId
+  const id = agenteEstado.ocPendenteAtivoId
   const r = await window.api.invoke(canal, id, pastasPermitidas())
   if (!r?.ok) {
     alert('Falha ao aplicar: ' + (r?.erro || 'erro'))
@@ -1575,14 +1585,14 @@ async function aplicarPendenteOc() {
 }
 
 async function aplicarHunksSelecionadosOc() {
-  if (!ocPendenteAtivoId) return
+  if (!agenteEstado.ocPendenteAtivoId) return
   const indices = [...ocHunksAceitos].sort((a, b) => a - b)
   if (!indices.length) {
     alert('Nenhum hunk selecionado.')
     return
   }
   if (!(await dgConfirm('Aplicar ' + indices.length + ' hunk(s) selecionado(s)?', 'Aplicar hunks'))) return
-  const def = await window.api.invoke('propostas:definir-hunks', ocPendenteAtivoId, indices)
+  const def = await window.api.invoke('propostas:definir-hunks', agenteEstado.ocPendenteAtivoId, indices)
   if (!def?.ok) {
     alert('Falha ao filtrar hunks: ' + (def?.erro || ''))
     return
@@ -1594,7 +1604,7 @@ async function aplicarHunksSelecionadosOc() {
   }
   const viaAgente = !!window.__dgApplyViaAgente || def.pendente?.origem === 'agent'
   const canal = viaAgente ? 'agente:aplicar-proposta' : 'openclaw:aplicar'
-  const id = ocPendenteAtivoId
+  const id = agenteEstado.ocPendenteAtivoId
   const r = await window.api.invoke(canal, id, pastasPermitidas())
   if (!r?.ok) {
     alert('Falha ao aplicar hunks: ' + (r?.erro || 'erro'))
@@ -1604,19 +1614,19 @@ async function aplicarHunksSelecionadosOc() {
 }
 
 async function rejeitarPendenteOc() {
-  if (!ocPendenteAtivoId) return
+  if (!agenteEstado.ocPendenteAtivoId) return
   const viaAgente = !!window.__dgApplyViaAgente
   const canal = viaAgente ? 'agente:rejeitar-proposta' : 'openclaw:rejeitar'
-  await window.api.invoke(canal, ocPendenteAtivoId)
-  const id = ocPendenteAtivoId
-  ocPendentes = ocPendentes.filter((p) => p.id !== id)
+  await window.api.invoke(canal, agenteEstado.ocPendenteAtivoId)
+  const id = agenteEstado.ocPendenteAtivoId
+  agenteEstado.ocPendentes = agenteEstado.ocPendentes.filter((p) => p.id !== id)
   if (viaAgente) {
-    agentPropostas = agentPropostas.filter((p) => p.id !== id)
-    mostrarPropostasAgent(agentPropostas)
+    agenteEstado.propostas = agenteEstado.propostas.filter((p) => p.id !== id)
+    mostrarPropostasAgent(agenteEstado.propostas)
   }
-  if (ocPendentes.length) {
+  if (agenteEstado.ocPendentes.length) {
     renderListaPendentesOc()
-    mostrarDiffOpenClaw(ocPendentes[0])
+    mostrarDiffOpenClaw(agenteEstado.ocPendentes[0])
   } else {
     fecharPainelDiff()
   }
@@ -2849,6 +2859,16 @@ configurarChatCore({
   enviarMensagemUi: () => enviarMensagemUi(),
   appendAgentTraceLive: (l) => appendAgentTraceLive(l)
 })
+configurarAgenteCards({
+  getEditor: () => editor,
+  toggleRight: (f) => toggleRight(f),
+  ativarAbaDireita: (p) => ativarAbaDireita(p),
+  oferecerCommitAposApply: (a) => oferecerCommitAposApply(a),
+  renderListaPendentesOc: () => renderListaPendentesOc(),
+  mostrarDiffOpenClaw: (p) => mostrarDiffOpenClaw(p),
+  anunciarEtapaAgente: (e) => anunciarEtapaAgente(e),
+  previewDiffNoEditor: (p) => previewDiffNoEditor(p)
+})
 
 // ---------- Config / Contas ----------
 // Agendador: injeta o prompt no chat quando um job vence
@@ -3295,7 +3315,7 @@ $('btn-oc-limpar-token')?.addEventListener('click', async () => {
   await carregarConfigOpenClawUi()
 })
 $('btn-oc-preview-editor')?.addEventListener('click', () => {
-  const p = ocPendentes.find((x) => x.id === ocPendenteAtivoId)
+  const p = agenteEstado.ocPendentes.find((x) => x.id === agenteEstado.ocPendenteAtivoId)
   if (p) void previewDiffNoEditor(p)
 })
 $('btn-oc-aplicar')?.addEventListener('click', () => void aplicarPendenteOc())
@@ -3303,446 +3323,6 @@ $('btn-oc-aplicar-hunks')?.addEventListener('click', () => void aplicarHunksSele
 $('btn-oc-rejeitar')?.addEventListener('click', () => void rejeitarPendenteOc())
 
 
-function renderAgentTrace(passos) {
-  const box = $('agent-trace')
-  if (!box) return
-  box.innerHTML = ''
-  if (!passos || !passos.length) {
-    box.innerHTML = '<span class="muted">Sem tool calls neste turno.</span>'
-    return
-  }
-  for (const p of passos) {
-    const div = document.createElement('div')
-    div.className = 'step'
-    if (p.tipo === 'tool') {
-      div.textContent =
-        '⚙️ ' +
-        (p.nome || 'tool') +
-        (p.resultado ? ' → ' + String(p.resultado).slice(0, 160) : '')
-    } else {
-      div.textContent = '💬 ' + String(p.texto || '').slice(0, 200)
-    }
-    box.appendChild(div)
-  }
-  box.scrollTop = box.scrollHeight
-}
-
-function appendAgentTraceLive(line) {
-  const box = $('agent-trace')
-  if (!box) return
-  if (box.querySelector('.muted')) box.innerHTML = ''
-  const div = document.createElement('div')
-  div.className = 'step'
-  div.textContent = line
-  box.appendChild(div)
-  box.scrollTop = box.scrollHeight
-}
-
-function atualizarChatPlanoCard(plano) {
-  const area = $('chat-messages')
-  renderChatPlanoCard(area, plano, {
-    onImplementar: (soProximo) => void executarPlanoDoChat(!!soProximo),
-    onMarcar: async (id, feito) => {
-      await window.api.invoke('agente:plano-marcar-passo', id, feito)
-      const r = await window.api.invoke('agente:plano-ler')
-      renderPlanoChecklist(r?.plano)
-      atualizarChatPlanoCard(r?.plano)
-    }
-  })
-}
-
-function atualizarChatApplyCard(propostas) {
-  const area = $('chat-messages')
-  renderChatApplyCard(area, propostas || agentPropostas, {
-    onAplicarTodas: () => void aplicarTodasPropostasAgent(),
-    onRevisar: () => {
-      toggleRight(true)
-      ativarAbaDireita('agent')
-      abrirFilaPropostasAgent()
-    },
-    onAplicarUma: (id) => void aplicarUmaPropostaAgent(id)
-  })
-}
-
-function mostrarChatRestoreAposApply(arquivos) {
-  renderChatRestoreStrip($('chat-messages'), {
-    arquivos: arquivos || [],
-    onDesfazer: () => void desfazerCheckpointDoChat()
-  })
-  atualizarChatApplyCard(agentPropostas)
-}
-
-async function desfazerCheckpointDoChat() {
-  const r = await window.api.invoke('agente:checkpoint-desfazer', pastasPermitidas())
-  if (r?.ok) {
-    if (window.dgToast) window.dgToast('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).', 'ok')
-    else alert('Checkpoint restaurado (' + (r.restaurados || 0) + ' arquivo(s)).')
-    ocultarChatRestoreStrip($('chat-messages'))
-  } else {
-    if (window.dgToast) window.dgToast('Falha: ' + (r?.erro || 'restore'), 'erro')
-    else alert('Falha: ' + (r?.erro || 'restore'))
-  }
-}
-
-async function aplicarUmaPropostaAgent(id) {
-  if (!id) return
-  if (!(await dgConfirm('Aplicar este arquivo no disco?', 'Aplicar'))) return
-  window.__dgApplyViaAgente = true
-  const r = await window.api.invoke('agente:aplicar-proposta', id, pastasPermitidas())
-  if (!r?.ok) {
-    if (window.dgToast) window.dgToast('Falha em apply: ' + (r?.erro || 'erro'), 'erro')
-    else alert('Falha em apply: ' + (r?.erro || ''))
-    return
-  }
-  agentPropostas = agentPropostas.filter((p) => p.id !== id)
-  const rest = await window.api.invoke('agente:propostas')
-  mostrarPropostasAgent(rest?.pendentes || [])
-  atualizarChatApplyCard(rest?.pendentes || [])
-  mostrarChatRestoreAposApply([r.path || r.absPath].filter(Boolean))
-  await oferecerCommitAposApply([r.path || r.absPath].filter(Boolean))
-}
-
-async function executarPlanoDoChat(soProximo) {
-  if (!state.pastaAtual) {
-    alert('Abra uma pasta primeiro.')
-    return
-  }
-  const area = $('chat-messages')
-  const modoSel = document.getElementById('chat-mode-select')
-  if (modoSel) modoSel.value = 'code'
-  const planToggle = document.getElementById('agent-plan-mode')
-  if (planToggle) planToggle.checked = false
-  mostrarBannerAgentMode(
-    area,
-    soProximo
-      ? 'Proximo passo do plano — Modo Agent'
-      : 'Implementar plano — sair do Plan e executar'
-  )
-  ligarProgressoAgent()
-  atualizarCartaoTrabalho(area, {
-    titulo: 'Modo Agent',
-    passo: soProximo ? 'Executando proximo passo…' : 'Implementando o plano…'
-  })
-  setChatLiveStatus('Modo Agent — executando plano…')
-  setChatSendMode('stop')
-  const agentStats = criarStatsVazios()
-  const offProg = window.api.on?.('agente:progresso', (_e, ev) => {
-    if (!ev || typeof ev !== 'object') return
-    aplicarEventoStats(agentStats, ev)
-    if (ev.tipo === 'stats' || ev.tipo === 'tool' || ev.tipo === 'proposta') {
-      pintarStatsNoCartao(area, agentStats)
-    }
-    if (ev.tipo === 'status') {
-      atualizarCartaoTrabalho(area, { titulo: 'Modo Agent', passo: humanizarStatus(ev.texto) })
-    }
-  })
-  try {
-    const r = await window.api.invoke('agente:executar-plano', {
-      raiz: state.pastaAtual,
-      pastas: pastasPermitidas(),
-      soProximo: !!soProximo
-    })
-    if (!r?.ok) {
-      alert(r?.erro || 'Falha ao executar plano')
-      return
-    }
-    if (r.texto) adicionarBolha('assistant', organizarRespostaCursor(r.texto), r.modelo || 'agente')
-    renderAgentTrace(r.passos || [])
-    mostrarPropostasAgent(r.propostas || [])
-    atualizarChatApplyCard(r.propostas || [])
-    renderPlanoChecklist(r.plano)
-    atualizarChatPlanoCard(r.plano)
-    atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
-    toggleRight(true)
-    ativarAbaDireita('agent')
-  } finally {
-    if (typeof offProg === 'function') offProg()
-    fecharCartaoTrabalho(area, 'Pronto')
-    setChatSendMode('send')
-    setChatLiveStatus('')
-    ocultarBannerAgentMode(area)
-  }
-}
-
-function mostrarPropostasAgent(propostas) {
-  agentPropostas = propostas || []
-  atualizarChatApplyCard(agentPropostas)
-  const box = $('agent-propostas-resumo')
-  if (!box) return
-  const tinhaFoco = box.contains(document.activeElement)
-  if (!agentPropostas.length) {
-    box.hidden = true
-    box.innerHTML = ''
-    box.removeAttribute('aria-label')
-    if (tinhaFoco) $('chat-input')?.focus()
-    return
-  }
-  box.hidden = false
-  const n = agentPropostas.length
-  const linhas = agentPropostas
-    .map((p) => {
-      const add = (String(p.unifiedDiff || '').match(/^\+/gm) || []).length
-      const del = (String(p.unifiedDiff || '').match(/^-/gm) || []).length
-      return (
-        '<li><code>' +
-        String(p.path || '').replace(/</g, '&lt;') +
-        '</code> <span class="muted">+' +
-        Math.max(0, add - 1) +
-        '/-' +
-        Math.max(0, del - 1) +
-        '</span></li>'
-      )
-    })
-    .join('')
-  box.setAttribute('aria-label', n + ' proposta(s) de edição pendentes')
-  box.innerHTML =
-    '<div class="agent-propostas-titulo"><strong>' +
-    n +
-    ' proposta(s)</strong></div><ul class="agent-propostas-lista">' +
-    linhas +
-    '</ul>'
-  const acoes = document.createElement('div')
-  acoes.className = 'agent-propostas-acoes'
-  const btnVer = document.createElement('button')
-  btnVer.type = 'button'
-  btnVer.className = 'btn-small'
-  btnVer.textContent = 'Revisar diffs'
-  btnVer.addEventListener('click', () => abrirFilaPropostasAgent())
-  const btnAll = document.createElement('button')
-  btnAll.type = 'button'
-  btnAll.className = 'btn-small'
-  btnAll.textContent = 'Aplicar todas'
-  btnAll.addEventListener('click', () => void aplicarTodasPropostasAgent())
-  acoes.appendChild(btnVer)
-  acoes.appendChild(btnAll)
-  box.appendChild(acoes)
-  if (tinhaFoco) btnVer.focus()
-}
-
-function abrirFilaPropostasAgent() {
-  if (!agentPropostas.length) return
-  ocPendentes = agentPropostas.map((p) => ({
-    id: p.id,
-    path: p.path,
-    absPath: p.absPath || p.path,
-    unifiedDiff: p.unifiedDiff
-  }))
-  // reutilizar painel OpenClaw mas apply via agente:aplicar-proposta
-  renderListaPendentesOc()
-  mostrarDiffOpenClaw(ocPendentes[0])
-  window.__dgApplyViaAgente = true
-}
-
-async function aplicarTodasPropostasAgent() {
-  if (!agentPropostas.length) return
-  const total = agentPropostas.length
-  if (
-    !(await dgConfirm(
-      'Aplicar ' + total + ' arquivo(s)? Um checkpoint será criado por arquivo.',
-      'Aplicar propostas'
-    ))
-  )
-    return
-  const aplicados = []
-  const checkpoints = []
-  const falhas = []
-  window.__dgApplyViaAgente = true
-  for (const p of [...agentPropostas]) {
-    const r = await window.api.invoke('agente:aplicar-proposta', p.id, pastasPermitidas())
-    if (!r?.ok) {
-      falhas.push({ path: p.path, erro: r?.erro || 'erro' })
-      continue
-    }
-    aplicados.push(p.path || r.path)
-    if (r.checkpointId) checkpoints.push({ id: r.checkpointId, path: p.path })
-  }
-  const rest = await window.api.invoke('agente:propostas')
-  mostrarPropostasAgent(rest?.pendentes || [])
-  atualizarChatApplyCard(rest?.pendentes || [])
-  if (aplicados.length) {
-    mostrarChatRestoreAposApply(aplicados)
-    await oferecerCommitAposApply(aplicados)
-  }
-  if (falhas.length) {
-    const resume = falhas
-      .slice(0, 5)
-      .map((f) => '· ' + f.path + ': ' + f.erro)
-      .join('\n')
-    const desfazer = await dgConfirm(
-      aplicados.length +
-        ' arquivo(s) aplicado(s), ' +
-        falhas.length +
-        ' falhou(aram):\n' +
-        resume +
-        '\n\nDeseja desfazer os arquivos já aplicados?',
-      'Desfazer aplicados'
-    )
-    if (desfazer && checkpoints.length) {
-      let desfeitos = 0
-      for (const ck of [...checkpoints].reverse()) {
-        const rr = await window.api.invoke('agente:checkpoint-restaurar', ck.id, pastasPermitidas())
-        if (rr?.ok) desfeitos++
-      }
-      ocultarChatRestoreStrip($('chat-messages'))
-      if (window.dgToast) window.dgToast('Apply parcial: ' + desfeitos + ' arquivo(s) revertido(s).', 'aviso')
-    } else if (window.dgToast) {
-      window.dgToast('Apply parcial: ' + aplicados.length + ' ok, ' + falhas.length + ' com falha.', 'aviso')
-    }
-    return
-  }
-  if (window.dgToast) window.dgToast('Apply concluído (' + aplicados.length + ' arquivo(s)).', 'ok')
-  else alert('Apply concluído.')
-}
-
-function ligarProgressoAgent() {
-  if (agentProgressUnsub) agentProgressUnsub()
-  const painelStats = criarStatsVazios()
-  agentProgressUnsub = window.api.on('agente:progresso', (_e, ev) => {
-    if (!ev || typeof ev !== 'object') return
-    aplicarEventoStats(painelStats, ev)
-    if (ev.tipo === 'stats' || ev.tipo === 'tool' || ev.tipo === 'proposta') {
-      let strip = document.getElementById('agent-stats-live')
-      if (!strip) {
-        const out = $('agent-output')
-        if (out && out.parentElement) {
-          strip = document.createElement('p')
-          strip.id = 'agent-stats-live'
-          strip.className = 'chat-work-stats agent-stats-live'
-          out.parentElement.insertBefore(strip, out)
-        }
-      }
-      if (strip) {
-        const parts = []
-        if (painelStats.edits) parts.push('Editing ' + painelStats.edits)
-        if (painelStats.explored) parts.push('explored ' + painelStats.explored)
-        if (painelStats.searches) parts.push(painelStats.searches + ' searches')
-        if (painelStats.tools) parts.push(painelStats.tools + ' tools')
-        if (painelStats.commands) parts.push('ran ' + painelStats.commands + ' commands')
-        strip.textContent = parts.join(' · ')
-        strip.hidden = !parts.length
-      }
-      pintarStatsNoCartao($('chat-messages'), painelStats)
-    }
-    if (ev.tipo === 'status') {
-      const etapa = humanizarStatus(ev.texto)
-      appendAgentTraceLive(etapa)
-      anunciarEtapaAgente(etapa)
-    }
-    else if (ev.tipo === 'tool' && ev.fase === 'inicio') appendAgentTraceLive(humanizarToolInicio(ev.nome) + '…')
-    else if (ev.tipo === 'tool' && ev.fase === 'fim')
-      appendAgentTraceLive(humanizarToolFim(ev.nome, ev.detalhe))
-    else if (ev.tipo === 'proposta') { appendAgentTraceLive('Sugestão: ' + (ev.path || 'arquivo')); if (ev.id) void previewDiffNoEditor({ id: ev.id, path: ev.path }) }
-    else if (ev.tipo === 'texto-delta') {
-      const out = $('agent-output')
-      if (out) {
-        if (out.dataset.stream !== '1') out.textContent = ''
-        out.dataset.stream = '1'
-        out.textContent += String(ev.texto || '')
-      }
-    }
-    else if (ev.tipo === 'texto') {
-      const out = $('agent-output')
-      if (out) {
-        out.textContent = String(ev.texto || '')
-        delete out.dataset.stream
-      }
-    }
-  })
-}
-
-/** Anuncia etapas e resultado do turno mesmo fora do painel Agent (ex.: chat). */
-function ligarAnuncioEtapasAgente() {
-  window.api.on?.('agente:progresso', (_e, ev) => {
-    if (!ev || typeof ev !== 'object') return
-    if (ev.tipo === 'fim') {
-      if (lerPreferenciasA11y().anuncioStreaming === 'silencioso') return
-      if (ev.cancelado) anunciar('Geração interrompida.')
-      else if (ev.ok) anunciar('Resposta concluída.')
-      else anunciar('Não foi possível concluir a resposta.', { urgencia: 'assertivo' })
-      return
-    }
-    if (ev.tipo !== 'status') return
-    anunciarEtapaAgente(humanizarStatus(ev.texto))
-  })
-}
-
-function coletarAbasCtx() {
-  const out = []
-  for (const a of state.abas) {
-    const item = { path: a.caminho, ativa: a.caminho === state.abaAtiva }
-    if (a.caminho === state.abaAtiva && editor && editor.getConteudo) {
-      try {
-        item.conteudo = editor.getConteudo()
-      } catch {
-        /* */
-      }
-    }
-    out.push(item)
-  }
-  return out
-}
-
-/** Erros/diagnostics recentes do agent (typecheck/test/manual) para o contexto. */
-async function coletarErrosEditor() {
-  try {
-    const r = await window.api.invoke('agente:diagnosticos')
-    const lista = (r?.recentes || r?.diagnosticos || []).filter((d) => d && d.ok === false && d.saida)
-    if (!lista.length) return ''
-    return lista
-      .slice(0, 5)
-      .map((d) => '[' + d.origem + '] ' + (d.resumo || '') + '\n' + String(d.saida || '').slice(0, 3000))
-      .join('\n\n')
-      .slice(0, 8000)
-  } catch {
-    return ''
-  }
-}
-
-function renderPlanoChecklist(plano) {
-  const box = $('agent-plano-checklist')
-  if (!box) return
-  const passos = plano?.passos || []
-  if (!passos.length) {
-    box.hidden = true
-    box.innerHTML = ''
-    return
-  }
-  box.hidden = false
-  box.innerHTML = ''
-  const titulo = document.createElement('div')
-  titulo.innerHTML =
-    '<strong>Plano</strong> <span class="muted">' +
-    passos.filter((p) => p.feito).length +
-    '/' +
-    passos.length +
-    '</span>'
-  box.appendChild(titulo)
-  for (const p of passos) {
-    const lab = document.createElement('label')
-    if (p.feito) lab.classList.add('feito')
-    const cb = document.createElement('input')
-    cb.type = 'checkbox'
-    cb.checked = !!p.feito
-    cb.addEventListener('change', async () => {
-      await window.api.invoke('agente:plano-marcar-passo', p.id, cb.checked)
-      const r = await window.api.invoke('agente:plano-ler')
-      renderPlanoChecklist(r?.plano)
-      atualizarChatPlanoCard(r?.plano)
-    })
-    const span = document.createElement('span')
-    span.textContent = p.texto
-    lab.appendChild(cb)
-    lab.appendChild(span)
-    box.appendChild(lab)
-  }
-  // Espelho vivo no transcript do chat
-  atualizarChatPlanoCard(plano)
-}
-
-async function refrescarPlanoUi() {
-  const r = await window.api.invoke('agente:plano-ler')
-  renderPlanoChecklist(r?.plano)
-}
 async function executarAgentUi(orquestrar) {
   if (!state.pastaAtual) {
     alert('Abra uma pasta primeiro.')
