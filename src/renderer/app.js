@@ -28,6 +28,7 @@ import { anunciar } from './features/ui/live-region.js'
 import { abrirJanelaFlutuante, iniciarJanelasFlutuantes } from './features/ui/janelas-flutuantes.js'
 import { mostrarToast } from './features/ui/toast.js'
 import { MENUS_BARRA } from './features/ui/menubar-dados.js'
+import { dgNormalizarErro, mostrarErroTipado } from './features/ui/erros.js'
 import {
   lerPreferenciasA11y,
   salvarPreferenciasA11y,
@@ -2727,23 +2728,7 @@ function ciclarAbas() {
 }
 
 // ---------- Erros tipados (Block 7) ----------
-const DG_CODIGOS_OLLAMA = new Set(['ERR_OLLAMA_OFFLINE', 'ERR_OLLAMA_MODEL_MISSING', 'ERR_LLM_TIMEOUT'])
-function dgIsErroApp(v) {
-  return !!v && typeof v === 'object' && typeof v.codigo === 'string' && typeof v.mensagem === 'string' && v.mensagem.trim().length > 0 && /^ERR_[A-Z0-9_]+$/.test(v.codigo)
-}
-function dgNormalizarErro(e, fallbackMsg) {
-  if (dgIsErroApp(e)) return e
-  if (e && typeof e === 'object' && dgIsErroApp(e.erro)) return e.erro
-  if (typeof e === 'string' && e.trim()) return { codigo: 'ERR_UNKNOWN', mensagem: e.trim() }
-  if (e && typeof e.erro === 'string' && e.erro.trim()) return { codigo: 'ERR_UNKNOWN', mensagem: e.erro.trim() }
-  return { codigo: 'ERR_UNKNOWN', mensagem: String(fallbackMsg || 'Ocorreu um erro.'), detalhe: String(e && e.message ? e.message : e || '') }
-}
-function mostrarErroTipado(erro, alvoId) {
-  const e = dgNormalizarErro(erro)
-  const alvo = $(alvoId || 'analysis-content')
-  if (!alvo) { mostrarToast(e.mensagem, 'erro'); return }
-  alvo.innerHTML = renderizarErroHtml(e)
-}
+// Implementação em features/ui/erros.js
 
 // ---------- Análise ----------
 function habilitarBotoesAnalise(habilitar) {
