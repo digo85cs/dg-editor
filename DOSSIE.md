@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 14:15:29** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.3** · branch `integra-13-11` · último commit: 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **17/11/2026, 14:22:16** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.3** · branch `integra-13-11` · último commit: af3778c 2026-11-17 refactor: extrai lazy-load do terminal e botoes do painel direito
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- af3778c 2026-11-17 refactor: extrai lazy-load do terminal e botoes do painel direito
 - 0a58cd5 2026-11-17 refactor: extrai composer/git-poll, status workspace e acessibilidade extra
 - 22553e9 2026-11-17 refactor: extrai titlebar e listeners da diff-bar
 - 01caadf 2026-11-17 refactor: extrai atalhos de teclado, auditoria UI e rotulos de arquivo
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 07a47b9 2026-11-17 refactor: extrai activity bar, abas de paineis e navegador bloco 3
 - 95c5ac1 2026-11-17 refactor: extrai tooltips ricos e status de boot (providers/ollama)
 - b85208a 2026-11-17 refactor: extrai comandos, tema, atalhos e preferencias a11y
-- 526c2d7 2026-11-17 refactor: extrai nucleo de abas do editor (ativar/fechar/autosave/init)
 
 ## 16. Como atualizar este dossiê
 
