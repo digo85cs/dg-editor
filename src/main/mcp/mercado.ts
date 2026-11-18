@@ -109,6 +109,34 @@ export function lerCatalogoMcp(): McpServidorCatalogo[] {
       descricao: 'Raciocínio passo a passo estruturado para problemas complexos',
       comando: 'npx -y @modelcontextprotocol/server-sequential-thinking',
       config: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-sequential-thinking'] }
+    },
+    {
+      id: 'context7',
+      nome: 'Context7',
+      descricao: 'Docs atualizadas de bibliotecas/frameworks direto no agente (Upstash, em alta no GitHub)',
+      comando: 'npx -y @upstash/context7-mcp',
+      config: { command: 'npx', args: ['-y', '@upstash/context7-mcp'] }
+    },
+    {
+      id: 'serena',
+      nome: 'Serena',
+      descricao: 'Toolkit semântico de código: símbolos, referências e edições seguras (oraios/serena)',
+      comando: 'uvx --from git+https://github.com/oraios/serena serena start-mcp-server',
+      config: { command: 'uvx', args: ['--from', 'git+https://github.com/oraios/serena', 'serena', 'start-mcp-server'] }
+    },
+    {
+      id: 'chrome-devtools',
+      nome: 'Chrome DevTools',
+      descricao: 'Depuração e automação do Chrome real via CDP (performance, network, console)',
+      comando: 'npx -y chrome-devtools-mcp@latest',
+      config: { command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest'] }
+    },
+    {
+      id: 'apify',
+      nome: 'Apify',
+      descricao: 'Web scraping e automação de atores prontos (requer APIFY_TOKEN)',
+      comando: 'npx -y apify-mcp-server',
+      config: { command: 'npx', args: ['-y', 'apify-mcp-server'], env: { APIFY_TOKEN: '<token>' } }
     }
   ]
 }

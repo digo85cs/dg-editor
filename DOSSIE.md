@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 09:31:28** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: 365a746 2026-11-18 feat(midia): cascata gratis-primeiro para imagem (midia_imagem_auto)
-> Alterações locais não commitadas: 6 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 09:35:45** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: 2cd01ee 2026-11-18 feat(midia): AI Horde gratis na cascata + Pixabay stock + JSON2Video
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 2cd01ee 2026-11-18 feat(midia): AI Horde gratis na cascata + Pixabay stock + JSON2Video
 - 365a746 2026-11-18 feat(midia): cascata gratis-primeiro para imagem (midia_imagem_auto)
 - 279e5d4 2026-11-18 feat(midia): PDF (pypdf) e planilhas (openpyxl) + diretiva documentos/sites
 - 27f0a75 2026-11-18 feat(midia): ferramentas criativas — Gemini img2img/Veo, OpenAI image/TTS, pandoc docs
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 0fcbf97 2026-11-17 feat(chat): imagem gerada aparece inline + Pollinations primeiro
 - 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
 - df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
-- db4c3a1 2026-11-17 docs: regenera DOSSIE v0.6.5
 
 ## 16. Como atualizar este dossiê
 

@@ -106,8 +106,28 @@ function tick(): void {
 
 export function iniciarAgendador(): void {
   if (timer) return
+  garantirJobInovacao()
   timer = setInterval(tick, 60_000)
   timer.unref?.()
+}
+
+/** Job semanal fixo do agente DG Inovador (idempotente pelo marcador no prompt). */
+export function garantirJobInovacao(): JobAgendado | null {
+  const MARCADOR = '[inovacao-semanal]'
+  const jobs = listarJobs()
+  const existente = jobs.find((j) => j.prompt.includes(MARCADOR))
+  if (existente) return existente
+  const job = adicionarJob({
+    prompt:
+      MARCADOR +
+      ' Execute o agente DG Inovador (.dg-editor/agentes/inovador.md): pesquise inovacoes e ferramentas ' +
+      'gratuitas para o DG Editor no GitHub e repositorios de referencia, classifique os achados, ' +
+      'implemente o que for aplicavel com validacao e grave o relatorio em .dg-editor/inovacoes/.',
+    cadaMin: 7 * 24 * 60,
+    raiz: process.cwd()
+  })
+  dglog('[agendador] job de inovacao semanal criado: ' + job.id)
+  return job
 }
 
 export function pararAgendador(): void {
