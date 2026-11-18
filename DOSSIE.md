@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 17:00:43** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.6** · branch `integra-13-11` · último commit: 2dcb3ea 2026-11-18 docs: atualiza contagem de tools MCP HTTP para 18
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 17:14:36** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.7** · branch `integra-13-11` · último commit: 17550a2 2026-11-18 chore: bump 0.6.7
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -336,16 +336,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
-- 2dcb3ea 2026-11-18 docs: atualiza contagem de tools MCP HTTP para 18
-- 13bd24c 2026-11-18 MCP HTTP: adiciona custo_resumo (18 tools)
-- e0344b4 2026-11-18 docs: documenta MCP HTTP permanente (dg-mcp.autopartz.app) no guia Adapta
-- c6a7ce1 2026-11-18 MCP HTTP: adiciona git_commit e git_push com trava de confirmacao
-- 4fbdf45 2026-11-18 MCP HTTP: adiciona testes_rodar e projeto_smoke (15 tools)
-- 3e2ee02 2026-11-18 MCP HTTP: expoe codigo_editar e terminal_exec alem das tools de leitura
-- cfc74c9 2026-11-18 chore: ignora artefatos de smoke
-- 0ac03f8 2026-11-18 chore: remove artefatos de smoke commitados por engano
-- 82b8142 2026-11-18 feat: painel de custo MCP, done-when checks, memoria observacional, pin av<14, refactor terminal
-- 605926e 2026-11-18 chore: dossie v0.6.6 + smoke cascata no script de midia
+- 17550a2 2026-11-18 chore: bump 0.6.7
+- c5a4a57 2026-11-18 docs: tools MCP HTTP agora 30
+- 3032cd3 2026-11-18 MCP HTTP: adiciona narracao e memes (30 tools)
+- 80e06ac 2026-11-18 docs: tools MCP HTTP agora 27
+- c1a3dc9 2026-11-18 MCP HTTP: adiciona doc_pdf e doc_planilha (27 tools)
+- a77d240 2026-11-18 docs: tools MCP HTTP agora 25
+- 4000965 2026-11-18 MCP HTTP: adiciona midia_video_auto (25 tools)
+- 9f29955 2026-11-18 docs: tools MCP HTTP agora 24
+- 960b855 2026-11-18 MCP HTTP: adiciona midia_imagem_auto (24 tools)
+- 66608fc 2026-11-18 docs: tools MCP HTTP agora 23
 
 ## 16. Como atualizar este dossiê
 
