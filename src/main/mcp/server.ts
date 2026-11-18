@@ -627,6 +627,20 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_getimg',
+    description:
+      'Gera imagem via getimg.ai (modelos variados: seedream, nano banana, gpt-image). PAGO: consome saldo pré-pago USD da conta. Requer GETIMG_API_KEY. Consulte saldo antes de usar em volume.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        modelo: { type: 'string', description: 'Slug do modelo (GET /v2/models lista; ex.: seedream-5-lite)' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_imagem_gemini',
     description:
       'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
@@ -2822,6 +2836,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const sm = await import('../midia/segmind')
         return await responder(await sm.gerarImagemSegmind(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_getimg') {
+        const p = z
+          .object({ prompt: z.string().min(1), modelo: z.string().optional(), saida: z.string().optional() })
+          .parse(args)
+        const gi = await import('../midia/getimg')
+        return await responder(await gi.gerarImagemGetimg(RAIZ, p))
       }
 
       if (name === 'midia_imagem_gemini') {
