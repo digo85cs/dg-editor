@@ -17,7 +17,7 @@ import { projectStateDir, resolverRaizDGEditor } from '../paths'
 import { obterRaizWorkspace } from '../workspace-raiz'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
-import { gitStatus, gitDiff, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar } from '../autonomia-tools'
+import { gitStatus, gitDiff, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke } from '../autonomia-tools'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -37,7 +37,7 @@ const server = new Server(
 const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
-  'git_status', 'git_diff', 'terminal_exec',
+  'git_status', 'git_diff', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar'
 ])
 
@@ -163,6 +163,16 @@ const TOOLS = [
       },
       required: ['comando']
     }
+  },
+  {
+    name: 'testes_rodar',
+    description: 'Roda a suite de testes do projeto (detecta script npm test ou validar). Timeout 120s.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'projeto_smoke',
+    description: 'Smoke rapido do projeto: package.json, git e qualidade.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
     name: 'git_status',
@@ -313,6 +323,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         confirmado: z.boolean().optional()
       }).parse(args)
       const r = await terminalExec(RAIZ, parsed.comando, parsed.args || [], parsed.confirmado ?? false)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'testes_rodar') {
+      const r = await testesRodar(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'projeto_smoke') {
+      const r = await projetoSmoke(RAIZ)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
