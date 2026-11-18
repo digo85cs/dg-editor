@@ -24,6 +24,8 @@ import { listarAgentes } from '../brain/agentes'
 import { gerarImagemAuto } from '../midia/cascata'
 import { gerarVideoAuto } from '../midia/video-auto'
 import { pdfOperar, planilhaOperar } from '../midia/arquivos-doc'
+import { narrar } from '../midia/core'
+import { gerarMeme, sincronizarMemes } from '../midia/memes'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -46,7 +48,7 @@ const ALLOWED_TOOLS = new Set([
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
   'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto', 'midia_video_auto',
-  'doc_pdf', 'doc_planilha'
+  'doc_pdf', 'doc_planilha', 'midia_narrar', 'midia_meme_gerar', 'midia_memes_listar'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -267,6 +269,39 @@ const TOOLS = [
         incluirPago: { type: 'boolean', description: 'Permitir Veo pago (default false)' }
       },
       required: []
+    }
+  },
+  {
+    name: 'midia_narrar',
+    description: 'Sintetiza narracao de texto em mp3 (edge-tts gratis ou voz local). Texto max 8000 chars.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        texto: { type: 'string' },
+        voz: { type: 'string', description: 'Id da voz (opcional; default do projeto)' },
+        taxa: { type: 'string', description: 'Velocidade relativa, ex: +10%' },
+        saida: { type: 'string' }
+      },
+      required: ['texto']
+    }
+  },
+  {
+    name: 'midia_memes_listar',
+    description: 'Lista templates de meme disponiveis (id, nome, largura, altura).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_meme_gerar',
+    description: 'Gera meme local com template + texto de cima/baixo (ImageMagick).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        template: { type: 'string', description: 'Id ou nome do template (ver midia_memes_listar)' },
+        topo: { type: 'string' },
+        baixo: { type: 'string' },
+        saida: { type: 'string' }
+      },
+      required: ['template']
     }
   },
   {
@@ -573,6 +608,38 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       })
       const { previewBase64: _omit2, ...resto2 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto2, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'midia_narrar') {
+      const parsed = z.object({
+        texto: z.string(),
+        voz: z.string().optional(),
+        taxa: z.string().optional(),
+        saida: z.string().optional()
+      }).parse(args)
+      const r = await narrar(RAIZ, parsed)
+      const { previewBase64: _omit5, ...resto5 } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto5, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'midia_memes_listar') {
+      await sincronizarMemes()
+      const { lerManifesto } = await import('../midia/memes')
+      const m = lerManifesto()
+      const lista = (m?.templates || []).map((t) => ({ id: t.id, nome: t.nome, largura: t.largura, altura: t.altura }))
+      return { content: [{ type: 'text', text: JSON.stringify(lista.slice(0, 100), null, 2) }] }
+    }
+
+    if (name === 'midia_meme_gerar') {
+      const parsed = z.object({
+        template: z.string(),
+        topo: z.string().optional(),
+        baixo: z.string().optional(),
+        saida: z.string().optional()
+      }).parse(args)
+      const r = await gerarMeme(RAIZ, parsed)
+      const { previewBase64: _omit6, ...resto6 } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto6, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'doc_pdf') {
