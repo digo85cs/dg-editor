@@ -17,7 +17,7 @@ import { projectStateDir, resolverRaizDGEditor } from '../paths'
 import { obterRaizWorkspace } from '../workspace-raiz'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
-import { gitStatus, gitDiff, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke } from '../autonomia-tools'
+import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke } from '../autonomia-tools'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -37,7 +37,7 @@ const server = new Server(
 const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
-  'git_status', 'git_diff', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
+  'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar'
 ])
 
@@ -162,6 +162,27 @@ const TOOLS = [
         confirmado: { type: 'boolean', description: 'Obrigatorio true para install/rm/push --force/reset' }
       },
       required: ['comando']
+    }
+  },
+  {
+    name: 'git_commit',
+    description: 'Commit de todas as alteracoes (git add -A + commit). Exige confirmado=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mensagem: { type: 'string', description: 'Mensagem do commit (1-500 chars)' },
+        confirmado: { type: 'boolean', description: 'Obrigatorio true para commitar' }
+      },
+      required: ['mensagem']
+    }
+  },
+  {
+    name: 'git_push',
+    description: 'Push da branch atual para origin. Exige confirmado=true.',
+    inputSchema: {
+      type: 'object',
+      properties: { confirmado: { type: 'boolean', description: 'Obrigatorio true para publicar' } },
+      required: []
     }
   },
   {
@@ -324,6 +345,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }).parse(args)
       const r = await terminalExec(RAIZ, parsed.comando, parsed.args || [], parsed.confirmado ?? false)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'git_commit') {
+      const parsed = z.object({
+        mensagem: z.string(),
+        confirmado: z.boolean().optional()
+      }).parse(args)
+      const r = await gitCommit(RAIZ, parsed.mensagem, parsed.confirmado ?? false)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'git_push') {
+      const parsed = z.object({ confirmado: z.boolean().optional() }).parse(args)
+      const r = await gitPush(RAIZ, parsed.confirmado ?? false)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'testes_rodar') {

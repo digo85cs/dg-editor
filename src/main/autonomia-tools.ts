@@ -305,6 +305,52 @@ export async function terminalExec(
   }
 }
 
+export async function gitCommit(
+  raiz: string,
+  mensagem: string,
+  confirmado = false
+): Promise<Record<string, unknown>> {
+  if (!confirmado) {
+    return { ok: false, erro: 'git_commit exige confirmado=true (revise a mensagem antes)' }
+  }
+  const msg = String(mensagem || '').trim()
+  if (!msg || msg.length > 500) return { ok: false, erro: 'mensagem invalida (1-500 chars)' }
+  const st = await gitStatus(raiz)
+  const porcelain = String(st.porcelain || '')
+  const linhas = porcelain.split('\n').filter((l) => l.trim() && !l.startsWith('##'))
+  if (linhas.length === 0) return { ok: false, erro: 'nada para commitar (working tree limpo)' }
+  const add = await run('git', ['-C', raiz, 'add', '-A'], raiz, 30000)
+  if (!add.ok) return { ok: false, erro: 'git add falhou', stderr: trunc(add.stderr, 800) }
+  const c = await run('git', ['-C', raiz, 'commit', '-m', msg], raiz, 60000)
+  return {
+    ok: c.ok,
+    code: c.code,
+    stdout: trunc(c.stdout, 2000),
+    stderr: trunc(c.stderr, 1000),
+    arquivos: linhas.length
+  }
+}
+
+export async function gitPush(
+  raiz: string,
+  confirmado = false
+): Promise<Record<string, unknown>> {
+  if (!confirmado) {
+    return { ok: false, erro: 'git_push exige confirmado=true (publica no remoto)' }
+  }
+  const branch = await run('git', ['-C', raiz, 'rev-parse', '--abbrev-ref', 'HEAD'], raiz, 8000)
+  const atual = (branch.stdout || '').trim()
+  if (!atual || atual === 'HEAD') return { ok: false, erro: 'branch indeterminada' }
+  const p = await run('git', ['-C', raiz, 'push', 'origin', atual], raiz, 120000)
+  return {
+    ok: p.ok,
+    branch: atual,
+    code: p.code,
+    stdout: trunc(p.stdout, 2000),
+    stderr: trunc(p.stderr, 1000)
+  }
+}
+
 export async function codigoEditar(
   raiz: string,
   arquivo: string,
