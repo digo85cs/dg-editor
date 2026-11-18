@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 14:33:51** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.6** · branch `integra-13-11` · último commit: 605926e 2026-11-18 chore: dossie v0.6.6 + smoke cascata no script de midia
-> Alterações locais não commitadas: 11 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 17:00:43** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.6** · branch `integra-13-11` · último commit: 2dcb3ea 2026-11-18 docs: atualiza contagem de tools MCP HTTP para 18
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,16 +336,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 2dcb3ea 2026-11-18 docs: atualiza contagem de tools MCP HTTP para 18
+- 13bd24c 2026-11-18 MCP HTTP: adiciona custo_resumo (18 tools)
+- e0344b4 2026-11-18 docs: documenta MCP HTTP permanente (dg-mcp.autopartz.app) no guia Adapta
+- c6a7ce1 2026-11-18 MCP HTTP: adiciona git_commit e git_push com trava de confirmacao
+- 4fbdf45 2026-11-18 MCP HTTP: adiciona testes_rodar e projeto_smoke (15 tools)
+- 3e2ee02 2026-11-18 MCP HTTP: expoe codigo_editar e terminal_exec alem das tools de leitura
+- cfc74c9 2026-11-18 chore: ignora artefatos de smoke
+- 0ac03f8 2026-11-18 chore: remove artefatos de smoke commitados por engano
+- 82b8142 2026-11-18 feat: painel de custo MCP, done-when checks, memoria observacional, pin av<14, refactor terminal
 - 605926e 2026-11-18 chore: dossie v0.6.6 + smoke cascata no script de midia
-- 1a28208 2026-11-18 chore: release v0.6.6
-- af4f975 2026-11-18 fix(midia): cost ceiling diario, HF router endpoint, CF whisper parse, inovador dry-run
-- f21e855 2026-11-18 feat(midia): cost ledger, video cascade, CF whisper fallback, gemini quota skip (100 tools)
-- ab02f46 2026-11-18 feat(brain): Cloudflare Workers AI chat provider (free tier, 3 models verified)
-- c0f858d 2026-11-18 feat(midia): Cloudflare Workers AI image (free tier) in cascade + tool (99 tools)
-- 6aa26e9 2026-11-18 feat(midia): getimg.ai provider (paid balance, explicit opt-in) + remove segmind from free cascade
-- 7201896 2026-11-18 feat(midia): Segmind image provider + cascade slot (97 tools)
-- 14fd8df 2026-11-18 feat(midia): HuggingFace Inference na cascata + Bitbucket Server no catalogo
-- 7d91c7b 2026-11-18 feat(mcp): catalogo cobre GitLab, Bitbucket, Azure DevOps, Forgejo/Gitea/Codeberg
 
 ## 16. Como atualizar este dossiê
 

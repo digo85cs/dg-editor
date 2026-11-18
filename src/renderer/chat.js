@@ -1,20 +1,15 @@
 /**
  * UI de histórico de chats (Nova conversa + dropdown + autosave).
  */
+import { tituloDeMensagens, novoIdChat, tempoRelativoChat } from './chat-utils.js'
+
+const novoId = novoIdChat
+const tempoRelativo = tempoRelativoChat
+
 let chatAtivoId = null
 let mensagensLocais = []
 let debounceTimer = null
 let raizChats = null
-
-function tituloDeMensagens(msgs) {
-  const primeira = (msgs || []).find((m) => m.role === 'user' && m.content)
-  const raw = String(primeira?.content || 'Nova conversa').replace(/\s+/g, ' ').trim()
-  return raw.slice(0, 40) || 'Nova conversa'
-}
-
-function novoId() {
-  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
-}
 
 export function obterMensagensChat() {
   return mensagensLocais.slice()
@@ -34,16 +29,6 @@ function lembrarChatAtivo(id) {
   } catch {
     /* */
   }
-}
-
-function tempoRelativo(iso) {
-  const t = Date.parse(String(iso || ''))
-  if (!Number.isFinite(t)) return ''
-  const s = Math.max(0, (Date.now() - t) / 1000)
-  if (s < 60) return Math.max(1, Math.floor(s)) + 's'
-  if (s < 3600) return Math.floor(s / 60) + 'm'
-  if (s < 86400) return Math.floor(s / 3600) + 'h'
-  return Math.floor(s / 86400) + 'd'
 }
 
 export async function iniciarHistoricoChat(
