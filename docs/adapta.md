@@ -63,6 +63,26 @@ node .dg-editor/bin/main/mcp/server.js
 
 (com `cwd` = raiz do projeto).
 
+### 2b. MCP HTTP permanente (recomendado — já configurado)
+
+O DG expõe um servidor MCP **HTTP** em `127.0.0.1:7331` (`src/main/mcp/http-server.ts`), publicado via Cloudflare Tunnel em:
+
+```text
+https://dg-mcp.autopartz.app/mcp
+```
+
+No Maestro: **Conectores → Adicionar via URL** → Tipo `http`, URL acima, Token = conteúdo de `%LOCALAPPDATA%\dg-editor\mcp-http-token.txt`.
+
+**Persistência (Windows):**
+
+- `cloudflared` service (auto-start) — túnel `dg-editor-mcp`, conta Cloudflare do `autopartz.app`
+- Tarefa agendada `DGEditor-MCP-HTTP` (logon) — roda `scripts/mcp-http-oculto.vbs` → `scripts/mcp-http-iniciar.bat`
+- Rebuild após mudanças: `npm run mcp:http` (gera `.dg-editor/bin/main/mcp/http-server.js`)
+
+**17 tools expostas:** `dossie_read`, `dossie_snapshot`, `vault_list`, `vault_read`, `projeto_arvore`, `codigo_buscar`, `codigo_ler`, `codigo_editar`, `git_status`, `git_diff`, `git_commit`, `git_push`, `terminal_exec`, `testes_rodar`, `projeto_smoke`, `qualidade_checar`, `resultado_avaliar`.
+
+Travas de segurança: Bearer token obrigatório; `terminal_exec`/`git_commit`/`git_push` exigem `confirmado=true`; caminhos protegidos (.env, chaves, credenciais) bloqueados; `codigo_editar` roda typecheck e reverte se falhar.
+
 ### 3. Pedidos úteis no Maestro
 
 - “Leia o dossiê do DG” → tool `dossie_read`
