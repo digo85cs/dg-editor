@@ -530,6 +530,77 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_editar_gemini',
+    description:
+      'Edita uma imagem local via Gemini (nano banana img2img): "troca o fundo", "põe chapéu". Requer GEMINI_API_KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        imagem: { type: 'string', description: 'Caminho da imagem de entrada' },
+        prompt: { type: 'string', description: 'Instrução de edição' },
+        saida: { type: 'string' }
+      },
+      required: ['imagem', 'prompt']
+    }
+  },
+  {
+    name: 'midia_imagem_openai',
+    description: 'Gera imagem via OpenAI gpt-image-1 (alta qualidade, paga). Requer OPENAI_API_KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        tamanho: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_video_gemini',
+    description:
+      'Gera vídeo por texto via Veo (Google) — leva minutos e consome cota paga. Requer GEMINI_API_KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        aspectRatio: { type: 'string', enum: ['16:9', '9:16'] },
+        duracaoSeg: { type: 'number', description: '4-8 (padrao 8)' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_tts_openai',
+    description:
+      'Narração TTS via OpenAI (vozes alloy/echo/fable/onyx/nova/shimmer). Requer OPENAI_API_KEY.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        texto: { type: 'string', description: 'Máx. 4096 caracteres' },
+        voz: { type: 'string', enum: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] },
+        formato: { type: 'string', enum: ['mp3', 'wav'] },
+        saida: { type: 'string' }
+      },
+      required: ['texto']
+    }
+  },
+  {
+    name: 'midia_documento_converter',
+    description:
+      'Converte documentos via pandoc local (gratuito): md/html/docx/odt/rtf → md, html, docx, odt, rtf, tex, pdf, epub, pptx. PDF exige engine instalada.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entrada: { type: 'string', description: 'Caminho do arquivo de entrada' },
+        formato: { type: 'string', description: 'Saída: md, html, docx, odt, rtf, tex, pdf, epub, pptx' },
+        saida: { type: 'string' }
+      },
+      required: ['entrada', 'formato']
+    }
+  },
+  {
     name: 'midia_diagrama',
     description: 'Gera diagrama Mermaid em PNG/SVG via mermaid.ink (gratuito).',
     inputSchema: {
@@ -2496,6 +2567,67 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const gem = await import('../midia/gemini-imagem')
         return await responder(await gem.gerarImagemGemini(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_editar_gemini') {
+        const p = z
+          .object({ imagem: z.string().min(1), prompt: z.string().min(1), saida: z.string().optional() })
+          .parse(args)
+        const gem = await import('../midia/gemini-imagem')
+        return await responder(await gem.editarImagemGemini(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_openai') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            tamanho: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const om = await import('../midia/openai-midia')
+        return await responder(await om.gerarImagemOpenAI(RAIZ, p))
+      }
+
+      if (name === 'midia_video_gemini') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            aspectRatio: z.string().optional(),
+            duracaoSeg: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const gv = await import('../midia/gemini-video')
+        return await responder(
+          await gv.gerarVideoGemini(RAIZ, {
+            prompt: p.prompt,
+            aspectRatio: p.aspectRatio === '9:16' ? '9:16' : '16:9',
+            duracaoSeg: p.duracaoSeg,
+            saida: p.saida
+          })
+        )
+      }
+
+      if (name === 'midia_tts_openai') {
+        const p = z
+          .object({
+            texto: z.string().min(1),
+            voz: z.string().optional(),
+            formato: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const om = await import('../midia/openai-midia')
+        return await responder(await om.sintetizarVozOpenAI(RAIZ, p))
+      }
+
+      if (name === 'midia_documento_converter') {
+        const p = z
+          .object({ entrada: z.string().min(1), formato: z.string().min(1), saida: z.string().optional() })
+          .parse(args)
+        const doc = await import('../midia/documento')
+        return await responder(await doc.converterDocumento(RAIZ, p))
       }
 
       if (name === 'midia_diagrama') {

@@ -1052,6 +1052,8 @@ export async function executarAgente(
       'senao midia_imagem_gerar (Pollinations, rapido — segundos) para pedidos simples. ' +
       'Use midia_comfyui_imagem (ComfyUI local em CPU, ilimitado) quando o usuario pedir lote/ilimitado/local ' +
       'ou quando Pollinations falhar por limite — avise que na CPU demora alguns minutos. ' +
+      'Edicao de imagem: midia_imagem_editar_gemini (img2img). Video IA pago: midia_video_gemini (Veo, minutos). ' +
+      'TTS OpenAI: midia_tts_openai. Documentos: midia_documento_converter (pandoc: md/docx/pdf/pptx). ' +
       'Para video use midia_comfyui_video (CPU, varios minutos — avise e prefira 8 a 16 quadros em 512x512). ' +
       '\nMEMES: use midia_memes_listar (sincroniza na primeira vez), escolha template por id/nome e chame ' +
       'midia_meme_gerar com topo/baixo. Banco gratuito do Imgflip; templates ficam locais. ' +

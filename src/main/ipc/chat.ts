@@ -428,8 +428,11 @@ async function executarChatSend(
         contextoAgente +=
           '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA ' +
           '(midia_imagem_gemini para imagem — melhor qualidade/velocidade se a chave Gemini existir; ' +
+          'midia_imagem_editar_gemini para editar imagem local; midia_imagem_openai se houver OPENAI_API_KEY; ' +
           'midia_imagem_gerar Pollinations como padrao rapido; midia_comfyui_imagem so se pedir ' +
-          'ilimitado/local ou se as nuvens falharem; midia_comfyui_video para video; ' +
+          'ilimitado/local ou se as nuvens falharem; midia_video_gemini para video IA se houver chave Gemini ' +
+          '(leva minutos, custo pago), senao midia_comfyui_video; midia_tts_openai para narracao OpenAI; ' +
+          'midia_documento_converter para md/docx/pdf/pptx via pandoc; ' +
           'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';
       }
