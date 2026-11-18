@@ -12,6 +12,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
+import { registrarUso } from './guarda-custo'
 
 const MODELO_VEO = 'veo-3.1-generate-preview'
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
@@ -66,7 +67,9 @@ export async function gerarVideoGemini(
     )
     if (!r.ok) {
       const corpo = await r.text().catch(() => '')
-      return { ok: false, erro: 'Veo HTTP ' + r.status + ': ' + corpo.slice(0, 300) }
+      const erro = 'Veo HTTP ' + r.status + ': ' + corpo.slice(0, 300)
+      registrarUso(raiz, 'veo', false, { detalhe: erro })
+      return { ok: false, erro }
     }
     const j = (await r.json()) as { name?: string }
     opNome = j.name || ''
@@ -118,6 +121,7 @@ export async function gerarVideoGemini(
     const buf = Buffer.from(await dl.arrayBuffer())
     const destino = destinoArquivo(raiz, nomeArquivo(prompt, '.mp4'), opts.saida)
     writeFileSync(destino, buf)
+    registrarUso(raiz, 'veo', true, { detalhe: aspecto + '/' + duracao + 's' })
     return {
       ok: true,
       caminho: destino,
@@ -131,7 +135,7 @@ export async function gerarVideoGemini(
         duracaoSeg: duracao,
         segundosProcessando: +((Date.now() - t0) / 1000).toFixed(1)
       },
-      aviso: 'Vídeo gerado pelo Veo (Google) — leva alguns minutos e consome cota paga da chave Gemini.'
+      aviso: 'Vídeo gerado pelo Veo (Google) — leva alguns minutos e consome cota paga da chave Gemini. Custo registrado em .dg-editor/uso-custo.json.'
     }
   } catch (e) {
     return { ok: false, erro: 'falha ao salvar o vídeo: ' + (e instanceof Error ? e.message : String(e)) }

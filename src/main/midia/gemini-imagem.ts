@@ -34,6 +34,21 @@ export function geminiImagemConfigurado(): boolean {
   return !!chaveGemini()
 }
 
+// Cota free de imagem esgotada (HTTP 429 quota=0) — pula a tentativa por 1h
+// para não gastar uma chamada inútil a cada pedido na cascata.
+let cotaImagemBloqueadaAte = 0
+
+export function geminiImagemCotaEsgotada(): boolean {
+  return Date.now() < cotaImagemBloqueadaAte
+}
+
+function registrarErroCota(status: number, corpo: string): void {
+  const t = corpo.toLowerCase()
+  if (status === 429 || /quota|free tier|rate limit|exceeded/i.test(t)) {
+    cotaImagemBloqueadaAte = Date.now() + 60 * 60_000
+  }
+}
+
 type ParteGemini = { text: string } | { inlineData: { mimeType: string; data: string } }
 
 async function chamarGeminiImagem(
@@ -51,6 +66,7 @@ async function chamarGeminiImagem(
   })
   if (!res.ok) {
     const corpo = await res.text().catch(() => '')
+    registrarErroCota(res.status, corpo)
     return { ok: false, erro: 'Gemini image HTTP ' + res.status + ': ' + corpo.slice(0, 300) }
   }
   const j = (await res.json().catch(() => null)) as {

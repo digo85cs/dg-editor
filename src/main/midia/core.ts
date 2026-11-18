@@ -1007,6 +1007,61 @@ print(json.dumps({
 }))
 `
 
+/** Fallback de transcrição via Cloudflare Workers AI Whisper (free tier). */
+async function transcreverCF(
+  raiz: string,
+  entrada: string,
+  idioma: string,
+  saida?: string
+): Promise<RespostaMidia | null> {
+  try {
+    const { cfConfigurado } = await import('./cloudflare')
+    if (!cfConfigurado()) return null
+    const abs = resolve(raiz, entrada)
+    if (!existsSync(abs)) return null
+    const buf = readFileSync(abs)
+    const ext = extname(abs).toLowerCase() || '.mp3'
+    const mime = ext === '.wav' ? 'audio/wav' : ext === '.m4a' ? 'audio/mp4' : ext === '.ogg' ? 'audio/ogg' : 'audio/mpeg'
+    const fd = new FormData()
+    fd.append('audio', new Blob([buf], { type: mime }), basename(abs))
+    if (idioma !== 'auto') fd.append('language', idioma)
+    const token = (process.env.CLOUDFLARE_API_TOKEN || '').trim()
+    const conta = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim()
+    const url =
+      'https://api.cloudflare.com/client/v4/accounts/' +
+      encodeURIComponent(conta) +
+      '/ai/run/@cf/openai/whisper'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: fd,
+      signal: AbortSignal.timeout(300_000)
+    })
+    if (!res.ok) return null
+    const txt = await res.text()
+    let dados: { text?: string; transcription?: string; vtt?: string } | null = null
+    try { dados = JSON.parse(txt) } catch { /* texto puro */ }
+    const texto =
+      (dados && (dados.text || dados.transcription)) ||
+      (typeof dados === 'object' && dados ? undefined : txt.trim())
+    if (!texto) return null
+    const destino = destinoArquivo(raiz, nomeArquivo('transcricao-cf', '.txt'), saida)
+    writeFileSync(destino, String(texto), 'utf8')
+    return {
+      ok: true,
+      caminho: destino,
+      caminhoRel: caminhoRelativo(raiz, destino),
+      bytes: statSync(destino).size,
+      mime: 'text/plain',
+      texto: String(texto).slice(0, 8000),
+      detalhes: { motor: 'cloudflare-whisper', idioma },
+      aviso: 'Transcrição via Cloudflare Workers AI Whisper (free tier) — fallback do faster-whisper local.'
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function transcrever(
   raiz: string,
   opts: { entrada: string; idioma?: string; modelo?: string; saida?: string }
@@ -1020,6 +1075,9 @@ export async function transcrever(
   writeFileSync(script, SCRIPT_WHISPER, 'utf8')
   const r = await rodar(pythonBin(), [script, opts.entrada, destino, modelo, idioma], 1_800_000)
   if (!r.ok || !existsSync(destino)) {
+    // Fallback: Cloudflare Workers AI Whisper (free tier) quando configurado.
+    const cf = await transcreverCF(raiz, opts.entrada, idioma, opts.saida)
+    if (cf) return cf
     return {
       ok: false,
       erro:

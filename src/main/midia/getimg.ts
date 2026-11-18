@@ -12,6 +12,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
+import { registrarUso } from './guarda-custo'
 
 const MODELO_PADRAO = 'seedream-5-lite'
 
@@ -47,13 +48,16 @@ export async function gerarImagemGetimg(
     })
     const txt = await res.text().catch(() => '')
     if (!res.ok) {
-      return { ok: false, erro: 'getimg HTTP ' + res.status + ': ' + txt.slice(0, 300) }
+      const erro = 'getimg HTTP ' + res.status + ': ' + txt.slice(0, 300)
+      registrarUso(raiz, 'getimg', false, { detalhe: erro })
+      return { ok: false, erro }
     }
     const ct = (res.headers.get('content-type') || '').toLowerCase()
     if (ct.startsWith('image/')) {
       const buf = Buffer.from(txt, 'binary')
       const destino = destinoArquivo(raiz, nomeArquivo('getimg-imagem', '.png'), opts.saida)
       writeFileSync(destino, buf)
+      registrarUso(raiz, 'getimg', true, { detalhe: modelo })
       return {
         ok: true,
         caminho: destino,
@@ -61,7 +65,7 @@ export async function gerarImagemGetimg(
         bytes: buf.length,
         mime: ct,
         previewBase64: previewDe(destino),
-        aviso: 'Imagem via getimg.ai — consumiu saldo pré-pago da conta.',
+        aviso: 'Imagem via getimg.ai — consumiu saldo pré-pago da conta. Custo registrado em .dg-editor/uso-custo.json.',
         detalhes: { motor: 'getimg', modelo }
       }
     }
@@ -74,6 +78,7 @@ export async function gerarImagemGetimg(
         const buf = Buffer.from(await img.arrayBuffer())
         const destino = destinoArquivo(raiz, nomeArquivo('getimg-imagem', '.png'), opts.saida)
         writeFileSync(destino, buf)
+        registrarUso(raiz, 'getimg', true, { detalhe: modelo })
         return {
           ok: true,
           caminho: destino,
@@ -81,13 +86,14 @@ export async function gerarImagemGetimg(
           bytes: buf.length,
           mime: 'image/png',
           previewBase64: previewDe(destino),
-          aviso: 'Imagem via getimg.ai — consumiu saldo pré-pago da conta.',
+          aviso: 'Imagem via getimg.ai — consumiu saldo pré-pago da conta. Custo registrado em .dg-editor/uso-custo.json.',
           detalhes: { motor: 'getimg', modelo }
         }
       }
     }
     return { ok: false, erro: 'getimg respondeu sem imagem: ' + txt.slice(0, 300) }
   } catch (e) {
+    registrarUso(raiz, 'getimg', false, { detalhe: 'rede' })
     return { ok: false, erro: 'getimg falhou: ' + (e instanceof Error ? e.message : String(e)) }
   }
 }

@@ -431,9 +431,11 @@ async function executarChatSend(
           'Gemini cota free -> Pollinations -> ComfyUI local -> OpenAI so com incluir_pago=true). ' +
           'Use as tools especificas so quando o usuario pedir um motor exato: ' +
           'midia_imagem_editar_gemini para editar imagem local; midia_imagem_openai para gpt-image pago; ' +
-          'midia_video_gemini para video IA realista se houver chave Gemini ' +
-          '(leva minutos, custo pago), senao midia_comfyui_video; midia_video_json2video para video ' +
-          'programatico (templates/cenas, requer chave); midia_estoque para fotos/videos stock do Pixabay ' +
+          'Para video generico use SEMPRE midia_video_auto (cascata gratis-primeiro: ' +
+          'JSON2Video cenas -> ComfyUI local -> Veo so com incluir_pago=true); ' +
+          'midia_video_gemini so quando o usuario pedir video IA realista pago (leva minutos); ' +
+          'midia_video_json2video para video programatico direto por cenas (templates); ' +
+          'midia_estoque para fotos/videos stock do Pixabay ' +
           '(requer PIXABAY_API_KEY); midia_tts_openai para narracao OpenAI; ' +
           'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';

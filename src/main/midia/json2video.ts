@@ -13,6 +13,7 @@ import {
   nomeArquivo,
   type RespostaMidia
 } from './core'
+import { registrarUso } from './guarda-custo'
 
 const BASE = 'https://api.json2video.com/v2'
 const TIMEOUT_RENDER_MS = 10 * 60_000
@@ -144,6 +145,7 @@ export async function gerarVideoJson2Video(
   if (!buf.length) return { ok: false, erro: 'vídeo vazio' }
   const destino = destinoArquivo(raiz, nomeArquivo(opts.titulo || 'video-json2video', '.mp4'), opts.saida)
   writeFileSync(destino, buf)
+  registrarUso(raiz, 'json2video', true, { detalhe: projeto })
   return {
     ok: true,
     caminho: destino,

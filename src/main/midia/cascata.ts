@@ -16,7 +16,7 @@
  */
 import type { RespostaMidia } from './core'
 import { gerarImagem as gerarImagemPollinations } from './core'
-import { gerarImagemGemini, geminiImagemConfigurado } from './gemini-imagem'
+import { gerarImagemGemini, geminiImagemConfigurado, geminiImagemCotaEsgotada } from './gemini-imagem'
 import { gerarImagemComfy, comfyInstalado } from './comfyui'
 
 export type OpcoesImagemAuto = {
@@ -48,7 +48,7 @@ export async function gerarImagemAuto(
   })
 
   // 1. Gemini (cota free do AI Studio)
-  if (geminiImagemConfigurado()) {
+  if (geminiImagemConfigurado() && !geminiImagemCotaEsgotada()) {
     const t0 = Date.now()
     try {
       const r = await gerarImagemGemini(raiz, { prompt: opts.prompt, saida: opts.saida })
@@ -57,7 +57,11 @@ export async function gerarImagemAuto(
       tentativas.push({ motor: 'gemini-image', ok: false, erro: String(e).slice(0, 160), segundos: +((Date.now() - t0) / 1000).toFixed(1) })
     }
   } else {
-    tentativas.push({ motor: 'gemini-image', ok: false, erro: 'sem GEMINI_API_KEY' })
+    tentativas.push({
+      motor: 'gemini-image',
+      ok: false,
+      erro: geminiImagemConfigurado() ? 'cota free esgotada (retry em até 1h)' : 'sem GEMINI_API_KEY'
+    })
   }
 
   // 2. Pollinations (grátis, sem chave)

@@ -11,6 +11,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
+import { registrarUso } from './guarda-custo'
 
 function chaveOpenAI(): string | null {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
@@ -47,7 +48,9 @@ export async function gerarImagemOpenAI(
     })
     if (!r.ok) {
       const corpo = await r.text().catch(() => '')
-      return { ok: false, erro: 'OpenAI image HTTP ' + r.status + ': ' + corpo.slice(0, 300) }
+      const erro = 'OpenAI image HTTP ' + r.status + ': ' + corpo.slice(0, 300)
+      registrarUso(raiz, 'openai-image', false, { detalhe: erro })
+      return { ok: false, erro }
     }
     const j = (await r.json()) as { data?: { b64_json?: string; url?: string }[] }
     const item = j.data?.[0]
@@ -70,9 +73,10 @@ export async function gerarImagemOpenAI(
       mime: 'image/png',
       previewBase64: previewDe(destino),
       detalhes: { motor: 'openai-image', modelo: 'gpt-image-1', tamanho, segundosProcessando: +((Date.now() - t0) / 1000).toFixed(1) },
-      aviso: 'Imagem gerada via OpenAI gpt-image-1 (pago, alta qualidade).'
+      aviso: 'Imagem gerada via OpenAI gpt-image-1 (pago, alta qualidade). Custo registrado em .dg-editor/uso-custo.json.'
     }
   } catch (e) {
+    registrarUso(raiz, 'openai-image', false, { detalhe: 'rede' })
     return { ok: false, erro: 'falha ao chamar a OpenAI: ' + (e instanceof Error ? e.message : String(e)) }
   }
 }
@@ -100,11 +104,14 @@ export async function sintetizarVozOpenAI(
     })
     if (!r.ok) {
       const corpo = await r.text().catch(() => '')
-      return { ok: false, erro: 'OpenAI TTS HTTP ' + r.status + ': ' + corpo.slice(0, 300) }
+      const erro = 'OpenAI TTS HTTP ' + r.status + ': ' + corpo.slice(0, 300)
+      registrarUso(raiz, 'openai-tts', false, { detalhe: erro })
+      return { ok: false, erro }
     }
     const buf = Buffer.from(await r.arrayBuffer())
     const destino = destinoArquivo(raiz, nomeArquivo('tts-' + voz, '.' + formato), opts.saida)
     writeFileSync(destino, buf)
+    registrarUso(raiz, 'openai-tts', true, { detalhe: voz + '/' + formato })
     return {
       ok: true,
       caminho: destino,
@@ -112,9 +119,10 @@ export async function sintetizarVozOpenAI(
       bytes: buf.length,
       mime: formato === 'wav' ? 'audio/wav' : 'audio/mpeg',
       detalhes: { motor: 'openai-tts', modelo: 'gpt-4o-mini-tts', voz, formato, segundosProcessando: +((Date.now() - t0) / 1000).toFixed(1) },
-      aviso: 'Narração gerada via OpenAI TTS (voz ' + voz + ').'
+      aviso: 'Narração gerada via OpenAI TTS (voz ' + voz + '). Custo registrado em .dg-editor/uso-custo.json.'
     }
   } catch (e) {
+    registrarUso(raiz, 'openai-tts', false, { detalhe: 'rede' })
     return { ok: false, erro: 'falha ao chamar a OpenAI TTS: ' + (e instanceof Error ? e.message : String(e)) }
   }
 }

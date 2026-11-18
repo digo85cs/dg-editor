@@ -627,6 +627,35 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_video_auto',
+    description:
+      'Gera vídeo em cascata grátis-primeiro: JSON2Video (cenas, 600s/mês grátis) → ComfyUI local → Veo (pago, só com incluir_pago). Use para pedidos genéricos de vídeo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Texto-para-vídeo (ComfyUI/Veo)' },
+        cenas: {
+          type: 'array',
+          description: 'Cenas JSON2Video: {imagemUrl?, texto?, narracao?, voz?, duracaoSeg?}',
+          items: {
+            type: 'object',
+            properties: {
+              imagemUrl: { type: 'string' },
+              texto: { type: 'string' },
+              narracao: { type: 'string' },
+              voz: { type: 'string' },
+              duracaoSeg: { type: 'number' }
+            }
+          }
+        },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        incluir_pago: { type: 'boolean', description: 'Permite Veo pago como último recurso' },
+        saida: { type: 'string' }
+      }
+    }
+  },
+  {
     name: 'midia_imagem_cf',
     description:
       'Gera imagem via Cloudflare Workers AI (flux-1-schnell free tier ~10k neuronios/dia). Requer CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.',
@@ -2829,6 +2858,40 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const j2v = await import('../midia/json2video')
         return await responder(await j2v.gerarVideoJson2Video(RAIZ, p))
+      }
+
+      if (name === 'midia_video_auto') {
+        const p = z
+          .object({
+            prompt: z.string().optional(),
+            cenas: z
+              .array(
+                z.object({
+                  imagemUrl: z.string().optional(),
+                  texto: z.string().optional(),
+                  narracao: z.string().optional(),
+                  voz: z.string().optional(),
+                  duracaoSeg: z.number().optional()
+                })
+              )
+              .optional(),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            incluir_pago: z.boolean().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const va = await import('../midia/video-auto')
+        return await responder(
+          await va.gerarVideoAuto(RAIZ, {
+            prompt: p.prompt,
+            cenas: p.cenas,
+            largura: p.largura,
+            altura: p.altura,
+            incluirPago: p.incluir_pago,
+            saida: p.saida
+          })
+        )
       }
 
       if (name === 'midia_imagem_hf') {

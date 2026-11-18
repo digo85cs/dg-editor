@@ -11,6 +11,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
+import { registrarUso } from './guarda-custo'
 
 const MODELO_PADRAO = 'sdxl1.0-newreality-lightning'
 
@@ -59,6 +60,7 @@ export async function gerarImagemSegmind(
       if (!buf.length) return { ok: false, erro: 'Segmind retornou imagem vazia' }
       const destino = destinoArquivo(raiz, nomeArquivo('segmind-imagem', ct.includes('png') ? '.png' : '.jpg'), opts.saida)
       writeFileSync(destino, buf)
+      registrarUso(raiz, 'segmind', true, { detalhe: modelo })
       return {
         ok: true,
         caminho: destino,
@@ -66,12 +68,16 @@ export async function gerarImagemSegmind(
         bytes: buf.length,
         mime: ct,
         previewBase64: previewDe(destino),
-        aviso: 'Imagem via Segmind (créditos grátis da conta).',
+        aviso: 'Imagem via Segmind (saldo pré-pago da conta). Custo registrado em .dg-editor/uso-custo.json.',
         detalhes: { motor: 'segmind', modelo }
       }
     }
     const txt = await res.text().catch(() => '')
-    if (!res.ok) return { ok: false, erro: 'Segmind HTTP ' + res.status + ': ' + txt.slice(0, 300) }
+    if (!res.ok) {
+      const erro = 'Segmind HTTP ' + res.status + ': ' + txt.slice(0, 300)
+      registrarUso(raiz, 'segmind', false, { detalhe: erro })
+      return { ok: false, erro }
+    }
     // Resposta JSON pode trazer URL(s) da imagem gerada.
     let dados: unknown = null
     try { dados = JSON.parse(txt) } catch { /* imagem em outro formato */ }
@@ -82,6 +88,7 @@ export async function gerarImagemSegmind(
         const buf = Buffer.from(await img.arrayBuffer())
         const destino = destinoArquivo(raiz, nomeArquivo('segmind-imagem', '.png'), opts.saida)
         writeFileSync(destino, buf)
+        registrarUso(raiz, 'segmind', true, { detalhe: modelo })
         return {
           ok: true,
           caminho: destino,
@@ -89,7 +96,7 @@ export async function gerarImagemSegmind(
           bytes: buf.length,
           mime: 'image/png',
           previewBase64: previewDe(destino),
-          aviso: 'Imagem via Segmind (créditos grátis da conta).',
+          aviso: 'Imagem via Segmind (saldo pré-pago da conta). Custo registrado em .dg-editor/uso-custo.json.',
           detalhes: { motor: 'segmind', modelo }
         }
       }
