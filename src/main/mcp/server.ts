@@ -627,6 +627,21 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_cf',
+    description:
+      'Gera imagem via Cloudflare Workers AI (flux-1-schnell free tier ~10k neuronios/dia). Requer CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        modelo: { type: 'string', description: 'Ex.: @cf/black-forest-labs/flux-1-schnell (padrao)' },
+        passos: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_imagem_getimg',
     description:
       'Gera imagem via getimg.ai (modelos variados: seedream, nano banana, gpt-image). PAGO: consome saldo pré-pago USD da conta. Requer GETIMG_API_KEY. Consulte saldo antes de usar em volume.',
@@ -2844,6 +2859,19 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const gi = await import('../midia/getimg')
         return await responder(await gi.gerarImagemGetimg(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_cf') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            modelo: z.string().optional(),
+            passos: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const cf = await import('../midia/cloudflare')
+        return await responder(await cf.gerarImagemCF(RAIZ, p))
       }
 
       if (name === 'midia_imagem_gemini') {
