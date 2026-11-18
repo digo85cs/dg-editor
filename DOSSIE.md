@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 17:24:33** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
+> Gerado automaticamente em **17/11/2026, 21:34:18** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: 0fcbf97 2026-11-17 feat(chat): imagem gerada aparece inline + Pollinations primeiro
 > Alterações locais não commitadas: 5 arquivo(s).
 
 ## 1. O que é
@@ -89,7 +89,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 5. Estúdio de mídia
 
-Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/efeitos-integracao.test.ts`, `__tests__/efeitos.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/voz-efeitos.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `efeitos.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `voz-efeitos.ts`, `vozes.ts`.
+Módulos: `__tests__/atualizacoes.test.ts`, `__tests__/audio.test.ts`, `__tests__/core.test.ts`, `__tests__/editor.test.ts`, `__tests__/efeitos-integracao.test.ts`, `__tests__/efeitos.test.ts`, `__tests__/hardware.test.ts`, `__tests__/memes.test.ts`, `__tests__/midia-integracao.test.ts`, `__tests__/musicas-livres.test.ts`, `__tests__/musicas.test.ts`, `__tests__/qualidade-integracao.test.ts`, `__tests__/qualidade.test.ts`, `__tests__/voz-efeitos.test.ts`, `__tests__/vozes-integracao.test.ts`, `__tests__/vozes.test.ts`, `atualizacoes.ts`, `audio.ts`, `comfyui-install.ts`, `comfyui.ts`, `core.ts`, `editor.ts`, `efeitos.ts`, `gemini-imagem.ts`, `hardware.ts`, `memes.ts`, `musicas-livres.ts`, `musicas.ts`, `qualidade.ts`, `voz-efeitos.ts`, `vozes.ts`.
 
 ### Biblioteca de músicas livres (por estilo)
 
@@ -205,13 +205,13 @@ Artefatos locais em `dist-apps/`:
 
 ## 9. MCP
 
-- **83** ferramentas registradas em `src/main/mcp/server.ts`.
+- **84** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 - Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `imagens_iso`, `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`. A ferramenta `imagens_iso` é somente leitura: não grava pendrive.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_gemini`, `midia_imagem_gerar`, `midia_imagem_melhorar`, `midia_imagem_qualidade`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_status`, `midia_transcrever`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 0fcbf97 2026-11-17 feat(chat): imagem gerada aparece inline + Pollinations primeiro
 - 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
 - df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
 - db4c3a1 2026-11-17 docs: regenera DOSSIE v0.6.5
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 34ab538 2026-11-17 chore: release v0.6.4
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
 - 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
-- f0fd5af 2026-11-17 refactor: extrai boot de paineis e avisos de deps do app.js
 
 ## 16. Como atualizar este dossiê
 

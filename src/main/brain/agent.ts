@@ -1048,7 +1048,8 @@ export async function executarAgente(
       'Vozes locais (Supertonic/Kokoro/Piper) sao gratuitas, naturais e nao precisam de internet; ' +
       'edge-tts e apenas alternativa em nuvem. As vozes infantis sao derivadas de vozes naturais. ' +
       'Para gerar imagem nao pergunte voz. ' +
-      'Para imagem, prefira midia_imagem_gerar (Pollinations, rapido — segundos) para pedidos simples. ' +
+      'Para imagem, prefira midia_imagem_gemini (nano banana — rapida e alta qualidade) quando a chave Gemini existir; ' +
+      'senao midia_imagem_gerar (Pollinations, rapido — segundos) para pedidos simples. ' +
       'Use midia_comfyui_imagem (ComfyUI local em CPU, ilimitado) quando o usuario pedir lote/ilimitado/local ' +
       'ou quando Pollinations falhar por limite — avise que na CPU demora alguns minutos. ' +
       'Para video use midia_comfyui_video (CPU, varios minutos — avise e prefira 8 a 16 quadros em 512x512). ' +

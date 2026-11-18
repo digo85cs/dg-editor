@@ -517,6 +517,19 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_gemini',
+    description:
+      'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Descricao da imagem' },
+        saida: { type: 'string', description: 'Arquivo/pasta de saida (relativo ao projeto)' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_diagrama',
     description: 'Gera diagrama Mermaid em PNG/SVG via mermaid.ink (gratuito).',
     inputSchema: {
@@ -2475,6 +2488,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             esperarLimite: false
           })
         )
+      }
+
+      if (name === 'midia_imagem_gemini') {
+        const p = z
+          .object({ prompt: z.string().min(1), saida: z.string().optional() })
+          .parse(args)
+        const gem = await import('../midia/gemini-imagem')
+        return await responder(await gem.gerarImagemGemini(RAIZ, p))
       }
 
       if (name === 'midia_diagrama') {
