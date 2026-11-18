@@ -611,6 +611,22 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_segmind',
+    description:
+      'Gera imagem via Segmind AI Gateway (creditos gratis da conta). Requer SEGMIND_API_KEY de platform.segmind.com/api-keys.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        modelo: { type: 'string', description: 'Slug do modelo, ex.: sdxl1.0-newreality-lightning (padrao)' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_imagem_gemini',
     description:
       'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
@@ -2792,6 +2808,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const hf = await import('../midia/hf-inferencia')
         return await responder(await hf.gerarImagemHF(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_segmind') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            modelo: z.string().optional(),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const sm = await import('../midia/segmind')
+        return await responder(await sm.gerarImagemSegmind(RAIZ, p))
       }
 
       if (name === 'midia_imagem_gemini') {
