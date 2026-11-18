@@ -129,3 +129,4 @@ _ed*.js
 .dg-editor/smoke/
 scripts/*.mjs
 !scripts/*.mjs.example
+.dg-editor/relatorios/
