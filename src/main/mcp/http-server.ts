@@ -18,6 +18,7 @@ import { obterRaizWorkspace } from '../workspace-raiz'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke } from '../autonomia-tools'
+import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -38,7 +39,7 @@ const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
-  'qualidade_checar', 'resultado_avaliar'
+  'qualidade_checar', 'resultado_avaliar', 'custo_resumo'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -208,6 +209,11 @@ const TOOLS = [
   {
     name: 'qualidade_checar',
     description: 'Checagens leves de qualidade (encoding/sintaxe) no projeto.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'custo_resumo',
+    description: 'Resumo de custo do dia: total USD, limite configurado e quebra por motor.',
     inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
@@ -388,6 +394,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     if (name === 'qualidade_checar') {
       const r = await qualidadeChecar(RAIZ)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'custo_resumo') {
+      const r = {
+        custoDiaUsd: custoDiaUsd(RAIZ),
+        limiteDiaUsd: limiteCustoDia(RAIZ),
+        porMotor: resumoUso(RAIZ)
+      }
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
