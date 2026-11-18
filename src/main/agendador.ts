@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { userDataDir } from './paths'
 import { dglog } from './dglog'
+import { carregarWorkspace } from './workspace-store'
 
 export interface JobAgendado {
   id: string
@@ -115,16 +116,27 @@ export function iniciarAgendador(): void {
 export function garantirJobInovacao(): JobAgendado | null {
   const MARCADOR = '[inovacao-semanal]'
   const jobs = listarJobs()
+  const PROMPT_INOVACAO =
+    MARCADOR +
+    ' Execute o agente DG Inovador (.dg-editor/agentes/inovador.md) em modo DRY-RUN: pesquise inovacoes e ' +
+    'ferramentas gratuitas para o DG Editor no GitHub e repositorios de referencia, classifique os achados e ' +
+    'grave o relatorio de propostas em .dg-editor/inovacoes/. NAO edite codigo-fonte: apenas proponha melhorias ' +
+    'com passo a passo para aprovacao do usuario.'
+  const raizPadrao = () => carregarWorkspace()?.pastaAtual || process.cwd()
   const existente = jobs.find((j) => j.prompt.includes(MARCADOR))
-  if (existente) return existente
+  if (existente) {
+    if (!existente.prompt.includes('DRY-RUN') || existente.raiz === process.cwd()) {
+      existente.prompt = PROMPT_INOVACAO
+      existente.raiz = raizPadrao()
+      gravar(jobs)
+      dglog('[agendador] job de inovacao atualizado p/ dry-run: ' + existente.id)
+    }
+    return existente
+  }
   const job = adicionarJob({
-    prompt:
-      MARCADOR +
-      ' Execute o agente DG Inovador (.dg-editor/agentes/inovador.md): pesquise inovacoes e ferramentas ' +
-      'gratuitas para o DG Editor no GitHub e repositorios de referencia, classifique os achados, ' +
-      'implemente o que for aplicavel com validacao e grave o relatorio em .dg-editor/inovacoes/.',
+    prompt: PROMPT_INOVACAO,
     cadaMin: 7 * 24 * 60,
-    raiz: process.cwd()
+    raiz: raizPadrao()
   })
   dglog('[agendador] job de inovacao semanal criado: ' + job.id)
   return job

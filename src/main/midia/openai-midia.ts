@@ -11,7 +11,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
-import { registrarUso } from './guarda-custo'
+import { bloqueioCusto, registrarUso } from './guarda-custo'
 
 function chaveOpenAI(): string | null {
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY
@@ -35,6 +35,8 @@ export async function gerarImagemOpenAI(
   if (!prompt) return { ok: false, erro: 'informe o prompt da imagem' }
   const chave = chaveOpenAI()
   if (!chave) return { ok: false, erro: ERRO_SEM_CHAVE }
+  const bloqueio = bloqueioCusto(raiz, 'openai-image')
+  if (bloqueio) return { ok: false, erro: bloqueio }
   const t0 = Date.now()
   const tamanho = ['1024x1024', '1536x1024', '1024x1536'].includes(String(opts.tamanho))
     ? String(opts.tamanho)
@@ -92,6 +94,8 @@ export async function sintetizarVozOpenAI(
   if (texto.length > 4096) return { ok: false, erro: 'texto muito longo (máx. 4096 caracteres)' }
   const chave = chaveOpenAI()
   if (!chave) return { ok: false, erro: ERRO_SEM_CHAVE }
+  const bloqueio = bloqueioCusto(raiz, 'openai-tts')
+  if (bloqueio) return { ok: false, erro: bloqueio }
   const voz = VOZES_OPENAI.includes(String(opts.voz)) ? String(opts.voz) : 'nova'
   const formato = String(opts.formato || 'mp3') === 'wav' ? 'wav' : 'mp3'
   const t0 = Date.now()

@@ -38,7 +38,8 @@ export async function gerarImagemHF(
     }
   }
   const modelo = (opts.modelo || MODELO_PADRAO).trim()
-  const url = 'https://api-inference.huggingface.co/models/' + encodeURIComponent(modelo)
+  // HF migrou api-inference.huggingface.co -> router.huggingface.co (Inference Providers)
+  const url = 'https://router.huggingface.co/hf-inference/models/' + encodeURIComponent(modelo)
   const corpo = JSON.stringify({ inputs: prompt.slice(0, 1000), parameters: { num_inference_steps: 4 } })
 
   // O modelo pode estar "loading" (503) na primeira chamada — tenta 3x com espera.
@@ -71,6 +72,10 @@ export async function gerarImagemHF(
       }
       const txt = await res.text().catch(() => '')
       ultimoErro = 'HTTP ' + res.status + ': ' + txt.slice(0, 200)
+      if (res.status === 403) {
+        ultimoErro += ' — token sem permissão de Inference Providers; edite em huggingface.co/settings/tokens e marque "Inference Providers".'
+        break
+      }
       if (res.status === 503 && /loading|starting/i.test(txt)) {
         await new Promise((r) => setTimeout(r, 10_000))
         continue

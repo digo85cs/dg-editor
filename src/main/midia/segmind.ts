@@ -11,7 +11,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
-import { registrarUso } from './guarda-custo'
+import { bloqueioCusto, registrarUso } from './guarda-custo'
 
 const MODELO_PADRAO = 'sdxl1.0-newreality-lightning'
 
@@ -38,6 +38,8 @@ export async function gerarImagemSegmind(
       erro: 'SEGMIND_API_KEY não configurada. Crie grátis em platform.segmind.com/api-keys e salve em Contas → Provedores.'
     }
   }
+  const bloqueio = bloqueioCusto(raiz, 'segmind')
+  if (bloqueio) return { ok: false, erro: bloqueio }
   const modelo = (opts.modelo || MODELO_PADRAO).trim().replace(/^\/+|\/+$/g, '')
   const corpo = JSON.stringify({
     prompt: prompt.slice(0, 2000),

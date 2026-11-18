@@ -1039,11 +1039,15 @@ async function transcreverCF(
     })
     if (!res.ok) return null
     const txt = await res.text()
-    let dados: { text?: string; transcription?: string; vtt?: string } | null = null
+    let dados: { text?: string; transcription?: string; vtt?: string; result?: { text?: string; vtt?: string } } | null = null
     try { dados = JSON.parse(txt) } catch { /* texto puro */ }
     const texto =
-      (dados && (dados.text || dados.transcription)) ||
-      (typeof dados === 'object' && dados ? undefined : txt.trim())
+      dados?.result?.text ||
+      dados?.result?.vtt ||
+      dados?.text ||
+      dados?.transcription ||
+      dados?.vtt ||
+      (dados && typeof dados === 'object' ? undefined : txt.trim())
     if (!texto) return null
     const destino = destinoArquivo(raiz, nomeArquivo('transcricao-cf', '.txt'), saida)
     writeFileSync(destino, String(texto), 'utf8')

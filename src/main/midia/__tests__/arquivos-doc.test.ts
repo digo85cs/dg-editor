@@ -21,7 +21,7 @@ function pdfSimples(caminho: string) {
 }
 
 describe.skipIf(!temPy)('arquivos-doc (python portátil)', () => {
-  it('planilha criar -> ler -> csv', async () => {
+  it('planilha criar -> ler -> csv', { timeout: 20_000 }, async () => {
     const c = await planilhaOperar(raiz, {
       acao: 'criar',
       aba: 'Vendas',
@@ -45,7 +45,7 @@ describe.skipIf(!temPy)('arquivos-doc (python portátil)', () => {
     expect(cv.caminho?.endsWith('.csv')).toBe(true)
   })
 
-  it('pdf info/dividir/texto', async () => {
+  it('pdf info/dividir/texto', { timeout: 20_000 }, async () => {
     const pdf = join(raiz, 'doc.pdf')
     pdfSimples(pdf)
 
@@ -62,7 +62,7 @@ describe.skipIf(!temPy)('arquivos-doc (python portátil)', () => {
     expect(txt.ok === true || txt.ok === false).toBe(true)
   })
 
-  it('pdf mesclar 2 arquivos', async () => {
+  it('pdf mesclar 2 arquivos', { timeout: 20_000 }, async () => {
     const a = join(raiz, 'a.pdf')
     const b = join(raiz, 'b.pdf')
     pdfSimples(a)

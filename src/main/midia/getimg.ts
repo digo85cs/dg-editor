@@ -12,7 +12,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
-import { registrarUso } from './guarda-custo'
+import { bloqueioCusto, registrarUso } from './guarda-custo'
 
 const MODELO_PADRAO = 'seedream-5-lite'
 
@@ -38,6 +38,8 @@ export async function gerarImagemGetimg(
       erro: 'GETIMG_API_KEY não configurada. Crie em getimg.ai/app/developer/api-keys.'
     }
   }
+  const bloqueio = bloqueioCusto(raiz, 'getimg')
+  if (bloqueio) return { ok: false, erro: bloqueio }
   const modelo = (opts.modelo || MODELO_PADRAO).trim()
   try {
     const res = await fetch('https://api.getimg.ai/v2/images/generations', {

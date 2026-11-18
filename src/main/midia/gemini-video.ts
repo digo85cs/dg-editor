@@ -12,7 +12,7 @@ import {
   previewDe,
   type RespostaMidia
 } from './core'
-import { registrarUso } from './guarda-custo'
+import { bloqueioCusto, registrarUso } from './guarda-custo'
 
 const MODELO_VEO = 'veo-3.1-generate-preview'
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
@@ -46,6 +46,8 @@ export async function gerarVideoGemini(
   if (!chave) {
     return { ok: false, erro: 'GEMINI_API_KEY não configurada. Cadastre em Contas → Provedores (gemini).' }
   }
+  const bloqueio = bloqueioCusto(raiz, 'veo')
+  if (bloqueio) return { ok: false, erro: bloqueio }
   const t0 = Date.now()
   const aspecto = opts.aspectRatio === '9:16' ? '9:16' : '16:9'
   const duracao = Math.min(8, Math.max(4, Math.floor(opts.duracaoSeg || 8)))

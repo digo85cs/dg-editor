@@ -89,3 +89,60 @@ export function avisoCusto(motor: string, ok: boolean): string {
     ? `Custo registrado no ledger (.dg-editor/uso-custo.json) — motor pago: ${motor}.`
     : ''
 }
+
+/** Motores pagos com estimativa de custo por chamada (USD). */
+const CUSTO_ESTIMADO: Record<string, number> = {
+  'openai-image': 0.05,
+  'openai-tts': 0.02,
+  veo: 0.40,
+  getimg: 0.05,
+  segmind: 0.02
+}
+
+export function ehMotorPago(motor: string): boolean {
+  return motor in CUSTO_ESTIMADO
+}
+
+/** Limite diário configurável: env DG_CUSTO_LIMITE_DIA_USD ou .dg-editor/custo-limite.json {"limiteDiaUsd":N}. 0/ausente = sem teto. */
+export function limiteCustoDia(raiz: string): number {
+  const env = Number(process.env.DG_CUSTO_LIMITE_DIA_USD)
+  if (Number.isFinite(env) && env > 0) return env
+  try {
+    const f = join(raiz, '.dg-editor', 'custo-limite.json')
+    if (existsSync(f)) {
+      const j = JSON.parse(readFileSync(f, 'utf8')) as { limiteDiaUsd?: number }
+      const v = Number(j.limiteDiaUsd)
+      if (Number.isFinite(v) && v > 0) return v
+    }
+  } catch { /* ignore */ }
+  return 0
+}
+
+function custoEstimado(motor: string): number {
+  return CUSTO_ESTIMADO[motor] ?? 0
+}
+
+/** Custo estimado do dia corrente (USD) somando registros pagos. */
+export function custoDiaUsd(raiz: string): number {
+  const hoje = new Date().toISOString().slice(0, 10)
+  let total = 0
+  for (const r of lerLedger(raiz).registros) {
+    if (!r.ts.startsWith(hoje)) continue
+    const c = r.custoUsd ?? (ehMotorPago(r.motor) ? custoEstimado(r.motor) : 0)
+    total += c
+  }
+  return total
+}
+
+/** Retorna mensagem de bloqueio se o teto diário foi atingido; null = liberado. */
+export function bloqueioCusto(raiz: string, motor: string): string | null {
+  if (!ehMotorPago(motor)) return null
+  const limite = limiteCustoDia(raiz)
+  if (limite <= 0) return null
+  const gasto = custoDiaUsd(raiz)
+  if (gasto < limite) return null
+  return (
+    `Teto de custo diário atingido: ~US$${gasto.toFixed(2)} >= US$${limite.toFixed(2)} (motor ${motor}). ` +
+    `Ajuste DG_CUSTO_LIMITE_DIA_USD ou .dg-editor/custo-limite.json, ou use um motor gratuito da cascata.`
+  )
+}
