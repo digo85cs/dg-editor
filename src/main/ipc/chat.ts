@@ -426,11 +426,12 @@ async function executarChatSend(
       let contextoAgente = context;
       if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(textoPedido)) {
         contextoAgente +=
-          '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA ' +
-          '(midia_imagem_gemini para imagem — melhor qualidade/velocidade se a chave Gemini existir; ' +
-          'midia_imagem_editar_gemini para editar imagem local; midia_imagem_openai se houver OPENAI_API_KEY; ' +
-          'midia_imagem_gerar Pollinations como padrao rapido; midia_comfyui_imagem so se pedir ' +
-          'ilimitado/local ou se as nuvens falharem; midia_video_gemini para video IA se houver chave Gemini ' +
+          '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA. ' +
+          'Para imagem generica use SEMPRE midia_imagem_auto (cascata gratis-primeiro: ' +
+          'Gemini cota free -> Pollinations -> ComfyUI local -> OpenAI so com incluir_pago=true). ' +
+          'Use as tools especificas so quando o usuario pedir um motor exato: ' +
+          'midia_imagem_editar_gemini para editar imagem local; midia_imagem_openai para gpt-image pago; ' +
+          'midia_video_gemini para video IA realista se houver chave Gemini ' +
           '(leva minutos, custo pago), senao midia_comfyui_video; midia_tts_openai para narracao OpenAI; ' +
           'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';

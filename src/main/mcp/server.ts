@@ -517,6 +517,24 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_auto',
+    description:
+      'Gera imagem em cascata GRATIS-PRIMEIRO: Gemini (cota free) → Pollinations → ComfyUI local → OpenAI pago (so se incluir_pago=true). Use esta para qualquer pedido generico de imagem; so use as tools especificas quando o usuario pedir um motor/provedor exato.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Descricao da imagem' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        seed: { type: 'number' },
+        passos: { type: 'number', description: 'Passos ComfyUI (opcional)' },
+        incluir_pago: { type: 'boolean', description: 'true permite cair no OpenAI gpt-image (pago) se os gratis falharem' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_imagem_gemini',
     description:
       'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
@@ -2603,6 +2621,32 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             seed: p.seed,
             saida: p.saida,
             esperarLimite: false
+          })
+        )
+      }
+
+      if (name === 'midia_imagem_auto') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            seed: z.number().optional(),
+            passos: z.number().optional(),
+            incluir_pago: z.boolean().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const { gerarImagemAuto } = await import('../midia/cascata')
+        return await responder(
+          await gerarImagemAuto(RAIZ, {
+            prompt: p.prompt,
+            largura: p.largura,
+            altura: p.altura,
+            seed: p.seed,
+            passos: p.passos,
+            incluirPago: p.incluir_pago,
+            saida: p.saida
           })
         )
       }
