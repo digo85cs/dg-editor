@@ -26,7 +26,7 @@ const TAR = process.platform === 'win32' ? join(process.env.SystemRoot || 'C:\\W
 
 const GRUPOS = [
   { nome: 'essenciais', pacotes: ['edge-tts'], obrigatorio: true },
-  { nome: 'transcricao', pacotes: ['faster-whisper'], obrigatorio: false },
+  { nome: 'transcricao', pacotes: ['faster-whisper', 'av<14'], obrigatorio: false },
   { nome: 'vozes-locais', pacotes: ['kokoro-onnx', 'piper-tts', 'supertonic'], obrigatorio: false }
 ];
 
@@ -46,7 +46,9 @@ function versaoPython() {
 }
 
 function pacoteInstalado(nome) {
-  const r = rodar(PY, ['-m', 'pip', 'show', nome], 60000);
+  // Aceita especificadores pip (ex.: "av<14") — a checagem usa só o nome do pacote.
+  const base = String(nome).split(/[<>=!~;\s]/)[0];
+  const r = rodar(PY, ['-m', 'pip', 'show', base], 60000);
   if (r.status !== 0) return null;
   const m = String(r.stdout || '').match(/^Version:\s*(.+)$/m);
   return m ? m[1].trim() : 'instalado';

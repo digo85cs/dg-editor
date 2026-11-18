@@ -592,7 +592,8 @@ async function instalarPacotes(op: { onProgresso?: (e: EventoProgresso) => void 
 
   progresso(op.onProgresso, 'pacotes', 'consulta', 'verificando pacotes instalados')
   const antes = await pacotesInstalados(py)
-  const faltando = antes ? alvo.filter((p) => !antes[p.toLowerCase()]) : alvo.slice()
+  const nomeBase = (spec: string) => spec.toLowerCase().split(/[<>=!~;\s]/)[0]
+  const faltando = antes ? alvo.filter((p) => !antes[nomeBase(p)]) : alvo.slice()
   if (!faltando.length) {
     return { ok: true, detalhe: 'todos os ' + alvo.length + ' pacotes já instalados', pacotes: antes || undefined }
   }
@@ -620,7 +621,7 @@ async function instalarPacotes(op: { onProgresso?: (e: EventoProgresso) => void 
     }
   }
   const depois = await pacotesInstalados(py)
-  const aindaFaltando = depois ? alvo.filter((p) => !depois[p.toLowerCase()]) : []
+  const aindaFaltando = depois ? alvo.filter((p) => !depois[nomeBase(p)]) : []
   progresso(op.onProgresso, 'pacotes', aindaFaltando.length ? 'erro' : 'ok', 'pacotes processados')
   return {
     ok: aindaFaltando.length === 0,

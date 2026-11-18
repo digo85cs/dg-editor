@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 14:19:39** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.6** · branch `integra-13-11` · último commit: 1a28208 2026-11-18 chore: release v0.6.6
-> Alterações locais não commitadas: 6 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 14:33:51** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.6** · branch `integra-13-11` · último commit: 605926e 2026-11-18 chore: dossie v0.6.6 + smoke cascata no script de midia
+> Alterações locais não commitadas: 11 arquivo(s).
 
 ## 1. O que é
 
@@ -205,13 +205,13 @@ Artefatos locais em `dist-apps/`:
 
 ## 9. MCP
 
-- **100** ferramentas registradas em `src/main/mcp/server.ts`.
+- **101** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 - Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `imagens_iso`, `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`. A ferramenta `imagens_iso` é somente leitura: não grava pendrive.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_diagrama`, `midia_documento_converter`, `midia_estoque`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_auto`, `midia_imagem_cf`, `midia_imagem_editar_gemini`, `midia_imagem_gemini`, `midia_imagem_gerar`, `midia_imagem_getimg`, `midia_imagem_hf`, `midia_imagem_horde`, `midia_imagem_melhorar`, `midia_imagem_openai`, `midia_imagem_qualidade`, `midia_imagem_segmind`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_pdf`, `midia_planilha`, `midia_status`, `midia_transcrever`, `midia_tts_openai`, `midia_video_auto`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_gemini`, `midia_video_json2video`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_custo`, `midia_diagrama`, `midia_documento_converter`, `midia_estoque`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_auto`, `midia_imagem_cf`, `midia_imagem_editar_gemini`, `midia_imagem_gemini`, `midia_imagem_gerar`, `midia_imagem_getimg`, `midia_imagem_hf`, `midia_imagem_horde`, `midia_imagem_melhorar`, `midia_imagem_openai`, `midia_imagem_qualidade`, `midia_imagem_segmind`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_pdf`, `midia_planilha`, `midia_status`, `midia_transcrever`, `midia_tts_openai`, `midia_video_auto`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_gemini`, `midia_video_json2video`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
 
 </details>
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 605926e 2026-11-18 chore: dossie v0.6.6 + smoke cascata no script de midia
 - 1a28208 2026-11-18 chore: release v0.6.6
 - af4f975 2026-11-18 fix(midia): cost ceiling diario, HF router endpoint, CF whisper parse, inovador dry-run
 - f21e855 2026-11-18 feat(midia): cost ledger, video cascade, CF whisper fallback, gemini quota skip (100 tools)
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 7201896 2026-11-18 feat(midia): Segmind image provider + cascade slot (97 tools)
 - 14fd8df 2026-11-18 feat(midia): HuggingFace Inference na cascata + Bitbucket Server no catalogo
 - 7d91c7b 2026-11-18 feat(mcp): catalogo cobre GitLab, Bitbucket, Azure DevOps, Forgejo/Gitea/Codeberg
-- c825ee2 2026-11-18 feat(agente): DG Inovador fixo + job semanal + catalogo MCP ampliado
 
 ## 16. Como atualizar este dossiê
 

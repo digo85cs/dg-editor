@@ -17,7 +17,7 @@
       "x64": "cpython-3\\.12\\.\\d+\\+\\d+-x86_64-pc-windows-msvc-install_only\\.tar\\.gz$",
       "arm64": "cpython-3\\.12\\.\\d+\\+\\d+-aarch64-pc-windows-msvc-install_only\\.tar\\.gz$"
     },
-    "pacotes": ["edge-tts", "faster-whisper", "kokoro-onnx", "piper-tts", "supertonic", "pycdlib", "pypdf", "openpyxl"],
+    "pacotes": ["edge-tts", "faster-whisper", "av<14", "kokoro-onnx", "piper-tts", "supertonic", "pycdlib", "pypdf", "openpyxl"],
     "pacotesMinVersaoApp": "0.3.0"
   },
   "ffmpeg": {
@@ -37,6 +37,6 @@
   "pacotesPip": {
     "minVersaoApp": "0.3.0",
     "essenciais": ["edge-tts"],
-    "completos": ["faster-whisper", "kokoro-onnx", "piper-tts", "supertonic", "pypdf", "openpyxl"]
+    "completos": ["faster-whisper", "av<14", "kokoro-onnx", "piper-tts", "supertonic", "pypdf", "openpyxl"]
   }
 }

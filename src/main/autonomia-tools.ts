@@ -148,23 +148,46 @@ export async function projetoSmoke(raiz: string): Promise<Record<string, unknown
   return { ok: passos.every((p) => p.ok), passos }
 }
 
-export function resultadoAvaliar(pedido: string, textoFinal: string, passosResumo: string): Record<string, unknown> {
+export function resultadoAvaliar(
+  pedido: string,
+  textoFinal: string,
+  passosResumo: string,
+  criterios: string[] = []
+): Record<string, unknown> {
   const ped = String(pedido || '').toLowerCase()
   const fin = String(textoFinal || '')
+  const finLower = fin.toLowerCase()
   const checks = {
     temResposta: fin.trim().length > 20,
-    mencionaPedido: ped.split(/\s+/).filter((w) => w.length > 4).slice(0, 3).some((w) => fin.toLowerCase().includes(w)),
+    mencionaPedido: ped.split(/\s+/).filter((w) => w.length > 4).slice(0, 3).some((w) => finLower.includes(w)),
     naoInventouCaminhoWindows:
       !/c:\\windows\\system32\\autopilot/i.test(fin) || /n[aã]o encontrado|falso positivo/i.test(fin),
     temProximoPasso: /pr[oó]xim|falta|pendente|ok|feito|conclu/i.test(fin)
   }
+  // Done-when: cada critério precisa ter evidência no texto final.
+  const doneWhen = (criterios || [])
+    .map((c) => String(c || '').trim())
+    .filter(Boolean)
+    .slice(0, 10)
+    .map((c) => {
+      const palavras = c.toLowerCase().split(/\s+/).filter((w) => w.length > 3)
+      const ok = palavras.length === 0 || palavras.some((w) => finLower.includes(w))
+      return { criterio: c, ok }
+    })
   const score = Object.values(checks).filter(Boolean).length
+  const doneOk = doneWhen.every((d) => d.ok)
   return {
-    ok: score >= 3,
+    ok: score >= 3 && doneOk,
     score,
     checks,
+    doneWhen,
     resumoPassos: trunc(passosResumo, 1200),
-    recomendacao: score >= 3 ? 'entregar' : 'revisar resposta antes de entregar'
+    recomendacao:
+      score >= 3 && doneOk
+        ? 'entregar'
+        : doneWhen.length && !doneOk
+          ? 'revisar: critérios done-when não atendidos'
+          : 'revisar resposta antes de entregar'
   }
 }
 

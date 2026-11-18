@@ -4,7 +4,14 @@ export const safeStorage = {
   encryptString: (s) => Buffer.from(s, 'utf8'),
   decryptString: (b) => b.toString('utf8')
 }
-export const app = { getPath: () => process.cwd(), getName: () => 'dg-editor-smoke', isPackaged: false }
+export const app = {
+  getPath: (nome) =>
+    nome === 'userData' && process.env.DG_USERDATA
+      ? process.env.DG_USERDATA
+      : nome === 'temp' ? require('node:os').tmpdir() : process.cwd(),
+  getName: () => 'dg-editor-smoke',
+  isPackaged: false
+}
 export const ipcMain = { handle: () => {}, on: () => {} }
 export const BrowserWindow = class {}
 export const shell = { openPath: async () => '', openExternal: async () => {} }

@@ -429,13 +429,19 @@ const TOOLS = [
   },
   {
     name: 'resultado_avaliar',
-    description: 'Avalia se a resposta final atende o pedido (checklist de qualidade antes de entregar).',
+    description:
+      'Avalia se a resposta final atende o pedido (checklist de qualidade + critérios done-when antes de entregar).',
     inputSchema: {
       type: 'object',
       properties: {
         pedido: { type: 'string' },
         textoFinal: { type: 'string' },
-        passosResumo: { type: 'string' }
+        passosResumo: { type: 'string' },
+        criterios: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Critérios done-when: condições que a resposta precisa evidenciar para considerar concluído.'
+        }
       },
       required: ['pedido', 'textoFinal']
     }
@@ -463,6 +469,12 @@ const TOOLS = [
     name: 'midia_status',
     description:
       'Status das ferramentas gratuitas do Estudio de midia (ffmpeg, ffprobe, python, faster-whisper, edge-tts, ComfyUI local).',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'midia_custo',
+    description:
+      'Painel de custo: gasto estimado do dia (USD), teto diário configurado e resumo de uso por motor pago (.dg-editor/uso-custo.json).',
     inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
@@ -1966,11 +1978,35 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
         .object({
           pedido: z.string(),
           textoFinal: z.string(),
-          passosResumo: z.string().optional()
+          passosResumo: z.string().optional(),
+          criterios: z.array(z.string()).max(10).optional()
         })
         .parse(args)
       const auto = await import('../autonomia-tools')
-      const r = auto.resultadoAvaliar(parsed.pedido, parsed.textoFinal, parsed.passosResumo || '')
+      const r = auto.resultadoAvaliar(
+        parsed.pedido,
+        parsed.textoFinal,
+        parsed.passosResumo || '',
+        parsed.criterios || []
+      )
+      // Memoria observacional: registra avaliacoes para sessoes futuras.
+      try {
+        const { appendFileSync, mkdirSync } = await import('node:fs')
+        const { join } = await import('node:path')
+        const dir = join(RAIZ, '.dg-editor')
+        mkdirSync(dir, { recursive: true })
+        appendFileSync(
+          join(dir, 'avaliacoes.jsonl'),
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            pedido: parsed.pedido.slice(0, 200),
+            ok: r.ok,
+            score: r.score,
+            criterios: (parsed.criterios || []).length
+          }) + '\n',
+          'utf8'
+        )
+      } catch { /* memoria e best-effort */ }
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
     }
 
@@ -2060,6 +2096,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       }
 
       if (name === 'midia_status') return await responder(await midia.statusMidia(RAIZ))
+      if (name === 'midia_custo') {
+        const gc = await import('../midia/guarda-custo')
+        return await responder({
+          ok: true,
+          texto: JSON.stringify(
+            {
+              gastoDiaUsd: +gc.custoDiaUsd(RAIZ).toFixed(4),
+              limiteDiaUsd: gc.limiteCustoDia(RAIZ),
+              arquivo: '.dg-editor/uso-custo.json',
+              configuracao:
+                'Defina o teto em .dg-editor/custo-limite.json {"limiteDiaUsd":N} ou env DG_CUSTO_LIMITE_DIA_USD. 0 = sem teto.',
+              porMotor: gc.resumoUso(RAIZ)
+            },
+            null,
+            2
+          )
+        })
+      }
       if (name === 'portabilidade_status') {
         const s = await midia.statusMidia(RAIZ)
         let ollama: { ok: boolean; modelos: string[]; erro?: string } = { ok: false, modelos: [] }
