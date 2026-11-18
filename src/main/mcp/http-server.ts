@@ -21,6 +21,7 @@ import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvali
 import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
 import { listarSkills } from '../brain/skills'
 import { listarAgentes } from '../brain/agentes'
+import { gerarImagemAuto } from '../midia/cascata'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -42,7 +43,7 @@ const ALLOWED_TOOLS = new Set([
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
-  'skills_listar', 'agentes_listar', 'chat_historico'
+  'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -231,6 +232,22 @@ const TOOLS = [
       type: 'object',
       properties: { limite: { type: 'number', description: 'Max mensagens (default 20, max 50)' } },
       required: []
+    }
+  },
+  {
+    name: 'midia_imagem_auto',
+    description: 'Gera imagem via cascata gratis-primeiro (Gemini free -> Pollinations -> Horde -> HF -> CF -> ComfyUI; OpenAI pago so com incluirPago=true).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        seed: { type: 'number' },
+        saida: { type: 'string', description: 'Nome do arquivo de saida (opcional)' },
+        incluirPago: { type: 'boolean', description: 'Permitir ultimo recurso pago (default false)' }
+      },
+      required: ['prompt']
     }
   },
   {
@@ -473,6 +490,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         content: String(m.content || '').slice(0, 2000)
       }))
       return { content: [{ type: 'text', text: JSON.stringify(msgs, null, 2) }] }
+    }
+
+    if (name === 'midia_imagem_auto') {
+      const parsed = z.object({
+        prompt: z.string(),
+        largura: z.number().optional(),
+        altura: z.number().optional(),
+        seed: z.number().optional(),
+        saida: z.string().optional(),
+        incluirPago: z.boolean().optional()
+      }).parse(args)
+      const r = await gerarImagemAuto(RAIZ, { ...parsed, incluirPago: parsed.incluirPago ?? false })
+      const { previewBase64: _omit, ...resto } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'vault_write') {
