@@ -2,7 +2,7 @@
  * Tools de autonomia v1: git, testes, qualidade, smoke, avaliacao de resultado.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 
@@ -258,4 +258,80 @@ export function blocoMemoriaProjeto(raiz: string): string {
     (m.buildCmd || '?') +
     '\n'
   )
+}
+
+export async function terminalExec(
+  raiz: string,
+  comando: string,
+  args: string[] = [],
+  confirmado = false
+): Promise<Record<string, unknown>> {
+  const cmd = comando.trim()
+  const linha = (cmd + ' ' + args.join(' ')).toLowerCase()
+  const destrutivo =
+    /\b(rm|del|rmdir|unlink|format|shutdown|reboot)\b/.test(linha) ||
+    /\b(install|uninstall|remove)\b/.test(linha) ||
+    /push\s+--force|--force\s+push|reset\s+--hard|clean\s+-fdx/.test(linha)
+  if (destrutivo && !confirmado) {
+    return {
+      ok: false,
+      erro: 'comando destrutivo — peça confirmação ao usuário e chame de novo com confirmado=true',
+      comando: cmd,
+      args
+    }
+  }
+  if (!/^[a-zA-Z0-9._+-]+$/.test(cmd)) {
+    return { ok: false, erro: 'comando invalido' }
+  }
+  try {
+    const { stdout, stderr } = await execFileAsync(cmd, args, {
+      cwd: raiz,
+      timeout: 20000,
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+      shell: false,
+      encoding: 'utf8'
+    })
+    const texto = (String(stdout || '') + (stderr ? '\n' + String(stderr) : '')).slice(0, 12000)
+    return { ok: true, texto }
+  } catch (e: unknown) {
+    const err = e as { message?: string; stdout?: string; stderr?: string }
+    return {
+      ok: false,
+      erro: err.message || String(e),
+      stdout: err.stdout || '',
+      stderr: err.stderr || ''
+    }
+  }
+}
+
+export async function codigoEditar(
+  raiz: string,
+  arquivo: string,
+  ancora: string,
+  novo: string,
+  verificar = true
+): Promise<Record<string, unknown>> {
+  const caminho = resolve(raiz, arquivo)
+  if (!existsSync(caminho)) {
+    return { ok: false, erro: 'arquivo nao encontrado: ' + arquivo }
+  }
+  const conteudo = readFileSync(caminho, 'utf8')
+  if (!conteudo.includes(ancora)) {
+    return { ok: false, erro: 'ancora nao encontrada no arquivo' }
+  }
+  const ocorrencias = (conteudo.match(new RegExp(ancora.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
+  if (ocorrencias !== 1) {
+    return { ok: false, erro: `ancora encontrada ${ocorrencias} vezes — deve ser exatamente 1` }
+  }
+  const novoConteudo = conteudo.replace(ancora, novo)
+  writeFileSync(caminho, novoConteudo, 'utf8')
+  if (verificar) {
+    const tsc = await run('tsc', ['--noEmit'], raiz, 60000)
+    if (!tsc.ok) {
+      writeFileSync(caminho, conteudo, 'utf8')
+      return { ok: false, erro: 'typecheck falhou — edição revertida', stderr: tsc.stderr }
+    }
+  }
+  return { ok: true, arquivo, alterado: true }
 }

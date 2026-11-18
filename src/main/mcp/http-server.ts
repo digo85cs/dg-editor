@@ -17,7 +17,7 @@ import { projectStateDir, resolverRaizDGEditor } from '../paths'
 import { obterRaizWorkspace } from '../workspace-raiz'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
-import { gitStatus, gitDiff, qualidadeChecar, resultadoAvaliar } from '../autonomia-tools'
+import { gitStatus, gitDiff, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar } from '../autonomia-tools'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -36,8 +36,9 @@ const server = new Server(
 
 const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
-  'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'git_status',
-  'git_diff', 'qualidade_checar', 'resultado_avaliar'
+  'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
+  'git_status', 'git_diff', 'terminal_exec',
+  'qualidade_checar', 'resultado_avaliar'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -135,6 +136,33 @@ const TOOLS = [
     name: 'codigo_ler',
     description: 'Le simbolo pelo nome OU arquivo pelo caminho relativo.',
     inputSchema: { type: 'object', properties: { nome: { type: 'string', description: 'Nome do simbolo OU caminho relativo' } }, required: ['nome'] }
+  },
+  {
+    name: 'codigo_editar',
+    description: 'Substitui uma ancora unica num arquivo. Se verificar=true (default), roda tsc e reverte se falhar.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        arquivo: { type: 'string', description: 'Caminho relativo a raiz do projeto' },
+        ancora: { type: 'string', description: 'Trecho existente que deve aparecer exatamente 1 vez' },
+        novo: { type: 'string', description: 'Texto que substitui a ancora' },
+        verificar: { type: 'boolean', description: 'Rodar typecheck apos editar (default true)' }
+      },
+      required: ['arquivo', 'ancora', 'novo']
+    }
+  },
+  {
+    name: 'terminal_exec',
+    description: 'Executa comando local na raiz do projeto (timeout 20s). Leitura livre; destrutivo exige confirmado=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        comando: { type: 'string', description: 'Binario (ex: git, npm, node)' },
+        args: { type: 'array', items: { type: 'string' }, description: 'Argumentos (sem shell)' },
+        confirmado: { type: 'boolean', description: 'Obrigatorio true para install/rm/push --force/reset' }
+      },
+      required: ['comando']
+    }
   },
   {
     name: 'git_status',
@@ -262,6 +290,30 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         return { content: [{ type: 'text', text: 'simbolo nao encontrado: ' + parsed.nome }], isError: true }
       }
       return { content: [{ type: 'text', text: JSON.stringify(hit, null, 2) }] }
+    }
+
+    if (name === 'codigo_editar') {
+      const parsed = z.object({
+        arquivo: z.string(),
+        ancora: z.string(),
+        novo: z.string(),
+        verificar: z.boolean().optional()
+      }).parse(args)
+      if (caminhoEhProtegido(parsed.arquivo)) {
+        return { content: [{ type: 'text', text: 'arquivo protegido: ' + parsed.arquivo }], isError: true }
+      }
+      const r = await codigoEditar(RAIZ, parsed.arquivo, parsed.ancora, parsed.novo, parsed.verificar ?? true)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'terminal_exec') {
+      const parsed = z.object({
+        comando: z.string(),
+        args: z.array(z.string()).optional(),
+        confirmado: z.boolean().optional()
+      }).parse(args)
+      const r = await terminalExec(RAIZ, parsed.comando, parsed.args || [], parsed.confirmado ?? false)
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'git_status') {
