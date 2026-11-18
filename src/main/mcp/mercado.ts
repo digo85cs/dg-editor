@@ -137,6 +137,50 @@ export function lerCatalogoMcp(): McpServidorCatalogo[] {
       descricao: 'Web scraping e automação de atores prontos (requer APIFY_TOKEN)',
       comando: 'npx -y apify-mcp-server',
       config: { command: 'npx', args: ['-y', 'apify-mcp-server'], env: { APIFY_TOKEN: '<token>' } }
+    },
+    {
+      id: 'gitlab',
+      nome: 'GitLab',
+      descricao: 'MRs, pipelines, issues e projetos GitLab (66 tools; requer GITLAB_TOKEN; Node >= 24)',
+      comando: 'npx -y @structured-world/gitlab-mcp',
+      config: {
+        command: 'npx',
+        args: ['-y', '@structured-world/gitlab-mcp'],
+        env: { GITLAB_TOKEN: '<token>', GITLAB_API_URL: 'https://gitlab.com' }
+      }
+    },
+    {
+      id: 'bitbucket',
+      nome: 'Bitbucket',
+      descricao: 'PRs, repos e CI do Bitbucket Cloud (requer BITBUCKET_TOKEN/EMAIL/USERNAME)',
+      comando: 'npx -y @nexus2520/bitbucket-mcp-server',
+      config: {
+        command: 'npx',
+        args: ['-y', '@nexus2520/bitbucket-mcp-server'],
+        env: { BITBUCKET_TOKEN: '<token>', BITBUCKET_EMAIL: '<email>', BITBUCKET_USERNAME: '<user>' }
+      }
+    },
+    {
+      id: 'azure-devops',
+      nome: 'Azure DevOps',
+      descricao: 'Repos, pipelines, work items e wikis do Azure DevOps (requer organization + PAT)',
+      comando: 'npx -y @azure-devops/mcp <organizacao>',
+      config: {
+        command: 'npx',
+        args: ['-y', '@azure-devops/mcp', '<organizacao>'],
+        env: { AZURE_DEVOPS_EXT_PAT: '<pat>' }
+      }
+    },
+    {
+      id: 'forgejo-gitea',
+      nome: 'Forgejo/Gitea/Codeberg',
+      descricao: '457 tools para Forgejo, Gitea e Codeberg: repos, issues, PRs, Actions (requer FORGEJO_URL + token)',
+      comando: 'npx -y @ric_/forgejo-mcp',
+      config: {
+        command: 'npx',
+        args: ['-y', '@ric_/forgejo-mcp'],
+        env: { FORGEJO_URL: 'https://codeberg.org', FORGEJO_TOKEN: '<token>' }
+      }
     }
   ]
 }
