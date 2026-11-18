@@ -172,6 +172,17 @@ export function lerCatalogoMcp(): McpServidorCatalogo[] {
       }
     },
     {
+      id: 'bitbucket-server',
+      nome: 'Bitbucket Server/DC',
+      descricao: 'Bitbucket Server/Data Center self-hosted: PRs, CI insights, blame (requer BITBUCKET_URL+TOKEN)',
+      comando: 'npx -y @pavel-kalmykov/bitbucket-server-mcp',
+      config: {
+        command: 'npx',
+        args: ['-y', '@pavel-kalmykov/bitbucket-server-mcp'],
+        env: { BITBUCKET_URL: 'https://seu-bitbucket', BITBUCKET_TOKEN: '<token>' }
+      }
+    },
+    {
       id: 'forgejo-gitea',
       nome: 'Forgejo/Gitea/Codeberg',
       descricao: '457 tools para Forgejo, Gitea e Codeberg: repos, issues, PRs, Actions (requer FORGEJO_URL + token)',

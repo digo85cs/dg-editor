@@ -5,8 +5,9 @@
  * 1. Gemini image — cota gratuita do AI Studio quando há chave;
  * 2. Pollinations — 100% grátis, sem chave (rate limit ~1/45s);
  * 3. AI Horde — fila comunitária gratuita, sem chave (~1min, até ~640px);
- * 4. ComfyUI local — ilimitado, mas lento em CPU;
- * 5. OpenAI gpt-image — PAGO, só como último recurso quando o usuário
+ * 4. HuggingFace Inference — free tier, requer HF_TOKEN (rápido);
+ * 5. ComfyUI local — ilimitado, mas lento em CPU;
+ * 6. OpenAI gpt-image — PAGO, só como último recurso quando o usuário
  *    tem OPENAI_API_KEY (a tool específica continua existindo para
  *    quando o pedido for explicitamente "melhor qualidade paga").
  *
@@ -96,7 +97,26 @@ export async function gerarImagemAuto(
     }
   }
 
-  // 4. ComfyUI local (ilimitado; geraImagemComfy já cai no Pollinations se não instalado — pulamos nesse caso)
+  // 4. HuggingFace Inference (free tier com HF_TOKEN; rápido na nuvem)
+  {
+    try {
+      const { gerarImagemHF, hfConfigurado } = await import('./hf-inferencia')
+      if (hfConfigurado()) {
+        const t0 = Date.now()
+        const r = await gerarImagemHF(raiz, { prompt: opts.prompt, saida: opts.saida })
+        if (registrar('huggingface', r, t0).ok) {
+          r.aviso = (r.aviso ? r.aviso + ' ' : '') + 'Cascata grátis-primeiro: Horde indisponível → HuggingFace free tier.'
+          return comCascata(r)
+        }
+      } else {
+        tentativas.push({ motor: 'huggingface', ok: false, erro: 'sem HF_TOKEN' })
+      }
+    } catch (e) {
+      tentativas.push({ motor: 'huggingface', ok: false, erro: String(e).slice(0, 160) })
+    }
+  }
+
+  // 5. ComfyUI local (ilimitado; geraImagemComfy já cai no Pollinations se não instalado — pulamos nesse caso)
   if (comfyInstalado()) {
     const t0 = Date.now()
     try {
@@ -119,7 +139,7 @@ export async function gerarImagemAuto(
     tentativas.push({ motor: 'comfyui-local', ok: false, erro: 'ComfyUI não instalado' })
   }
 
-  // 5. OpenAI pago — só se o usuário pedir explicitamente (incluirPago)
+  // 6. OpenAI pago — só se o usuário pedir explicitamente (incluirPago)
   if (opts.incluirPago) {
     try {
       const { gerarImagemOpenAI } = await import('./openai-midia')

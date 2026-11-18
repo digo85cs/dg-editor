@@ -597,6 +597,20 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_hf',
+    description:
+      'Gera imagem via HuggingFace Inference (FLUX.1-schnell por padrao; free tier mensal). Requer HF_TOKEN gratis de huggingface.co/settings/tokens.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        modelo: { type: 'string', description: 'Ex.: black-forest-labs/FLUX.1-dev (padrao schnell)' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
     name: 'midia_imagem_gemini',
     description:
       'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
@@ -2770,6 +2784,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const j2v = await import('../midia/json2video')
         return await responder(await j2v.gerarVideoJson2Video(RAIZ, p))
+      }
+
+      if (name === 'midia_imagem_hf') {
+        const p = z
+          .object({ prompt: z.string().min(1), modelo: z.string().optional(), saida: z.string().optional() })
+          .parse(args)
+        const hf = await import('../midia/hf-inferencia')
+        return await responder(await hf.gerarImagemHF(RAIZ, p))
       }
 
       if (name === 'midia_imagem_gemini') {
