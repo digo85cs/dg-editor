@@ -22,19 +22,18 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "outDir": "out",
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ],
       "@main/*": [
-        "src/main/*"
+        "./src/main/*"
       ],
       "@renderer/*": [
-        "src/renderer/*"
+        "./src/renderer/*"
       ],
       "@shared/*": [
-        "src/shared/*"
+        "./src/shared/*"
       ]
     }
   },
