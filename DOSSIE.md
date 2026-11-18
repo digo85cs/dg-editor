@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 11:39:46** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: ab02f46 2026-11-18 feat(brain): Cloudflare Workers AI chat provider (free tier, 3 models verified)
-> Alterações locais não commitadas: 12 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 14:19:39** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.6** · branch `integra-13-11` · último commit: 1a28208 2026-11-18 chore: release v0.6.6
+> Alterações locais não commitadas: 6 arquivo(s).
 
 ## 1. O que é
 
@@ -232,7 +232,7 @@ Utilitários locais relevantes:
 
 - ffmpeg — mídia: **presente**
 - ImageMagick — imagem (ImageMagick): ausente
-- pandoc — documentos: ausente
+- pandoc — documentos: **presente**
 - yt-dlp — download de vídeo: ausente
 - 7z — arquivos (7-Zip): ausente
 - tesseract — OCR: ausente
@@ -336,6 +336,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 1a28208 2026-11-18 chore: release v0.6.6
+- af4f975 2026-11-18 fix(midia): cost ceiling diario, HF router endpoint, CF whisper parse, inovador dry-run
+- f21e855 2026-11-18 feat(midia): cost ledger, video cascade, CF whisper fallback, gemini quota skip (100 tools)
 - ab02f46 2026-11-18 feat(brain): Cloudflare Workers AI chat provider (free tier, 3 models verified)
 - c0f858d 2026-11-18 feat(midia): Cloudflare Workers AI image (free tier) in cascade + tool (99 tools)
 - 6aa26e9 2026-11-18 feat(midia): getimg.ai provider (paid balance, explicit opt-in) + remove segmind from free cascade
@@ -343,9 +346,6 @@ Utilitários locais relevantes:
 - 14fd8df 2026-11-18 feat(midia): HuggingFace Inference na cascata + Bitbucket Server no catalogo
 - 7d91c7b 2026-11-18 feat(mcp): catalogo cobre GitLab, Bitbucket, Azure DevOps, Forgejo/Gitea/Codeberg
 - c825ee2 2026-11-18 feat(agente): DG Inovador fixo + job semanal + catalogo MCP ampliado
-- 2cd01ee 2026-11-18 feat(midia): AI Horde gratis na cascata + Pixabay stock + JSON2Video
-- 365a746 2026-11-18 feat(midia): cascata gratis-primeiro para imagem (midia_imagem_auto)
-- 279e5d4 2026-11-18 feat(midia): PDF (pypdf) e planilhas (openpyxl) + diretiva documentos/sites
 
 ## 16. Como atualizar este dossiê
 

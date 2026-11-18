@@ -1,5 +1,6 @@
 /** Smoke real das tools de midia — uso manual: node scripts/smoke-midia.mjs */
 import { gerarImagemHF, hfConfigurado } from '../src/main/midia/hf-inferencia'
+import { gerarImagemAuto } from '../src/main/midia/cascata'
 import { buscarMidia, baixarMidia } from '../src/main/midia/estoque'
 import { gerarVideoJson2Video, json2videoConfigurado } from '../src/main/midia/json2video'
 import { gerarVideoAuto } from '../src/main/midia/video-auto'
@@ -25,6 +26,13 @@ async function main() {
   if (alvo === 'todos' || alvo === 'hf') {
     if (!hfConfigurado()) console.log('[hf] HF_TOKEN ausente — pulando')
     else resumo('hf', await gerarImagemHF(RAIZ, { prompt: 'a red apple on white table, product photo' }))
+  }
+
+  if (alvo === 'cascata') {
+    const r = await gerarImagemAuto(RAIZ, { prompt: 'a red apple on white table, product photo' })
+    resumo('cascata', r)
+    const casc = (r.detalhes as { cascata?: { motor: string; ok: boolean; segundos?: number; erro?: string }[] })?.cascata
+    for (const t of casc || []) console.log(`   ${t.motor}: ok=${t.ok} ${t.segundos ?? ''}s ${t.erro || ''}`)
   }
 
   if (alvo === 'todos' || alvo === 'pixabay') {
