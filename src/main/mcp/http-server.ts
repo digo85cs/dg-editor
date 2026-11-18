@@ -42,7 +42,7 @@ const ALLOWED_TOOLS = new Set([
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
-  'skills_listar', 'agentes_listar'
+  'skills_listar', 'agentes_listar', 'chat_historico'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -223,6 +223,15 @@ const TOOLS = [
     name: 'agentes_listar',
     description: 'Lista agentes definidos no projeto (.dg-editor/agentes) validados.',
     inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'chat_historico',
+    description: 'Historico recente do chat do projeto (ultimas N mensagens, conteudo truncado).',
+    inputSchema: {
+      type: 'object',
+      properties: { limite: { type: 'number', description: 'Max mensagens (default 20, max 50)' } },
+      required: []
+    }
   },
   {
     name: 'vault_write',
@@ -454,6 +463,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (name === 'agentes_listar') {
       const lista = listarAgentes(RAIZ).map((a) => ({ id: a.id, nome: a.nome, especialidade: a.especialidade, skills: a.skills }))
       return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
+    }
+
+    if (name === 'chat_historico') {
+      const parsed = z.object({ limite: z.number().optional() }).parse(args)
+      const limite = Math.min(Math.max(parsed.limite ?? 20, 1), 50)
+      const msgs = loadChat(RAIZ).slice(-limite).map((m) => ({
+        role: m.role,
+        content: String(m.content || '').slice(0, 2000)
+      }))
+      return { content: [{ type: 'text', text: JSON.stringify(msgs, null, 2) }] }
     }
 
     if (name === 'vault_write') {
