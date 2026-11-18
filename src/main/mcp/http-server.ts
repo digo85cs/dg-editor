@@ -22,6 +22,7 @@ import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
 import { listarSkills } from '../brain/skills'
 import { listarAgentes } from '../brain/agentes'
 import { gerarImagemAuto } from '../midia/cascata'
+import { gerarVideoAuto } from '../midia/video-auto'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -43,7 +44,7 @@ const ALLOWED_TOOLS = new Set([
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
-  'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto'
+  'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto', 'midia_video_auto'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -248,6 +249,22 @@ const TOOLS = [
         incluirPago: { type: 'boolean', description: 'Permitir ultimo recurso pago (default false)' }
       },
       required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_video_auto',
+    description: 'Gera video via cascata gratis-primeiro (JSON2Video com cenas -> ComfyUI local; Veo pago so com incluirPago=true).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'Texto-para-video (ComfyUI/Veo)' },
+        cenas: { type: 'array', items: { type: 'object' }, description: 'Cenas JSON2Video [{texto?, imagem?, narracao?}]' },
+        largura: { type: 'number' },
+        altura: { type: 'number' },
+        saida: { type: 'string' },
+        incluirPago: { type: 'boolean', description: 'Permitir Veo pago (default false)' }
+      },
+      required: []
     }
   },
   {
@@ -504,6 +521,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       const r = await gerarImagemAuto(RAIZ, { ...parsed, incluirPago: parsed.incluirPago ?? false })
       const { previewBase64: _omit, ...resto } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'midia_video_auto') {
+      const parsed = z.object({
+        prompt: z.string().optional(),
+        cenas: z.array(z.record(z.string(), z.unknown())).optional(),
+        largura: z.number().optional(),
+        altura: z.number().optional(),
+        saida: z.string().optional(),
+        incluirPago: z.boolean().optional()
+      }).parse(args)
+      const r = await gerarVideoAuto(RAIZ, {
+        ...parsed,
+        cenas: parsed.cenas as never,
+        incluirPago: parsed.incluirPago ?? false
+      })
+      const { previewBase64: _omit2, ...resto2 } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto2, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'vault_write') {
