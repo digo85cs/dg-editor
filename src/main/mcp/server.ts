@@ -535,6 +535,68 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_imagem_horde',
+    description:
+      'Gera imagem gratis via AI Horde (comunidade de GPUs, sem chave; fila ~1min, ate ~640px). Bom fallback quando Pollinations esta em rate limit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        largura: { type: 'number', description: '64-640 (padrao 512)' },
+        altura: { type: 'number', description: '64-640 (padrao 512)' },
+        seed: { type: 'number' },
+        saida: { type: 'string' }
+      },
+      required: ['prompt']
+    }
+  },
+  {
+    name: 'midia_estoque',
+    description:
+      'Banco de midia stock gratuito via Pixabay (fotos e videos royalty-free). Requer PIXABAY_API_KEY (gratis em pixabay.com/api/docs). acao=buscar lista resultados; acao=baixar baixa pelo downloadURL/video url retornado.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['buscar', 'baixar'], description: 'Padrao buscar' },
+        tipo: { type: 'string', enum: ['imagem', 'video'], description: 'Padrao imagem' },
+        consulta: { type: 'string', description: 'Termo de busca (buscar)' },
+        pagina: { type: 'number' },
+        por_pagina: { type: 'number' },
+        url: { type: 'string', description: 'URL pixabay.com retornada pela busca (baixar)' },
+        saida: { type: 'string' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'midia_video_json2video',
+    description:
+      'Monta video programatico via JSON2Video (600s gratis/mes; requer JSON2VIDEO_API_KEY). Cada cena aceita imagemUrl publica, texto na tela e/ou narracao TTS. Baixa o MP4 pronto.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cenas: {
+          type: 'array',
+          description: 'Ate 20 cenas',
+          items: {
+            type: 'object',
+            properties: {
+              imagemUrl: { type: 'string', description: 'URL publica da imagem de fundo' },
+              texto: { type: 'string', description: 'Texto sobreposto na tela' },
+              narracao: { type: 'string', description: 'Texto narrado (TTS)' },
+              voz: { type: 'string' },
+              duracaoSeg: { type: 'number', description: '1-60 (padrao 5)' }
+            }
+          }
+        },
+        resolucao: { type: 'string', enum: ['small', 'medium', 'hd', 'full-hd'] },
+        titulo: { type: 'string' },
+        saida: { type: 'string' }
+      },
+      required: ['cenas']
+    }
+  },
+  {
     name: 'midia_imagem_gemini',
     description:
       'Gera imagem via Gemini (nano banana) — rapida e de alta qualidade. Requer GEMINI_API_KEY configurada; se faltar, use midia_imagem_gerar.',
@@ -2649,6 +2711,65 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
             saida: p.saida
           })
         )
+      }
+
+      if (name === 'midia_imagem_horde') {
+        const p = z
+          .object({
+            prompt: z.string().min(1),
+            largura: z.number().optional(),
+            altura: z.number().optional(),
+            seed: z.number().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const { gerarImagemHorde } = await import('../midia/horde')
+        return await responder(await gerarImagemHorde(RAIZ, p))
+      }
+
+      if (name === 'midia_estoque') {
+        const p = z
+          .object({
+            acao: z.enum(['buscar', 'baixar']).optional(),
+            tipo: z.enum(['imagem', 'video']).optional(),
+            consulta: z.string().optional(),
+            pagina: z.number().optional(),
+            por_pagina: z.number().optional(),
+            url: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const est = await import('../midia/estoque')
+        if ((p.acao || 'buscar') === 'baixar') {
+          return await responder(await est.baixarMidia(RAIZ, { url: p.url || '', tipo: p.tipo, consulta: p.consulta, saida: p.saida }))
+        }
+        return await responder(
+          await est.buscarMidia(RAIZ, { tipo: p.tipo || 'imagem', consulta: p.consulta || '', pagina: p.pagina, porPagina: p.por_pagina })
+        )
+      }
+
+      if (name === 'midia_video_json2video') {
+        const p = z
+          .object({
+            cenas: z
+              .array(
+                z.object({
+                  imagemUrl: z.string().optional(),
+                  texto: z.string().optional(),
+                  narracao: z.string().optional(),
+                  voz: z.string().optional(),
+                  duracaoSeg: z.number().optional()
+                })
+              )
+              .min(1)
+              .max(20),
+            resolucao: z.enum(['small', 'medium', 'hd', 'full-hd']).optional(),
+            titulo: z.string().optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const j2v = await import('../midia/json2video')
+        return await responder(await j2v.gerarVideoJson2Video(RAIZ, p))
       }
 
       if (name === 'midia_imagem_gemini') {

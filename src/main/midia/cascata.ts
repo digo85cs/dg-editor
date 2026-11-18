@@ -4,8 +4,9 @@
  * Ordem (sempre grátis antes de pago):
  * 1. Gemini image — cota gratuita do AI Studio quando há chave;
  * 2. Pollinations — 100% grátis, sem chave (rate limit ~1/45s);
- * 3. ComfyUI local — ilimitado, mas lento em CPU;
- * 4. OpenAI gpt-image — PAGO, só como último recurso quando o usuário
+ * 3. AI Horde — fila comunitária gratuita, sem chave (~1min, até ~640px);
+ * 4. ComfyUI local — ilimitado, mas lento em CPU;
+ * 5. OpenAI gpt-image — PAGO, só como último recurso quando o usuário
  *    tem OPENAI_API_KEY (a tool específica continua existindo para
  *    quando o pedido for explicitamente "melhor qualidade paga").
  *
@@ -74,7 +75,28 @@ export async function gerarImagemAuto(
     }
   }
 
-  // 3. ComfyUI local (ilimitado; geraImagemComfy já cai no Pollinations se não instalado — pulamos nesse caso)
+  // 3. AI Horde (comunidade gratuita, sem chave; fila ~1min, até ~640px)
+  {
+    const t0 = Date.now()
+    try {
+      const { gerarImagemHorde } = await import('./horde')
+      const r = await gerarImagemHorde(raiz, {
+        prompt: opts.prompt,
+        largura: opts.largura,
+        altura: opts.altura,
+        seed: opts.seed,
+        saida: opts.saida
+      })
+      if (registrar('ai-horde', r, t0).ok) {
+        r.aviso = (r.aviso ? r.aviso + ' ' : '') + 'Cascata grátis-primeiro: Pollinations indisponível → AI Horde.'
+        return comCascata(r)
+      }
+    } catch (e) {
+      tentativas.push({ motor: 'ai-horde', ok: false, erro: String(e).slice(0, 160), segundos: +((Date.now() - t0) / 1000).toFixed(1) })
+    }
+  }
+
+  // 4. ComfyUI local (ilimitado; geraImagemComfy já cai no Pollinations se não instalado — pulamos nesse caso)
   if (comfyInstalado()) {
     const t0 = Date.now()
     try {
@@ -97,7 +119,7 @@ export async function gerarImagemAuto(
     tentativas.push({ motor: 'comfyui-local', ok: false, erro: 'ComfyUI não instalado' })
   }
 
-  // 4. OpenAI pago — só se o usuário pedir explicitamente (incluirPago)
+  // 5. OpenAI pago — só se o usuário pedir explicitamente (incluirPago)
   if (opts.incluirPago) {
     try {
       const { gerarImagemOpenAI } = await import('./openai-midia')
