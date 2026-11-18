@@ -5,7 +5,7 @@
  */
 import type { ProviderConfig } from './providers'
 
-export type ProviderFormato = 'openai' | 'ollama' | 'cursor-cli' | 'codex-cli'
+export type ProviderFormato = 'openai' | 'ollama' | 'cursor-cli' | 'codex-cli' | 'anthropic'
 
 export interface ModeloCatalogo {
   id: string
@@ -76,7 +76,8 @@ function desc(
     arli: 'ARLI_API_KEY',
     openai: 'OPENAI_API_KEY',
     deepseek: 'DEEPSEEK_API_KEY',
-    zai: 'ZAI_API_KEY'
+    zai: 'ZAI_API_KEY',
+    anthropic: 'ANTHROPIC_API_KEY'
   }
   return {
     id,
@@ -305,6 +306,16 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
     apiKeyRef: 'zai', tier: 2, ordem: 203,
     preco: { entradaPor1M: 1.40, saidaPor1M: 4.40 }, // Z.AI GLM-5.3 — fonte: https://docs.z.ai/guides/overview/pricing — consulta 2026-11-10
     modelos: [{ id: 'glm-5.3', capacidades: ['chat', 'codigo', 'analise'] }],
+  }),
+  desc('anthropic', 'Anthropic Claude', 'anthropic', 'https://api.anthropic.com', {
+    apiKeyRef: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY', tier: 2, ordem: 204,
+    timeoutMs: 300_000, numPredict: 8192,
+    preco: { entradaPor1M: 3.00, saidaPor1M: 15.00 }, // Claude Sonnet — faixa conservadora; ver platform.claude.com/pricing
+    modelos: [
+      { id: 'claude-sonnet-4-5', contexto: 200_000, capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] },
+      { id: 'claude-haiku-4-5', contexto: 200_000, capacidades: ['chat', 'codigo', 'analise'] },
+      { id: 'claude-opus-4-1', contexto: 200_000, capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] },
+    ],
   }),
 
   // ---------------- LOCAL por ultimo (so se online/CLI falharem) ----------------

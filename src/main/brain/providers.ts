@@ -17,7 +17,7 @@ import { executarCodex, CodexCliError, statusCodexEmCache } from './codex-cli'
 export interface ProviderConfig {
   id: string
   tipo: 'local' | 'online' | 'cli'
-  formato: 'ollama' | 'openai' | 'cursor-cli' | 'codex-cli'
+  formato: 'ollama' | 'openai' | 'cursor-cli' | 'codex-cli' | 'anthropic'
   modelo: string
   baseUrl: string
   apiKeyEnv?: string
@@ -392,6 +392,148 @@ async function adapterOpenAI(
   }
 }
 
+/** Adapter Anthropic Messages API (Claude) — formato próprio, não OpenAI-compatible. */
+async function adapterAnthropic(
+  cfg: ProviderConfig,
+  mensagens: Message[],
+  tools?: ToolDef[],
+  signal?: AbortSignal
+): Promise<RespostaProvider> {
+  const key =
+    lerChave(cfg.id) ||
+    (cfg.apiKeyRef ? lerChave(cfg.apiKeyRef) : null) ||
+    (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : undefined)
+  if (!key) {
+    throw new ErroProvider('auth', 'chave ausente: ' + (cfg.apiKeyRef || cfg.apiKeyEnv || cfg.id), cfg.id, 401)
+  }
+
+  // Anthropic: system vai em campo próprio; tool results viram blocos tool_result em msg user.
+  const sistema: string[] = []
+  const msgs: Array<{ role: 'user' | 'assistant'; content: unknown }> = []
+  for (const m of mensagens) {
+    if (m.role === 'system') {
+      if (m.content) sistema.push(m.content)
+      continue
+    }
+    if (m.role === 'tool') {
+      const bloco = {
+        type: 'tool_result',
+        tool_use_id: m.tool_call_id || m.name || 'tool',
+        content: m.content || ''
+      }
+      const ult = msgs[msgs.length - 1]
+      if (ult && ult.role === 'user' && Array.isArray(ult.content)) {
+        ;(ult.content as unknown[]).push(bloco)
+      } else {
+        msgs.push({ role: 'user', content: [bloco] })
+      }
+      continue
+    }
+    if (m.role === 'assistant' && m.tool_calls?.length) {
+      const blocos: unknown[] = []
+      if (m.content) blocos.push({ type: 'text', text: m.content })
+      for (const tc of m.tool_calls) {
+        blocos.push({
+          type: 'tool_use',
+          id: tc.id || 'toolu_' + Math.random().toString(36).slice(2, 10),
+          name: tc.function.name,
+          input:
+            typeof tc.function.arguments === 'string'
+              ? parseArgs(tc.function.arguments)
+              : tc.function.arguments || {}
+        })
+      }
+      msgs.push({ role: 'assistant', content: blocos })
+      continue
+    }
+    msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' })
+  }
+  // Anthropic exige começar com user
+  while (msgs.length && msgs[0].role !== 'user') msgs.shift()
+  if (!msgs.length) msgs.push({ role: 'user', content: ' ' })
+
+  const corpo: Record<string, unknown> = {
+    model: cfg.modelo,
+    max_tokens: cfg.numPredict,
+    messages: msgs
+  }
+  if (sistema.length) corpo.system = sistema.join('\n\n')
+  if (tools && tools.length > 0) {
+    corpo.tools = tools.map((t) => ({
+      name: t.name,
+      description: t.description || t.name,
+      input_schema: (t.inputSchema as Record<string, unknown>) || { type: 'object', properties: {} }
+    }))
+  }
+
+  let status = 0
+  let body = ''
+  try {
+    const r = await httpJsonUrl(
+      'https://api.anthropic.com/v1/messages',
+      corpo,
+      'POST',
+      cfg.timeoutMs,
+      {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      signal
+    )
+    status = r.status
+    body = r.body
+  } catch (e) {
+    if (e instanceof ErroProvider) {
+      e.providerId = cfg.id
+      throw e
+    }
+    throw new ErroProvider('rede', String(e), cfg.id)
+  }
+  if (status >= 400) throw classificarHttp(status, body, cfg.id)
+
+  let json: {
+    content?: Array<{ type?: string; text?: string; id?: string; name?: string; input?: unknown }>
+    model?: string
+    usage?: { input_tokens?: number; output_tokens?: number }
+  }
+  try {
+    json = JSON.parse(body)
+  } catch {
+    throw new ErroProvider('outro', 'JSON invalido Anthropic', cfg.id)
+  }
+
+  const blocos = json.content || []
+  const content = blocos
+    .filter((b) => b.type === 'text' && b.text)
+    .map((b) => b.text)
+    .join('')
+  const tool_calls = blocos
+    .filter((b) => b.type === 'tool_use' && b.name)
+    .map((b) => ({
+      function: {
+        name: String(b.name),
+        arguments:
+          typeof b.input === 'string' ? parseArgs(b.input) : (b.input as Record<string, unknown>) || {}
+      }
+    }))
+
+  return {
+    content,
+    tool_calls,
+    modeloUsado: json.model || cfg.modelo,
+    providerId: cfg.id,
+    bruto: json,
+    usage: json.usage
+      ? {
+          prompt_tokens: json.usage.input_tokens,
+          completion_tokens: json.usage.output_tokens,
+          total_tokens: (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0)
+        }
+      : undefined
+  }
+}
+
 const CURSOR_STATUS_REL = join('.dg-editor', 'cursor-cli-status.json')
 
 export function marcarCursorCliAprovado(ok: boolean, detalhe?: string): void {
@@ -604,6 +746,9 @@ export async function chamarProvider(
     }
     if (cfg.formato === 'ollama') {
       return await adapterOllama(cfg, mensagens, tools, ac.signal)
+    }
+    if (cfg.formato === 'anthropic') {
+      return await adapterAnthropic(cfg, mensagens, tools, ac.signal)
     }
     return await adapterOpenAI(cfg, mensagens, tools, ac.signal)
   } finally {

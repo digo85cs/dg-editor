@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **17/11/2026, 21:34:18** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: 0fcbf97 2026-11-17 feat(chat): imagem gerada aparece inline + Pollinations primeiro
-> Alterações locais não commitadas: 5 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 08:15:25** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: ed05903 2026-11-17 feat(midia): tool midia_imagem_gemini (nano banana)
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- ed05903 2026-11-17 feat(midia): tool midia_imagem_gemini (nano banana)
 - 0fcbf97 2026-11-17 feat(chat): imagem gerada aparece inline + Pollinations primeiro
 - 44b4088 2026-11-17 docs: regenera DOSSIE pos-fix midia
 - df4c6c0 2026-11-17 fix(agente): pedido de midia nunca responde placeholder sem tool
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - c11c6ad 2026-11-17 feat: marketplace MCP UI, exportar chat, watcher Devin, temas custom, paralelo-merge --revisar, painel providers
 - 34ab538 2026-11-17 chore: release v0.6.4
 - 2dd9c66 2026-11-17 feat: secao Automacoes no modal Contas (agendador + credenciais)
-- 4913496 2026-11-17 refactor: extrai sequencia final de boot para boot-final.js
 
 ## 16. Como atualizar este dossiê
 
