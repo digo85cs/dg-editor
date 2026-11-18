@@ -432,9 +432,16 @@ async function executarChatSend(
           'midia_imagem_gerar Pollinations como padrao rapido; midia_comfyui_imagem so se pedir ' +
           'ilimitado/local ou se as nuvens falharem; midia_video_gemini para video IA se houver chave Gemini ' +
           '(leva minutos, custo pago), senao midia_comfyui_video; midia_tts_openai para narracao OpenAI; ' +
-          'midia_documento_converter para md/docx/pdf/pptx via pandoc; ' +
           'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';
+      }
+      if (/pdf|documento|planilha|xlsx|csv|pptx|docx|odt|epub|convert|site|p[aá]gina|app\b|landing|apresenta|relat[oó]rio/i.test(textoPedido)) {
+        contextoAgente +=
+          '\n\nDIRETIVA DOCUMENTOS/SITES: se o pedido envolve PDF use midia_pdf (info/mesclar/dividir/' +
+          'texto/formulario) ou midia_documento_converter (pandoc: md/html/docx/odt/rtf -> pdf/docx/pptx/epub). ' +
+          'Planilhas: midia_planilha (ler/criar xlsx, csv<->xlsx). Para "criar site/pagina/app", escreva os ' +
+          'arquivos de verdade no workspace (html/css/js) com as tools de arquivo e informe os caminhos. ' +
+          'Execute a tool correspondente em vez de so descrever.\n';
       }
       try {
         const { expandirMencoes } = await import('../agent/mencoes');

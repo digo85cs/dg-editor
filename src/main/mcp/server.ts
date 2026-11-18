@@ -601,6 +601,52 @@ const TOOLS = [
     }
   },
   {
+    name: 'midia_pdf',
+    description:
+      'Manipula PDFs via pypdf local: info (paginas/campos), mesclar, dividir (inicio/fim), extrair texto, preencher formulario (campos {nome:valor}).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: {
+          type: 'string',
+          enum: ['info', 'mesclar', 'dividir', 'texto', 'formulario'],
+          description: 'Padrao info'
+        },
+        entrada: { type: 'string', description: 'PDF de entrada (exceto mesclar)' },
+        entradas: { type: 'array', items: { type: 'string' }, description: 'Lista de PDFs para mesclar' },
+        inicio: { type: 'number', description: 'Pagina inicial p/ dividir' },
+        fim: { type: 'number', description: 'Pagina final p/ dividir' },
+        campos: { type: 'object', description: 'Mapa nomeCampo->valor p/ formulario' },
+        saida: { type: 'string' }
+      },
+      required: ['acao']
+    }
+  },
+  {
+    name: 'midia_planilha',
+    description:
+      'Planilhas via openpyxl local: ler xlsx (abas+dados), criar xlsx a partir de linhas, csv->xlsx, xlsx->csv.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: {
+          type: 'string',
+          enum: ['ler', 'criar', 'csv-para-xlsx', 'xlsx-para-csv'],
+          description: 'Padrao ler'
+        },
+        entrada: { type: 'string', description: 'Arquivo de entrada (.xlsx/.csv)' },
+        saida: { type: 'string' },
+        aba: { type: 'string', description: 'Nome da aba ao criar' },
+        linhas: {
+          type: 'array',
+          items: { type: 'array' },
+          description: 'Linhas da planilha ao criar (array de arrays)'
+        }
+      },
+      required: ['acao']
+    }
+  },
+  {
     name: 'midia_diagrama',
     description: 'Gera diagrama Mermaid em PNG/SVG via mermaid.ink (gratuito).',
     inputSchema: {
@@ -2628,6 +2674,36 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           .parse(args)
         const doc = await import('../midia/documento')
         return await responder(await doc.converterDocumento(RAIZ, p))
+      }
+
+      if (name === 'midia_pdf') {
+        const p = z
+          .object({
+            acao: z.enum(['info', 'mesclar', 'dividir', 'texto', 'formulario']),
+            entrada: z.string().optional(),
+            entradas: z.array(z.string()).optional(),
+            inicio: z.number().optional(),
+            fim: z.number().optional(),
+            campos: z.record(z.string(), z.string()).optional(),
+            saida: z.string().optional()
+          })
+          .parse(args)
+        const ad = await import('../midia/arquivos-doc')
+        return await responder(await ad.pdfOperar(RAIZ, p))
+      }
+
+      if (name === 'midia_planilha') {
+        const p = z
+          .object({
+            acao: z.enum(['ler', 'criar', 'csv-para-xlsx', 'xlsx-para-csv']),
+            entrada: z.string().optional(),
+            saida: z.string().optional(),
+            aba: z.string().optional(),
+            linhas: z.array(z.array(z.union([z.string(), z.number()]))).optional()
+          })
+          .parse(args)
+        const ad = await import('../midia/arquivos-doc')
+        return await responder(await ad.planilhaOperar(RAIZ, p))
       }
 
       if (name === 'midia_diagrama') {
