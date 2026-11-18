@@ -19,6 +19,8 @@ import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke, lerMemoriaProjeto, gravarMemoriaProjeto } from '../autonomia-tools'
 import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
+import { listarSkills } from '../brain/skills'
+import { listarAgentes } from '../brain/agentes'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -39,7 +41,8 @@ const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
-  'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write'
+  'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
+  'skills_listar', 'agentes_listar'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -209,6 +212,16 @@ const TOOLS = [
   {
     name: 'qualidade_checar',
     description: 'Checagens leves de qualidade (encoding/sintaxe) no projeto.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'skills_listar',
+    description: 'Lista skills do projeto (.dg-editor/skills) com id, titulo e gatilho.',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'agentes_listar',
+    description: 'Lista agentes definidos no projeto (.dg-editor/agentes) validados.',
     inputSchema: { type: 'object', properties: {}, required: [] }
   },
   {
@@ -431,6 +444,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         porMotor: resumoUso(RAIZ)
       }
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'skills_listar') {
+      const lista = listarSkills(RAIZ).map((s) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }))
+      return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
+    }
+
+    if (name === 'agentes_listar') {
+      const lista = listarAgentes(RAIZ).map((a) => ({ id: a.id, nome: a.nome, especialidade: a.especialidade, skills: a.skills }))
+      return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
     }
 
     if (name === 'vault_write') {
