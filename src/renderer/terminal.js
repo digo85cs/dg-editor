@@ -5,7 +5,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import { apiTerm, cssVar, formatShellLabel, gravarPerfis, lerPerfis, rotuloDoShellId, shellIdFromInfo, temaXterm } from './terminal-utils.js'
+import { apiTerm, cssVar, formatShellLabel, gravarPerfis, lerPerfis, resumirScrollback, rotuloDoShellId, shellIdFromInfo, temaXterm } from './terminal-utils.js'
 
 const LS_HEIGHT = 'dg-terminal-height'
 const LS_MODE = 'dg-terminal-mode'
@@ -99,11 +99,7 @@ export function initTerminalPanel() {
 
   function resumoScrollback(a) {
     try {
-      const txt = bufferTexto(a.id)
-      if (!txt) return ''
-      const linhas = txt.replace(/\r/g, '').split('\n')
-      while (linhas.length && !linhas[linhas.length - 1].trim()) linhas.pop()
-      return linhas.slice(-MAX_SCROLLBACK_LINHAS).join('\n').slice(-MAX_SCROLLBACK_CHARS)
+      return resumirScrollback(bufferTexto(a.id), MAX_SCROLLBACK_LINHAS, MAX_SCROLLBACK_CHARS)
     } catch {
       return ''
     }

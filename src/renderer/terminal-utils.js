@@ -86,6 +86,13 @@ export function rotuloDoShellId(id) {
   return id
 }
 
+export function resumirScrollback(txt, maxLinhas = 80, maxChars = 8000) {
+  if (!txt) return ''
+  const linhas = String(txt).replace(/\r/g, '').split('\n')
+  while (linhas.length && !linhas[linhas.length - 1].trim()) linhas.pop()
+  return linhas.slice(-maxLinhas).join('\n').slice(-maxChars)
+}
+
 export function shellIdFromInfo(shell) {
   if (!shell) return null
   if (shell.tipo === 'cmd') return 'cmd'
