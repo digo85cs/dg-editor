@@ -23,6 +23,7 @@ import { listarSkills } from '../brain/skills'
 import { listarAgentes } from '../brain/agentes'
 import { gerarImagemAuto } from '../midia/cascata'
 import { gerarVideoAuto } from '../midia/video-auto'
+import { pdfOperar, planilhaOperar } from '../midia/arquivos-doc'
 
 const raizWS = obterRaizWorkspace()
 const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
@@ -44,7 +45,8 @@ const ALLOWED_TOOLS = new Set([
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
   'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write',
-  'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto', 'midia_video_auto'
+  'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto', 'midia_video_auto',
+  'doc_pdf', 'doc_planilha'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -265,6 +267,38 @@ const TOOLS = [
         incluirPago: { type: 'boolean', description: 'Permitir Veo pago (default false)' }
       },
       required: []
+    }
+  },
+  {
+    name: 'doc_pdf',
+    description: 'Operacoes em PDF locais via pypdf: info, mesclar, dividir, extrair texto, preencher formulario.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['info', 'mesclar', 'dividir', 'texto', 'formulario'] },
+        entrada: { type: 'string', description: 'Arquivo PDF relativo a raiz' },
+        entradas: { type: 'array', items: { type: 'string' }, description: 'Para mesclar: lista de PDFs' },
+        inicio: { type: 'number' },
+        fim: { type: 'number' },
+        campos: { type: 'object', additionalProperties: { type: 'string' }, description: 'formulario: nome->valor' },
+        saida: { type: 'string' }
+      },
+      required: ['acao']
+    }
+  },
+  {
+    name: 'doc_planilha',
+    description: 'Operacoes em planilhas locais via python: ler xlsx, criar, csv<->xlsx.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['ler', 'criar', 'csv-para-xlsx', 'xlsx-para-csv'] },
+        entrada: { type: 'string' },
+        saida: { type: 'string' },
+        aba: { type: 'string' },
+        linhas: { type: 'array', items: { type: 'array', items: {} } }
+      },
+      required: ['acao']
     }
   },
   {
@@ -539,6 +573,34 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       })
       const { previewBase64: _omit2, ...resto2 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto2, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'doc_pdf') {
+      const parsed = z.object({
+        acao: z.enum(['info', 'mesclar', 'dividir', 'texto', 'formulario']),
+        entrada: z.string().optional(),
+        entradas: z.array(z.string()).optional(),
+        inicio: z.number().optional(),
+        fim: z.number().optional(),
+        campos: z.record(z.string(), z.string()).optional(),
+        saida: z.string().optional()
+      }).parse(args)
+      const r = await pdfOperar(RAIZ, parsed)
+      const { previewBase64: _omit3, ...resto3 } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto3, null, 2) }], isError: !r.ok }
+    }
+
+    if (name === 'doc_planilha') {
+      const parsed = z.object({
+        acao: z.enum(['ler', 'criar', 'csv-para-xlsx', 'xlsx-para-csv']),
+        entrada: z.string().optional(),
+        saida: z.string().optional(),
+        aba: z.string().optional(),
+        linhas: z.array(z.array(z.union([z.string(), z.number()]))).optional()
+      }).parse(args)
+      const r = await planilhaOperar(RAIZ, parsed)
+      const { previewBase64: _omit4, ...resto4 } = r as Record<string, unknown>
+      return { content: [{ type: 'text', text: JSON.stringify(resto4, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'vault_write') {
