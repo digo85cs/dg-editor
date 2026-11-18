@@ -126,3 +126,6 @@ boot.log
 .dgrules.truncado.bak
 .dgrules*.bak
 _ed*.js
+.dg-editor/smoke/
+scripts/*.mjs
+!scripts/*.mjs.example
