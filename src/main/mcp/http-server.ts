@@ -17,7 +17,7 @@ import { projectStateDir, resolverRaizDGEditor } from '../paths'
 import { obterRaizWorkspace } from '../workspace-raiz'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
-import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke } from '../autonomia-tools'
+import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke, lerMemoriaProjeto, gravarMemoriaProjeto } from '../autonomia-tools'
 import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
 
 const raizWS = obterRaizWorkspace()
@@ -39,7 +39,7 @@ const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
-  'qualidade_checar', 'resultado_avaliar', 'custo_resumo'
+  'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -215,6 +215,21 @@ const TOOLS = [
     name: 'custo_resumo',
     description: 'Resumo de custo do dia: total USD, limite configurado e quebra por motor.',
     inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'projeto_memoria',
+    description: 'Memoria persistente do projeto (stack, testCmd, buildCmd, notas). Le ou grava .dg-editor/projeto-memoria.json.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        gravar: { type: 'boolean', description: 'true para gravar campos abaixo; false/ausente so le' },
+        stack: { type: 'string' },
+        testCmd: { type: 'string' },
+        buildCmd: { type: 'string' },
+        notas: { type: 'string' }
+      },
+      required: []
+    }
   },
   {
     name: 'resultado_avaliar',
@@ -403,6 +418,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         limiteDiaUsd: limiteCustoDia(RAIZ),
         porMotor: resumoUso(RAIZ)
       }
+      return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'projeto_memoria') {
+      const parsed = z.object({
+        gravar: z.boolean().optional(),
+        stack: z.string().optional(),
+        testCmd: z.string().optional(),
+        buildCmd: z.string().optional(),
+        notas: z.string().optional()
+      }).parse(args)
+      const r = parsed.gravar
+        ? gravarMemoriaProjeto(RAIZ, parsed)
+        : lerMemoriaProjeto(RAIZ) || gravarMemoriaProjeto(RAIZ, {})
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
