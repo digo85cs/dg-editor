@@ -168,6 +168,28 @@ export const CATALOGO_PROVIDERS: ProviderDescriptor[] = [
     }
   ),
   desc(
+    'cloudflare-workers-ai',
+    'Cloudflare Workers AI (free tier)',
+    'openai',
+    'https://api.cloudflare.com/client/v4/accounts/' +
+      (process.env.CLOUDFLARE_ACCOUNT_ID || 'ACCOUNT_ID') +
+      '/ai/v1',
+    {
+      apiKeyRef: 'cloudflare',
+      apiKeyEnv: 'CLOUDFLARE_API_TOKEN',
+      tier: 1,
+      cotaDiaria: 500,
+      ordem: 9,
+      modelos: [
+        { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', contexto: 24_000, capacidades: ['chat', 'codigo', 'analise'] },
+        { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', contexto: 32_000, capacidades: ['chat', 'codigo', 'analise'] },
+        { id: '@cf/qwen/qwq-32b', contexto: 32_000, capacidades: ['chat', 'codigo', 'analise', 'raciocinio'] },
+      ],
+      preco: { entradaPor1M: 0, saidaPor1M: 0 },
+      ativo: !!(process.env.CLOUDFLARE_API_TOKEN && process.env.CLOUDFLARE_ACCOUNT_ID),
+    }
+  ),
+  desc(
     'gemini-flash-lite',
     'Google Gemini Flash-Lite (OpenAI shim)',
     'openai',

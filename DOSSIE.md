@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 10:43:16** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.5** · branch `integra-13-11` · último commit: 6aa26e9 2026-11-18 feat(midia): getimg.ai provider (paid balance, explicit opt-in) + remove segmind from free cascade
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **18/11/2026, 10:44:42** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.5** · branch `integra-13-11` · último commit: c0f858d 2026-11-18 feat(midia): Cloudflare Workers AI image (free tier) in cascade + tool (99 tools)
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c0f858d 2026-11-18 feat(midia): Cloudflare Workers AI image (free tier) in cascade + tool (99 tools)
 - 6aa26e9 2026-11-18 feat(midia): getimg.ai provider (paid balance, explicit opt-in) + remove segmind from free cascade
 - 7201896 2026-11-18 feat(midia): Segmind image provider + cascade slot (97 tools)
 - 14fd8df 2026-11-18 feat(midia): HuggingFace Inference na cascata + Bitbucket Server no catalogo
@@ -345,7 +346,6 @@ Utilitários locais relevantes:
 - 365a746 2026-11-18 feat(midia): cascata gratis-primeiro para imagem (midia_imagem_auto)
 - 279e5d4 2026-11-18 feat(midia): PDF (pypdf) e planilhas (openpyxl) + diretiva documentos/sites
 - 27f0a75 2026-11-18 feat(midia): ferramentas criativas — Gemini img2img/Veo, OpenAI image/TTS, pandoc docs
-- d2febbc 2026-11-18 chore(tsconfig): remove baseUrl deprecado (TS 7.0)
 
 ## 16. Como atualizar este dossiê
 
