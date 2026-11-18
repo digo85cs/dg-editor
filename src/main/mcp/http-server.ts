@@ -39,7 +39,7 @@ const ALLOWED_TOOLS = new Set([
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
-  'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria'
+  'qualidade_checar', 'resultado_avaliar', 'custo_resumo', 'projeto_memoria', 'vault_write'
 ])
 
 function logCall(toolName: string, args: unknown): void {
@@ -210,6 +210,18 @@ const TOOLS = [
     name: 'qualidade_checar',
     description: 'Checagens leves de qualidade (encoding/sintaxe) no projeto.',
     inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'vault_write',
+    description: 'Grava arquivo no vault (.dg-editor). Caminho relativo, max 512KB, nomes protegidos bloqueados.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caminho: { type: 'string', description: 'Path relativo ao .dg-editor (ex: relatorios/x.md)' },
+        conteudo: { type: 'string' }
+      },
+      required: ['caminho', 'conteudo']
+    }
   },
   {
     name: 'custo_resumo',
@@ -419,6 +431,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         porMotor: resumoUso(RAIZ)
       }
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
+    }
+
+    if (name === 'vault_write') {
+      const parsed = z.object({ caminho: z.string(), conteudo: z.string() }).parse(args)
+      if (caminhoEhProtegido(parsed.caminho)) {
+        return { content: [{ type: 'text', text: 'arquivo protegido: ' + parsed.caminho }], isError: true }
+      }
+      if (Buffer.byteLength(parsed.conteudo, 'utf8') > 512 * 1024) {
+        return { content: [{ type: 'text', text: 'conteudo excede 512KB' }], isError: true }
+      }
+      const abs = join(VAULT, parsed.caminho)
+      if (!dentroDoVault(abs)) throw new Error('caminho fora do vault')
+      await fs.mkdir(join(abs, '..'), { recursive: true })
+      await fs.writeFile(abs, parsed.conteudo, 'utf8')
+      return { content: [{ type: 'text', text: JSON.stringify({ ok: true, caminho: parsed.caminho }) }] }
     }
 
     if (name === 'projeto_memoria') {
