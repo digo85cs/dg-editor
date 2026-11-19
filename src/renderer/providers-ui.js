@@ -4,6 +4,14 @@
  * consome apenas canais IPC da camada principal (sem logica de negocio).
  * Textos em pt-BR.
  */
+import {
+  motivoDe,
+  badgeTier,
+  badgeDisponivel,
+  formatarData,
+  formatarUsd
+} from './features/ui/provider-badges.js'
+
 (function () {
   const api = window.api || {};
   let modal = null;
@@ -147,28 +155,6 @@
 
   window.dgAbrirProvedores = abrir;
 
-  function badgeTier(tier) {
-    const cores = { 1: '#1e5a32', 2: '#5a4a1e', 3: '#6b1e1e' };
-    const rotulos = { 1: 'gratuito', 2: 'pago', 3: 'local' };
-    const cor = cores[tier] || '#555';
-    return '<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;background:' + cor + ';color:#fff">' + (rotulos[tier] || 'tier ' + tier) + '</span>';
-  }
-
-  function badgeDisponivel(it) {
-    const motivo = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
-    const map = {
-      ok: ['#1e5a32', 'disponível'],
-      local: ['#1e5a32', 'local ok'],
-      'sem-chave': ['#8b1e1e', 'sem chave'],
-      'chave-invalida': ['#9a3412', 'chave inválida'],
-      esgotado: ['#854d0e', 'cota esgotada'],
-      desativado: ['#666', 'desativado']
-    };
-    const [cor, lab] = map[motivo] || ['#6b1e1e', it && it.disponivel ? 'disponível' : 'indisponível'];
-    const lat = it && it.latenciaMs != null ? ' · ' + it.latenciaMs + 'ms' : '';
-    return '<span style="color:' + cor + '">● ' + lab + lat + '</span>';
-  }
-
   async function renderFila(fila) {
     const el = document.getElementById('providers-fila');
     if (!el) return;
@@ -179,7 +165,7 @@
     const soDisp = !!(document.getElementById('filtro-so-disponiveis') || {}).checked;
     const lista = soDisp
       ? fila.filter((it) => {
-          const m = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
+          const m = motivoDe(it);
           return m === 'ok' || m === 'local';
         })
       : fila;
@@ -189,7 +175,7 @@
     }
     let html = '<div class="prov-list">';
     for (const it of lista) {
-      const motivo = (it && it.motivo) || (it && it.disponivel ? 'ok' : 'sem-chave');
+      const motivo = motivoDe(it);
       html +=
         '<div class="prov-row" data-motivo="' + esc(motivo) + '">' +
         '<div class="prov-row-bar" aria-hidden="true"></div>' +
@@ -264,11 +250,6 @@
         }
       };
     });
-  }
-
-  function formatarData(iso) {
-    if (!iso) return '—';
-    try { return new Date(iso).toLocaleString('pt-BR', { hour12: false }); } catch { return iso; }
   }
 
   async function renderCotas(cotas) {
@@ -351,13 +332,7 @@
     const todosNaoRastreados = naoRastreados.length > 0 && trackedProviders.length === 0;
     const haMistura = naoRastreados.length > 0 && trackedProviders.length > 0;
 
-    // Formata valor rastreado: 2 casas se >= 0.01, 4 casas se > 0 e < 0.01 (evita $0,00 enganoso)
-    let usdStr;
-    if (usd > 0 && usd < 0.01) {
-      usdStr = '$' + usd.toFixed(4);
-    } else {
-      usdStr = '$' + usd.toFixed(2);
-    }
+    const usdStr = '$' + formatarUsd(usd);
 
     if (todosNaoRastreados) {
       el.innerHTML = '<strong>Hoje:</strong> <span style="color:#b45309">Gasto não rastreado — ' + naoRastreados.length + ' provedor(es) sem preço configurado</span>';
@@ -384,8 +359,7 @@
     if (trackedProviders.length > 0) {
       html += ' | por provider: ' + trackedProviders.map(([id, v]) => {
         const vv = Number(v);
-        const vStr = vv > 0 && vv < 0.01 ? vv.toFixed(4) : vv.toFixed(2);
-        return esc(id) + ' $' + vStr;
+        return esc(id) + ' $' + formatarUsd(vv);
       }).join(', ');
     }
 
