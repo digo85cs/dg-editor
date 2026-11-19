@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 15:02:05** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.2** · branch `integra-13-11` · último commit: 24e1914 2026-11-19 feat(ui): painel Auto — permissoes, agendador, credenciais e MCP no painel direito
+> Gerado automaticamente em **19/11/2026, 15:46:30** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.3** · branch `integra-13-11` · último commit: 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -336,6 +336,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
+- bd41984 2026-11-19 chore: dossie v0.8.2
 - 24e1914 2026-11-19 feat(ui): painel Auto — permissoes, agendador, credenciais e MCP no painel direito
 - c071dce 2026-11-19 chore: dossie v0.8.1
 - 565f690 2026-11-19 feat(agente): permissoes aplicadas no loop de tools, /permissoes, diagnosticos Python no contexto
@@ -344,8 +346,6 @@ Utilitários locais relevantes:
 - c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
 - 6189c9a 2026-11-19 chore: dossie v0.7.0
 - 482af52 2026-11-19 chore: v0.7.0
-- ed72427 2026-11-19 fix(ui): toast OpenRouter so quando nenhum provider disponivel
-- e59b109 2026-11-19 docs: regra de atualizar versao local e atalho desktop
 
 ## 16. Como atualizar este dossiê
 
