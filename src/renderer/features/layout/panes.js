@@ -79,6 +79,9 @@ export function ativarAbaDireita(pane) {
     el.classList.toggle('active', el.id === 'pane-' + p)
   })
   if (p === 'agent') void carregarAgentesUi()
+  if (p === 'auto') {
+    void import('../ui/painel-auto.js').then((m) => m.carregarPainelAuto()).catch(() => {})
+  }
   if (p === 'browser') {
     if (deps.browserBloco3.isAberto()) deps.setBrowserVisivel(true)
     else {
