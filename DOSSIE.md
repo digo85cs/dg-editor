@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 16:41:23** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.6** · branch `integra-13-11` · último commit: fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
+> Gerado automaticamente em **19/11/2026, 16:50:39** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.7** · branch `integra-13-11` · último commit: 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **387**.
-- Canais expostos pelo preload: **371**.
+- Canais registrados no main: **391**.
+- Canais expostos pelo preload: **376**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
+- 706f4ba 2026-11-19 chore: dossiê v0.8.6
 - fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
 - 312d1f7 2026-11-19 chore: dossiê v0.8.5
 - b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 8437bc6 2026-11-19 chore: dossie v0.8.3
 - 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
 - bd41984 2026-11-19 chore: dossie v0.8.2
-- 24e1914 2026-11-19 feat(ui): painel Auto — permissoes, agendador, credenciais e MCP no painel direito
-- c071dce 2026-11-19 chore: dossie v0.8.1
 
 ## 16. Como atualizar este dossiê
 
