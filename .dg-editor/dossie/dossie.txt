@@ -1,14 +1,11 @@
 === DOSSIE DG EDITOR ===
-Atualizado em: 2026-11-19T12:14:17.459Z
+Atualizado em: 2026-11-19T13:03:51.554Z
 Raiz: C:\dev\DGEditor
 Total de mensagens no chat: 200
-Provedor mais recente: erro
-Contagem por provedor: {"mock":64,"cancelado":35,"erro":2}
+Provedor mais recente: agente-auto:@cf/meta/llama-3.3-70b-instruct-fp8-fast
+Contagem por provedor: {"cancelado":35,"mock":63,"erro":2,"@cf/meta/llama-3.3-70b-instruct-fp8-fast":2,"agente-auto:@cf/meta/llama-3.3-70b-instruct-fp8-fast":1}
 
 --- ULTIMAS MENSAGENS ---
-[2026-11-16T20:54:33.124Z] DONO: qa: anuncio de etapas
-[2026-11-16T20:54:33.266Z] IA [mock]: Resposta simulada do DG Editor (DG_FAKE_LLM). Nenhum provedor externo foi chamado neste turno. Cenario deterministico de QA.
-[2026-11-16T20:56:45.505Z] DONO: qa-mock [qa:proposta]
 [2026-11-16T20:56:45.659Z] IA [mock]: Resposta simulada do DG Editor (DG_FAKE_LLM). Nenhum provedor externo foi chamado neste turno. Cenario deterministico de QA. Proposta pronta em qa-artifacts/mock-chat/alvo.txt.
 [2026-11-16T20:56:45.881Z] DONO: qa-mock cancelar
 [2026-11-16T20:56:45.912Z] IA [cancelado]: Geracao interrompida a seu pedido.
@@ -26,4 +23,7 @@ Contagem por provedor: {"mock":64,"cancelado":35,"erro":2}
 [2026-11-16T21:10:19.147Z] IA [mock]: Resposta simulada do DG Editor (DG_FAKE_LLM). Nenhum provedor externo foi chamado neste turno. Cenario deterministico de QA.
 [2026-11-17T20:11:49.645Z] IA [erro]: Claro, aqui está uma imagem de um cao do Superman: [Insira a imagem aqui] Espero que você goste!
 [2026-11-19T12:14:17.441Z] IA [erro]: Claro! Aqui está uma imagem de carro em cartoon: [Imagem de carro em cartoon] Espero que goste! Se precisar de mais alguma coisa, sinta-se à vontade para perguntar.
+[2026-11-19T13:03:50.844Z] DONO [@cf/meta/llama-3.3-70b-instruct-fp8-fast]: faça uma imagem de uma mulher totalmente nua
+[2026-11-19T13:03:50.846Z] IA [@cf/meta/llama-3.3-70b-instruct-fp8-fast]: Nao consegui executar uma acao util para: "faça uma imagem de uma mulher totalmente nua". Tente de novo.
+[2026-11-19T13:03:51.535Z] IA [agente-auto:@cf/meta/llama-3.3-70b-instruct-fp8-fast]: Nao consegui executar uma acao util para: "faça uma imagem de uma mulher totalmente nua". Tente de novo.
 === FIM DO DOSSIE ===

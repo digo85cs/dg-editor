@@ -424,7 +424,8 @@ async function executarChatSend(
       const arquivoAtivo = typeof options.arquivo === 'string' ? options.arquivo : '';
       let perguntaAgente = textoPedido;
       let contextoAgente = context;
-      if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i.test(textoPedido)) {
+      const pedidoMidia = /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i.test(textoPedido);
+      if (pedidoMidia) {
         contextoAgente +=
           '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA. ' +
           'Para imagem generica use SEMPRE midia_imagem_auto (cascata gratis-primeiro: ' +
@@ -486,6 +487,7 @@ async function executarChatSend(
       let contentOut = resposta?.texto || 'Sem resposta do agente.';
       // Mídia gerada por tools (imagem/vídeo/meme/áudio) → envia preview ao chat
       // para exibir inline, estilo Nano Banana.
+      let midiaOk = false;
       try {
         for (const p of resposta?.passos || []) {
           if (p.tipo !== 'tool' || !/midia_|comfyui|meme|narrar|musica/i.test(String(p.nome))) continue;
@@ -500,9 +502,34 @@ async function executarChatSend(
               mime: j.mime,
               aviso: j.aviso
             });
+            midiaOk = true;
           }
         }
       } catch { /* midia inline é best-effort */ }
+      // Fallback determinístico: modelo não chamou tool de mídia → gera direto.
+      if (pedidoMidia && !midiaOk && !signal?.aborted) {
+        try {
+          const { gerarImagemAuto } = await import('../midia/cascata');
+          const { gerarVideoAuto } = await import('../midia/video-auto');
+          const r = /v[ií]deo|video/i.test(textoPedido)
+            ? await gerarVideoAuto(rootOk, { prompt: perguntaAgente })
+            : await gerarImagemAuto(rootOk, { prompt: perguntaAgente });
+          if (r.ok && r.caminho && !event.sender.isDestroyed()) {
+            const { previewBase64, ...restoMidia } = r as Record<string, unknown>;
+            event.sender.send('chat:midia', {
+              nome: 'midia_auto',
+              caminho: String(r.caminho),
+              preview: typeof previewBase64 === 'string' ? previewBase64 : undefined,
+              mime: typeof r.mime === 'string' ? r.mime : undefined,
+              aviso: typeof r.aviso === 'string' ? r.aviso : undefined
+            });
+            const caminhoRel = typeof restoMidia.caminhoRel === 'string' ? restoMidia.caminhoRel : r.caminho;
+            contentOut = 'Mídia gerada: ' + caminhoRel + (r.aviso ? ' — ' + r.aviso : '');
+          }
+        } catch (eMidia) {
+          dglog('[chat] midia fallback: ' + String(eMidia));
+        }
+      }
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
       if (
