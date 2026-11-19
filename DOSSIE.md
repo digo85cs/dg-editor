@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 16:34:06** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.5** · branch `integra-13-11` · último commit: b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
+> Gerado automaticamente em **19/11/2026, 16:41:23** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.6** · branch `integra-13-11` · último commit: fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
+- 312d1f7 2026-11-19 chore: dossiê v0.8.5
 - b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
 - c0fa1e3 2026-11-19 chore: dossiê v0.8.4
 - 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - bd41984 2026-11-19 chore: dossie v0.8.2
 - 24e1914 2026-11-19 feat(ui): painel Auto — permissoes, agendador, credenciais e MCP no painel direito
 - c071dce 2026-11-19 chore: dossie v0.8.1
-- 565f690 2026-11-19 feat(agente): permissoes aplicadas no loop de tools, /permissoes, diagnosticos Python no contexto
-- fdb9118 2026-11-19 feat(chat): slash commands de midia (/imagem /video /audio), /wiki, /autocommit e guarda de placeholder
 
 ## 16. Como atualizar este dossiê
 
