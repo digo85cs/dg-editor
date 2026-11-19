@@ -130,3 +130,4 @@ _ed*.js
 scripts/*.mjs
 !scripts/*.mjs.example
 .dg-editor/relatorios/
+.dg-editor/resposta-cache/
