@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 17:08:14** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.9** · branch `integra-13-11` · último commit: e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
+> Gerado automaticamente em **19/11/2026, 18:38:51** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.0** · branch `integra-13-11` · último commit: 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
+- feaff43 2026-11-19 chore: dossiê v0.8.9
 - e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
 - 7dcf172 2026-11-19 chore: dossiê v0.8.8
 - b35831a 2026-11-19 refactor(renderer): extrai builders do painel de ferramentas
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 706f4ba 2026-11-19 chore: dossiê v0.8.6
 - fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
 - 312d1f7 2026-11-19 chore: dossiê v0.8.5
-- b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
-- c0fa1e3 2026-11-19 chore: dossiê v0.8.4
 
 ## 16. Como atualizar este dossiê
 
