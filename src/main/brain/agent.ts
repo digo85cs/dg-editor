@@ -738,6 +738,36 @@ async function rodarLoopComProvider(
       }
       const { tool, args } = validado
       const nome = tool.name
+
+      // Permissoes do app (dg:permissoes:*): leitura/edicao/bash/mcp.
+      // Antes disto os flags existiam so na UI — nada era aplicado no loop.
+      try {
+        const { obterPermissoes } = await import('../permissoes')
+        const perm = obterPermissoes()
+        const categoriaPerm = classificarToolAgente(nome)
+        let bloqueio = ''
+        if (nome === 'terminal_exec' && !perm.permitirBash) bloqueio = 'terminal_exec bloqueado (permitirBash=false)'
+        else if (categoriaPerm === 'edit' && !perm.permitirEdicao) bloqueio = nome + ' bloqueado (permitirEdicao=false)'
+        else if ((categoriaPerm === 'explore' || categoriaPerm === 'search') && !perm.permitirLeitura)
+          bloqueio = nome + ' bloqueado (permitirLeitura=false)'
+        else if (/^ext_|^mcp_/i.test(nome) && !perm.permitirMcp) bloqueio = nome + ' bloqueado (permitirMcp=false)'
+        if (bloqueio) {
+          dglog('[agente] ' + bloqueio)
+          emit({ tipo: 'tool', nome, fase: 'fim', detalhe: bloqueio })
+          passos.push({ tipo: 'tool', nome, args, resultado: JSON.stringify({ ok: false, erro: bloqueio }) })
+          mensagens.push({
+            role: 'tool',
+            tool_name: nome,
+            tool_call_id: 'call_' + ti,
+            name: nome,
+            content: JSON.stringify({ ok: false, erro: bloqueio + '. Explique ao usuario que a permissao esta desligada em Configuracoes.' }).slice(0, 2400)
+          })
+          return 'ok'
+        }
+      } catch {
+        /* permissoes indisponiveis → segue sem bloqueio */
+      }
+
       if (nome === 'terminal_exec') {
         const linha = (
           String((args as { comando?: string }).comando || '') +

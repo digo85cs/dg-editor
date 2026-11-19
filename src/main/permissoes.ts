@@ -20,13 +20,15 @@ export function obterPermissoes(): Permissoes {
   try {
     const p = permPath()
     if (!existsSync(p)) {
-      const def: Permissoes = { permitirLeitura: true, permitirEdicao: true, permitirBash: false, permitirMcp: true, semprePedirMcp: true }
+      // Default tudo permitido: os flags eram so visuais ate agora — ligar
+      // enforce com bash/edicao desligados por padrao quebraria o agente.
+      const def: Permissoes = { permitirLeitura: true, permitirEdicao: true, permitirBash: true, permitirMcp: true, semprePedirMcp: true }
       writeFileSync(p, JSON.stringify(def, null, 2), 'utf8')
       return def
     }
     return JSON.parse(readFileSync(p, 'utf8'))
   } catch {
-    return { permitirLeitura: true, permitirEdicao: true, permitirBash: false, permitirMcp: true, semprePedirMcp: true }
+    return { permitirLeitura: true, permitirEdicao: true, permitirBash: true, permitirMcp: true, semprePedirMcp: true }
   }
 }
 

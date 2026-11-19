@@ -130,6 +130,14 @@ export async function montarContextoImplicito(opts: ContextoImplicitoOpts): Prom
   }
 
   try {
+    const { pyResumoDiagnosticos } = await import('../lsp/python-servico')
+    const diagPy = await pyResumoDiagnosticos(opts.raiz)
+    if (diagPy) partes.push(diagPy)
+  } catch {
+    /* idem */
+  }
+
+  try {
     const dirSpecs = join(opts.raiz, '.dg-editor', 'specs')
     if (existsSync(dirSpecs)) {
       const specs = readdirSync(dirSpecs).filter((n) => n.endsWith('.md'))

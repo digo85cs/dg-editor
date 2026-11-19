@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes'])
 
 /** Retorno estendido: comandos de midia pedem geracao direta pela cascata. */
 export interface ResultadoComando {
@@ -463,6 +463,41 @@ function cmdAutocommit(arg: string, raiz: string): string {
     '. Uso: `/autocommit on|off`.'
 }
 
+/** /permissoes [leitura|edicao|bash|mcp on|off] — flags aplicadas no loop do agente. */
+async function cmdPermissoes(arg: string): Promise<string> {
+  try {
+    const { obterPermissoes, salvarPermissoes } = await import('./permissoes')
+    const atual = obterPermissoes()
+    const partes = arg.trim().split(/\s+/).filter(Boolean)
+    const mapa: Record<string, keyof typeof atual> = {
+      leitura: 'permitirLeitura', edicao: 'permitirEdicao', bash: 'permitirBash',
+      mcp: 'permitirMcp', semprepedirmcp: 'semprePedirMcp'
+    }
+    if (partes.length >= 2) {
+      const chave = mapa[partes[0].toLowerCase()]
+      const valor = partes[1].toLowerCase()
+      if (!chave || (valor !== 'on' && valor !== 'off')) {
+        return 'Uso: `/permissoes <leitura|edicao|bash|mcp> on|off`'
+      }
+      const novo = { ...atual, [chave]: valor === 'on' }
+      const r = salvarPermissoes(novo)
+      return r.ok
+        ? 'Permissao ' + partes[0].toLowerCase() + ' = ' + valor.toUpperCase() +
+          '.\nEstado: leitura=' + novo.permitirLeitura + ' edicao=' + novo.permitirEdicao +
+          ' bash=' + novo.permitirBash + ' mcp=' + novo.permitirMcp
+        : 'Falha ao salvar permissoes.'
+    }
+    return 'Permissoes do agente (agora aplicadas no loop de tools):\n' +
+      '- leitura: ' + atual.permitirLeitura + ' (ferramentas de busca/leitura)\n' +
+      '- edicao: ' + atual.permitirEdicao + ' (codigo_editar, vault_write, dossie_write)\n' +
+      '- bash: ' + atual.permitirBash + ' (terminal_exec)\n' +
+      '- mcp: ' + atual.permitirMcp + ' (servidores externos ext_*)\n' +
+      'Alterar: `/permissoes <nome> on|off`'
+  } catch (e) {
+    return 'Permissoes erro: ' + String(e)
+  }
+}
+
 async function cmdLimpar(raiz: string): Promise<string> {
   try {
     const { clearChat } = await import('./chatstore')
@@ -532,6 +567,8 @@ export async function executarComandoChat(
       return { content: cmdWiki(raiz) }
     case 'autocommit':
       return { content: cmdAutocommit(parsed.arg, raiz) }
+    case 'permissoes':
+      return { content: await cmdPermissoes(parsed.arg) }
     case 'ajuda':
       return {
         content:
@@ -557,6 +594,7 @@ export async function executarComandoChat(
           '- `/imagem|/video|/audio <prompt>` — gera midia direto pela cascata (sem agente)\n' +
           '- `/wiki` — gera .dg-editor/wiki.md com o mapa do repo\n' +
           '- `/autocommit on|off` — commit automatico das alteracoes do agente\n' +
+          '- `/permissoes [leitura|edicao|bash|mcp on|off]` — permissoes aplicadas no agente\n' +
           '- `/ajuda` — esta lista'
       }
     default:
