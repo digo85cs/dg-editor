@@ -48,6 +48,13 @@ import {
   registrarDiagnosticoManual
 } from './diagnosticos'
 import { gerarContinuidade, dossieDirDoApp } from '../bridge-adapta'
+import {
+  iniciarBackground,
+  listarBackground,
+  statusBackground,
+  cancelarBackground,
+  limparBackgroundAntigas
+} from './background'
 
 type AbaCtx = {
   path: string
@@ -440,6 +447,50 @@ export function registerAgentExtrasIpc(): void {
   })
 
   ipcMain.handle('agente:cancelar', () => cancelarFilaAgente())
+
+  // Subagentes em background (paralelos ao chat; nao passam pela fila serial)
+  ipcMain.handle('agente:background-iniciar', (_e, payload: unknown) => {
+    if (emSafeMode()) return { ok: false, erro: 'safe-mode' }
+    const o = exigirObjeto(payload, 'background')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const pedido = exigirString(o.pedido, 'pedido')
+    if (isErroPayload(pedido)) return pedido
+    if (!pedido.trim()) return { ok: false, erro: 'pedido vazio' }
+    const agente = typeof o.agente === 'string' && o.agente.trim() ? o.agente.trim() : undefined
+    return iniciarBackground(escopo.raiz, pedido, { agente })
+  })
+
+  ipcMain.handle('agente:background-listar', (_e, payload: unknown) => {
+    const o = exigirObjeto(payload, 'background')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    limparBackgroundAntigas(escopo.raiz)
+    return { ok: true, tarefas: listarBackground(escopo.raiz) }
+  })
+
+  ipcMain.handle('agente:background-status', (_e, payload: unknown) => {
+    const o = exigirObjeto(payload, 'background')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const id = exigirString(o.id, 'id')
+    if (isErroPayload(id)) return id
+    const t = statusBackground(escopo.raiz, id)
+    return t ? { ok: true, tarefa: t } : { ok: false, erro: 'tarefa nao encontrada' }
+  })
+
+  ipcMain.handle('agente:background-cancelar', (_e, payload: unknown) => {
+    const o = exigirObjeto(payload, 'background')
+    if (isErroPayload(o)) return o
+    const escopo = validarEscopoAgent(o.raiz, o.pastas)
+    if ('ok' in escopo) return escopo
+    const id = exigirString(o.id, 'id')
+    if (isErroPayload(id)) return id
+    return cancelarBackground(escopo.raiz, id)
+  })
 
   ipcMain.handle('propostas:listar', () => ({ ok: true, pendentes: listarPendentes() }))
   ipcMain.handle('agente:propostas', () => ({ ok: true, pendentes: listarPendentes() }))

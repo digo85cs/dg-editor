@@ -83,6 +83,8 @@ const invokeChannels = [
   'agente:pedir', 'agente:orquestrar', 'agente:listar', 'agente:criar', 'agente:fila-status',
   'agente:externos',
   'agente:cancelar', 'agente:propostas', 'agente:aplicar-proposta', 'agente:rejeitar-proposta',
+  'agente:background-iniciar', 'agente:background-listar', 'agente:background-status',
+  'agente:background-cancelar',
   'agente:plano-salvar', 'agente:plano-ler', 'agente:plano-limpar', 'agente:executar-plano',
   'agente:plano-marcar-passo', 'agente:plano-atualizar-passos',
   'agente:verificar', 'agente:diagnosticos', 'agente:diagnostico-manual',
@@ -150,7 +152,8 @@ const eventOnChannels = [
   'midia:linha-tempo-progresso',
   'imagens:usb-progresso',
   'agendador:disparo',
-  'devin:sessao-mudou'
+  'devin:sessao-mudou',
+  'agente:background'
 ] as const
 
 /** Canais de send (fire-and-forget) permitidos. */

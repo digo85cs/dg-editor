@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes', 'desfazer', 'redo', 'checkpoints', 'goal', 'reload'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes', 'desfazer', 'redo', 'checkpoints', 'goal', 'reload', 'background', 'tarefas', 'tarefa'])
 
 /** Retorno estendido: comandos de midia pedem geracao direta pela cascata. */
 export interface ResultadoComando {
@@ -508,6 +508,75 @@ function cmdCheckpoints(): string {
   }
 }
 
+/** /background <pedido> — roda um subagente em background (paralelo ao chat). */
+async function cmdBackground(arg: string, raiz: string): Promise<string> {
+  const pedido = arg.trim()
+  if (!pedido) {
+    return 'Uso: `/background <pedido>` — roda um agente em segundo plano.\n' +
+      'Acompanhe com `/tarefas` e `/tarefa <id>`. `/tarefa <id> cancelar` aborta.'
+  }
+  try {
+    const { iniciarBackground } = await import('./agent/background')
+    const r = iniciarBackground(raiz, pedido)
+    if (!r.ok) return 'Falha ao iniciar background: ' + (r.erro || 'erro')
+    return 'Tarefa em background iniciada: `' + r.id + '`\n' +
+      'Pedido: ' + pedido.slice(0, 120) + '\n' +
+      'Você pode continuar conversando — aviso quando terminar. `/tarefas` lista, `/tarefa ' + r.id + '` mostra o resultado.'
+  } catch (e) {
+    return 'Background erro: ' + String(e)
+  }
+}
+
+function fmtDuracao(ms?: number): string {
+  if (!ms || ms < 0) return ''
+  if (ms < 60_000) return Math.round(ms / 1000) + 's'
+  return Math.floor(ms / 60_000) + 'min ' + Math.round((ms % 60_000) / 1000) + 's'
+}
+
+/** /tarefas — lista subagentes em background da pasta. */
+async function cmdTarefas(raiz: string): Promise<string> {
+  try {
+    const { listarBackground } = await import('./agent/background')
+    const ts = listarBackground(raiz, 15)
+    if (!ts.length) return 'Nenhuma tarefa em background nesta pasta.'
+    const linhas = ts.map((t) => {
+      const st = t.status === 'rodando' ? '⏳ rodando' : t.status === 'ok' ? '✅ ok' : t.status === 'cancelada' ? '⛔ cancelada' : '❌ erro'
+      return '- `' + t.id + '` ' + st + ' — ' + t.pedido.slice(0, 70) +
+        (t.duracaoMs ? ' (' + fmtDuracao(t.duracaoMs) + ')' : '')
+    })
+    return 'Tarefas em background (' + ts.length + '):\n' + linhas.join('\n') +
+      '\nUse `/tarefa <id>` para ver o resultado ou `/tarefa <id> cancelar`.'
+  } catch (e) {
+    return 'Tarefas erro: ' + String(e)
+  }
+}
+
+/** /tarefa <id> [cancelar] — status/resultado de um subagente em background. */
+async function cmdTarefa(arg: string, raiz: string): Promise<string> {
+  const partes = arg.trim().split(/\s+/)
+  const id = partes[0] || ''
+  const acao = partes[1]?.toLowerCase()
+  if (!id) return 'Uso: `/tarefa <id>` (status/resultado) ou `/tarefa <id> cancelar`.'
+  try {
+    const bg = await import('./agent/background')
+    if (acao === 'cancelar') {
+      const r = bg.cancelarBackground(raiz, id)
+      return r.ok ? 'Tarefa ' + id + ' cancelada.' : 'Nao foi possivel cancelar: ' + (r.erro || 'erro')
+    }
+    const t = bg.statusBackground(raiz, id)
+    if (!t) return 'Tarefa `' + id + '` nao encontrada nesta pasta.'
+    const cab = 'Tarefa `' + t.id + '` — ' + t.status +
+      (t.duracaoMs ? ' (' + fmtDuracao(t.duracaoMs) + ')' : '') +
+      (t.agente ? ' agente=' + t.agente : '') + '\nPedido: ' + t.pedido.slice(0, 200)
+    if (t.status === 'rodando') return cab + '\n\nAinda executando…'
+    if (t.erro) return cab + '\n\nErro: ' + t.erro
+    const txt = (t.texto || '(sem texto)').slice(0, 6000)
+    return cab + '\n\n' + txt + (t.passos ? '\n\n(' + t.passos + ' passos de tool)' : '')
+  } catch (e) {
+    return 'Tarefa erro: ' + String(e)
+  }
+}
+
 /** /goal <texto|status|clear> — objetivo ativo injetado no contexto do agente. */
 function cmdGoal(arg: string, raiz: string): string {
   const arq = join(raiz, '.dg-editor', 'meta.json')
@@ -705,6 +774,12 @@ export async function executarComandoChat(
       return { content: cmdGoal(parsed.arg, raiz) }
     case 'reload':
       return { content: await cmdReload(raiz) }
+    case 'background':
+      return { content: await cmdBackground(parsed.arg, raiz) }
+    case 'tarefas':
+      return { content: await cmdTarefas(raiz) }
+    case 'tarefa':
+      return { content: await cmdTarefa(parsed.arg, raiz) }
     case 'ajuda':
       return {
         content:
@@ -734,6 +809,8 @@ export async function executarComandoChat(
           '- `/permissoes bloquear|desbloquear|bloqueadas <padrao>` — deny-list por tool (ex.: ftp_*)\n' +
           '- `/desfazer` — restaura ultimo checkpoint de alteracoes do agente\n' +
           '- `/redo` — refaz o que o ultimo `/desfazer` desfez\n' +
+          '- `/background <pedido>` — subagente em segundo plano (voce continua no chat)\n' +
+          '- `/tarefas` — lista tarefas em background; `/tarefa <id>` resultado; `/tarefa <id> cancelar`\n' +
           '- `/goal <texto|status|clear>` — objetivo ativo injetado no contexto\n' +
           '- `/reload` — reconecta MCP sem reiniciar o app\n' +
           '- `/ajuda` — esta lista'

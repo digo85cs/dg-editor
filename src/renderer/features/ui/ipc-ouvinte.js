@@ -104,6 +104,18 @@ export function ligarIpcOuvintes() {
         'info'
       )
     })
+    // Subagente em background concluiu — avisa e deixa o resultado no /tarefa <id>
+    window.api.on('agente:background', (_e, p) => {
+      const t = p || {}
+      const rotulo = String(t.pedido || '').slice(0, 60)
+      if (t.status === 'ok') {
+        mostrarToast('Tarefa background concluída: ' + rotulo + ' — /tarefa ' + t.id, 'ok')
+      } else if (t.status === 'cancelada') {
+        mostrarToast('Tarefa background cancelada: ' + rotulo, 'aviso')
+      } else {
+        mostrarToast('Tarefa background falhou: ' + rotulo + (t.erro ? ' — ' + String(t.erro).slice(0, 80) : ''), 'erro')
+      }
+    })
   }
 
   $('btn-brain-avaliar')?.addEventListener('click', async () => {
