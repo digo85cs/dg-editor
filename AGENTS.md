@@ -5,6 +5,7 @@
 - **Sempre** que houver melhoria aplicada: commitar, dar push em `integra-13-11` **e** `main`, e atualizar o release no GitHub (`scripts/publicar-release.ps1` ou `npm run publish:release`).
 - **Sempre** copiar os instaladores gerados (`dist-app/DG-Editor-*-x64.exe` e `DG-Editor-Portable-*.exe`) para `C:\Users\digo8\OneDrive\APP\`.
 - **Sempre** remover os instaladores antigos do DG Editor dessa pasta antes/depois de copiar — não acumular versões velhas.
+- **Sempre** atualizar a versão local e o atalho da área de trabalho: rodar `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/criar-atalho-desktop.ps1` (atalho `OneDrive\Desktop\DG Editor.lnk` → `abrir-dg-editor.vbs` → repo `C:\dev\DGEditor`).
 - Bump de versão em `package.json` antes de cada release (`npm version X.Y.Z --no-git-tag-version`).
 
 ## Validação mínima antes de commit/push
