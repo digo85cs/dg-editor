@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **18/11/2026, 17:14:36** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.6.7** · branch `integra-13-11` · último commit: 17550a2 2026-11-18 chore: bump 0.6.7
+> Gerado automaticamente em **19/11/2026, 09:32:10** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.6.8** · branch `integra-13-11` · último commit: fe25b2c 2026-11-19 chore: bump 0.6.8
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -336,16 +336,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- fe25b2c 2026-11-19 chore: bump 0.6.8
+- e1d7ddb 2026-11-19 chore: ignora resposta-cache (runtime)
+- 441f378 2026-11-19 Chat: midia inline para pedidos de cartoon/arte + render de audio/video
+- 65767c6 2026-11-18 chore: dossie e lockfile da v0.6.7
 - 17550a2 2026-11-18 chore: bump 0.6.7
 - c5a4a57 2026-11-18 docs: tools MCP HTTP agora 30
 - 3032cd3 2026-11-18 MCP HTTP: adiciona narracao e memes (30 tools)
 - 80e06ac 2026-11-18 docs: tools MCP HTTP agora 27
 - c1a3dc9 2026-11-18 MCP HTTP: adiciona doc_pdf e doc_planilha (27 tools)
 - a77d240 2026-11-18 docs: tools MCP HTTP agora 25
-- 4000965 2026-11-18 MCP HTTP: adiciona midia_video_auto (25 tools)
-- 9f29955 2026-11-18 docs: tools MCP HTTP agora 24
-- 960b855 2026-11-18 MCP HTTP: adiciona midia_imagem_auto (24 tools)
-- 66608fc 2026-11-18 docs: tools MCP HTTP agora 23
 
 ## 16. Como atualizar este dossiê
 
