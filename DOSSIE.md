@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 11:03:50** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.7.0** · branch `integra-13-11` · último commit: 482af52 2026-11-19 chore: v0.7.0
-> Alterações locais não commitadas: 4 arquivo(s).
+> Gerado automaticamente em **19/11/2026, 14:35:08** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.0** · branch `integra-13-11` · último commit: 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
+> Alterações locais não commitadas: 8 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
+- c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
+- 6189c9a 2026-11-19 chore: dossie v0.7.0
 - 482af52 2026-11-19 chore: v0.7.0
 - ed72427 2026-11-19 fix(ui): toast OpenRouter so quando nenhum provider disponivel
 - e59b109 2026-11-19 docs: regra de atualizar versao local e atalho desktop
@@ -343,9 +346,6 @@ Utilitários locais relevantes:
 - 2f67dcc 2026-11-19 chore: bump 0.6.9
 - 49aae33 2026-11-19 docs: AGENTS.md com regra permanente de release e pasta APP
 - f9e57db 2026-11-19 Chat: fallback deterministico de midia quando modelo nao chama tool
-- 46ca204 2026-11-19 chore: dossie e lockfile da v0.6.8
-- fe25b2c 2026-11-19 chore: bump 0.6.8
-- e1d7ddb 2026-11-19 chore: ignora resposta-cache (runtime)
 
 ## 16. Como atualizar este dossiê
 

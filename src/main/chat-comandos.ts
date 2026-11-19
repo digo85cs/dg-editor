@@ -10,7 +10,13 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit'])
+
+/** Retorno estendido: comandos de midia pedem geracao direta pela cascata. */
+export interface ResultadoComando {
+  content: string
+  midia?: { tipo: 'imagem' | 'video' | 'audio'; prompt: string }
+}
 
 function parse(texto: string): { cmd: string; arg: string } | null {
   const m = texto.trim().match(/^\/([a-zA-Z-]+)(?:\s+([\s\S]*))?$/)
@@ -409,6 +415,54 @@ function cmdRegras(raiz: string): string {
   return partes.join('\n')
 }
 
+/** /imagem|/video|/audio <prompt> — geracao direta pela cascata, sem agente. */
+function cmdMidia(cmd: string, arg: string): ResultadoComando {
+  if (!arg) return { content: 'Uso: /' + cmd + ' <descricao do que gerar>' }
+  const tipo = cmd === 'video' ? 'video' : cmd === 'audio' ? 'audio' : 'imagem'
+  return {
+    content: 'Gerando ' + tipo + ' pela cascata (gratis primeiro)…',
+    midia: { tipo, prompt: arg }
+  }
+}
+
+/** /wiki — gera .dg-editor/wiki.md com mapa do repo para agentes e humanos. */
+function cmdWiki(raiz: string): string {
+  try {
+    const mapa = mapaRepositorio(raiz, [])
+    const dir = join(raiz, '.dg-editor')
+    mkdirSync(dir, { recursive: true })
+    const arq = join(dir, 'wiki.md')
+    const agora = new Date().toISOString()
+    const conteudo =
+      '# Wiki do projeto\n\n> Gerado por `/wiki` em ' + agora + '.\n\n' +
+      '## Mapa de simbolos\n\n```\n' + (mapa ? mapa.slice(0, 14000) : '(sem codigo)') + '\n```\n\n' +
+      '## Como usar\n\n- `/mapa` — mapa resumido no chat\n' +
+      '- `/spec <titulo>` — criar spec antes de tarefa grande\n' +
+      '- Agentes leem este arquivo via contexto implicito quando presente.\n'
+    writeFileSync(arq, conteudo, 'utf8')
+    return 'Wiki gerada: ' + arq + '\n\n' + (mapa ? mapa.split('\n').length + ' linhas de mapa.' : 'Sem codigo para mapear.')
+  } catch (e) {
+    return 'Wiki erro: ' + String(e)
+  }
+}
+
+/** /autocommit on|off|status — commit automatico das alteracoes do agente. */
+function cmdAutocommit(arg: string, raiz: string): string {
+  const arq = join(raiz, '.dg-editor', 'autocommit.json')
+  const ler = (): boolean => {
+    try { return JSON.parse(readFileSync(arq, 'utf8')).ativo === true } catch { return false }
+  }
+  const sub = arg.trim().toLowerCase()
+  if (sub === 'on' || sub === 'off') {
+    mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+    writeFileSync(arq, JSON.stringify({ ativo: sub === 'on' }, null, 2) + '\n', 'utf8')
+    return 'Autocommit ' + (sub === 'on' ? 'ATIVADO' : 'desativado') +
+      '. Quando ligado, alteracoes aplicadas pelo agente viram commit automatico.'
+  }
+  return 'Autocommit esta ' + (ler() ? 'ATIVADO' : 'desativado') +
+    '. Uso: `/autocommit on|off`.'
+}
+
 async function cmdLimpar(raiz: string): Promise<string> {
   try {
     const { clearChat } = await import('./chatstore')
@@ -426,7 +480,7 @@ async function cmdLimpar(raiz: string): Promise<string> {
 export async function executarComandoChat(
   raiz: string,
   texto: string
-): Promise<{ content: string } | null> {
+): Promise<ResultadoComando | null> {
   const parsed = parse(texto)
   if (!parsed) return null
   switch (parsed.cmd) {
@@ -470,6 +524,14 @@ export async function executarComandoChat(
       return { content: await cmdWorktree(parsed.arg, raiz) }
     case 'mcps':
       return { content: cmdMcps(raiz, parsed.arg) }
+    case 'imagem':
+    case 'video':
+    case 'audio':
+      return cmdMidia(parsed.cmd, parsed.arg)
+    case 'wiki':
+      return { content: cmdWiki(raiz) }
+    case 'autocommit':
+      return { content: cmdAutocommit(parsed.arg, raiz) }
     case 'ajuda':
       return {
         content:
@@ -492,6 +554,9 @@ export async function executarComandoChat(
           '- `/paralelo <nome> [tarefa]` — agente isolado em git worktree\n' +
           '- `/paralelo-merge <nome> [--revisar]` — mergeia o worktree na branch atual (--revisar mostra o diff)\n' +
           '- `/devin-sync` — sessões Devin com status/PRs para merge\n' +
+          '- `/imagem|/video|/audio <prompt>` — gera midia direto pela cascata (sem agente)\n' +
+          '- `/wiki` — gera .dg-editor/wiki.md com o mapa do repo\n' +
+          '- `/autocommit on|off` — commit automatico das alteracoes do agente\n' +
           '- `/ajuda` — esta lista'
       }
     default:

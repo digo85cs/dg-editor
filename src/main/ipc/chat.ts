@@ -169,6 +169,47 @@ async function executarChatSend(
     const { executarComandoChat } = await import('../chat-comandos');
     const cmd = await executarComandoChat(rootOk, textoPedido);
     if (cmd) {
+      // /imagem /video /audio: geracao direta pela cascata + preview inline.
+      if (cmd.midia?.prompt) {
+        try {
+          const { gerarImagemAuto } = await import('../midia/cascata');
+          const { gerarVideoAuto } = await import('../midia/video-auto');
+          const { narrar } = await import('../midia/core');
+          const promptMidia = cmd.midia.prompt;
+          const r = cmd.midia.tipo === 'video'
+            ? await gerarVideoAuto(rootOk, { prompt: promptMidia })
+            : cmd.midia.tipo === 'audio'
+              ? await narrar(rootOk, { texto: promptMidia })
+              : await gerarImagemAuto(rootOk, { prompt: promptMidia });
+          if (r.ok && r.caminho) {
+            const { previewBase64, ...resto } = r as Record<string, unknown>;
+            if (!event.sender.isDestroyed()) {
+              event.sender.send('chat:midia', {
+                nome: 'cmd_' + cmd.midia.tipo,
+                caminho: String(r.caminho),
+                preview: typeof previewBase64 === 'string' ? previewBase64 : undefined,
+                mime: typeof r.mime === 'string' ? r.mime : undefined,
+                aviso: typeof r.aviso === 'string' ? r.aviso : undefined
+              });
+            }
+            const rel = typeof resto.caminhoRel === 'string' ? resto.caminhoRel : String(r.caminho);
+            return {
+              ok: true,
+              message: { ...assistantMsg, content: 'Mídia gerada: ' + rel, provider: 'comando' }
+            };
+          }
+          const erroMidia = typeof r.erro === 'string' && r.erro ? r.erro : 'cascata nao gerou arquivo';
+          return {
+            ok: false,
+            message: { ...assistantMsg, content: 'Falha ao gerar ' + cmd.midia.tipo + ': ' + erroMidia.slice(0, 300), provider: 'comando' }
+          };
+        } catch (eMidia) {
+          return {
+            ok: false,
+            message: { ...assistantMsg, content: 'Falha ao gerar mídia: ' + String(eMidia).slice(0, 300), provider: 'comando' }
+          };
+        }
+      }
       return {
         ok: true,
         message: { ...assistantMsg, content: cmd.content, provider: 'comando' }
@@ -561,6 +602,12 @@ async function executarChatSend(
       if (pedidoMidia && !midiaOk) {
         const fb = await fallbackMidia(perguntaAgente, signal);
         if (fb.caminho) contentOut = 'Mídia gerada: ' + fb.caminho;
+        else if (fb.erro) {
+          const soPlaceholder = contentOut.replace(/!?\[[^\]]*\]\([^)]*\)|\[[^\]]*\]|\(Imagem[^)]*\)/g, '').trim().length < 40;
+          if (soPlaceholder) {
+            contentOut = 'Não consegui gerar a mídia: ' + fb.erro.slice(0, 300) + '. Tente de novo ou ajuste o pedido.';
+          }
+        }
       }
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
@@ -627,6 +674,30 @@ async function executarChatSend(
           }
         } else {
           contentOut += '\n\nAprovacao automatica nao aplicada: ' + gate.motivo + '. As propostas seguem para revisao.';
+        }
+      }
+      // Autocommit (/autocommit on): agente aplicou alteracoes → vira commit.
+      if (propostas.length > 0) {
+        try {
+          const { existsSync, readFileSync } = await import('fs');
+          const { join } = await import('path');
+          const flagPath = join(rootOk, '.dg-editor', 'autocommit.json');
+          const flagOn = existsSync(flagPath) &&
+            (JSON.parse(readFileSync(flagPath, 'utf8')) as { ativo?: boolean }).ativo === true;
+          if (flagOn) {
+            const { gitStatus, gitCommit } = await import('../git');
+            const st = await gitStatus(rootOk);
+            if (st.ok && st.itens?.length) {
+              const resumo = contentOut.split('\n').map((l) => l.trim()).find((l) => l.length > 3) || 'alteracoes do agente';
+              const msg = ('agente(' + idAgente + '): ' + resumo).slice(0, 72);
+              const c = await gitCommit(rootOk, msg);
+              contentOut += c.ok
+                ? '\n\nAutocommit: `' + (c.hash || '') + '` — ' + msg
+                : '\n\nAutocommit falhou: ' + (c.erro || 'erro');
+            }
+          }
+        } catch (eAuto) {
+          dglog('[chat] autocommit: ' + String(eAuto));
         }
       }
       return publicar(
@@ -744,6 +815,14 @@ async function executarChatSend(
             if (!midiaOkOrc) {
               const fb = await fallbackMidia(textoPedido, signal);
               if (fb.caminho) respostaTexto = (respostaTexto ? respostaTexto + '\n\n' : '') + 'Mídia gerada: ' + fb.caminho;
+              // Guarda de placeholder: resposta so com "![...](...)" e midia falhou → erro real.
+              const soPlaceholder = /^\s*(!?\[[^\]]*\]\([^)]*\)|\[[^\]]*\]|\(Imagem[^)]*\))\s*$/im.test(respostaTexto)
+                && respostaTexto.replace(/!?\[[^\]]*\]\([^)]*\)|\[[^\]]*\]|\(Imagem[^)]*\)/g, '').trim().length < 40;
+              if (soPlaceholder && !fb.caminho) {
+                respostaTexto = fb.erro
+                  ? 'Não consegui gerar a mídia: ' + fb.erro.slice(0, 300) + '. Tente de novo ou ajuste o pedido.'
+                  : 'Não consegui gerar a mídia solicitada. Tente de novo ou ajuste o pedido.';
+              }
             }
             return publicar(respostaTexto || 'Sem resposta do agente.', 'agente-auto:' + modeloUsado, {
               propostas: [],
