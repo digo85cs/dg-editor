@@ -4038,3 +4038,4 @@ body.tema-escuro .tree-ctx-item.is-perigo { color: #f07178; }
 .auto-mini { font-size: 11px; padding: 1px 6px; }
 .auto-perms { display: flex; flex-wrap: wrap; gap: 10px; padding: 2px; }
 .auto-perm { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dg-text-muted); cursor: pointer; }
+.auto-presets { display: flex; gap: 6px; margin-top: 6px; }

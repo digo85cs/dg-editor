@@ -1,4 +1,5 @@
 import path from 'path'
+import { mkdirSync, writeFileSync } from 'fs'
 import { obterPromptRapido } from './fast-chat'
 import { chamarTool, listarTools, garantirMcpNaRaiz, type McpTool } from '../mcp/client'
 import { montarContexto, blocoMemoria } from '../memory/hybrid'
@@ -40,6 +41,23 @@ function ehToolLeituraParalela(nome: string): boolean {
   return /^(codigo_ler|projeto_arvore|disco_inspecionar|disco_buscar|codigo_buscar|git_status|git_diff|vault_read|dossie_read|skill_ler|skill_listar|agente_listar|conector_listar|vault_list|navegador_ler|ftp_listar)$/.test(
     String(nome || '')
   )
+}
+
+/** Saida grande de tool: head+tail no prompt, completo salvo em .dg-editor/tmp. */
+function limitarResultadoTool(raiz: string, nome: string, texto: string): string {
+  if (texto.length <= 6000) return texto
+  try {
+    const dir = path.join(raiz, '.dg-editor', 'tmp')
+    mkdirSync(dir, { recursive: true })
+    const arq = path.join(dir, 'tool-' + Date.now().toString(36) + '-' + String(nome).replace(/[^a-z0-9_-]/gi, '_') + '.log')
+    writeFileSync(arq, texto, 'utf8')
+    const rel = path.relative(raiz, arq)
+    return texto.slice(0, 4000) +
+      '\n\n...[saída truncada: ' + texto.length + ' chars — completo em ' + rel + ']...\n\n' +
+      texto.slice(-1500)
+  } catch {
+    return texto.slice(0, 6000)
+  }
 }
 
 /** Profundidade de executarAgente — bloqueia agente_executar recursivo. */
@@ -751,6 +769,25 @@ async function rodarLoopComProvider(
         else if ((categoriaPerm === 'explore' || categoriaPerm === 'search') && !perm.permitirLeitura)
           bloqueio = nome + ' bloqueado (permitirLeitura=false)'
         else if (/^ext_|^mcp_/i.test(nome) && !perm.permitirMcp) bloqueio = nome + ' bloqueado (permitirMcp=false)'
+        // Deny-list por tool/padrão: .dg-editor/tools-bloqueadas.json { "padroes": ["git_push", "ftp_*"] }
+        if (!bloqueio) {
+          try {
+            const { readFileSync, existsSync } = await import('fs')
+            const { join } = await import('path')
+            const arqBloq = join(raiz, '.dg-editor', 'tools-bloqueadas.json')
+            if (existsSync(arqBloq)) {
+              const j = JSON.parse(readFileSync(arqBloq, 'utf8')) as { padroes?: unknown }
+              const padroes = Array.isArray(j.padroes) ? j.padroes.map(String) : []
+              const alvo = String(nome).toLowerCase()
+              for (const p of padroes) {
+                const pat = p.trim().toLowerCase()
+                if (!pat) continue
+                const re = new RegExp('^' + pat.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$')
+                if (re.test(alvo)) { bloqueio = nome + ' bloqueado pela deny-list (' + pat + ')'; break }
+              }
+            }
+          } catch { /* deny-list ausente/invalida → segue */ }
+        }
         if (bloqueio) {
           dglog('[agente] ' + bloqueio)
           emit({ tipo: 'tool', nome, fase: 'fim', detalhe: bloqueio })
@@ -910,7 +947,7 @@ async function rodarLoopComProvider(
         tool_name: nome,
         tool_call_id: 'call_' + ti,
         name: nome,
-        content: textoRes.slice(0, 6000)
+        content: limitarResultadoTool(raiz, nome, textoRes)
       })
       return 'ok'
     }

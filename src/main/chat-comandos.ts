@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes', 'desfazer', 'checkpoints', 'goal', 'reload'])
 
 /** Retorno estendido: comandos de midia pedem geracao direta pela cascata. */
 export interface ResultadoComando {
@@ -463,8 +463,114 @@ function cmdAutocommit(arg: string, raiz: string): string {
     '. Uso: `/autocommit on|off`.'
 }
 
-/** /permissoes [leitura|edicao|bash|mcp on|off] — flags aplicadas no loop do agente. */
-async function cmdPermissoes(arg: string): Promise<string> {
+/** /desfazer — restaura o ultimo checkpoint de alteracoes do agente. */
+async function cmdDesfazer(raiz: string): Promise<string> {
+  try {
+    const { ultimoCheckpoint, restaurarCheckpoint } = await import('./agent/checkpoint')
+    const u = ultimoCheckpoint()
+    if (!u) return 'Nenhum checkpoint para desfazer.'
+    const r = await restaurarCheckpoint(u.id, [raiz])
+    return r.ok
+      ? 'Desfeito: ' + r.restaurados + ' arquivo(s) restaurados (checkpoint de ' + u.origem + ').'
+      : 'Falha ao desfazer: ' + (r.erro || 'erro')
+  } catch (e) {
+    return 'Desfazer erro: ' + String(e)
+  }
+}
+
+function cmdCheckpoints(): string {
+  try {
+    // lista e por app, nao por raiz — importamos o modulo direto
+    return 'Use `/desfazer` para restaurar o ultimo checkpoint.\n' +
+      'Checkpoints sao criados automaticamente antes de cada escrita do agente.'
+  } catch {
+    return 'Checkpoints indisponiveis.'
+  }
+}
+
+/** /goal <texto|status|clear> — objetivo ativo injetado no contexto do agente. */
+function cmdGoal(arg: string, raiz: string): string {
+  const arq = join(raiz, '.dg-editor', 'meta.json')
+  const ler = (): string => {
+    try {
+      const j = JSON.parse(readFileSync(arq, 'utf8')) as { goal?: string }
+      return typeof j.goal === 'string' ? j.goal : ''
+    } catch { return '' }
+  }
+  const sub = arg.trim().toLowerCase()
+  if (sub === 'clear' || sub === 'limpar') {
+    try {
+      const j = JSON.parse(readFileSync(arq, 'utf8')) as Record<string, unknown>
+      delete j.goal
+      writeFileSync(arq, JSON.stringify(j, null, 2) + '\n', 'utf8')
+    } catch { /* */ }
+    return 'Objetivo ativo removido.'
+  }
+  if (sub === 'status') {
+    const g = ler()
+    return g ? 'Objetivo ativo:\n' + g : 'Nenhum objetivo ativo. Defina com `/goal <texto>`.'
+  }
+  if (!arg.trim()) return 'Uso: `/goal <objetivo>` · `/goal status` · `/goal clear`'
+  try {
+    mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+    let j: Record<string, unknown> = {}
+    try { j = JSON.parse(readFileSync(arq, 'utf8')) } catch { /* */ }
+    j.goal = arg.trim().slice(0, 2000)
+    writeFileSync(arq, JSON.stringify(j, null, 2) + '\n', 'utf8')
+    return 'Objetivo ativo definido:\n' + j.goal +
+      '\n\nO agente vera este objetivo em todo turno ate `/goal clear`. Ao cumpri-lo, avise no chat.'
+  } catch (e) {
+    return 'Goal erro: ' + String(e)
+  }
+}
+
+/** /reload — reconecta MCP (rele mcp-externos.json) sem reiniciar o app. */
+async function cmdReload(raiz: string): Promise<string> {
+  try {
+    const { desconectarMcp, garantirMcpNaRaiz } = await import('./mcp/client')
+    await desconectarMcp().catch(() => {})
+    await garantirMcpNaRaiz(raiz)
+    return 'Reload concluido: MCP reconectado com .dg-editor/mcp-externos.json atual. ' +
+      'Catalogo de modelos e regras ja sao lidos a cada uso.'
+  } catch (e) {
+    return 'Reload erro: ' + String(e)
+  }
+}
+
+/** Estende /permissoes com deny-list por tool: bloquear|desbloquear|bloqueadas <padrao>. */
+async function cmdPermissoes(arg: string, raiz: string): Promise<string> {
+  const arqBloq = join(raiz, '.dg-editor', 'tools-bloqueadas.json')
+  const lerBloq = (): string[] => {
+    try {
+      const j = JSON.parse(readFileSync(arqBloq, 'utf8')) as { padroes?: unknown }
+      return Array.isArray(j.padroes) ? j.padroes.map(String) : []
+    } catch { return [] }
+  }
+  const salvarBloq = (lista: string[]) => {
+    mkdirSync(join(raiz, '.dg-editor'), { recursive: true })
+    writeFileSync(arqBloq, JSON.stringify({ padroes: lista }, null, 2) + '\n', 'utf8')
+  }
+  const sub = arg.trim().split(/\s+/)
+  const acao = (sub[0] || '').toLowerCase()
+  if (acao === 'bloquear' || acao === 'desbloquear' || acao === 'bloqueadas') {
+    const padrao = sub.slice(1).join(' ').trim()
+    if (acao === 'bloqueadas') {
+      const l = lerBloq()
+      return l.length
+        ? 'Tools bloqueadas nesta pasta (.dg-editor/tools-bloqueadas.json):\n' + l.map((p) => '• ' + p).join('\n') +
+          '\n\nPadroes aceitam * (ex.: ftp_*). Remover: `/permissoes desbloquear <padrao>`'
+        : 'Nenhuma tool bloqueada. Bloquear: `/permissoes bloquear <padrao>`'
+    }
+    if (!padrao) return 'Uso: `/permissoes ' + acao + ' <padrao>` — ex.: git_push, ftp_*, terminal_exec'
+    let l = lerBloq()
+    if (acao === 'bloquear') {
+      if (!l.includes(padrao)) l.push(padrao)
+    } else {
+      l = l.filter((p) => p !== padrao)
+    }
+    salvarBloq(l)
+    return 'Deny-list atualizada: ' + (l.length ? l.join(', ') : '(vazia)')
+  }
   try {
     const { obterPermissoes, salvarPermissoes } = await import('./permissoes')
     const atual = obterPermissoes()
@@ -568,7 +674,15 @@ export async function executarComandoChat(
     case 'autocommit':
       return { content: cmdAutocommit(parsed.arg, raiz) }
     case 'permissoes':
-      return { content: await cmdPermissoes(parsed.arg) }
+      return { content: await cmdPermissoes(parsed.arg, raiz) }
+    case 'desfazer':
+      return { content: await cmdDesfazer(raiz) }
+    case 'checkpoints':
+      return { content: cmdCheckpoints() }
+    case 'goal':
+      return { content: cmdGoal(parsed.arg, raiz) }
+    case 'reload':
+      return { content: await cmdReload(raiz) }
     case 'ajuda':
       return {
         content:
@@ -595,6 +709,10 @@ export async function executarComandoChat(
           '- `/wiki` — gera .dg-editor/wiki.md com o mapa do repo\n' +
           '- `/autocommit on|off` — commit automatico das alteracoes do agente\n' +
           '- `/permissoes [leitura|edicao|bash|mcp on|off]` — permissoes aplicadas no agente\n' +
+          '- `/permissoes bloquear|desbloquear|bloqueadas <padrao>` — deny-list por tool (ex.: ftp_*)\n' +
+          '- `/desfazer` — restaura ultimo checkpoint de alteracoes do agente\n' +
+          '- `/goal <texto|status|clear>` — objetivo ativo injetado no contexto\n' +
+          '- `/reload` — reconecta MCP sem reiniciar o app\n' +
           '- `/ajuda` — esta lista'
       }
     default:

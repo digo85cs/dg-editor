@@ -551,6 +551,21 @@ async function executarChatSend(
           'midia_meme_gerar para meme; midia_narrar para narracao). NUNCA responda com placeholder ' +
           'como "[Insira a imagem]" — a ferramenta gera o arquivo de verdade e retorna o caminho.\n';
       }
+      // /goal ativo: injeta o objetivo em todo turno ate /goal clear.
+      try {
+        const { existsSync, readFileSync } = await import('fs');
+        const { join } = await import('path');
+        const metaPath = join(rootOk, '.dg-editor', 'meta.json');
+        if (existsSync(metaPath)) {
+          const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { goal?: string };
+          if (typeof meta.goal === 'string' && meta.goal.trim()) {
+            contextoAgente +=
+              '\n\nOBJETIVO ATIVO (/goal): ' + meta.goal.trim() +
+              '\nTrabalhe para cumpri-lo. Se considerar cumprido, diga explicitamente ' +
+              '"objetivo cumprido" para o usuario poder rodar `/goal clear`.';
+          }
+        }
+      } catch { /* meta.json ausente/invalido */ }
       if (/pdf|documento|planilha|xlsx|csv|pptx|docx|odt|epub|convert|site|p[aá]gina|app\b|landing|apresenta|relat[oó]rio/i.test(textoPedido)) {
         contextoAgente +=
           '\n\nDIRETIVA DOCUMENTOS/SITES: se o pedido envolve PDF use midia_pdf (info/mesclar/dividir/' +
@@ -798,8 +813,23 @@ async function executarChatSend(
           const todos = listarAgentes(rootOk).map((a) => a.id);
           // Ordena: o idAgente selecionado primeiro, depois o resto
           const fila = [idAgente, ...todos.filter((id) => id !== idAgente)];
+          // /goal ativo tambem vale no caminho do orquestrador.
+          let contextoGoalOrc: string | undefined;
           try {
-            const orc = await orquestrarAgentes(rootOk, textoPedido, fila, undefined, {
+            const { existsSync, readFileSync } = await import('fs');
+            const { join } = await import('path');
+            const metaPath = join(rootOk, '.dg-editor', 'meta.json');
+            if (existsSync(metaPath)) {
+              const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { goal?: string };
+              if (typeof meta.goal === 'string' && meta.goal.trim()) {
+                contextoGoalOrc =
+                  'OBJETIVO ATIVO (/goal): ' + meta.goal.trim() +
+                  '\nTrabalhe para cumpri-lo; se cumprido, diga "objetivo cumprido".';
+              }
+            }
+          } catch { /* */ }
+          try {
+            const orc = await orquestrarAgentes(rootOk, textoPedido, fila, contextoGoalOrc, {
               pararNoPrimeiroSucesso: true,
               tarefa: modoValido
             });

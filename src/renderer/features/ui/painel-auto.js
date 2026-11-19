@@ -171,6 +171,15 @@ function ligarBotoes() {
       } else mostrarToast('Falha: ' + (r?.erro || 'erro'), 'erro')
     })
   }
+  document.querySelectorAll('[data-agenda-min]').forEach((b) => {
+    if (b.dataset.ligado) return
+    b.dataset.ligado = '1'
+    b.addEventListener('click', () => {
+      const inp = $('auto-agenda-min')
+      if (inp) inp.value = b.getAttribute('data-agenda-min') || ''
+      inp?.focus()
+    })
+  })
   const cred = $('auto-cred-add')
   if (cred && !cred.dataset.ligado) {
     cred.dataset.ligado = '1'
