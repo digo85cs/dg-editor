@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 16:50:39** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.7** · branch `integra-13-11` · último commit: 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **19/11/2026, 16:59:57** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.8** · branch `integra-13-11` · último commit: 9b25846 2026-11-19 chore: dossiê v0.8.7
+> Alterações locais não commitadas: 5 arquivo(s).
 
 ## 1. O que é
 
@@ -337,6 +337,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 9b25846 2026-11-19 chore: dossiê v0.8.7
 - 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
 - 706f4ba 2026-11-19 chore: dossiê v0.8.6
 - fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
@@ -346,7 +347,6 @@ Utilitários locais relevantes:
 - 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
 - 8437bc6 2026-11-19 chore: dossie v0.8.3
 - 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
-- bd41984 2026-11-19 chore: dossie v0.8.2
 
 ## 16. Como atualizar este dossiê
 
