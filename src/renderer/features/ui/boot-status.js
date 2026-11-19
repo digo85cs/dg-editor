@@ -26,8 +26,17 @@ export function iniciarStatusProviders(qaModoPromise) {
           sb.title = 'OpenRouter online'
         }
       } else if (!emQa) {
-        const motivo = (r && r.erro) || 'chave inválida ou ausente'
-        mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
+        // So avisa se NENHUM provider estiver disponivel — senao e falso alarme
+        // (chat ja faz failover para o proximo provider configurado).
+        let temDisponivel = false
+        try {
+          const fila = await window.api.invoke('providers:fila')
+          temDisponivel = Array.isArray(fila?.fila) && fila.fila.some((p) => p.disponivel)
+        } catch { /* se a checagem falhar, mantem o aviso */ temDisponivel = false }
+        if (!temDisponivel) {
+          const motivo = (r && r.erro) || 'chave inválida ou ausente'
+          mostrarToast('OpenRouter: ' + motivo + ' — cole uma chave válida em Provedores IA', 'aviso')
+        }
       }
     } catch (e) {
       /* silencioso se canal indisponível */
