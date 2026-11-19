@@ -9,11 +9,8 @@
 !endif
 
 !macro customInstall
-  ; Força atalho Desktop → exe instalado (icone embutido no executavel = canonico)
-  SetShellVarContext current
-  CreateShortCut "$DESKTOP\DG Editor.lnk" "$INSTDIR\DG Editor.exe" "" "$INSTDIR\DG Editor.exe" 0 SW_SHOWNORMAL
-  SetShellVarContext all
-  CreateShortCut "$DESKTOP\DG Editor.lnk" "$INSTDIR\DG Editor.exe" "" "$INSTDIR\DG Editor.exe" 0 SW_SHOWNORMAL
+  ; Atalho desktop fica a cargo do electron-builder (createDesktopShortcut).
+  ; Criar outro aqui gerava duplicata (contextos current/all).
 !macroend
 
 !macro customUnInstall

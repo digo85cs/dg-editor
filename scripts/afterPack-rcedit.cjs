@@ -64,6 +64,32 @@ exports.default = async function afterPackRcedit(context) {
   }
 
   vi.outputToResourceEntries(res.entries)
+
+  // Embute o icone canonico (resources/dg-editor.ico) — signAndEditExecutable
+  // esta desligado, entao o electron-builder nao grava RT_GROUP_ICON/RT_ICON
+  // e o exe fica com o icone default do Electron.
+  try {
+    const iconIco = path.join(context.packager.projectDir, 'resources', 'dg-editor.ico')
+    if (fs.existsSync(iconIco)) {
+      const iconFile = ResEdit.Data.IconFile.from(fs.readFileSync(iconIco))
+      const icons = (iconFile.icons || [])
+        .map((i) => i && i.data)
+        .filter(Boolean)
+      if (icons.length) {
+        // Grupo existente do exe Electron: id=1, lang=1033 (0x409).
+        ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
+          res.entries,
+          1,
+          1033,
+          icons
+        )
+        console.log('[afterPack-rcedit] icone embutido (' + icons.length + ' tamanhos)')
+      }
+    }
+  } catch (e) {
+    console.warn('[afterPack-rcedit] icone falhou (segue sem icone):', e && e.message)
+  }
+
   res.outputResource(exe)
   const out = Buffer.from(exe.generate())
   fs.writeFileSync(exePath, out)
