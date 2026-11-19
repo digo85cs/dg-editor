@@ -167,12 +167,24 @@ export async function enviarMensagem() {
     const wrap = bolha.querySelector('.msg-text') || bolha
     const fig = document.createElement('figure')
     fig.className = 'chat-midia'
-    if (typeof m.preview === 'string' && /^data:image\//.test(m.preview)) {
+    const prev = typeof m.preview === 'string' ? m.preview : ''
+    const mime = typeof m.mime === 'string' ? m.mime : ''
+    if (/^data:image\//.test(prev)) {
       const img = document.createElement('img')
-      img.src = m.preview
+      img.src = prev
       img.alt = m.nome || 'mídia gerada'
       img.loading = 'lazy'
       fig.appendChild(img)
+    } else if (/^data:video\//.test(prev)) {
+      const vid = document.createElement('video')
+      vid.src = prev
+      vid.controls = true
+      fig.appendChild(vid)
+    } else if (/^data:audio\//.test(prev)) {
+      const aud = document.createElement('audio')
+      aud.src = prev
+      aud.controls = true
+      fig.appendChild(aud)
     }
     if (m.caminho) {
       const cap = document.createElement('figcaption')

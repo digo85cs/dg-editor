@@ -424,7 +424,7 @@ async function executarChatSend(
       const arquivoAtivo = typeof options.arquivo === 'string' ? options.arquivo : '';
       let perguntaAgente = textoPedido;
       let contextoAgente = context;
-      if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(textoPedido)) {
+      if (/imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i.test(textoPedido)) {
         contextoAgente +=
           '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA. ' +
           'Para imagem generica use SEMPRE midia_imagem_auto (cascata gratis-primeiro: ' +
