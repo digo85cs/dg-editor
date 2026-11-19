@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 16:23:30** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.4** · branch `integra-13-11` · último commit: 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
+> Gerado automaticamente em **19/11/2026, 16:34:06** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.5** · branch `integra-13-11` · último commit: b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
+- c0fa1e3 2026-11-19 chore: dossiê v0.8.4
 - 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
 - 8437bc6 2026-11-19 chore: dossie v0.8.3
 - 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - c071dce 2026-11-19 chore: dossie v0.8.1
 - 565f690 2026-11-19 feat(agente): permissoes aplicadas no loop de tools, /permissoes, diagnosticos Python no contexto
 - fdb9118 2026-11-19 feat(chat): slash commands de midia (/imagem /video /audio), /wiki, /autocommit e guarda de placeholder
-- 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
-- c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
 
 ## 16. Como atualizar este dossiê
 
