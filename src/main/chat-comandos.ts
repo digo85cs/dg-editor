@@ -10,7 +10,7 @@ import { mapaRepositorio } from './agent/repo-mapa'
 import { readRules, readComplementaryRules } from './dgrules'
 import { lerCatalogoMcp } from './mcp/mercado'
 
-const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes', 'desfazer', 'checkpoints', 'goal', 'reload'])
+const COMANDOS = new Set(['mapa', 'diff', 'commit', 'limpar', 'modelo', 'regras', 'ajuda', 'spec', 'specs', 'devin', 'devin-status', 'devin-listar', 'devin-sync', 'worktree', 'mcps', 'credenciais', 'agendar', 'agendados', 'paralelo', 'paralelo-merge', 'imagem', 'video', 'audio', 'wiki', 'autocommit', 'permissoes', 'desfazer', 'redo', 'checkpoints', 'goal', 'reload'])
 
 /** Retorno estendido: comandos de midia pedem geracao direta pela cascata. */
 export interface ResultadoComando {
@@ -466,15 +466,35 @@ function cmdAutocommit(arg: string, raiz: string): string {
 /** /desfazer — restaura o ultimo checkpoint de alteracoes do agente. */
 async function cmdDesfazer(raiz: string): Promise<string> {
   try {
-    const { ultimoCheckpoint, restaurarCheckpoint } = await import('./agent/checkpoint')
+    const { ultimoCheckpoint, restaurarCheckpoint, criarCheckpoint, PREFIXO_REDO } = await import('./agent/checkpoint')
     const u = ultimoCheckpoint()
     if (!u) return 'Nenhum checkpoint para desfazer.'
+    // snapshot do estado atual (edits do agente) vira candidato a /redo
+    try {
+      await criarCheckpoint(u.arquivos.map((a) => a.path), PREFIXO_REDO + u.id)
+    } catch { /* redo e best-effort */ }
     const r = await restaurarCheckpoint(u.id, [raiz])
     return r.ok
-      ? 'Desfeito: ' + r.restaurados + ' arquivo(s) restaurados (checkpoint de ' + u.origem + ').'
+      ? 'Desfeito: ' + r.restaurados + ' arquivo(s) restaurados (checkpoint de ' + u.origem + '). Use `/redo` para refazer.'
       : 'Falha ao desfazer: ' + (r.erro || 'erro')
   } catch (e) {
     return 'Desfazer erro: ' + String(e)
+  }
+}
+
+/** /redo — reaplica o estado capturado pelo ultimo /desfazer. */
+async function cmdRedo(raiz: string): Promise<string> {
+  try {
+    const { ultimoCheckpointRedo, restaurarCheckpoint, rearmarCheckpoint, PREFIXO_REDO } = await import('./agent/checkpoint')
+    const r0 = ultimoCheckpointRedo()
+    if (!r0) return 'Nada para refazer — use `/desfazer` primeiro.'
+    const idOriginal = r0.origem.slice(PREFIXO_REDO.length)
+    const r = await restaurarCheckpoint(r0.id, [raiz])
+    if (!r.ok) return 'Falha ao refazer: ' + (r.erro || 'erro')
+    if (idOriginal) rearmarCheckpoint(idOriginal)
+    return 'Refeito: ' + r.restaurados + ' arquivo(s) restaurados.'
+  } catch (e) {
+    return 'Redo erro: ' + String(e)
   }
 }
 
@@ -677,6 +697,8 @@ export async function executarComandoChat(
       return { content: await cmdPermissoes(parsed.arg, raiz) }
     case 'desfazer':
       return { content: await cmdDesfazer(raiz) }
+    case 'redo':
+      return { content: await cmdRedo(raiz) }
     case 'checkpoints':
       return { content: cmdCheckpoints() }
     case 'goal':
@@ -711,6 +733,7 @@ export async function executarComandoChat(
           '- `/permissoes [leitura|edicao|bash|mcp on|off]` — permissoes aplicadas no agente\n' +
           '- `/permissoes bloquear|desbloquear|bloqueadas <padrao>` — deny-list por tool (ex.: ftp_*)\n' +
           '- `/desfazer` — restaura ultimo checkpoint de alteracoes do agente\n' +
+          '- `/redo` — refaz o que o ultimo `/desfazer` desfez\n' +
           '- `/goal <texto|status|clear>` — objetivo ativo injetado no contexto\n' +
           '- `/reload` — reconecta MCP sem reiniciar o app\n' +
           '- `/ajuda` — esta lista'

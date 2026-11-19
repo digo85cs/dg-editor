@@ -179,7 +179,28 @@ export async function restaurarCheckpoint(
   return { ok: true, restaurados: n }
 }
 
-/** Ultimo checkpoint ainda nao desfeito (base do "Desfazer"). */
+/** Prefixo dos checkpoints-snapshot criados pelo /desfazer para alimentar /redo. */
+export const PREFIXO_REDO = 'redo:'
+
+/** Ultimo checkpoint real (nao-redo) ainda nao desfeito — base do "Desfazer". */
 export function ultimoCheckpoint(): CheckpointMeta | null {
-  return listarCheckpoints(50).find((c) => !c.desfeitoEm) || null
+  return listarCheckpoints(50).find((c) => !c.desfeitoEm && !c.origem.startsWith(PREFIXO_REDO)) || null
+}
+
+/** Ultimo snapshot de redo ainda nao consumido — base do "/redo". */
+export function ultimoCheckpointRedo(): CheckpointMeta | null {
+  return listarCheckpoints(50).find((c) => !c.desfeitoEm && c.origem.startsWith(PREFIXO_REDO)) || null
+}
+
+/** Rearma um checkpoint desfeito (volta a ser candidato a /desfazer). */
+export function rearmarCheckpoint(id: string): void {
+  try {
+    const mp = metaPath(id)
+    if (!existsSync(mp)) return
+    const meta = JSON.parse(readFileSync(mp, 'utf8')) as CheckpointMeta
+    delete meta.desfeitoEm
+    writeFileSync(mp, JSON.stringify(meta, null, 2), 'utf8')
+  } catch {
+    /* best-effort */
+  }
 }
