@@ -4,6 +4,7 @@
  */
 import { initModesUI } from './modes-ui.js'
 import { state } from './state/app-state.js'
+import { rotuloStatusUpdate, resumoDepsManutencao, htmlItensDeps } from './features/ui/status-mappers.js'
 
 function hostContas() {
   return (
@@ -313,33 +314,12 @@ function pintarStatusUpdate(st) {
   const el = document.getElementById('sb-update')
   const btn = document.getElementById('btn-update-check')
   if (!el) return
-  const msg = st?.mensagem || '—'
-  const semFeed = /nenhuma release|sem feed de release/i.test(msg)
-  el.textContent =
-    st?.estado === 'pronta'
-      ? 'Update pronta'
-      : st?.estado === 'baixando'
-        ? 'Update ' + (st.progresso || 0) + '%'
-        : st?.estado === 'disponivel'
-          ? 'Update ' + (st.versaoRemota || '')
-          : st?.estado === 'atualizado'
-            ? semFeed
-              ? 'sem release'
-              : 'v' + (st.versaoAtual || '')
-            : st?.estado === 'erro'
-              ? 'update erro'
-              : st?.empacotado
-                ? msg.slice(0, 28)
-                : 'dev'
-  el.title = msg + (st?.erro ? ' — ' + st.erro : '')
+  const r = rotuloStatusUpdate(st)
+  el.textContent = r.texto
+  el.title = r.title
   if (btn) {
-    btn.textContent = st?.estado === 'pronta' ? 'Reiniciar' : 'Update'
-    btn.title =
-      st?.estado === 'pronta'
-        ? 'Reiniciar e aplicar atualização'
-        : semFeed
-          ? 'Ainda não há release no GitHub — publique com scripts/publicar-release.ps1'
-          : 'Verificar atualização do DG Editor'
+    btn.textContent = r.botao
+    btn.title = r.botaoTitle
   }
 }
 
@@ -417,35 +397,17 @@ function pintarDepsManutencao(st) {
   const statusEl = document.getElementById('deps-manut-status')
   const lista = document.getElementById('deps-manut-lista')
   const chk = document.getElementById('deps-manut-ativo')
-  const itens = Array.isArray(st?.itens) ? st.itens : []
-  const pend = itens.filter((i) => !i.instalado || i.precisaAtualizar).length
+  const r = resumoDepsManutencao(st)
   if (sb) {
-    sb.textContent = !st?.winget
-      ? 'Deps: sem winget'
-      : st?.emCurso
-        ? 'Deps: atualizando…'
-        : pend > 0
-          ? 'Deps: ' + pend + ' pend.'
-          : 'Deps: ok'
-    sb.title = st?.ultimaMensagem || st?.mensagem || 'Ferramentas do sistema'
+    sb.textContent = r.badge
+    sb.title = r.badgeTitle
   }
   if (chk && typeof st?.ativo === 'boolean') chk.checked = st.ativo
   if (statusEl) {
-    statusEl.textContent =
-      (st?.ultimaMensagem || st?.mensagem || '—') +
-      (st?.ultimaExecucao ? ' · ' + new Date(st.ultimaExecucao).toLocaleString() : '')
+    statusEl.textContent = r.statusTexto
   }
   if (lista) {
-    lista.innerHTML = itens
-      .map((i) => {
-        const estado = !i.instalado
-          ? 'ausente'
-          : i.precisaAtualizar
-            ? 'atualizar → ' + (i.versaoDisponivel || '?')
-            : 'ok ' + (i.versaoAtual || '')
-        return '<li><strong>' + String(i.nome || i.id) + '</strong> — ' + estado + '</li>'
-      })
-      .join('')
+    lista.innerHTML = htmlItensDeps(st?.itens)
   }
 }
 
