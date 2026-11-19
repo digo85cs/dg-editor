@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 14:35:08** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.0** · branch `integra-13-11` · último commit: 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
-> Alterações locais não commitadas: 8 arquivo(s).
+> Gerado automaticamente em **19/11/2026, 14:49:20** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.1** · branch `integra-13-11` · último commit: 565f690 2026-11-19 feat(agente): permissoes aplicadas no loop de tools, /permissoes, diagnosticos Python no contexto
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -336,6 +336,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 565f690 2026-11-19 feat(agente): permissoes aplicadas no loop de tools, /permissoes, diagnosticos Python no contexto
+- fdb9118 2026-11-19 feat(chat): slash commands de midia (/imagem /video /audio), /wiki, /autocommit e guarda de placeholder
 - 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
 - c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
 - 6189c9a 2026-11-19 chore: dossie v0.7.0
@@ -344,8 +346,6 @@ Utilitários locais relevantes:
 - e59b109 2026-11-19 docs: regra de atualizar versao local e atalho desktop
 - 179f141 2026-11-19 chore: dossie e lockfile da v0.6.9
 - 2f67dcc 2026-11-19 chore: bump 0.6.9
-- 49aae33 2026-11-19 docs: AGENTS.md com regra permanente de release e pasta APP
-- f9e57db 2026-11-19 Chat: fallback deterministico de midia quando modelo nao chama tool
 
 ## 16. Como atualizar este dossiê
 
