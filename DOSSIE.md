@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 17:00:41** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.8** · branch `integra-13-11` · último commit: b35831a 2026-11-19 refactor(renderer): extrai builders do painel de ferramentas
+> Gerado automaticamente em **19/11/2026, 17:08:14** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.9** · branch `integra-13-11` · último commit: e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
+- 7dcf172 2026-11-19 chore: dossiê v0.8.8
 - b35831a 2026-11-19 refactor(renderer): extrai builders do painel de ferramentas
 - 9b25846 2026-11-19 chore: dossiê v0.8.7
 - 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 312d1f7 2026-11-19 chore: dossiê v0.8.5
 - b260469 2026-11-19 feat: /redo real + tools navegador_* na ponte MCP HTTP
 - c0fa1e3 2026-11-19 chore: dossiê v0.8.4
-- 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
-- 8437bc6 2026-11-19 chore: dossie v0.8.3
 
 ## 16. Como atualizar este dossiê
 
