@@ -475,6 +475,43 @@ export function registrarHandlersMidia(): void {
     }
   })
 
+  // Voz do composer: audio gravado no renderer chega em base64 → temp em
+  // .dg-editor/tmp → whisper local/CF → devolve so o texto (sem arquivo de saida).
+  ipcMain.handle('midia:voz-transcrever', async (_e, payload?: unknown) => {
+    const tmpFiles: string[] = []
+    try {
+      const o = objeto(payload)
+      const r = raizValida(o.raiz)
+      if (!r.ok) return r
+      const b64 = texto(o.audio, 8_000_000)
+      const mime = texto(o.mime, 80) || 'audio/webm'
+      if (!b64) return { ok: false, erro: 'audio vazio' }
+      const buf = Buffer.from(b64, 'base64')
+      if (!buf.length) return { ok: false, erro: 'audio invalido' }
+      const extPorMime: Record<string, string> = {
+        'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a',
+        'audio/mpeg': '.mp3', 'audio/wav': '.wav', 'audio/x-wav': '.wav',
+        'video/webm': '.webm'
+      }
+      const ext = extPorMime[mime.split(';')[0].trim()] || '.webm'
+      const dirTmp = join(r.raiz, '.dg-editor', 'tmp')
+      const { mkdirSync } = await import('fs')
+      mkdirSync(dirTmp, { recursive: true })
+      const entrada = join(dirTmp, 'voz-' + Date.now().toString(36) + ext)
+      tmpFiles.push(entrada)
+      writeFileSync(entrada, buf)
+      const res = await transcrever(r.raiz, { entrada, idioma: texto(o.idioma, 10) || 'pt' })
+      if (!res.ok) return { ok: false, erro: res.erro || 'transcricao falhou' }
+      return { ok: true, texto: String(res.texto || '').trim() }
+    } catch (e) {
+      return falha(e)
+    } finally {
+      for (const f of tmpFiles) {
+        try { (await import('fs')).unlinkSync(f) } catch { /* best-effort */ }
+      }
+    }
+  })
+
   ipcMain.handle('midia:vozes', async (_e, payload?: unknown) => {
     try {
       const o = objeto(payload)

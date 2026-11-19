@@ -76,6 +76,7 @@ import {
   definirSkillChat
 } from './features/chat/skill-chip.js'
 import { obterAnexosChat, limparAnexosChat, ligarAnexosChat } from './features/chat/anexos.js'
+import './features/chat/voz-chat.js'
 import { abrirModalReinicio, fecharModalReinicio, perguntarEscolha } from './features/ui/escolha-modal.js'
 import {
   configurarDiagnosticos,

@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 15:46:30** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.3** · branch `integra-13-11` · último commit: 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **19/11/2026, 16:22:15** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.4** · branch `integra-13-11` · último commit: 8437bc6 2026-11-19 chore: dossie v0.8.3
+> Alterações locais não commitadas: 9 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **386**.
-- Canais expostos pelo preload: **370**.
+- Canais registrados no main: **387**.
+- Canais expostos pelo preload: **371**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -82,6 +82,7 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 - `midia:voz-padrao`
 - `midia:voz-presets`
 - `midia:voz-previa`
+- `midia:voz-transcrever`
 - `midia:vozes`
 - `midia:vozes-baixar`
 
@@ -336,6 +337,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 8437bc6 2026-11-19 chore: dossie v0.8.3
 - 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
 - bd41984 2026-11-19 chore: dossie v0.8.2
 - 24e1914 2026-11-19 feat(ui): painel Auto — permissoes, agendador, credenciais e MCP no painel direito
@@ -345,7 +347,6 @@ Utilitários locais relevantes:
 - 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
 - c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
 - 6189c9a 2026-11-19 chore: dossie v0.7.0
-- 482af52 2026-11-19 chore: v0.7.0
 
 ## 16. Como atualizar este dossiê
 

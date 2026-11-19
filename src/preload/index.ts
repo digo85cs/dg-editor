@@ -98,7 +98,7 @@ const invokeChannels = [
   'midia:imagem', 'midia:diagrama', 'midia:html-imagem', 'midia:imagem-melhorar',
   'midia:fotos-video', 'midia:video-cortar', 'midia:video-juntar', 'midia:video-capa',
   'midia:video-analisar', 'midia:video-melhorar', 'midia:imagem-qualidade',
-  'midia:transcrever', 'midia:narrar', 'midia:legendas',
+  'midia:transcrever', 'midia:voz-transcrever', 'midia:narrar', 'midia:legendas',
   'midia:vozes', 'midia:vozes-baixar', 'midia:voz-previa', 'midia:voz-padrao',
   'midia:memes', 'midia:memes-sincronizar', 'midia:memes-pasta', 'midia:meme', 'midia:foto-video',
   'midia:hardware', 'midia:comfy-pre', 'midia:comfy-instalar', 'midia:comfy-instalacao',
