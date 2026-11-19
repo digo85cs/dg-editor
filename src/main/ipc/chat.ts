@@ -323,16 +323,25 @@ async function executarChatSend(
     return enviou;
   };
 
-  /** Fallback deterministico: gera midia direto quando o modelo nao chamou tool. Retorna caminho relativo ou null. */
-  const fallbackMidia = async (prompt: string, signal?: AbortSignal): Promise<string | null> => {
-    if (!RE_PEDIDO_MIDIA.test(prompt) || signal?.aborted) return null;
+  /** Fallback deterministico: gera midia direto quando o modelo nao chamou tool.
+   *  Retorna { caminho } em sucesso ou { erro } quando a cascata falha. */
+  const fallbackMidia = async (
+    prompt: string,
+    signal?: AbortSignal
+  ): Promise<{ caminho: string | null; erro: string | null }> => {
+    if (!RE_PEDIDO_MIDIA.test(prompt) || signal?.aborted) return { caminho: null, erro: null };
     try {
       const { gerarImagemAuto } = await import('../midia/cascata');
       const { gerarVideoAuto } = await import('../midia/video-auto');
       const r = RE_PEDIDO_VIDEO.test(prompt)
         ? await gerarVideoAuto(rootOk, { prompt })
         : await gerarImagemAuto(rootOk, { prompt });
-      if (!(r.ok && r.caminho) || event.sender.isDestroyed()) return null;
+      if (!(r.ok && r.caminho)) {
+        const erro = typeof r.erro === 'string' && r.erro ? r.erro : 'cascata nao gerou arquivo';
+        dglog('[chat] midia fallback falhou: ' + erro);
+        return { caminho: null, erro };
+      }
+      if (event.sender.isDestroyed()) return { caminho: null, erro: null };
       const { previewBase64, ...restoMidia } = r as Record<string, unknown>;
       event.sender.send('chat:midia', {
         nome: 'midia_auto',
@@ -342,10 +351,13 @@ async function executarChatSend(
         aviso: typeof r.aviso === 'string' ? r.aviso : undefined
       });
       dglog('[chat] midia fallback ok: ' + String(r.caminho));
-      return typeof restoMidia.caminhoRel === 'string' ? restoMidia.caminhoRel : String(r.caminho);
+      return {
+        caminho: typeof restoMidia.caminhoRel === 'string' ? restoMidia.caminhoRel : String(r.caminho),
+        erro: null
+      };
     } catch (eMidia) {
       dglog('[chat] midia fallback: ' + String(eMidia));
-      return null;
+      return { caminho: null, erro: String(eMidia) };
     }
   };
 
@@ -547,8 +559,8 @@ async function executarChatSend(
       let midiaOk = enviarMidiaDePassos(resposta?.passos);
       // Fallback determinístico: modelo não chamou tool de mídia → gera direto.
       if (pedidoMidia && !midiaOk) {
-        const caminhoMidia = await fallbackMidia(perguntaAgente, signal);
-        if (caminhoMidia) contentOut = 'Mídia gerada: ' + caminhoMidia;
+        const fb = await fallbackMidia(perguntaAgente, signal);
+        if (fb.caminho) contentOut = 'Mídia gerada: ' + fb.caminho;
       }
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
@@ -685,6 +697,28 @@ async function executarChatSend(
                 : 'dg-engenheiro';
         const tarefa = modoValido === 'ask' ? 'chat' : 'codigo';
 
+        // Pedido de midia no modo auto: gera DIRETO pela cascata antes do
+        // orquestrador — cada agente da fila estoura 60s no meio da geracao
+        // (13 timeouts seguidos = ~13 min sem midia visivel).
+        if (
+          agenteSel === 'auto' &&
+          RE_PEDIDO_MIDIA.test(textoPedido) &&
+          !/pdf|documento|planilha|xlsx|csv|pptx|docx|odt|epub|convert|site|p[aá]gina|app\b|landing|apresenta|relat[oó]rio/i.test(textoPedido)
+        ) {
+          const fb = await fallbackMidia(textoPedido, signal);
+          if (fb.caminho) {
+            return publicar('Mídia gerada: ' + fb.caminho, 'midia:auto', {});
+          }
+          if (fb.erro) {
+            return publicar(
+              'Não consegui gerar a mídia: ' + fb.erro.slice(0, 300) +
+              '. Tente de novo ou ajuste o pedido.',
+              'midia:erro',
+              {}
+            );
+          }
+        }
+
         // Selecao automatica: fila com o melhor agente primeiro + fallback automatico.
         if (agenteSel === 'auto' && rootOk) {
           if (signal?.aborted) throw new Error('cancelado pelo usuario');
@@ -708,8 +742,8 @@ async function executarChatSend(
               if (enviarMidiaDePassos(passoAg.passos)) midiaOkOrc = true;
             }
             if (!midiaOkOrc) {
-              const caminhoMidia = await fallbackMidia(textoPedido, signal);
-              if (caminhoMidia) respostaTexto = (respostaTexto ? respostaTexto + '\n\n' : '') + 'Mídia gerada: ' + caminhoMidia;
+              const fb = await fallbackMidia(textoPedido, signal);
+              if (fb.caminho) respostaTexto = (respostaTexto ? respostaTexto + '\n\n' : '') + 'Mídia gerada: ' + fb.caminho;
             }
             return publicar(respostaTexto || 'Sem resposta do agente.', 'agente-auto:' + modeloUsado, {
               propostas: [],
