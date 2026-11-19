@@ -121,7 +121,7 @@ export async function orquestrarAgentes(
       ultimoTexto = r.texto || ''
       // Pedido de midia respondido com placeholder ("[Insira a imagem]") sem chamar
       // nenhuma tool = falha disfarçada; segue para o próximo agente da fila.
-      const pediuMidia = /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica/i.test(prompt)
+      const pediuMidia = /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|catoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i.test(prompt)
       const usouTool = (r.passos || []).some((p) => p.tipo === 'tool')
       const placeholder =
         /\[\s*(insira|insiro|imagem|aqui|v[ií]deo)|aqui est[áa]\s+(a|sua)\s+(imagem|v[ií]deo|m[uú]sica)/i.test(

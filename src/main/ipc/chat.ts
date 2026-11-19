@@ -10,6 +10,12 @@ import { dglog } from '../dglog';
 import { calcularUso } from '../brain/custo-sessao';
 import type { IpcResult, ChatSendResult } from './types';
 
+/** Intencao de midia no pedido do chat (imagem/video/audio/meme/documento visual). */
+const RE_PEDIDO_MIDIA =
+  /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|catoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i;
+const RE_PEDIDO_VIDEO = /v[ií]deo|video/i;
+const RE_PASSO_MIDIA = /midia_|comfyui|meme|narrar|musica/i;
+
 // ============================================================================
 // HANDLERS DE CHAT
 // ============================================================================
@@ -292,6 +298,57 @@ async function executarChatSend(
     appendChat(rootOk, { role: 'user', content: textoPedido, at: Date.now() });
   };
 
+  /** Envia chat:midia para cada passo de tool de midia com resultado ok. Retorna true se enviou algo. */
+  const enviarMidiaDePassos = (
+    passos: Array<{ tipo?: string; nome?: string; resultado?: string }> | undefined
+  ): boolean => {
+    let enviou = false;
+    try {
+      for (const p of passos || []) {
+        if (p.tipo !== 'tool' || !RE_PASSO_MIDIA.test(String(p.nome))) continue;
+        let j: { ok?: boolean; caminho?: string; previewBase64?: string; mime?: string; aviso?: string } | null = null;
+        try { j = JSON.parse(String(p.resultado || '')); } catch { continue; }
+        if (!j || j.ok !== true || !j.caminho) continue;
+        if (event.sender.isDestroyed()) continue;
+        event.sender.send('chat:midia', {
+          nome: String(p.nome),
+          caminho: j.caminho,
+          preview: typeof j.previewBase64 === 'string' ? j.previewBase64 : undefined,
+          mime: j.mime,
+          aviso: j.aviso
+        });
+        enviou = true;
+      }
+    } catch { /* midia inline e best-effort */ }
+    return enviou;
+  };
+
+  /** Fallback deterministico: gera midia direto quando o modelo nao chamou tool. Retorna caminho relativo ou null. */
+  const fallbackMidia = async (prompt: string, signal?: AbortSignal): Promise<string | null> => {
+    if (!RE_PEDIDO_MIDIA.test(prompt) || signal?.aborted) return null;
+    try {
+      const { gerarImagemAuto } = await import('../midia/cascata');
+      const { gerarVideoAuto } = await import('../midia/video-auto');
+      const r = RE_PEDIDO_VIDEO.test(prompt)
+        ? await gerarVideoAuto(rootOk, { prompt })
+        : await gerarImagemAuto(rootOk, { prompt });
+      if (!(r.ok && r.caminho) || event.sender.isDestroyed()) return null;
+      const { previewBase64, ...restoMidia } = r as Record<string, unknown>;
+      event.sender.send('chat:midia', {
+        nome: 'midia_auto',
+        caminho: String(r.caminho),
+        preview: typeof previewBase64 === 'string' ? previewBase64 : undefined,
+        mime: typeof r.mime === 'string' ? r.mime : undefined,
+        aviso: typeof r.aviso === 'string' ? r.aviso : undefined
+      });
+      dglog('[chat] midia fallback ok: ' + String(r.caminho));
+      return typeof restoMidia.caminhoRel === 'string' ? restoMidia.caminhoRel : String(r.caminho);
+    } catch (eMidia) {
+      dglog('[chat] midia fallback: ' + String(eMidia));
+      return null;
+    }
+  };
+
   try {
     const { getCachedAnalysis } = await import('../analyzer');
     const { readRules } = await import('../dgrules');
@@ -424,7 +481,7 @@ async function executarChatSend(
       const arquivoAtivo = typeof options.arquivo === 'string' ? options.arquivo : '';
       let perguntaAgente = textoPedido;
       let contextoAgente = context;
-      const pedidoMidia = /imagem|image|foto|v[ií]deo|video|meme|narrar|[aá]udio|audio|m[uú]sica|musica|cartoon|desenho|ilustra|arte|logo|banner|avatar|[ií]cone|wallpaper|p[oô]ster|thumbnail|capa\b/i.test(textoPedido);
+      const pedidoMidia = RE_PEDIDO_MIDIA.test(textoPedido);
       if (pedidoMidia) {
         contextoAgente +=
           '\n\nDIRETIVA MIDIA: o pedido e de midia. Chame a tool midia_* correspondente AGORA. ' +
@@ -487,48 +544,11 @@ async function executarChatSend(
       let contentOut = resposta?.texto || 'Sem resposta do agente.';
       // Mídia gerada por tools (imagem/vídeo/meme/áudio) → envia preview ao chat
       // para exibir inline, estilo Nano Banana.
-      let midiaOk = false;
-      try {
-        for (const p of resposta?.passos || []) {
-          if (p.tipo !== 'tool' || !/midia_|comfyui|meme|narrar|musica/i.test(String(p.nome))) continue;
-          let j: { ok?: boolean; caminho?: string; previewBase64?: string; mime?: string; aviso?: string } | null = null;
-          try { j = JSON.parse(String(p.resultado || '')); } catch { continue; }
-          if (!j || j.ok !== true || !j.caminho) continue;
-          if (!event.sender.isDestroyed()) {
-            event.sender.send('chat:midia', {
-              nome: String(p.nome),
-              caminho: j.caminho,
-              preview: typeof j.previewBase64 === 'string' ? j.previewBase64 : undefined,
-              mime: j.mime,
-              aviso: j.aviso
-            });
-            midiaOk = true;
-          }
-        }
-      } catch { /* midia inline é best-effort */ }
+      let midiaOk = enviarMidiaDePassos(resposta?.passos);
       // Fallback determinístico: modelo não chamou tool de mídia → gera direto.
-      if (pedidoMidia && !midiaOk && !signal?.aborted) {
-        try {
-          const { gerarImagemAuto } = await import('../midia/cascata');
-          const { gerarVideoAuto } = await import('../midia/video-auto');
-          const r = /v[ií]deo|video/i.test(textoPedido)
-            ? await gerarVideoAuto(rootOk, { prompt: perguntaAgente })
-            : await gerarImagemAuto(rootOk, { prompt: perguntaAgente });
-          if (r.ok && r.caminho && !event.sender.isDestroyed()) {
-            const { previewBase64, ...restoMidia } = r as Record<string, unknown>;
-            event.sender.send('chat:midia', {
-              nome: 'midia_auto',
-              caminho: String(r.caminho),
-              preview: typeof previewBase64 === 'string' ? previewBase64 : undefined,
-              mime: typeof r.mime === 'string' ? r.mime : undefined,
-              aviso: typeof r.aviso === 'string' ? r.aviso : undefined
-            });
-            const caminhoRel = typeof restoMidia.caminhoRel === 'string' ? restoMidia.caminhoRel : r.caminho;
-            contentOut = 'Mídia gerada: ' + caminhoRel + (r.aviso ? ' — ' + r.aviso : '');
-          }
-        } catch (eMidia) {
-          dglog('[chat] midia fallback: ' + String(eMidia));
-        }
+      if (pedidoMidia && !midiaOk) {
+        const caminhoMidia = await fallbackMidia(perguntaAgente, signal);
+        if (caminhoMidia) contentOut = 'Mídia gerada: ' + caminhoMidia;
       }
       const propostas = Array.isArray(resposta?.propostas) ? resposta.propostas : [];
       // Verify so quando houve edicao (propostas) — evita typecheck em todo turno (lentidao).
@@ -679,8 +699,18 @@ async function executarChatSend(
               tarefa: modoValido
             });
             const ultimo = orc.passos[orc.passos.length - 1];
-            const respostaTexto = orc.textoFinal || (ultimo ? ultimo.texto : '');
+            let respostaTexto = orc.textoFinal || (ultimo ? ultimo.texto : '');
             const modeloUsado = orc.passos.map((p) => p.modelo).filter(Boolean).pop() || 'agente-auto';
+            // Midia inline: orquestrador retorna passos internos dos agentes —
+            // extrai resultados de tools midia_* e envia chat:midia ao renderer.
+            let midiaOkOrc = false;
+            for (const passoAg of orc.passos || []) {
+              if (enviarMidiaDePassos(passoAg.passos)) midiaOkOrc = true;
+            }
+            if (!midiaOkOrc) {
+              const caminhoMidia = await fallbackMidia(textoPedido, signal);
+              if (caminhoMidia) respostaTexto = (respostaTexto ? respostaTexto + '\n\n' : '') + 'Mídia gerada: ' + caminhoMidia;
+            }
             return publicar(respostaTexto || 'Sem resposta do agente.', 'agente-auto:' + modeloUsado, {
               propostas: [],
               autoAprovacao: { ok: false, motivo: 'sem propostas via orquestrador' },
