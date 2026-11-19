@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 16:22:15** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.8.4** · branch `integra-13-11` · último commit: 8437bc6 2026-11-19 chore: dossie v0.8.3
-> Alterações locais não commitadas: 9 arquivo(s).
+> Gerado automaticamente em **19/11/2026, 16:23:30** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.8.4** · branch `integra-13-11` · último commit: 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -337,6 +337,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 29bcf5d 2026-11-19 feat(chat): ditado por voz no composer (Whisper local/CF)
 - 8437bc6 2026-11-19 chore: dossie v0.8.3
 - 8b0c2e4 2026-11-19 feat(chat): /goal, /desfazer, /reload, deny-list por tool, truncamento inteligente de output e presets do agendador
 - bd41984 2026-11-19 chore: dossie v0.8.2
@@ -346,7 +347,6 @@ Utilitários locais relevantes:
 - fdb9118 2026-11-19 feat(chat): slash commands de midia (/imagem /video /audio), /wiki, /autocommit e guarda de placeholder
 - 8c27f43 2026-11-19 fix(chat): pedido de midia gera direto pela cascata no modo auto
 - c64772d 2026-11-19 fix(chat): midia inline no caminho do orquestrador (agente=auto)
-- 6189c9a 2026-11-19 chore: dossie v0.7.0
 
 ## 16. Como atualizar este dossiê
 
