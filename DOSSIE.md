@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 07:14:12** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.3** · branch `integra-13-11` · último commit: c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
+> Gerado automaticamente em **20/11/2026, 07:59:45** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.4** · branch `integra-13-11` · último commit: b15a804 2026-11-20 feat(chat): visao de imagens + qwen2.5-coder:14b como default de codigo
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- b15a804 2026-11-20 feat(chat): visao de imagens + qwen2.5-coder:14b como default de codigo
+- 85b4584 2026-11-20 chore: dossiê v0.9.3
 - c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
 - b64dac2 2026-11-20 chore: dossiê v0.9.2
 - 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 1b734bf 2026-11-19 chore: dossiê v0.9.0
 - 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
 - feaff43 2026-11-19 chore: dossiê v0.8.9
-- e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
-- 7dcf172 2026-11-19 chore: dossiê v0.8.8
 
 ## 16. Como atualizar este dossiê
 
