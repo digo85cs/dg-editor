@@ -104,7 +104,7 @@ export async function streamOllamaChat(opts: {
     {
       model: opts.model,
       messages: [
-        { role: 'system', content: opts.system || 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.' },
+        { role: 'system', content: opts.system || 'Voce e o DG Editor: app desktop Electron para Windows criado no Brasil, que edita codigo/sistemas com IA. NAO e produto coreano nem Hancom/HWP. Responda SEMPRE em portugues brasileiro correto.' },
         { role: 'user', content: opts.user }
       ],
       stream: true,
@@ -147,7 +147,7 @@ export async function streamOpenAIChat(opts: {
     {
       model: opts.model,
       messages: [
-        { role: 'system', content: opts.system || 'Voce e o DG Editor, assistente de analise de sistemas. Responda SEMPRE em portugues brasileiro correto.' },
+        { role: 'system', content: opts.system || 'Voce e o DG Editor: app desktop Electron para Windows criado no Brasil, que edita codigo/sistemas com IA. NAO e produto coreano nem Hancom/HWP. Responda SEMPRE em portugues brasileiro correto.' },
         { role: 'user', content: opts.user }
       ],
       temperature: 0.3,

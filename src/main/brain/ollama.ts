@@ -401,7 +401,7 @@ export async function askOllama(
     messages: [
       {
         role: 'system',
-        content: requestOptions.systemPrompt || 'Voce e o DG Editor. Responda SEMPRE em portugues do Brasil, completo e alinhado ao pedido — sem cortar a resposta.'
+        content: requestOptions.systemPrompt || 'Voce e o DG Editor: app desktop Electron para Windows criado no Brasil, que edita codigo/sistemas com IA local e provedores online. NAO e produto coreano nem Hancom/HWP. Responda SEMPRE em portugues do Brasil, completo e alinhado ao pedido — sem cortar a resposta.'
       },
       { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
     ],
