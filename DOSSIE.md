@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **19/11/2026, 18:38:51** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.0** · branch `integra-13-11` · último commit: 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
+> Gerado automaticamente em **20/11/2026, 06:35:05** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.1** · branch `integra-13-11` · último commit: 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
+- 1b734bf 2026-11-19 chore: dossiê v0.9.0
 - 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
 - feaff43 2026-11-19 chore: dossiê v0.8.9
 - e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 9b25846 2026-11-19 chore: dossiê v0.8.7
 - 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
 - 706f4ba 2026-11-19 chore: dossiê v0.8.6
-- fc50984 2026-11-19 fix(installer): um so atalho desktop + icone canonico no exe
-- 312d1f7 2026-11-19 chore: dossiê v0.8.5
 
 ## 16. Como atualizar este dossiê
 
