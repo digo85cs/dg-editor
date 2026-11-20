@@ -50,6 +50,28 @@ const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const OLLAMA_BASE = 'http://127.0.0.1:11434'
 const KEY_ENV = 'OPENROUTER_API_KEY'
 
+// Cache de modelos Ollama instalados NESTA maquina (via /api/tags, TTL 60s).
+// null = ainda nao sincronizado → disponivel() nao bloqueia (comportamento antigo).
+let ollamaInstalados: { tags: string[]; em: number } | null = null
+const OLLAMA_TAGS_TTL_MS = 60_000
+
+/** Atualiza o cache de modelos locais instalados. Barato: 1 GET /api/tags por minuto. */
+export async function sincronizarModelosInstalados(): Promise<void> {
+  if (ollamaInstalados && Date.now() - ollamaInstalados.em < OLLAMA_TAGS_TTL_MS) return
+  try {
+    const tags = await listModelos()
+    if (tags.length) ollamaInstalados = { tags, em: Date.now() }
+  } catch {
+    /* Ollama fora: mantem cache anterior; fila cai no failover normal */
+  }
+}
+
+/** true se o modelo esta instalado (ou cache desconhecido). Usa matchModelo p/ variantes de tag. */
+function modeloOllamaInstalado(nome: string): boolean {
+  if (!ollamaInstalados) return true
+  return matchModelo(ollamaInstalados.tags, nome) !== null
+}
+
 const REGISTRO_BASE: ModeloReg[] = [
   { nome: 'qwen2.5-coder:1.5b', tipo: 'local', contexto: 4096, forca: 3, tokS: 35.5, tarefas: ['chat', 'codigo'] },
   { nome: 'qwen2.5-coder:3b', tipo: 'local', contexto: 8192, forca: 5, tokS: 18.8, tarefas: ['chat', 'codigo'] },
@@ -192,7 +214,12 @@ export function disponivel(cfg: ProviderConfig): StatusDisponivel {
     if (!cursorCliAprovadoNaSessao() && process.env.DG_CURSOR_CLI_OK !== '1') return 'indisponivel'
     return 'ok'
   }
-  if (cfg.tipo === 'local') return 'ok'
+  if (cfg.tipo === 'local') {
+    // Auto-adaptacao por PC: modelo Ollama nao instalado nesta maquina e
+    // pulado na hora — a fila usa so o que existe de verdade no hardware.
+    if (cfg.formato === 'ollama' && !modeloOllamaInstalado(cfg.modelo)) return 'indisponivel'
+    return 'ok'
+  }
 
   // online — cofre (id/apiKeyRef) ou env
   {

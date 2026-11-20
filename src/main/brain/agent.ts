@@ -1287,6 +1287,8 @@ export async function executarAgente(
 
     let fila: ProviderConfig[]
     try {
+      const { sincronizarModelosInstalados } = await import('./registry')
+      await sincronizarModelosInstalados()
       fila = filaPronta(tarefa, { pedido: pergunta })
     } catch (e) {
       throw e

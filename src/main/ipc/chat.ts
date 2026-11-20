@@ -900,8 +900,9 @@ async function executarChatSend(
       const { guardianPodeOperar } = await import('../guardian');
       const { ensureOllama } = await import('../ollama-keeper');
       const { streamOllamaChat, streamOpenAIChat } = await import('../brain/stream-chat');
-      const { filaPronta, limitesPorTarefa } = await import('../brain/registry');
+      const { filaPronta, limitesPorTarefa, sincronizarModelosInstalados } = await import('../brain/registry');
       const { lerChave } = await import('../brain/segredos-providers');
+      await sincronizarModelosInstalados().catch(() => {});
       const tarefaLocal = guardianPodeOperar() ? 'chat' : 'chat-rapido';
       let modeloChat = modeloParaTarefa(rootOk, 'chat');
       let modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat;
