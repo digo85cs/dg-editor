@@ -88,3 +88,9 @@ Objetivo geral: levar o DG Editor a estado de uso diário confiável (A1–A10).
 - [ ] Confirmar que `DG_MCP_TOKEN` nunca aparece em logs
 - [ ] Validar `npm run dist:win:installer`
 - [ ] Rodar `npm run certificar` e `npm run limpeza:organica`
+
+## Notas 20/11/2026 (v0.9.20-v0.9.21)
+
+- Refatoração do renderer concluída na prática: `app.js` virou composition root (614 linhas, só wiring `configurarX`). Maior arquivo restante: `midia-ui.js` (2293 linhas) — funcional e coberto por e2e; split em sub-módulos é melhoria futura de manutenibilidade, não bloqueia.
+- QA: ipc 15/15, perf OK, e2e 86 OK/1 WARN (captura real de tela depende de desktop)/0 ERRO.
+- MCP: `npm run smoke:mcp` valida tools/call reais; bug de dispatch corrigido na v0.9.21 (4 tools inacessíveis).
