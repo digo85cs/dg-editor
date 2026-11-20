@@ -30932,6 +30932,13 @@ function getLogsDir() {
 function getDossieDir() {
   return resolveFromRaiz(".dg-editor", "dossie");
 }
+function dirEmpacotado(sub) {
+  const rp = process.resourcesPath;
+  if (!rp || process.defaultApp)
+    return null;
+  const p = (0, import_path.join)(rp, "dg-editor", sub);
+  return (0, import_fs.existsSync)(p) ? p : null;
+}
 function getUserDataPath() {
   try {
     const { app: app9 } = require("electron");
@@ -245897,8 +245904,7 @@ function parseMd(arquivo2, brutoIn) {
   }
   return { id, titulo, gatilho, instrucao: corpo.trim(), arquivo: arquivo2 };
 }
-function listarSkills(raiz) {
-  const dir = dirSkills(raiz);
+function lerDir(dir) {
   if (!import_fs5.default.existsSync(dir))
     return [];
   return import_fs5.default.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
@@ -245907,6 +245913,15 @@ function listarSkills(raiz) {
     s.arquivo = abs;
     return s;
   });
+}
+function listarSkills(raiz) {
+  const locais = lerDir(dirSkills(raiz));
+  const emb = dirEmpacotado("skills");
+  const pacote = emb ? lerDir(emb) : [];
+  if (!locais.length && !pacote.length)
+    return [];
+  const vistos = new Set(locais.map((s) => s.id));
+  return [...locais, ...pacote.filter((s) => !vistos.has(s.id))];
 }
 function lerSkill(raiz, id) {
   return listarSkills(raiz).find((s) => s.id === id || s.titulo === id) || null;
@@ -246221,6 +246236,7 @@ var init_skills = __esm({
     "use strict";
     import_fs5 = __toESM(require("fs"));
     import_path5 = __toESM(require("path"));
+    init_paths();
   }
 });
 
@@ -249506,8 +249522,7 @@ function validarAgente(a) {
     erros.push("system prompt vazio");
   return { ok: erros.length === 0, erros };
 }
-function listarAgentes(raiz) {
-  const dir = dirAgentes(raiz);
+function lerDir2(dir) {
   if (!import_fs14.default.existsSync(dir))
     return [];
   return import_fs14.default.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => {
@@ -249521,6 +249536,15 @@ function listarAgentes(raiz) {
     }
     return a;
   }).filter((a) => a !== null);
+}
+function listarAgentes(raiz) {
+  const locais = lerDir2(dirAgentes(raiz));
+  const emb = dirEmpacotado("agentes");
+  const pacote = emb ? lerDir2(emb) : [];
+  if (!locais.length && !pacote.length)
+    return [];
+  const vistos = new Set(locais.map((a) => a.id));
+  return [...locais, ...pacote.filter((a) => !vistos.has(a.id))];
 }
 function lerAgente(raiz, id) {
   return listarAgentes(raiz).find((a) => a.id === id || a.nome === id) || null;
@@ -249799,6 +249823,7 @@ var init_agentes = __esm({
     import_path14 = __toESM(require("path"));
     init_ollama();
     init_dglog();
+    init_paths();
   }
 });
 
@@ -251310,6 +251335,12 @@ function mcpHabilitado() {
   return lerPrefs().habilitado;
 }
 function serverJs() {
+  const rp = process.resourcesPath;
+  if (rp && !process.defaultApp) {
+    const empacotado = import_path17.default.join(rp, "mcp-server.cjs");
+    if ((0, import_fs16.existsSync)(empacotado))
+      return empacotado;
+  }
   const raiz = resolverRaizProjeto();
   return import_path17.default.join(raiz, ".dg-editor", "bin", "main", "mcp", "server.js");
 }
@@ -254373,23 +254404,44 @@ function regrasParaContexto(raiz, arquivos, texto, maxChars) {
   }
   const budgetLang = Math.min(900, Math.max(200, Math.floor(maxChars * 0.25)));
   out += contextoLinguagensFree(arquivos, texto, budgetLang);
-  const dir = (0, import_path36.join)(raiz, ".dg-editor", "regras");
-  if (!(0, import_fs33.existsSync)(dir))
+  const dirs = [(0, import_path36.join)(raiz, ".dg-editor", "regras")];
+  const emb = dirEmpacotado("regras");
+  if (emb)
+    dirs.push(emb);
+  const nomes = [];
+  const dirsValidos = dirs.filter((d) => (0, import_fs33.existsSync)(d));
+  if (!dirsValidos.length)
     return out.slice(0, maxChars);
-  let nomes = [];
-  try {
-    nomes = (0, import_fs33.readdirSync)(dir).filter((n) => n.endsWith(".md"));
-  } catch {
-    return out.slice(0, maxChars);
+  const vistos = /* @__PURE__ */ new Set();
+  for (const d of dirsValidos) {
+    try {
+      for (const n of (0, import_fs33.readdirSync)(d).filter((x) => x.endsWith(".md"))) {
+        if (!vistos.has(n)) {
+          vistos.add(n);
+          nomes.push(n);
+        }
+      }
+    } catch {
+    }
+  }
+  const dirPorNome = /* @__PURE__ */ new Map();
+  for (const d of dirsValidos) {
+    for (const n of nomes) {
+      if (!dirPorNome.has(n) && (0, import_fs33.existsSync)((0, import_path36.join)(d, n)))
+        dirPorNome.set(n, d);
+    }
   }
   const rels = arquivos.map((a) => a.replace(/\\/g, "/"));
   const pedido = (texto || "").toLowerCase();
   for (const nome of nomes) {
     if (out.length >= maxChars)
       break;
+    const dirArquivo = dirPorNome.get(nome);
+    if (!dirArquivo)
+      continue;
     let bruto = "";
     try {
-      bruto = (0, import_fs33.readFileSync)((0, import_path36.join)(dir, nome), "utf8");
+      bruto = (0, import_fs33.readFileSync)((0, import_path36.join)(dirArquivo, nome), "utf8");
     } catch {
       continue;
     }
@@ -254421,6 +254473,7 @@ var init_regras_escopo = __esm({
     import_fs33 = require("fs");
     import_path36 = require("path");
     init_dgrules();
+    init_paths();
     init_linguagens_contexto();
     init_repo_mapa();
   }

@@ -3,8 +3,9 @@
  * Chat, MCP e agente devem usar isto — nunca cair no DGEditor por acidente.
  */
 import { existsSync } from 'fs'
-import { resolve } from 'path'
+import { resolve, sep } from 'path'
 import { dglog } from './dglog'
+import { userDataDir } from './paths'
 
 let raizAtiva: string | null = null
 
@@ -50,6 +51,17 @@ export function resolverRaizChat(rootPayload: string): { ok: true; abs: string; 
     if (!existsSync(abs)) {
       return { ok: false, erro: 'Pasta do repositorio nao encontrada: ' + abs }
     }
+    // userData do app nunca e "projeto" — explorar Cache/leveldb nao ajuda
+    // ninguem. Forca o usuario a escolher a pasta real no Bloco 1.
+    try {
+      const ud = resolve(userDataDir())
+      if (abs === ud || abs.startsWith(ud + sep)) {
+        return {
+          ok: false,
+          erro: 'A pasta ativa e o diretorio de dados do DG Editor (' + ud + '), nao um projeto. Selecione a pasta do seu projeto no Bloco 1 e envie de novo.'
+        }
+      }
+    } catch { /* userDataDir indisponivel — segue */ }
     definirRaizWorkspace(abs)
     return { ok: true, abs }
   } catch (e) {

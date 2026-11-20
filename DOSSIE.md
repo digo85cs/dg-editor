@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 10:54:46** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.13** · branch `integra-13-11` · último commit: c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 11:21:38** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.14** · branch `integra-13-11` · último commit: 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -265,6 +265,7 @@ Utilitários locais relevantes:
 - `npm run branding` — `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/gerar-branding.ps1`
 - `npm run build` — `npm run verificar:encoding && npm run verificar:sintaxe && npm run verificar:contraste && electron-vite build`
 - `npm run build:mcp` — `tsc -p src/main/mcp/tsconfig.mcp.json --pretty false & node -e "require('fs').accessSync('.dg-editor/bin/main/mcp/server.js');console.log('[build:mcp] ok')"`
+- `npm run build:mcp-bundle` — `esbuild src/main/mcp/server.ts --bundle --platform=node --format=cjs --target=node18 --outfile=resources/mcp-server.cjs --external:electron`
 - `npm run certificar` — `node scripts/certificar.cjs`
 - `npm run deploy` — `npm run dist:win:installer`
 - `npm run dev` — `electron-vite dev`
@@ -286,7 +287,7 @@ Utilitários locais relevantes:
 - `npm run mcp:http` — `tsc -p src/main/mcp/tsconfig.mcp.json && node .dg-editor/bin/main/mcp/http-server.js`
 - `npm run postbuild` — `node scripts/dossie.cjs`
 - `npm run postinstall` — `node scripts/patch-node-pty-spectre.cjs && node scripts/rebuild-node-pty.cjs && node scripts/garantir-launchers.cjs && node scripts/garantir-electron.cjs`
-- `npm run prebuild` — `npm run build:mcp && node scripts/sincronizar-skills.cjs`
+- `npm run prebuild` — `npm run build:mcp && npm run build:mcp-bundle && node scripts/sincronizar-skills.cjs`
 - `npm run predev` — `node scripts/garantir-build.cjs`
 - `npm run prestart` — `node scripts/garantir-launchers.cjs`
 - `npm run preview` — `electron-vite preview`
@@ -337,6 +338,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
 - c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
 - 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
 - 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
@@ -346,7 +348,6 @@ Utilitários locais relevantes:
 - da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
 - 796da79 2026-11-20 chore: dossiê v0.9.8
 - f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
-- 6f4cc2c 2026-11-20 chore: dossiê v0.9.7
 
 ## 16. Como atualizar este dossiê
 

@@ -12,7 +12,15 @@ import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
 
-const IGNORAR_DIRS = new Set(['node_modules', 'out', '.git', 'dist', 'dist-app', '.dg-editor'])
+const IGNORAR_DIRS = new Set([
+  'node_modules', 'out', '.git', 'dist', 'dist-app', '.dg-editor',
+  // Perfil Electron/userData — nunca e conteudo de projeto
+  'Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache',
+  'blob_storage', 'Local Storage', 'Session Storage', 'Shared Dictionary',
+  'WebStorage', 'IndexedDB', 'leveldb', 'Network', 'Partitions', 'Dictionaries',
+  'Crashpad', 'ShaderCache', 'GrShaderCache', 'component_crx_cache',
+  'dg-mcp', 'dg-modes', 'dg-perm', 'dg-skills', 'dgnav'
+])
 const EXT_TEXTO = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.md', '.txt',
   '.css', '.html', '.py', '.php', '.rb', '.go', '.rs', '.java', '.cs',

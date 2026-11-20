@@ -1549,7 +1549,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
 
     if (name === 'projeto_arvore') {
       const { maxProfundidade = 3, filtro } = args as { maxProfundidade?: number; filtro?: string }
-      const ignorar = new Set(['node_modules', 'out', '.git', 'dist', '.dg-editor'])
+      const ignorar = new Set([
+        'node_modules', 'out', '.git', 'dist', '.dg-editor',
+        // Perfil Electron/userData — nunca e conteudo de projeto
+        'Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache',
+        'blob_storage', 'Local Storage', 'Session Storage', 'Shared Dictionary',
+        'WebStorage', 'IndexedDB', 'leveldb', 'Network', 'Partitions', 'Dictionaries',
+        'Crashpad', 'ShaderCache', 'GrShaderCache', 'component_crx_cache',
+        'dg-mcp', 'dg-modes', 'dg-perm', 'dg-skills', 'dgnav'
+      ])
       const linhas: string[] = []
       async function walk(dir: string, nivel: number) {
         if (nivel > maxProfundidade) return
