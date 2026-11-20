@@ -1362,6 +1362,24 @@ export async function executarAgente(
             modo: opcoes.modo
           })
           const ms = Date.now() - t0
+          // Pedido de acao respondido com "sem acao util" = modelo fraco
+          // desistiu sem usar tools. Nao aceita como sucesso: escala para o
+          // proximo provider da fila (14b/online) em vez de devolver a falha.
+          if (
+            pedidoPedeAcao(pergunta) &&
+            /nao consegui executar uma acao util/i.test(String(resp.texto || '')) &&
+            pi + 1 < maxTentativas
+          ) {
+            const motivo = 'sem-acao-util'
+            dglog(
+              '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
+              ' motivo=' + motivo + ' resultado=escalando'
+            )
+            appendFailoverLog(raiz, { tarefa, tentou: cfg.id, motivo, resultado: 'falhou' })
+            tentativasOut.push({ provider: cfg.id, resultado: 'falhou: ' + motivo })
+            saltos++
+            break // sai do while de retries → próximo provider da fila
+          }
           dglog(
             '[provider] tarefa=' + tarefa + ' tentou=' + cfg.id +
             ' motivo=ok resultado=ok'

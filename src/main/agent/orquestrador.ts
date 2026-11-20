@@ -45,11 +45,11 @@ const FILA_PADRAO = ['dg-engenheiro', 'revisor']
 // Chat simples precisa de resposta rapida; codigo/edicao pode demorar mais.
 const AGENT_TIMEOUT_MS: Record<string, number> = {
   chat: 30_000,
-  codigo: 60_000,
+  codigo: 300_000,
   plan: 60_000,
-  debug: 60_000,
-  agent: 60_000,
-  auto: 60_000
+  debug: 120_000,
+  agent: 300_000,
+  auto: 300_000
 }
 
 export async function orquestrarAgentes(
