@@ -74,7 +74,8 @@
     "apps:win": "node scripts/apps/build.cjs --tipo=win",
     "apps:status": "node scripts/apps/build.cjs --status",
     "apps:setup": "node scripts/apps/build.cjs --setup",
-    "apps:publicar": "node scripts/apps/build.cjs --publicar"
+    "apps:publicar": "node scripts/apps/build.cjs --publicar",
+    "smoke:mcp": "node scripts/mcp-smoke.cjs"
   },
   "build": {
     "appId": "com.dgeditor.app",
