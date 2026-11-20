@@ -30,7 +30,7 @@ const invokeChannels = [
   'auditoria:rodar', 'auditoria:periodica',
   'janela:minimizar', 'janela:maximizar', 'janela:fechar', 'janela:estado',
   'janela:recarregar', 'janela:zoom', 'janela:zoom-fator', 'janela:zoom-estado', 'janela:tela-cheia',
-  'app:get-version', 'app:qa-mode',
+  'app:get-version', 'app:qa-mode', 'custo:diario',
   'devin:status', 'devin:sessao-criar', 'devin:sessao-status',
   'lsp:abrir', 'lsp:fechar', 'lsp:hover', 'lsp:definicao', 'lsp:diagnosticos',
   'credenciais:listar', 'credenciais:definir', 'credenciais:remover', 'credenciais:tem',

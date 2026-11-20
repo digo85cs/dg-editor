@@ -39,6 +39,19 @@ export function handleAppQaMode(): { ok: boolean; e2e: boolean; fakeLlm: boolean
 }
 
 /**
+ * Resumo de tokens/custo estimados do dia no chat do projeto ativo.
+ */
+export async function handleCustoDiario(): Promise<unknown> {
+  try {
+    const { resolverRaizProjeto } = await import('../paths');
+    const { resumoCustoDiario } = await import('../brain/custo-diario');
+    return resumoCustoDiario(resolverRaizProjeto());
+  } catch (e: unknown) {
+    return { ok: false, erro: String(e) };
+  }
+}
+
+/**
  * Handler para fechar aplicacao
  */
 export function handleAppQuit(
@@ -60,6 +73,7 @@ export function registrarHandlersApp(): void {
 
   ipcMain.handle('app:raiz-projeto', handleAppRaizProjeto);
   ipcMain.handle('app:qa-mode', handleAppQaMode);
+  ipcMain.handle('custo:diario', handleCustoDiario);
   ipcMain.on('app:quit', handleAppQuit);
 
   dglog('[ipc:app] handlers registrados!');
