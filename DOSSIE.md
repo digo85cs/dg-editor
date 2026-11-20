@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 18:30:46** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.17** · branch `integra-13-11` · último commit: a450222 2026-11-20 docs: registra armadilhas ELECTRON_RUN_AS_NODE e requires nao bundlados
+> Gerado automaticamente em **20/11/2026, 19:00:54** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.18** · branch `integra-13-11` · último commit: 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -338,6 +338,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
+- 34d39e9 2026-11-20 fix(renderer): helper $ ausente em config-contas.js quebrava modais Config/Contas
+- bfb2beb 2026-11-20 chore: dossie v0.9.17
 - a450222 2026-11-20 docs: registra armadilhas ELECTRON_RUN_AS_NODE e requires nao bundlados
 - f308c53 2026-11-20 fix(main): elimina requires relativos quebrados no bundle empacotado
 - dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
@@ -345,9 +348,6 @@ Utilitários locais relevantes:
 - 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
 - 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
 - c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
-- 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
-- 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
-- 8016bbb 2026-11-20 chore: dossiê v0.9.10
 
 ## 16. Como atualizar este dossiê
 
