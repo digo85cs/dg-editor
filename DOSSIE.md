@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 07:59:45** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.4** · branch `integra-13-11` · último commit: b15a804 2026-11-20 feat(chat): visao de imagens + qwen2.5-coder:14b como default de codigo
+> Gerado automaticamente em **20/11/2026, 08:43:53** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.5** · branch `integra-13-11` · último commit: a724c5b 2026-11-20 fix(chat): forca pt-BR em visao, agente e chat mesmo com pedido/conteudo em outro idioma
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- a724c5b 2026-11-20 fix(chat): forca pt-BR em visao, agente e chat mesmo com pedido/conteudo em outro idioma
+- 66260a8 2026-11-20 chore: dossiê v0.9.4
 - b15a804 2026-11-20 feat(chat): visao de imagens + qwen2.5-coder:14b como default de codigo
 - 85b4584 2026-11-20 chore: dossiê v0.9.3
 - c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 5c26022 2026-11-20 chore: dossiê v0.9.1
 - 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
 - 1b734bf 2026-11-19 chore: dossiê v0.9.0
-- 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
-- feaff43 2026-11-19 chore: dossiê v0.8.9
 
 ## 16. Como atualizar este dossiê
 
