@@ -307,6 +307,13 @@ function pareceJsonTool(texto: string): boolean {
   return /^\s*\{\s*"name"\s*:/.test(t) || /^\s*\{\s*"\w+"\s*:\s*\{/.test(t)
 }
 
+/** Pedido que exige ACAO (editar/rodar/instalar), nao so explicacao. */
+function pedidoPedeAcao(pergunta: string): boolean {
+  return /\b(implement|implementar|implementa|corrig|fix|editar|edit|refator|criar|adicionar|atualiz|upgrade|update|instal|install|configur|execut|fa[cç]a|faca|rode|run|deploy|escrev|write|remov|delete|migra|migrate|test|teste|gera|gerar)/i.test(
+    String(pergunta || '')
+  )
+}
+
 function extrairTextoUtilTool(raw: string): string {
   const t = String(raw || '').trim()
   if (!t) return ''
@@ -562,6 +569,7 @@ async function rodarLoopComProvider(
   const assinaturasFeitas = new Set<string>()
   const statsAcc = { edits: 0, explored: 0, searches: 0, tools: 0, commands: 0 }
   let pediuResumo = false
+  let nudgesAcao = 0
   const labelModelo = cfg.modelo
   const emit = (ev: EventoAgente) => {
     try {
@@ -710,6 +718,32 @@ async function rodarLoopComProvider(
     }
 
     if (chamadas.length === 0) {
+      // Pedido de ACAO respondido com prosa (sem nenhuma tool): o modelo
+      // "conselhou" em vez de executar (ex.: "gem update rails"). Forca o
+      // loop a continuar com instrucao corretiva — estilo Devin/Cursor.
+      if (
+        !jaUsouTool &&
+        tools.length > 0 &&
+        pedidoPedeAcao(pergunta) &&
+        nudgesAcao < 2 &&
+        i + 1 < maxIter
+      ) {
+        nudgesAcao++
+        dglog('[agente] resposta em prosa sem tools p/ pedido de acao — nudge ' + nudgesAcao)
+        if (r.content) {
+          mensagens.push({ role: 'assistant', content: r.content })
+        }
+        mensagens.push({
+          role: 'user',
+          content:
+            'O usuario pediu uma ACAO concreta, nao conselhos. ' +
+            'Execute AGORA com as tools disponiveis: leia o projeto, rode comandos, edite arquivos. ' +
+            'NAO repita orientacoes do tipo "voce pode rodar X" — faca voce mesmo e mostre o resultado. ' +
+            'Se algo nao for possivel, diga o erro real da tool.'
+        })
+        emit({ tipo: 'status', texto: 'Forcando execucao com tools…', modelo: labelModelo })
+        continue
+      }
       dglog('[agente] final apos ' + (i + 1) + ' iteracoes via ' + cfg.id)
       const fin = await finalizarAgente(raiz, pergunta, labelModelo, r.content || '', passos)
       return { ...fin, propostas: propostasAcc }
