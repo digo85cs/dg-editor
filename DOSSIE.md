@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 18:29:27** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.16** · branch `integra-13-11` · último commit: dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
-> Alterações locais não commitadas: 9 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 18:30:46** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.17** · branch `integra-13-11` · último commit: a450222 2026-11-20 docs: registra armadilhas ELECTRON_RUN_AS_NODE e requires nao bundlados
+> Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
 
@@ -338,6 +338,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- a450222 2026-11-20 docs: registra armadilhas ELECTRON_RUN_AS_NODE e requires nao bundlados
+- f308c53 2026-11-20 fix(main): elimina requires relativos quebrados no bundle empacotado
 - dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
 - 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
 - 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
@@ -346,8 +348,6 @@ Utilitários locais relevantes:
 - 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
 - 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
 - 8016bbb 2026-11-20 chore: dossiê v0.9.10
-- 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
-- 7f9ca8a 2026-11-20 chore: dossiê v0.9.9
 
 ## 16. Como atualizar este dossiê
 
