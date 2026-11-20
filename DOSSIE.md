@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 06:35:05** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.1** · branch `integra-13-11` · último commit: 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
+> Gerado automaticamente em **20/11/2026, 06:48:34** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.2** · branch `integra-13-11` · último commit: 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
+- 5c26022 2026-11-20 chore: dossiê v0.9.1
 - 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
 - 1b734bf 2026-11-19 chore: dossiê v0.9.0
 - 87c243c 2026-11-19 refactor(renderer): extrai badges de providers e secao Automacoes
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 7dcf172 2026-11-19 chore: dossiê v0.8.8
 - b35831a 2026-11-19 refactor(renderer): extrai builders do painel de ferramentas
 - 9b25846 2026-11-19 chore: dossiê v0.8.7
-- 7cae0c3 2026-11-19 feat(agent): subagentes em background (/background, /tarefas, /tarefa)
-- 706f4ba 2026-11-19 chore: dossiê v0.8.6
 
 ## 16. Como atualizar este dossiê
 
