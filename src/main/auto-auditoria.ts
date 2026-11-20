@@ -12,6 +12,7 @@ import { dglog } from './dglog'
 import { checarIntegracaoFerramentas } from './auditoria-integracao'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
+import { resolverRaizDGEditor } from './paths'
 import {
   detectarShell,
   listarShells,
@@ -680,7 +681,9 @@ async function checarProviders(): Promise<Achado[]> {
 
 function checarSkills(): Achado[] {
   const out: Achado[] = []
-  const raiz = resolverRaizProjeto()
+  // Skills locais moram em <raiz-dados>/.dg-editor/skills; no app empacotado a
+  // raiz de dados e userData (resolverRaizDGEditor), nao o app.asar.
+  const raiz = resolverRaizDGEditor()
   try {
     const skills = listarSkills(raiz)
     out.push({
@@ -728,7 +731,7 @@ function checarSkills(): Achado[] {
 
 function checarAgentesArea(): Achado[] {
   const out: Achado[] = []
-  const raiz = resolverRaizProjeto()
+  const raiz = resolverRaizDGEditor()
   try {
     const agentes = listarAgentes(raiz)
     const skillIds = new Set(listarSkills(raiz).map((s) => s.id))
