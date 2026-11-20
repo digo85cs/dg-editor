@@ -13,6 +13,7 @@ import {
   type RespostaMidia
 } from './core'
 import { bloqueioCusto, registrarUso } from './guarda-custo'
+import { lerChave } from '../brain/segredos-providers'
 
 const MODELO_VEO = 'veo-3.1-generate-preview'
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
@@ -21,7 +22,6 @@ function chaveGemini(): string | null {
   if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { lerChave } = require('../brain/segredos-providers') as typeof import('../brain/segredos-providers')
     return lerChave('gemini')
   } catch {
     return null

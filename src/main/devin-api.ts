@@ -6,13 +6,13 @@
 
 const BASE = 'https://api.devin.ai/v3'
 
+import { lerChave } from './brain/segredos-providers'
+
 function cfg(): { key: string; org: string | null } | null {
   let key = process.env.DEVIN_API_KEY || ''
   if (!key) {
     try {
       // vault safeStorage — credencial definida via /credenciais ou IPC
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { lerChave } = require('./brain/segredos-providers') as typeof import('./brain/segredos-providers')
       key = lerChave('devin') || ''
     } catch {
       /* vault indisponível */
@@ -22,8 +22,6 @@ function cfg(): { key: string; org: string | null } | null {
   let org = process.env.DEVIN_ORG_ID || ''
   if (!org) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { lerChave } = require('./brain/segredos-providers') as typeof import('./brain/segredos-providers')
       org = lerChave('devin-org') || ''
     } catch {
       /* */

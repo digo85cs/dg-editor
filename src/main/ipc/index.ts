@@ -63,6 +63,7 @@ import { registrarHandlersDevin } from './devin';
 import { registrarHandlersLsp } from './lsp';
 import { registrarHandlersIntegracoes } from './integracoes';
 import { registrarComfyUIIpc } from '../comfyui-mcp';
+import { iniciarAgendador } from '../agendador';
 
 // ============================================================================
 // ESTADO
@@ -155,7 +156,6 @@ registrarHandlersIntegracoes();
 
 // Agendador de prompts — dispara 'agendador:disparo' para a janela
 try {
-  const { iniciarAgendador } = require('../agendador') as typeof import('../agendador');
   iniciarAgendador();
 } catch (e) {
   dglog('[agendador] falha ao iniciar: ' + String(e));

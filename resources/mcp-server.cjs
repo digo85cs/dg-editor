@@ -31,7 +31,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/zod/v4/core/util.js
 var util_exports = {};
@@ -33323,7 +33322,7 @@ var require_typescript = __commonJS({
         }
         return to;
       };
-      var __toCommonJS2 = (mod) => (__copyProps2, mod);
+      var __toCommonJS = (mod) => (__copyProps2, mod);
       var typescript_exports = {};
       __export2(typescript_exports, {
         ANONYMOUS: () => ANONYMOUS,
@@ -35571,7 +35570,7 @@ var require_typescript = __commonJS({
         writeFileEnsuringDirectories: () => writeFileEnsuringDirectories,
         zipWith: () => zipWith
       });
-      module3.exports = __toCommonJS2(typescript_exports);
+      module3.exports = __toCommonJS(typescript_exports);
       var versionMajorMinor = "5.9";
       var version2 = "5.9.3";
       var Comparison = /* @__PURE__ */ ((Comparison3) => {
@@ -247547,14 +247546,6 @@ var init_provider_env_map = __esm({
 });
 
 // src/main/brain/segredos-providers.ts
-var segredos_providers_exports = {};
-__export(segredos_providers_exports, {
-  chaveConfigurada: () => chaveConfigurada,
-  lerChave: () => lerChave,
-  listarChavesConfiguradas: () => listarChavesConfiguradas,
-  removerChave: () => removerChave,
-  salvarChave: () => salvarChave
-});
 function ehOpenRouterId(id) {
   return id === "openrouter" || id.startsWith("openrouter");
 }
@@ -247567,14 +247558,6 @@ function aceitarChave(id, chave) {
 }
 function arquivoCofre() {
   return (0, import_path10.join)(userDataDir(), "providers-keys.bin");
-}
-function mascarar(chave) {
-  if (!chave)
-    return "\u2014";
-  return chave.slice(0, 4) + "****";
-}
-function dglogSeguro(mensagem, chave) {
-  dglog(mensagem + (chave ? " chave=" + mascarar(chave) : ""));
 }
 function lerArquivoCofre() {
   const ARQUIVO = arquivoCofre();
@@ -247590,14 +247573,6 @@ function lerArquivoCofre() {
   } catch {
     return null;
   }
-}
-function gravarArquivoCofre(dados) {
-  const dir = userDataDir();
-  if (!(0, import_fs10.existsSync)(dir))
-    (0, import_fs10.mkdirSync)(dir, { recursive: true });
-  const texto = JSON.stringify(dados);
-  const buf = import_electron3.safeStorage.encryptString(texto);
-  (0, import_fs10.writeFileSync)(arquivoCofre(), buf);
 }
 function chaveNoCofre(id) {
   const cofre = lerArquivoCofre();
@@ -247654,62 +247629,10 @@ function resolverChave(idOuRef) {
 function chaveConfigurada(id) {
   return resolverChave(id) != null;
 }
-function salvarChave(id, chave) {
-  if (!chave || typeof chave !== "string" || !chave.trim()) {
-    return { ok: false, erro: "chave vazia" };
-  }
-  if (ehOpenRouterId(id) && !chaveOpenRouterPareceValida(chave.trim())) {
-    return { ok: false, erro: "chave OpenRouter inv\xE1lida (use sk-or-v1-\u2026 completa)" };
-  }
-  if (!import_electron3.safeStorage.isEncryptionAvailable()) {
-    dglogSeguro("[segredos-providers] criptografia indispon\xEDvel", chave);
-    return { ok: false, erro: "criptografia indispon\xEDvel \u2014 n\xE3o \xE9 seguro gravar chave em texto plano" };
-  }
-  try {
-    const cofre = lerArquivoCofre() || { versao: VERSAO, chaves: {} };
-    cofre.chaves[id] = chave.trim();
-    gravarArquivoCofre(cofre);
-    dglogSeguro("[segredos-providers] chave salva", chave);
-    return { ok: true };
-  } catch (e) {
-    dglogSeguro("[segredos-providers] falha ao salvar chave", chave);
-    return { ok: false, erro: String(e?.message || e) };
-  }
-}
 function lerChave(id) {
   return resolverChave(id);
 }
-function removerChave(id) {
-  try {
-    const cofre = lerArquivoCofre();
-    if (cofre?.chaves && cofre.chaves[id] !== void 0) {
-      delete cofre.chaves[id];
-      gravarArquivoCofre(cofre);
-    }
-    return { ok: true };
-  } catch {
-    return { ok: true };
-  }
-}
-function listarChavesConfiguradas() {
-  const cofre = lerArquivoCofre();
-  const ids = /* @__PURE__ */ new Set();
-  if (cofre?.chaves) {
-    for (const k of Object.keys(cofre.chaves)) {
-      if (cofre.chaves[k] && cofre.chaves[k].trim().length > 0)
-        ids.add(k);
-    }
-  }
-  for (const p of listarProviders()) {
-    if (p.apiKeyEnv) {
-      const v = process.env[p.apiKeyEnv];
-      if (typeof v === "string" && v.trim().length > 0)
-        ids.add(p.id);
-    }
-  }
-  return [...ids];
-}
-var import_electron3, import_fs10, import_path10, VERSAO;
+var import_electron3, import_fs10, import_path10;
 var init_segredos_providers = __esm({
   "src/main/brain/segredos-providers.ts"() {
     "use strict";
@@ -247720,7 +247643,6 @@ var init_segredos_providers = __esm({
     init_providers_registry();
     init_paths();
     init_provider_env_map();
-    VERSAO = 1;
   }
 });
 
@@ -251944,7 +251866,7 @@ function lerEstado() {
   if (estadoCache)
     return estadoCache;
   if (!(0, import_fs19.existsSync)(arquivoCota())) {
-    estadoCache = { versao: VERSAO2, permitirPago: false, tetoDiarioUSD: void 0, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] };
+    estadoCache = { versao: VERSAO, permitirPago: false, tetoDiarioUSD: void 0, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] };
     return estadoCache;
   }
   try {
@@ -251953,7 +251875,7 @@ function lerEstado() {
       throw new Error("estado invalido");
     if (j.versao === 1) {
       estadoCache = {
-        versao: VERSAO2,
+        versao: VERSAO,
         permitirPago: false,
         tetoDiarioUSD: void 0,
         gastoHojeUSD: 0,
@@ -251964,7 +251886,7 @@ function lerEstado() {
       return estadoCache;
     }
     estadoCache = {
-      versao: j.versao ?? VERSAO2,
+      versao: j.versao ?? VERSAO,
       permitirPago: j.permitirPago ?? false,
       tetoDiarioUSD: j.tetoDiarioUSD,
       gastoHojeUSD: j.gastoHojeUSD ?? 0,
@@ -251974,7 +251896,7 @@ function lerEstado() {
     return estadoCache;
   } catch (e) {
     dglog("[roteador-cota] arquivo corrompido, regenerando vazio: " + String(e?.message || e));
-    estadoCache = { versao: VERSAO2, permitirPago: false, tetoDiarioUSD: void 0, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] };
+    estadoCache = { versao: VERSAO, permitirPago: false, tetoDiarioUSD: void 0, gastoHojeUSD: 0, gastoPorProvider: {}, entradas: [] };
     return estadoCache;
   }
 }
@@ -252196,7 +252118,7 @@ function emitirEventoCota() {
   } catch {
   }
 }
-var import_electron5, import_fs19, import_path20, VERSAO2, DIA_MS, RAIZ, estadoCache, naoRastreadosSet, naoRastreadosLogadoSet;
+var import_electron5, import_fs19, import_path20, VERSAO, DIA_MS, RAIZ, estadoCache, naoRastreadosSet, naoRastreadosLogadoSet;
 var init_roteador_cota = __esm({
   "src/main/brain/roteador-cota.ts"() {
     "use strict";
@@ -252208,7 +252130,7 @@ var init_roteador_cota = __esm({
     init_providers_registry();
     init_segredos_providers();
     init_paths();
-    VERSAO2 = 2;
+    VERSAO = 2;
     DIA_MS = 24 * 60 * 60 * 1e3;
     RAIZ = process.env.DG_ROOT || process.cwd();
     estadoCache = null;
@@ -269505,8 +269427,7 @@ function chaveGemini() {
   if (process.env.GEMINI_API_KEY)
     return process.env.GEMINI_API_KEY;
   try {
-    const { lerChave: lerChave2 } = (init_segredos_providers(), __toCommonJS(segredos_providers_exports));
-    return lerChave2("gemini");
+    return lerChave("gemini");
   } catch {
     return null;
   }
@@ -269636,6 +269557,7 @@ var init_gemini_imagem = __esm({
     import_node_fs33 = require("node:fs");
     import_node_path28 = require("node:path");
     init_core3();
+    init_segredos_providers();
     MODELO_IMAGEM = "gemini-2.5-flash-image";
     URL_GERAR = "https://generativelanguage.googleapis.com/v1beta/models/" + MODELO_IMAGEM + ":generateContent";
     cotaImagemBloqueadaAte = 0;
@@ -269856,8 +269778,7 @@ function chaveOpenAI() {
   if (process.env.OPENAI_API_KEY)
     return process.env.OPENAI_API_KEY;
   try {
-    const { lerChave: lerChave2 } = (init_segredos_providers(), __toCommonJS(segredos_providers_exports));
-    return lerChave2("openai");
+    return lerChave("openai");
   } catch {
     return null;
   }
@@ -269973,6 +269894,7 @@ var init_openai_midia = __esm({
     import_node_fs36 = require("node:fs");
     init_core3();
     init_guarda_custo();
+    init_segredos_providers();
     ERRO_SEM_CHAVE = "OPENAI_API_KEY n\xE3o configurada. Cadastre em Contas \u2192 Provedores (openai).";
     VOZES_OPENAI = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
   }
@@ -270395,8 +270317,7 @@ function chaveGemini2() {
   if (process.env.GEMINI_API_KEY)
     return process.env.GEMINI_API_KEY;
   try {
-    const { lerChave: lerChave2 } = (init_segredos_providers(), __toCommonJS(segredos_providers_exports));
-    return lerChave2("gemini");
+    return lerChave("gemini");
   } catch {
     return null;
   }
@@ -270506,6 +270427,7 @@ var init_gemini_video = __esm({
     import_node_fs39 = require("node:fs");
     init_core3();
     init_guarda_custo();
+    init_segredos_providers();
     MODELO_VEO = "veo-3.1-generate-preview";
     BASE5 = "https://generativelanguage.googleapis.com/v1beta";
     dormir5 = (ms) => new Promise((r) => setTimeout(r, ms));

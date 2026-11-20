@@ -13,6 +13,7 @@ import {
   validarEntrada,
   type RespostaMidia
 } from './core'
+import { lerChave } from '../brain/segredos-providers'
 
 const MODELO_IMAGEM = 'gemini-2.5-flash-image'
 const URL_GERAR =
@@ -23,7 +24,6 @@ function chaveGemini(): string | null {
   try {
     // vault safeStorage — lazy p/ não quebrar o servidor MCP (electron run-as-node)
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { lerChave } = require('../brain/segredos-providers') as typeof import('../brain/segredos-providers')
     return lerChave('gemini')
   } catch {
     return null

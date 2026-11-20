@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 11:56:26** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.15** · branch `integra-13-11` · último commit: 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 18:29:27** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.16** · branch `integra-13-11` · último commit: dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
+> Alterações locais não commitadas: 9 arquivo(s).
 
 ## 1. O que é
 
@@ -338,6 +338,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
 - 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
 - 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
 - 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
@@ -347,7 +348,6 @@ Utilitários locais relevantes:
 - 8016bbb 2026-11-20 chore: dossiê v0.9.10
 - 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
 - 7f9ca8a 2026-11-20 chore: dossiê v0.9.9
-- da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
 
 ## 16. Como atualizar este dossiê
 
