@@ -274766,7 +274766,7 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
         isError: !r.ok
       };
     }
-    if (name.startsWith("midia_") || name === "imagens_iso" || name.startsWith("apps_") || name.startsWith("reversa_") || name === "notas_mapa_mental" || name === "tela_gravacoes" || name === "receber_lan") {
+    if (name.startsWith("midia_") || name === "imagens_iso" || name.startsWith("apps_") || name.startsWith("reversa_") || name === "notas_mapa_mental" || name === "tela_gravacoes" || name === "receber_lan" || name === "portabilidade_status" || name === "agentes_externos_status" || name === "provisionamento_status" || name === "provisionamento_atualizar") {
       const midia = await Promise.resolve().then(() => (init_core3(), core_exports3));
       const responder = async (r) => ({
         content: [{ type: "text", text: JSON.stringify(r, null, 2) }],

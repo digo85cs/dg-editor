@@ -2090,7 +2090,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
       name.startsWith('reversa_') ||
       name === 'notas_mapa_mental' ||
       name === 'tela_gravacoes' ||
-      name === 'receber_lan'
+      name === 'receber_lan' ||
+      name === 'portabilidade_status' ||
+      name === 'agentes_externos_status' ||
+      name === 'provisionamento_status' ||
+      name === 'provisionamento_atualizar'
     ) {
       const midia = await import('../midia/core')
       const responder = async (r: { ok: boolean; erro?: string; [k: string]: unknown }) => ({
