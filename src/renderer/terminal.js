@@ -5,16 +5,13 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import { apiTerm, cssVar, formatShellLabel, gravarPerfis, lerPerfis, resumirScrollback, rotuloDoShellId, shellIdFromInfo, temaXterm } from './terminal-utils.js'
+import { apiTerm, cssVar, formatShellLabel, gravarPerfis, lerPerfis, resumirScrollback, rotuloDoShellId, shellIdFromInfo, temaXterm, LS_LAYOUT, MAX_SCROLLBACK_LINHAS, MAX_SCROLLBACK_CHARS, serializarLayout, parseLayoutSnapshot, escreverScrollbackRestaurado } from './terminal-utils.js'
 
 const LS_HEIGHT = 'dg-terminal-height'
 const LS_MODE = 'dg-terminal-mode'
 const LS_ORIENT = 'dg-terminal-orient'
 const LS_SPLIT_RATIO = 'dg-terminal-split-ratio'
-const LS_LAYOUT = 'dg.terminal.layout'
 const MAX_ABAS_RESTORE = 4
-const MAX_SCROLLBACK_LINHAS = 80
-const MAX_SCROLLBACK_CHARS = 8000
 
 /**
  * @typedef {{ id: string, titulo: string, shellId: string|null, cwd: string|null, xterm: any, fit: any, pane: HTMLElement, tabBtn: HTMLElement, unsubData: (()=>void)|null, unsubExit: (()=>void)|null }} Aba
@@ -64,15 +61,6 @@ export function initTerminalPanel() {
     }, 2500)
   }
 
-  function escreverScrollbackRestaurado(xterm, texto) {
-    const linhas = String(texto).replace(/\r/g, '').split('\n').slice(-MAX_SCROLLBACK_LINHAS)
-    if (!linhas.length) return
-    try {
-      xterm.write('\x1b[90m' + linhas.join('\r\n') + '\x1b[0m\r\n')
-    } catch {
-      /* xterm descartado */
-    }
-  }
   const ratioRef = {
     value: Math.min(0.8, Math.max(0.2, parseFloat(localStorage.getItem(LS_SPLIT_RATIO) || '0.5') || 0.5))
   }
@@ -107,20 +95,7 @@ export function initTerminalPanel() {
 
   function salvarSnapshot() {
     try {
-      const keys = [...grupos.keys()].sort()
-      const snap = {
-        modo,
-        orientacao,
-        grupos: keys.map((k) => ({
-          abas: [...(grupos.get(k)?.abas.values() || [])].map((a) => ({
-            shellId: a.shellId || '',
-            cwd: a.cwd || '',
-            perfilNome: a.perfilNome || '',
-            scrollback: resumoScrollback(a)
-          }))
-        })),
-        grupoAtivo: Math.max(0, keys.indexOf(grupoAtivoKey))
-      }
+      const snap = serializarLayout(grupos, grupoAtivoKey, modo, orientacao, resumoScrollback)
       localStorage.setItem(LS_LAYOUT, JSON.stringify(snap))
       persistLayout()
     } catch {
@@ -129,21 +104,13 @@ export function initTerminalPanel() {
   }
 
   function lerSnapshot() {
+    let raw = null
     try {
-      const raw = localStorage.getItem(LS_LAYOUT)
-      if (!raw) return null
-      const snap = JSON.parse(raw)
-      if (!snap || (snap.modo !== 'single' && snap.modo !== 'split')) return null
-      if (!Array.isArray(snap.grupos) || snap.grupos.length < 1) return null
-      return snap
+      raw = localStorage.getItem(LS_LAYOUT)
     } catch {
-      try {
-        localStorage.removeItem(LS_LAYOUT)
-      } catch {
-        /* */
-      }
-      return null
+      /* */
     }
+    return parseLayoutSnapshot(raw)
   }
 
   function aplicarTema() {

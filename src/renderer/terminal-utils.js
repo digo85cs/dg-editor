@@ -100,3 +100,59 @@ export function shellIdFromInfo(shell) {
   if (shell.tipo === 'pwsh-preview') return 'pwsh-preview-' + (shell.versao || 'x')
   return 'pwsh-' + (shell.versao || 'x')
 }
+
+/* ---------- Snapshot de layout (abas/split) ---------- */
+
+export const LS_LAYOUT = 'dg.terminal.layout'
+export const MAX_SCROLLBACK_LINHAS = 80
+export const MAX_SCROLLBACK_CHARS = 8000
+
+/**
+ * Serializa o estado dos grupos de abas para localStorage.
+ * resumoFn(a) deve retornar o scrollback resumido da aba.
+ */
+export function serializarLayout(grupos, grupoAtivoKey, modo, orientacao, resumoFn) {
+  const keys = [...grupos.keys()].sort()
+  return {
+    modo,
+    orientacao,
+    grupos: keys.map((k) => ({
+      abas: [...(grupos.get(k)?.abas.values() || [])].map((a) => ({
+        shellId: a.shellId || '',
+        cwd: a.cwd || '',
+        perfilNome: a.perfilNome || '',
+        scrollback: resumoFn(a)
+      }))
+    })),
+    grupoAtivo: Math.max(0, keys.indexOf(grupoAtivoKey))
+  }
+}
+
+/** Parse defensivo do snapshot salvo; remove chave corrompida e retorna null. */
+export function parseLayoutSnapshot(raw) {
+  try {
+    if (!raw) return null
+    const snap = JSON.parse(raw)
+    if (!snap || (snap.modo !== 'single' && snap.modo !== 'split')) return null
+    if (!Array.isArray(snap.grupos) || snap.grupos.length < 1) return null
+    return snap
+  } catch {
+    try {
+      localStorage.removeItem(LS_LAYOUT)
+    } catch {
+      /* */
+    }
+    return null
+  }
+}
+
+/** Escreve o scrollback restaurado no xterm com marcador visual discreto. */
+export function escreverScrollbackRestaurado(xterm, texto) {
+  const linhas = String(texto).replace(/\r/g, '').split('\n').slice(-MAX_SCROLLBACK_LINHAS)
+  if (!linhas.length) return
+  try {
+    xterm.write('\x1b[90m' + linhas.join('\r\n') + '\x1b[0m\r\n')
+  } catch {
+    /* xterm descartado */
+  }
+}
