@@ -5,6 +5,8 @@ import { escapar } from '../../utils/dom.js'
 import { mostrarToast } from './toast.js'
 import { abrirJanelaFlutuante } from './janelas-flutuantes.js'
 
+const $ = (id) => document.getElementById(id)
+
 let deps = {}
 
 /** Registra callbacks do app.js (ex.: config do OpenClaw). Chamar no boot. */
