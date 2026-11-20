@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 06:48:34** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.2** · branch `integra-13-11` · último commit: 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
+> Gerado automaticamente em **20/11/2026, 07:14:12** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.3** · branch `integra-13-11` · último commit: c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
+- b64dac2 2026-11-20 chore: dossiê v0.9.2
 - 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
 - 5c26022 2026-11-20 chore: dossiê v0.9.1
 - 9ca4cc5 2026-11-20 refactor(renderer): onboarding, chat-loading e snapshot de terminal
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - feaff43 2026-11-19 chore: dossiê v0.8.9
 - e53a676 2026-11-19 feat(lsp): diagnosticos Python com pyflakes + refactor status-mappers
 - 7dcf172 2026-11-19 chore: dossiê v0.8.8
-- b35831a 2026-11-19 refactor(renderer): extrai builders do painel de ferramentas
-- 9b25846 2026-11-19 chore: dossiê v0.8.7
 
 ## 16. Como atualizar este dossiê
 
