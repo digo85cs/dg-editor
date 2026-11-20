@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 09:05:40** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.7** · branch `integra-13-11` · último commit: 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
+> Gerado automaticamente em **20/11/2026, 09:57:09** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.8** · branch `integra-13-11` · último commit: f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
+- 6f4cc2c 2026-11-20 chore: dossiê v0.9.7
 - 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
 - 3fd981e 2026-11-20 chore: dossiê v0.9.6
 - e6e349d 2026-11-20 fix(chat): injeta identidade real do DG Editor nos system prompts
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 66260a8 2026-11-20 chore: dossiê v0.9.4
 - b15a804 2026-11-20 feat(chat): visao de imagens + qwen2.5-coder:14b como default de codigo
 - 85b4584 2026-11-20 chore: dossiê v0.9.3
-- c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
-- b64dac2 2026-11-20 chore: dossiê v0.9.2
 
 ## 16. Como atualizar este dossiê
 
