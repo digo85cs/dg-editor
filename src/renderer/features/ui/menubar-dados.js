@@ -55,6 +55,7 @@ export const MENUS_BARRA = {
     { id: 'auditar', label: 'Auto auditoria' },
     { id: 'regras-projeto', label: 'Regras do projeto (.dgrules)' },
     { sep: true },
+    { id: 'estudio-midia', label: 'Estúdio de mídia' },
     { id: 'navegador', label: 'Navegador embutido', accel: 'Ctrl+Shift+N' }
   ],
   ajuda: [{ id: 'sobre', label: 'Sobre o DG Editor' }]

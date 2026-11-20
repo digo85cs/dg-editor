@@ -563,6 +563,15 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
       if (sel.empty) return ''
       return view.state.doc.sliceString(sel.from, sel.to)
     },
+    inserirTexto: (texto) => {
+      const t = String(texto || '')
+      if (!t) return
+      const pos = view.state.selection.main.head
+      view.dispatch({
+        changes: { from: pos, insert: t },
+        selection: { anchor: pos + t.length }
+      })
+    },
     isDirty: () => view.state.doc.toString() !== salvo,
     setSalvo: (texto) => {
       salvo = paraDocumento(texto)

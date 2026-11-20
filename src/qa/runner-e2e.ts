@@ -183,7 +183,15 @@ export async function executarSuiteE2e(
     })
   } finally {
     try {
-      await app?.close()
+      await Promise.race([
+        app?.close(),
+        new Promise((r) => setTimeout(r, 10000))
+      ])
+    } catch {
+      /* */
+    }
+    try {
+      app?.process()?.kill()
     } catch {
       /* */
     }

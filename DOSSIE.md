@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 19:32:23** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.19** · branch `integra-13-11` · último commit: 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
-> Alterações locais não commitadas: 4 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 20:13:47** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.20** · branch `integra-13-11` · último commit: 4728fb7 2026-11-20 chore: v0.9.19 — custo diario + gitignore midias + dossie
+> Alterações locais não commitadas: 18 arquivo(s).
 
 ## 1. O que é
 
@@ -338,6 +338,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 4728fb7 2026-11-20 chore: v0.9.19 — custo diario + gitignore midias + dossie
 - 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
 - 0d2fc3e 2026-11-20 chore: dossie v0.9.18
 - 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
@@ -347,7 +348,6 @@ Utilitários locais relevantes:
 - f308c53 2026-11-20 fix(main): elimina requires relativos quebrados no bundle empacotado
 - dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
 - 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
-- 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
 
 ## 16. Como atualizar este dossiê
 

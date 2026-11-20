@@ -9,6 +9,7 @@ import { focarRegiao, focarPainelIa } from '../layout/panes.js'
 import { alternarTerminalNoBloco3 } from '../layout/paineis.js'
 import { desktopPermitido, pedirPermissaoDesktop } from '../arquivos/desktop-vault.js'
 import { abrirNavegadorNoBloco3 } from './activity-browser.js'
+import { executarComandoLocal } from '../../comandos.js'
 
 export function ligarAtalhosTeclado() {
   document.addEventListener(
@@ -82,6 +83,11 @@ export function ligarAtalhosTeclado() {
       if ((e.ctrlKey || e.metaKey) && e.key === '`') {
         e.preventDefault()
         alternarTerminalNoBloco3()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault()
+        executarComandoLocal('colar-markdown')
+        return
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()

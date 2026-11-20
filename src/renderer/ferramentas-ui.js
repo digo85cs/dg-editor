@@ -1,5 +1,6 @@
 /** Painel das cinco ferramentas, ligado so ao que o DG Editor ja executa. */
 import { pastasPermitidas } from './features/arquivos/index.js'
+import { pintarMidia } from './midia-ui.js'
 import {
   blocoFerramenta as bloco,
   formCriarFerramenta as formCriar,
@@ -19,7 +20,8 @@ export function ligarFerramentas(pastaFn) {
     artefatos: 'Artefatos',
     skills: 'Skills',
     conectores: 'Conectores',
-    memoria: 'Memória'
+    memoria: 'Memória',
+    midia: 'Estúdio de mídia'
   }
 
   function pasta() {
@@ -47,6 +49,7 @@ export function ligarFerramentas(pastaFn) {
     else if (id === 'skills') await pintarSkills(raiz)
     else if (id === 'conectores') await pintarConectores()
     else if (id === 'memoria') await pintarMemoria(raiz)
+    else if (id === 'midia') await pintarMidia(corpo, raiz)
   }
 
   function fechar() {
@@ -591,4 +594,8 @@ export function ligarFerramentas(pastaFn) {
     void abrir(btn.dataset.tool)
   })
   document.getElementById('tool-voltar')?.addEventListener('click', fechar)
+
+  // Atalhos para menu, paleta de comandos e agente abrirem uma ferramenta.
+  window.dgAbrirFerramenta = (id) => abrir(String(id || ''))
+  window.dgEstudioMidia = () => abrir('midia')
 }

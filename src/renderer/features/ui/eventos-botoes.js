@@ -46,6 +46,16 @@ export function ligarEventosBotoes() {
   $('btn-desktop-use')?.addEventListener('click', () => pedirPermissaoDesktop())
   $('btn-open-vault')?.addEventListener('click', () => void abrirVault())
   $('btn-close-vault')?.addEventListener('click', () => void fecharVault())
+  $('btn-vault-grafo')?.addEventListener('click', () =>
+    void import('../../grafo-vault.js').then((m) =>
+      m.abrirGrafoVault({ abrirNota: (p) => void import('../editor/abas-core.js').then((a) => a.abrirArquivoNaAba(p)) })
+    )
+  )
+  $('btn-mapa-mental')?.addEventListener('click', () =>
+    void import('../../mapa-mental.js').then((m) =>
+      m.abrirMapaMental({ raiz: state.pastaAtual || state.vaultRaiz || '' })
+    )
+  )
   $('md-preview')?.addEventListener('click', (ev) => {
     const a = ev.target?.closest?.('a.wiki-link')
     if (!a) return

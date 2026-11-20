@@ -1,6 +1,6 @@
 # Radar Diario — DG Editor
 
-Data: 2026-11-20T21:58:37.271Z
+Data: 2026-11-20T22:37:16.575Z
 Provider usado: cloudflare-workers-ai(cache)
 Custo estimado total: $0.000000 USD
 
@@ -240,4 +240,4 @@ Ordenadas por impacto. Cada item entra em modo plan e exige aprovacao do usuario
 5. Mapear MCP servers uteis e expor via IPC do DG Editor
 
 ---
-*Gerado pelo Radar Diario do DG Editor — 2026-11-20T21:58:37.271Z*
+*Gerado pelo Radar Diario do DG Editor — 2026-11-20T22:37:16.575Z*

@@ -34,11 +34,13 @@ import {
 import { abrirPasta } from '../arquivos/pastas-crud.js'
 import { abrirVault, fecharVault } from '../arquivos/desktop-vault.js'
 import { pastasPermitidas } from '../arquivos/index.js'
-import { salvarArquivoAtivo, fecharAba } from '../editor/abas-core.js'
+import { salvarArquivoAtivo, fecharAba, abrirArquivoNaAba } from '../editor/abas-core.js'
 import { formatarDocumentoAtivo } from '../editor/abas-ui.js'
 import { pedirOpenClawUi } from '../editor/diff-pendentes.js'
 import { abrirOrientadorPrompt } from '../chat/historico-orientador.js'
 import { renderizarChat } from '../chat/chat-core.js'
+import { mostrarToast } from './toast.js'
+import { anunciar } from './live-region.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -68,6 +70,28 @@ export function aplicarTemaLocal(tema) {
 
 export async function carregarTema() {
   return _carregarTema(deps.getEditor())
+}
+
+async function colarComoMarkdown() {
+  try {
+    const r = await window.api.invoke('clipboard:colar-markdown')
+    if (!r?.ok) {
+      mostrarToast(r?.erro || 'Área de transferência vazia', 'erro')
+      return
+    }
+    const editorAtivo = $('center-pane-editor')?.classList.contains('active')
+    const ed = deps.getEditor?.()
+    if (editorAtivo && ed?.inserirTexto && state.abaAtiva) {
+      ed.inserirTexto(r.markdown)
+      mostrarToast('Markdown colado · ' + r.caracteres + ' caracteres', 'ok')
+      anunciar('Conteúdo colado como Markdown no editor')
+      return
+    }
+    const { abrirColarMarkdown } = await import('../../colar-markdown.js')
+    abrirColarMarkdown(r.markdown, r.origem)
+  } catch (e) {
+    mostrarToast('Falha ao colar Markdown: ' + String(e), 'erro')
+  }
 }
 
 export function bootstrapComandos() {
@@ -132,6 +156,59 @@ export function bootstrapComandos() {
       titulo: 'Navegador embutido',
       atalho: 'Ctrl+Shift+N',
       fn: () => deps.abrirNavegadorNoBloco3()
+    },
+    {
+      id: 'estudio-midia',
+      titulo: 'Estúdio de mídia',
+      fn: () => window.dgEstudioMidia?.()
+    },
+    {
+      id: 'gravar-tela',
+      titulo: 'Gravar tela (janela ou monitor)',
+      fn: () =>
+        void import('../../gravador.js').then((m) =>
+          m.abrirGravador({ raiz: state.pastaAtual || '' })
+        )
+    },
+    {
+      id: 'receber-lan',
+      titulo: 'Receber arquivos do celular (LAN)',
+      fn: () =>
+        void import('../../compartilhar.js').then((m) =>
+          m.abrirCompartilhamento({ raiz: state.pastaAtual || '' })
+        )
+    },
+    {
+      id: 'reversa',
+      titulo: 'Engenharia reversa local',
+      fn: () =>
+        void import('../../reversa.js').then((m) =>
+          m.abrirReversa({ raiz: state.pastaAtual || '' })
+        )
+    },
+    {
+      id: 'grafo-vault',
+      titulo: 'Grafo do vault',
+      fn: () =>
+        void import('../../grafo-vault.js').then((m) =>
+          m.abrirGrafoVault({
+            abrirNota: (p) => void abrirArquivoNaAba(p)
+          })
+        )
+    },
+    {
+      id: 'mapa-mental',
+      titulo: 'Mapa mental',
+      fn: () =>
+        void import('../../mapa-mental.js').then((m) =>
+          m.abrirMapaMental({ raiz: state.pastaAtual || '' })
+        )
+    },
+    {
+      id: 'colar-markdown',
+      titulo: 'Colar como Markdown',
+      atalho: 'Ctrl+Shift+V',
+      fn: () => void colarComoMarkdown()
     },
     {
       id: 'adapta-copiar',
