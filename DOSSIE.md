@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 08:57:03** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.6** · branch `integra-13-11` · último commit: e6e349d 2026-11-20 fix(chat): injeta identidade real do DG Editor nos system prompts
+> Gerado automaticamente em **20/11/2026, 09:05:40** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.7** · branch `integra-13-11` · último commit: 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
+- 3fd981e 2026-11-20 chore: dossiê v0.9.6
 - e6e349d 2026-11-20 fix(chat): injeta identidade real do DG Editor nos system prompts
 - 0766362 2026-11-20 chore: dossiê v0.9.5
 - a724c5b 2026-11-20 fix(chat): forca pt-BR em visao, agente e chat mesmo com pedido/conteudo em outro idioma
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 85b4584 2026-11-20 chore: dossiê v0.9.3
 - c7eca17 2026-11-20 feat(agent): interpretacao-acao-validacao para todo pedido do chat
 - b64dac2 2026-11-20 chore: dossiê v0.9.2
-- 41af939 2026-11-20 fix(agent): forca execucao com tools quando modelo responde prosa p/ pedido de acao
-- 5c26022 2026-11-20 chore: dossiê v0.9.1
 
 ## 16. Como atualizar este dossiê
 
