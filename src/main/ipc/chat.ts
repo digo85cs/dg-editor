@@ -219,34 +219,24 @@ async function executarChatSend(
     dglog('[chat:comando] erro: ' + String(e));
   }
 
-  // === DETECAO DE ANEXOS DE IMAGEM (sem suporte a visão) ===
+  // === ANEXOS DE IMAGEM: interpretacao por modelo de visao (qwen2.5vl local / Gemini) ===
   const options = opts && typeof opts === 'object' && !Array.isArray(opts)
     ? opts as Record<string, unknown>
     : {};
+  const imagensAnexo: Array<{ nome: string; tipo: string; data: string }> = [];
   try {
     const anexosBruto = (options as Record<string, unknown>)?.anexos;
     if (Array.isArray(anexosBruto)) {
       const EXT_IMAGEM = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico']);
-      const imagens = anexosBruto.filter((a: unknown) => {
-        if (!a || typeof a !== 'object') return false;
-        const nome = String((a as Record<string, unknown>).nome || '');
+      for (const a of anexosBruto) {
+        if (!a || typeof a !== 'object') continue;
+        const nome = String((a as Record<string, unknown>).nome || 'imagem');
         const tipo = String((a as Record<string, unknown>).tipo || '');
+        const data = String((a as Record<string, unknown>).data || '');
         const ext = nome.includes('.') ? nome.split('.').pop() || '' : '';
-        return EXT_IMAGEM.has(ext.toLowerCase()) || /^image\//i.test(tipo);
-      });
-      if (imagens.length > 0) {
-        const lista = imagens.map((a: Record<string, unknown>) => String(a.nome || 'imagem')).join(', ');
-        const msgImagem = {
-          role: 'assistant' as const,
-          content:
-            'O DG Editor nao suporta analise de imagens (visao nao disponível no modelo local). ' +
-            'Anexo(s) nao processado(s): ' + lista +
-            '. Descreva o problema em texto (o que a imagem mostra, erro, codigo ou comportamento) que eu tento resolver.',
-          at: Date.now(),
-          provider: 'erro'
-        };
-        appendChat(rootOk, msgImagem);
-        return { ok: false, message: msgImagem };
+        if ((EXT_IMAGEM.has(ext.toLowerCase()) || /^image\//i.test(tipo)) && data) {
+          imagensAnexo.push({ nome, tipo: tipo || 'image/png', data });
+        }
       }
     }
   } catch {
@@ -521,7 +511,39 @@ async function executarChatSend(
     }
     if (modoValido === 'ask') context += '\nMODO ASK: explique e responda sem propor alteracoes de arquivos.\n';
     contextoUso = context + '\n' + textoPedido;
-   
+
+    // === VISAO: imagem anexada → modelo VL interpreta conforme o pedido ===
+    // Pedido so de leitura/pergunta sobre a imagem responde direto pelo VL.
+    // Pedido de acao injeta a interpretacao no contexto e o agente executa com tools.
+    if (imagensAnexo.length > 0) {
+      try {
+        const { interpretarImagens } = await import('../brain/visao');
+        const visao = await interpretarImagens(imagensAnexo, textoPedido);
+        const RE_VISAO_SO =
+          /o que|descreva|descreve|leia|identifique|qual|conte|traduza|resuma|explique|mostre|o que tem|what|describe|read|transcreva|legenda/i;
+        const RE_ACAO_VISAO =
+          /\b(implement|corrig|fix|editar|edit|refator|criar|adicionar|atualiz|upgrade|instal|configur|execut|fa[cç]a|faca|rode|run|deploy|escrev|remov|delete|migra|test|teste|gera|gerar|transform|converta|mude|troque|ajust|melhor|otimiz|corrija)/i;
+        const soPergunta =
+          RE_VISAO_SO.test(textoPedido) && !RE_ACAO_VISAO.test(textoPedido) && !RE_PEDIDO_MIDIA.test(textoPedido);
+        if (soPergunta) {
+          persistirUsuario();
+          return await publicar(visao.texto, visao.fonte, { visao: true });
+        }
+        context +=
+          '\n\n### IMAGEM ANEXADA (interpretacao do modelo de visao)\n' +
+          visao.texto.slice(0, 6000) +
+          '\nUse essa interpretacao para agir no projeto. Se precisar de mais detalhe, diga o que falta.';
+        contextoUso = context + '\n' + textoPedido;
+      } catch (eVisao) {
+        dglog('[chat] visao falhou: ' + String(eVisao));
+        context +=
+          '\n\n### IMAGEM ANEXADA\n' +
+          imagensAnexo.map((i) => i.nome).join(', ') +
+          ' — interpretacao de visao indisponivel (' + String(eVisao).slice(0, 160) + '). ' +
+          'Peca ao usuario para descrever em texto ou instale qwen2.5vl no Ollama.';
+      }
+    }
+
     const rodarAgente = async (idAgente: string, tarefa: 'chat' | 'codigo', signal?: AbortSignal) => {
       process.env.DG_ROOT = rootOk;
       if (signal?.aborted) throw new Error('cancelado pelo usuario');

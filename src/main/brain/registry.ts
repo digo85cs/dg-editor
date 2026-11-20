@@ -450,6 +450,15 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
     }),
     cfgCursorCli(),
     cfg({
+      id: 'ollama:qwen2.5-coder:14b',
+      tipo: 'local',
+      formato: 'ollama',
+      modelo: 'qwen2.5-coder:14b',
+      baseUrl: OLLAMA_BASE,
+      numPredict: 1024,
+      timeoutMs: 300_000
+    }),
+    cfg({
       id: 'ollama:qwen2.5-coder:7b',
       tipo: 'local',
       formato: 'ollama',
