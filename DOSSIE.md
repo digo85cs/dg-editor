@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 10:25:57** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.10** · branch `integra-13-11` · último commit: 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
+> Gerado automaticamente em **20/11/2026, 10:39:45** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.11** · branch `integra-13-11` · último commit: 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
+- 8016bbb 2026-11-20 chore: dossiê v0.9.10
 - 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
 - 7f9ca8a 2026-11-20 chore: dossiê v0.9.9
 - da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 6f4cc2c 2026-11-20 chore: dossiê v0.9.7
 - 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
 - 3fd981e 2026-11-20 chore: dossiê v0.9.6
-- e6e349d 2026-11-20 fix(chat): injeta identidade real do DG Editor nos system prompts
-- 0766362 2026-11-20 chore: dossiê v0.9.5
 
 ## 16. Como atualizar este dossiê
 
