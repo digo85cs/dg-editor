@@ -213,6 +213,22 @@ async function main() {
   const shellTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'shell-detect.ts'), 'utf-8')
   const indexTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'index.ts'), 'utf-8')
   const audTs = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'auto-auditoria.ts'), 'utf-8')
+  // Renderer foi modularizado: padroes de UI podem estar em app.js OU em
+  // src/renderer/features/**. Concatenar tudo para checks de presenca.
+  const rendererAllSrc = () => {
+    const dir = pathT.join(rootT, 'src', 'renderer')
+    let out = ''
+    const walk = (d) => {
+      for (const f of fsT.readdirSync(d)) {
+        const p = pathT.join(d, f)
+        const st = fsT.statSync(p)
+        if (st.isDirectory()) walk(p)
+        else if (/\.(js|ts)$/.test(f)) out += fsT.readFileSync(p, 'utf-8') + '\n'
+      }
+    }
+    walk(dir)
+    return out
+  }
 
   assert(
     'terminal.js nao recria xterm ao trocar de aba',
@@ -656,7 +672,7 @@ async function main() {
   {
     const av27 = pathT.join(rootT, 'src', 'main', 'brain', 'avaliacao.ts')
     const main27 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'brain.ts'), 'utf-8')
-    const app27 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const app27 = rendererAllSrc()
     assert('avaliacao.ts existe', fsT.existsSync(av27))
     assert('brain:avaliar handler existe', /ipcMain\.handle\(['"]brain:avaliar['"]/.test(main27))
     assert('nota < 6 dispara toast', /nota < 6/.test(app27) && /abaixo do esperado/.test(app27))
@@ -682,9 +698,9 @@ async function main() {
   // ---------- 29. Animacoes do chat (PRE-A) ----------
   section('29. Animacoes do chat')
   {
-    const chat29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'chat.js'), 'utf-8')
+    const chat29 = rendererAllSrc()
     const css29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'styles.css'), 'utf-8')
-    const app29 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8')
+    const app29 = rendererAllSrc()
     const rend29 = chat29 + app29 + css29
     assert('dg-loading-bubble existe no renderer', /dg-loading-bubble/.test(rend29))
     assert('keyframes dos 3 dots existem', /dg-dot-pulse|dot-pulse/.test(css29))
@@ -711,10 +727,7 @@ async function main() {
   // ---------- 30. Analise: primeiro clique e agente ----------
   section('30. Analise: primeiro clique e agente')
   {
-    const app30 =
-      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'app.js'), 'utf-8') +
-      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'analise', 'acoes.js'), 'utf-8') +
-      fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'features', 'arquivos', 'contexto-pasta.js'), 'utf-8')
+    const app30 = rendererAllSrc()
     const html30 = fsT.readFileSync(pathT.join(rootT, 'src', 'renderer', 'index.html'), 'utf-8')
     const main30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'ipc', 'analise.ts'), 'utf-8')
     const hib30 = fsT.readFileSync(pathT.join(rootT, 'src', 'main', 'brain', 'hibrido.ts'), 'utf-8')

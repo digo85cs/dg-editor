@@ -22,7 +22,25 @@ const TOOLS = [
   ['midia_vozes_listar', {}],
   ['midia_musicas', {}],
   ['conector_listar', {}],
-  ['resultado_avaliar', { pedido: 'diga ok', textoFinal: 'ok', criterios: ['respondeu'] }]
+  ['resultado_avaliar', { pedido: 'diga ok', textoFinal: 'ok', criterios: ['respondeu'] }],
+  // sem args obrigatorios, somente leitura/diagnostico (nada que escreva, instale ou gaste)
+  ['git_diff', {}],
+  ['projeto_smoke', {}],
+  ['midia_custo', {}],
+  ['midia_comfyui_status', {}],
+  ['midia_memes_listar', {}],
+  ['midia_hardware', {}],
+  ['midia_atualizacoes', {}],
+  ['midia_musicas_livres', {}],
+  ['imagens_iso', {}],
+  ['notas_mapa_mental', {}],
+  ['tela_gravacoes', {}],
+  ['receber_lan', {}],
+  ['reversa_status', {}],
+  ['apps_status', {}],
+  ['qualidade_checar', {}],
+  ['testes_rodar', {}],
+  ['dossie_snapshot', {}]
 ]
 
 let nextId = 1
@@ -78,6 +96,33 @@ const notificacao = (method, params) => {
   const tools = list.result?.tools || []
   console.log(`tools/list: ${tools.length} tools`)
 
+  // Fase 2: prova de alcance — tools COM args obrigatorios recebem {} e devem
+  // falhar na validacao zod (prova que o dispatch existe); "tool desconhecida"
+  // = bug. Tools sem obrigatorios so rodam se estiverem na lista segura acima.
+  const schemaPorNome = new Map(tools.map(t => [t.name, t.inputSchema || {}]))
+  const nomesValidacao = tools
+    .map(t => t.name)
+    .filter(n => {
+      const req = schemaPorNome.get(n)?.required || []
+      return req.length > 0 && !TOOLS.some(([tn]) => tn === n)
+    })
+  console.log(`\n== fase validacao: ${nomesValidacao.length} tools com args obrigatorios ==`)
+  let alcanceOk = 0
+  const inalcancaveis = []
+  for (const name of nomesValidacao) {
+    try {
+      const r = await enviar('tools/call', { name, arguments: {} })
+      const txt = JSON.stringify(r.result || r.error || '')
+      if (/tool desconhecida/i.test(txt)) { inalcancaveis.push(name); console.log(`  [ERRO] ${name}: tool desconhecida`) }
+      else { alcanceOk++; }
+    } catch (e) {
+      if (/tool desconhecida/i.test(e.message)) { inalcancaveis.push(name); console.log(`  [ERRO] ${name}: ${e.message}`) }
+      else alcanceOk++
+    }
+  }
+  console.log(`alcance: ${alcanceOk}/${nomesValidacao.length} respondem (validacao ou execucao)`)
+  if (inalcancaveis.length) console.log('INALCANCAVEIS:', inalcancaveis.join(', '))
+
   let ok = 0
   const falhas = []
   for (const [name, args] of TOOLS) {
@@ -94,7 +139,12 @@ const notificacao = (method, params) => {
       console.log(`  [ERRO] ${name}: ${e.message}`)
     }
   }
-  console.log(`\nRESUMO: ${ok}/${TOOLS.length} tools OK` + (falhas.length ? ` | falhas: ${falhas.join(', ')}` : ''))
+  const semObrigatorios = tools
+    .map(t => t.name)
+    .filter(n => !(schemaPorNome.get(n)?.required || []).length && !TOOLS.some(([tn]) => tn === n))
+  console.log(`tools sem args obrigatorios fora da lista segura (nao chamadas): ${semObrigatorios.length}`)
+  if (semObrigatorios.length) console.log('  ' + semObrigatorios.join(', '))
+  console.log(`\nRESUMO: ${ok}/${TOOLS.length} tools OK, alcance ${alcanceOk}/${nomesValidacao.length}` + (falhas.length || inalcancaveis.length ? ` | falhas: ${falhas.concat(inalcancaveis).join(', ')}` : ''))
   proc.kill()
   process.exit(falhas.length ? 1 : 0)
 })().catch((e) => { console.error('fatal:', e); proc.kill(); process.exit(1) })

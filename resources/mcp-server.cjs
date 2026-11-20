@@ -252615,17 +252615,29 @@ function trunc(s, n = 4e3) {
   const t = String(s || "");
   return t.length > n ? t.slice(0, n) + "\n\u2026" : t;
 }
+function candidatosCliJs(cmd) {
+  const cli = SHIM_CLI[cmd.toLowerCase()];
+  if (!cli)
+    return [];
+  const dirs = [];
+  const base = (0, import_path22.dirname)(process.execPath);
+  dirs.push((0, import_path22.join)(base, "node_modules", "npm", "bin"));
+  if (process.env.APPDATA)
+    dirs.push((0, import_path22.join)(process.env.APPDATA, "npm", "node_modules", "npm", "bin"));
+  if (process.env.NVM_SYMLINK || process.env.NVM_HOME) {
+    dirs.push((0, import_path22.join)(process.env.NVM_SYMLINK || process.env.NVM_HOME || "", "node_modules", "npm", "bin"));
+  }
+  return dirs.map((d) => (0, import_path22.join)(d, cli)).filter((p) => (0, import_fs21.existsSync)(p));
+}
+function nodeBin() {
+  const exe = process.execPath.toLowerCase();
+  if (/electron|dg editor/.test(exe))
+    return null;
+  return process.execPath;
+}
 async function run(cmd, args, cwd, timeoutMs = 6e4) {
-  try {
-    const r = await execFileAsync2(cmd, args, {
-      cwd,
-      timeout: timeoutMs,
-      windowsHide: true,
-      maxBuffer: 2 * 1024 * 1024,
-      encoding: "utf8"
-    });
-    return { ok: true, code: 0, stdout: String(r.stdout || ""), stderr: String(r.stderr || "") };
-  } catch (e) {
+  const opts = { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 2 * 1024 * 1024, encoding: "utf8" };
+  const falha2 = (e) => {
     const err = e;
     return {
       ok: false,
@@ -252633,6 +252645,33 @@ async function run(cmd, args, cwd, timeoutMs = 6e4) {
       stdout: String(err.stdout || ""),
       stderr: String(err.stderr || err.message || e)
     };
+  };
+  if (process.platform === "win32" && WIN_SHIMS.test(cmd)) {
+    const cliJs = candidatosCliJs(cmd)[0];
+    const node2 = nodeBin();
+    if (cliJs && node2) {
+      try {
+        const r = await execFileAsync2(node2, [cliJs, ...args], opts);
+        return { ok: true, code: 0, stdout: String(r.stdout || ""), stderr: String(r.stderr || "") };
+      } catch (e) {
+        return falha2(e);
+      }
+    }
+    const cmdAbs = (0, import_path22.join)((0, import_path22.dirname)(process.execPath), cmd + ".cmd");
+    const alvo = (0, import_fs21.existsSync)(cmdAbs) ? cmdAbs : cmd + ".cmd";
+    const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+    try {
+      const r = await execP([q(alvo), ...args.map(q)].join(" "), opts);
+      return { ok: true, code: 0, stdout: String(r.stdout || ""), stderr: String(r.stderr || "") };
+    } catch (e) {
+      return falha2(e);
+    }
+  }
+  try {
+    const r = await execFileAsync2(cmd, args, opts);
+    return { ok: true, code: 0, stdout: String(r.stdout || ""), stderr: String(r.stderr || "") };
+  } catch (e) {
+    return falha2(e);
   }
 }
 async function gitStatus(raiz) {
@@ -252925,7 +252964,7 @@ async function codigoEditar(raiz, arquivo2, ancora, novo, verificar = true) {
   }
   return { ok: true, arquivo: arquivo2, alterado: true };
 }
-var import_fs21, import_path22, import_child_process6, import_util10, execFileAsync2;
+var import_fs21, import_path22, import_child_process6, import_util10, execP, execFileAsync2, WIN_SHIMS, SHIM_CLI;
 var init_autonomia_tools = __esm({
   "src/main/autonomia-tools.ts"() {
     "use strict";
@@ -252933,7 +252972,10 @@ var init_autonomia_tools = __esm({
     import_path22 = require("path");
     import_child_process6 = require("child_process");
     import_util10 = require("util");
+    execP = (0, import_util10.promisify)(import_child_process6.exec);
     execFileAsync2 = (0, import_util10.promisify)(import_child_process6.execFile);
+    WIN_SHIMS = /^(npm|npx|pnpm|yarn|bun)$/i;
+    SHIM_CLI = { npm: "npm-cli.js", npx: "npx-cli.js" };
   }
 });
 
@@ -255154,10 +255196,10 @@ async function rodarLoopComProvider(raiz, pergunta, cfg2, tarefa, tools, systemE
           bloqueio = nome + " bloqueado (permitirMcp=false)";
         if (!bloqueio) {
           try {
-            const { readFileSync: readFileSync42, existsSync: existsSync58 } = await import("fs");
+            const { readFileSync: readFileSync42, existsSync: existsSync59 } = await import("fs");
             const { join: join58 } = await import("path");
             const arqBloq = join58(raiz, ".dg-editor", "tools-bloqueadas.json");
-            if (existsSync58(arqBloq)) {
+            if (existsSync59(arqBloq)) {
               const j = JSON.parse(readFileSync42(arqBloq, "utf8"));
               const padroes = Array.isArray(j.padroes) ? j.padroes.map(String) : [];
               const alvo = String(nome).toLowerCase();
@@ -272808,6 +272850,23 @@ async function executeOllamaTool(name, args, root, runtime = {}) {
 
 // src/main/mcp/server.ts
 var execFileAsync4 = (0, import_node_util.promisify)(import_node_child_process11.execFile);
+var execAsync = (0, import_node_util.promisify)(import_node_child_process11.exec);
+var SHIM_CLI_JS = { npm: "npm-cli.js", npx: "npx-cli.js" };
+function resolverCliJsShim(cmd) {
+  const cli = SHIM_CLI_JS[cmd.toLowerCase()];
+  if (!cli || /electron|dg editor/i.test(process.execPath))
+    return null;
+  const dirs = [
+    (0, import_node_path32.join)((0, import_node_path32.dirname)(process.execPath), "node_modules", "npm", "bin"),
+    process.env.APPDATA ? (0, import_node_path32.join)(process.env.APPDATA, "npm", "node_modules", "npm", "bin") : ""
+  ].filter(Boolean);
+  for (const d of dirs) {
+    const p = (0, import_node_path32.join)(d, cli);
+    if ((0, import_node_fs44.existsSync)(p))
+      return p;
+  }
+  return null;
+}
 function raizAtual() {
   const env = process.env.DG_ROOT;
   if (env && env.trim())
@@ -274566,15 +274625,46 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
           isError: true
         };
       }
+      const ehShimWin = process.platform === "win32" && /^(npm|npx|pnpm|yarn|bun)$/i.test(cmd);
+      const cliJsShim = ehShimWin ? resolverCliJsShim(cmd) : null;
       try {
-        const { stdout, stderr } = await execFileAsync4(cmd, argv, {
-          cwd: RAIZ2,
-          timeout: 2e4,
-          windowsHide: true,
-          maxBuffer: 1024 * 1024,
-          shell: false,
-          encoding: "utf8"
-        });
+        let stdout = "";
+        let stderr = "";
+        if (cliJsShim) {
+          const r = await execFileAsync4(process.execPath, [cliJsShim, ...argv], {
+            cwd: RAIZ2,
+            timeout: 2e4,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            encoding: "utf8"
+          });
+          stdout = String(r.stdout || "");
+          stderr = String(r.stderr || "");
+        } else if (ehShimWin) {
+          const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+          const alvo = (0, import_node_path32.join)((0, import_node_path32.dirname)(process.execPath), cmd + ".cmd");
+          const linha2 = [q((0, import_node_fs44.existsSync)(alvo) ? alvo : cmd + ".cmd"), ...argv.map(q)].join(" ");
+          const r = await execAsync(linha2, {
+            cwd: RAIZ2,
+            timeout: 2e4,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            encoding: "utf8"
+          });
+          stdout = String(r.stdout || "");
+          stderr = String(r.stderr || "");
+        } else {
+          const r = await execFileAsync4(cmd, argv, {
+            cwd: RAIZ2,
+            timeout: 2e4,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            shell: false,
+            encoding: "utf8"
+          });
+          stdout = String(r.stdout || "");
+          stderr = String(r.stderr || "");
+        }
         const texto = (String(stdout || "") + (stderr ? "\n" + String(stderr) : "")).slice(0, 12e3);
         return {
           content: [{ type: "text", text: JSON.stringify({ ok: true, texto }, null, 2) }]

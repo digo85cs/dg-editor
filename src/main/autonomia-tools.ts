@@ -2,9 +2,11 @@
  * Tools de autonomia v1: git, testes, qualidade, smoke, avaliacao de resultado.
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
-import { join, resolve } from 'path'
-import { execFile } from 'child_process'
+import { dirname, join, resolve } from 'path'
+import { exec, execFile } from 'child_process'
 import { promisify } from 'util'
+
+const execP = promisify(exec)
 
 const execFileAsync = promisify(execFile)
 
@@ -13,22 +15,42 @@ function trunc(s: string, n = 4000): string {
   return t.length > n ? t.slice(0, n) + '\n…' : t
 }
 
+// No Windows, npm/npx sao shims .cmd: execFile sem shell nao resolve o nome
+// puro e com .cmd o Node >=18.20 exige shell (EINVAL). Alem disso, invocar
+// "npm.cmd" por nome faz %~dp0 expandir para o CWD (quirk do cmd) e o shim
+// procura node_modules/npm no projeto errado. Solucao: chamar o npm-cli.js
+// real via node quando possivel; senao, o .cmd por caminho absoluto.
+const WIN_SHIMS = /^(npm|npx|pnpm|yarn|bun)$/i
+const SHIM_CLI: Record<string, string> = { npm: 'npm-cli.js', npx: 'npx-cli.js' }
+
+function candidatosCliJs(cmd: string): string[] {
+  const cli = SHIM_CLI[cmd.toLowerCase()]
+  if (!cli) return []
+  const dirs: string[] = []
+  const base = dirname(process.execPath)
+  dirs.push(join(base, 'node_modules', 'npm', 'bin'))
+  if (process.env.APPDATA) dirs.push(join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin'))
+  if (process.env.NVM_SYMLINK || process.env.NVM_HOME) {
+    dirs.push(join(process.env.NVM_SYMLINK || process.env.NVM_HOME || '', 'node_modules', 'npm', 'bin'))
+  }
+  return dirs.map((d) => join(d, cli)).filter((p) => existsSync(p))
+}
+
+function nodeBin(): string | null {
+  const exe = process.execPath.toLowerCase()
+  // Electron nao roda scripts node diretamente — precisa de node.exe real.
+  if (/electron|dg editor/.test(exe)) return null
+  return process.execPath
+}
+
 async function run(
   cmd: string,
   args: string[],
   cwd: string,
   timeoutMs = 60_000
 ): Promise<{ ok: boolean; code: number; stdout: string; stderr: string }> {
-  try {
-    const r = await execFileAsync(cmd, args, {
-      cwd,
-      timeout: timeoutMs,
-      windowsHide: true,
-      maxBuffer: 2 * 1024 * 1024,
-      encoding: 'utf8'
-    })
-    return { ok: true, code: 0, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') }
-  } catch (e: unknown) {
+  const opts = { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8' as const }
+  const falha = (e: unknown) => {
     const err = e as { code?: number; stdout?: string; stderr?: string; message?: string }
     return {
       ok: false,
@@ -36,6 +58,34 @@ async function run(
       stdout: String(err.stdout || ''),
       stderr: String(err.stderr || err.message || e)
     }
+  }
+  if (process.platform === 'win32' && WIN_SHIMS.test(cmd)) {
+    const cliJs = candidatosCliJs(cmd)[0]
+    const node = nodeBin()
+    if (cliJs && node) {
+      try {
+        const r = await execFileAsync(node, [cliJs, ...args], opts)
+        return { ok: true, code: 0, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') }
+      } catch (e) {
+        return falha(e)
+      }
+    }
+    // Fallback: .cmd por caminho absoluto (evita o quirk do %~dp0).
+    const cmdAbs = join(dirname(process.execPath), cmd + '.cmd')
+    const alvo = existsSync(cmdAbs) ? cmdAbs : cmd + '.cmd'
+    const q = (s: string) => '"' + String(s).replace(/"/g, '""') + '"'
+    try {
+      const r = await execP([q(alvo), ...args.map(q)].join(' '), opts)
+      return { ok: true, code: 0, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') }
+    } catch (e) {
+      return falha(e)
+    }
+  }
+  try {
+    const r = await execFileAsync(cmd, args, opts)
+    return { ok: true, code: 0, stdout: String(r.stdout || ''), stderr: String(r.stderr || '') }
+  } catch (e: unknown) {
+    return falha(e)
   }
 }
 

@@ -5,13 +5,32 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { promises as fs } from 'node:fs'
-import { execFile } from 'node:child_process'
+import { promises as fs, existsSync } from 'node:fs'
+import { exec, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { z } from 'zod'
 
 const execFileAsync = promisify(execFile)
+const execAsync = promisify(exec)
+
+// npm/npx no Windows: resolve o CLI JS real (node node_modules/npm/bin/npm-cli.js)
+// em vez de depender do shim .cmd — invocado por nome, o %~dp0 do cmd expande
+// para o CWD e o shim procura node_modules/npm no projeto errado.
+const SHIM_CLI_JS: Record<string, string> = { npm: 'npm-cli.js', npx: 'npx-cli.js' }
+function resolverCliJsShim(cmd: string): string | null {
+  const cli = SHIM_CLI_JS[cmd.toLowerCase()]
+  if (!cli || /electron|dg editor/i.test(process.execPath)) return null
+  const dirs = [
+    join(dirname(process.execPath), 'node_modules', 'npm', 'bin'),
+    process.env.APPDATA ? join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin') : ''
+  ].filter(Boolean)
+  for (const d of dirs) {
+    const p = join(d, cli)
+    if (existsSync(p)) return p
+  }
+  return null
+}
 import { gravarDossie, lerDossie, dossieSnapshot } from '../dossie'
 import { projectStateDir, resolverRaizProjeto, caminhoDentroDaRaiz } from '../paths'
 import { loadChat } from '../chatstore'
@@ -1863,15 +1882,50 @@ server.setRequestHandler(CallToolRequestSchema, async (req: { params: { name: st
           isError: true
         }
       }
+      // npm/npx sao shims .cmd no Windows — execFile sem shell nao resolve o
+      // nome puro e com .cmd o Node >=18.20 exige shell (EINVAL). Invocar por
+      // nome tambem faz %~dp0 expandir para o CWD e o shim procurar
+      // node_modules/npm no projeto errado. Solucao: npm-cli.js via node.
+      const ehShimWin = process.platform === 'win32' && /^(npm|npx|pnpm|yarn|bun)$/i.test(cmd)
+      const cliJsShim = ehShimWin ? resolverCliJsShim(cmd) : null
       try {
-        const { stdout, stderr } = await execFileAsync(cmd, argv, {
-          cwd: RAIZ,
-          timeout: 20000,
-          windowsHide: true,
-          maxBuffer: 1024 * 1024,
-          shell: false,
-          encoding: 'utf8'
-        })
+        let stdout = ''
+        let stderr = ''
+        if (cliJsShim) {
+          const r = await execFileAsync(process.execPath, [cliJsShim, ...argv], {
+            cwd: RAIZ,
+            timeout: 20000,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            encoding: 'utf8'
+          })
+          stdout = String(r.stdout || '')
+          stderr = String(r.stderr || '')
+        } else if (ehShimWin) {
+          const q = (s: string) => '"' + String(s).replace(/"/g, '""') + '"'
+          const alvo = join(dirname(process.execPath), cmd + '.cmd')
+          const linha = [q(existsSync(alvo) ? alvo : cmd + '.cmd'), ...argv.map(q)].join(' ')
+          const r = await execAsync(linha, {
+            cwd: RAIZ,
+            timeout: 20000,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            encoding: 'utf8'
+          })
+          stdout = String(r.stdout || '')
+          stderr = String(r.stderr || '')
+        } else {
+          const r = await execFileAsync(cmd, argv, {
+            cwd: RAIZ,
+            timeout: 20000,
+            windowsHide: true,
+            maxBuffer: 1024 * 1024,
+            shell: false,
+            encoding: 'utf8'
+          })
+          stdout = String(r.stdout || '')
+          stderr = String(r.stderr || '')
+        }
         const texto = (String(stdout || '') + (stderr ? '\n' + String(stderr) : '')).slice(0, 12000)
         return {
           content: [{ type: 'text', text: JSON.stringify({ ok: true, texto }, null, 2) }]
