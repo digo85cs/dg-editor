@@ -423,6 +423,31 @@ function sintetizarDeTools(passos: PassoAgente[], pedido: string): string {
         'Use disco_buscar com padrao partz|autopartz (raizes: OneDrive/CURSOR, dev, xampp) e complete os blocos.'
       )
     }
+    // Pedido vago/multi-parte: keywords do pedido raramente constam no
+    // conteudo dos arquivos. Em vez de beco sem saida, devolve o que foi
+    // executado + amostra real do que as tools encontraram.
+    const nomes = Array.from(
+      new Set(tools.map((t) => ('nome' in t && t.nome ? String(t.nome) : '')).filter(Boolean))
+    )
+    const amostras: string[] = []
+    let total = 0
+    for (const t of tools) {
+      const util = extrairTextoUtilTool(String(t.resultado || '')).trim()
+      if (!util) continue
+      const fatia = util.slice(0, 900)
+      if (total + fatia.length > 3000) break
+      amostras.push(fatia)
+      total += fatia.length
+    }
+    if (amostras.length) {
+      return (
+        'Executei estas verificacoes no projeto: ' +
+        nomes.join(', ') +
+        '.\n\n' +
+        amostras.join('\n---\n') +
+        '\n\nSe quiser, peca uma acao mais especifica (ex.: "adicione logs em X" ou "crie teste para Y") que eu aplico a mudanca.'
+      )
+    }
     return (
       'As tools rodaram, mas o resultado nao respondeu ao seu pedido: "' +
       String(pedido).slice(0, 160) +
