@@ -317,8 +317,17 @@ function pareceJsonTool(texto: string): boolean {
 
 /** Pedido que exige ACAO (editar/rodar/instalar), nao so explicacao. */
 function pedidoPedeAcao(pergunta: string): boolean {
+  const p = String(pergunta || '')
+  // Pergunta genuina ("como faco X?", "o que e Y?") nao e ordem de acao.
+  if (
+    /^\s*(como|o que|oque|por ?que|pq|qual|quais|explique|me (explica|diz|mostra|ensina)|what|how|why|explain)\b/i.test(
+      p
+    )
+  ) {
+    return false
+  }
   return /\b(implement|implementar|implementa|corrig|fix|editar|edit|refator|criar|adicionar|atualiz|upgrade|update|instal|install|configur|execut|fa[cç]a|faca|rode|run|deploy|escrev|write|remov|delete|migra|migrate|test|teste|gera|gerar)/i.test(
-    String(pergunta || '')
+    p
   )
 }
 
@@ -758,7 +767,11 @@ async function rodarLoopComProvider(
         continue
       }
       dglog('[agente] final apos ' + (i + 1) + ' iteracoes via ' + cfg.id)
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, r.content || '', passos)
+      // Pedido de acao sem NENHUMA tool rodada: prosa de conselho ("rode X",
+      // "voce pode...") nao e resposta — sintetiza erro honesto em vez de
+      // devolver tutorial generico que parece resultado.
+      const textoFinal = ehAcao && !jaUsouTool ? '' : r.content || ''
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos)
       return { ...fin, propostas: propostasAcc }
     }
 
