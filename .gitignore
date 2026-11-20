@@ -131,3 +131,4 @@ scripts/*.mjs
 !scripts/*.mjs.example
 .dg-editor/relatorios/
 .dg-editor/resposta-cache/
+.dg-editor/midias/

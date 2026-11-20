@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 19:00:54** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.18** · branch `integra-13-11` · último commit: 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
-> Alterações locais não commitadas: 1 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 19:32:23** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.19** · branch `integra-13-11` · último commit: 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **391**.
-- Canais expostos pelo preload: **376**.
+- Canais registrados no main: **392**.
+- Canais expostos pelo preload: **377**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -338,6 +338,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
+- 0d2fc3e 2026-11-20 chore: dossie v0.9.18
 - 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
 - 34d39e9 2026-11-20 fix(renderer): helper $ ausente em config-contas.js quebrava modais Config/Contas
 - bfb2beb 2026-11-20 chore: dossie v0.9.17
@@ -346,8 +348,6 @@ Utilitários locais relevantes:
 - dc2adf9 2026-11-20 feat(boot): logs de debug no index.ts (main process)
 - 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
 - 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
-- 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
-- c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
 
 ## 16. Como atualizar este dossiê
 
