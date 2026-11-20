@@ -175,7 +175,10 @@ Padrao Cursor (obrigatorio):
 7. Falso positivo (ex.: Windows Autopilot no lugar do projeto): descarte e continue a busca.
 8. Resposta final: curta, em portugues do Brasil, um bloco limpo (estilo Cursor), so o util.
 9. Tool falhou: diga o erro e tente alternativa no mesmo turno.
-10. NUNCA colocar nome do modelo (ollama:/qwen/…) no corpo da resposta.`
+10. NUNCA colocar nome do modelo (ollama:/qwen/…) no corpo da resposta.
+11. Todo pedido termina com ACAO executada (tool rodada, arquivo editado, comando executado) ou ERRO real reportado. Nunca entregue so orientacao ("voce pode rodar X") quando o usuario pediu para fazer.
+12. Pedido ambiguo: interprete a intencao mais provavel e aja; so pergunte quando faltar dado essencial insubstituivel.
+13. Apos agir, valide: rode o teste/build/check disponivel ou releia o arquivo alterado antes de responder.`
 
 /**
  * Modelos pequenos (3b) as vezes escrevem o tool_call como TEXTO em vez de
@@ -718,28 +721,33 @@ async function rodarLoopComProvider(
     }
 
     if (chamadas.length === 0) {
-      // Pedido de ACAO respondido com prosa (sem nenhuma tool): o modelo
-      // "conselhou" em vez de executar (ex.: "gem update rails"). Forca o
-      // loop a continuar com instrucao corretiva — estilo Devin/Cursor.
+      // Modelo respondeu prosa sem usar nenhuma tool. Pedido de ACAO tem
+      // nudge forte (ate 2x); qualquer outro pedido tem 1 nudge suave —
+      // o modelo decide se e duvida (responde direto) ou exige verificacao.
+      const ehAcao = pedidoPedeAcao(pergunta)
+      const maxNudges = ehAcao ? 2 : 1
       if (
         !jaUsouTool &&
         tools.length > 0 &&
-        pedidoPedeAcao(pergunta) &&
-        nudgesAcao < 2 &&
+        nudgesAcao < maxNudges &&
         i + 1 < maxIter
       ) {
         nudgesAcao++
-        dglog('[agente] resposta em prosa sem tools p/ pedido de acao — nudge ' + nudgesAcao)
+        dglog('[agente] prosa sem tools — nudge ' + nudgesAcao + (ehAcao ? ' (acao)' : ' (geral)'))
         if (r.content) {
           mensagens.push({ role: 'assistant', content: r.content })
         }
         mensagens.push({
           role: 'user',
-          content:
-            'O usuario pediu uma ACAO concreta, nao conselhos. ' +
-            'Execute AGORA com as tools disponiveis: leia o projeto, rode comandos, edite arquivos. ' +
-            'NAO repita orientacoes do tipo "voce pode rodar X" — faca voce mesmo e mostre o resultado. ' +
-            'Se algo nao for possivel, diga o erro real da tool.'
+          content: ehAcao
+            ? 'O usuario pediu uma ACAO concreta, nao conselhos. ' +
+              'Execute AGORA com as tools disponiveis: leia o projeto, rode comandos, edite arquivos. ' +
+              'NAO repita orientacoes do tipo "voce pode rodar X" — faca voce mesmo e mostre o resultado. ' +
+              'Depois de agir, valide (teste/build/check ou releitura do arquivo). ' +
+              'Se algo nao for possivel, diga o erro real da tool.'
+            : 'Verifique se o pedido exige acao ou checagem no projeto. ' +
+              'Se for so duvida conceitual, responda direto e encerre. ' +
+              'Se exigir agir/verificar, chame as tools agora — nao fique so na orientacao.'
         })
         emit({ tipo: 'status', texto: 'Forcando execucao com tools…', modelo: labelModelo })
         continue
