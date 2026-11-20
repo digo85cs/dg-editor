@@ -346,6 +346,18 @@ export function getQaArtifactsDir(raizProjeto?: string): string {
 // ============================================================================
 
 /**
+ * Diretorio de defaults empacotados no app (resources/dg-editor/<sub>).
+ * Usado quando o app esta instalado e a raiz resolvida (userData) nao tem
+ * .dg-editor/skills|agentes|regras — o pacote precisa levar os defaults.
+ */
+export function dirEmpacotado(sub: string): string | null {
+  const rp = (process as { resourcesPath?: string }).resourcesPath;
+  if (!rp || process.defaultApp) return null;
+  const p = join(rp, 'dg-editor', sub);
+  return existsSync(p) ? p : null;
+}
+
+/**
  * Caminho do diretorio de dados do usuario (appData)
  */
 export function getUserDataPath(): string {

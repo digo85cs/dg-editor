@@ -54,6 +54,13 @@ export async function setMcpHabilitado(v: boolean): Promise<{ ok: boolean; habil
 }
 
 function serverJs(): string {
+  // App empacotado: o servidor MCP vai em resources/mcp-server.cjs (bundle
+  // unico via esbuild). Em dev usa .dg-editor/bin compilado pelo tsc.
+  const rp = (process as { resourcesPath?: string }).resourcesPath
+  if (rp && !process.defaultApp) {
+    const empacotado = path.join(rp, 'mcp-server.cjs')
+    if (existsSync(empacotado)) return empacotado
+  }
   const raiz = resolverRaizProjeto()
   return path.join(raiz, '.dg-editor', 'bin', 'main', 'mcp', 'server.js')
 }

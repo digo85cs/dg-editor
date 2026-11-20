@@ -4,6 +4,7 @@
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { basename, join } from 'path'
 import { readRules, readComplementaryRules } from './dgrules'
+import { dirEmpacotado } from './paths'
 import { contextoLinguagensFree } from './linguagens-contexto'
 import { mapaRepositorio } from './agent/repo-mapa'
 
@@ -36,16 +37,36 @@ export function regrasParaContexto(
   }
   const budgetLang = Math.min(900, Math.max(200, Math.floor(maxChars * 0.25)))
   out += contextoLinguagensFree(arquivos, texto, budgetLang)
-  const dir = join(raiz, '.dg-editor', 'regras')
-  if (!existsSync(dir)) return out.slice(0, maxChars)
-  let nomes: string[] = []
-  try { nomes = readdirSync(dir).filter((n) => n.endsWith('.md')) } catch { return out.slice(0, maxChars) }
+  // Local + defaults empacotados (app instalado: raiz=userData sem .dg-editor).
+  const dirs = [join(raiz, '.dg-editor', 'regras')]
+  const emb = dirEmpacotado('regras')
+  if (emb) dirs.push(emb)
+  const nomes: string[] = []
+  const dirsValidos = dirs.filter((d) => existsSync(d))
+  if (!dirsValidos.length) return out.slice(0, maxChars)
+  const vistos = new Set<string>()
+  for (const d of dirsValidos) {
+    try {
+      for (const n of readdirSync(d).filter((x) => x.endsWith('.md'))) {
+        if (!vistos.has(n)) { vistos.add(n); nomes.push(n) }
+      }
+    } catch { /* segue */ }
+  }
+  // Guardar o dir de cada nome para leitura (local vence: dirs[0] primeiro)
+  const dirPorNome = new Map<string, string>()
+  for (const d of dirsValidos) {
+    for (const n of nomes) {
+      if (!dirPorNome.has(n) && existsSync(join(d, n))) dirPorNome.set(n, d)
+    }
+  }
   const rels = arquivos.map((a) => a.replace(/\\/g, '/'))
   const pedido = (texto || '').toLowerCase()
   for (const nome of nomes) {
     if (out.length >= maxChars) break
+    const dirArquivo = dirPorNome.get(nome)
+    if (!dirArquivo) continue
     let bruto = ''
-    try { bruto = readFileSync(join(dir, nome), 'utf8') } catch { continue }
+    try { bruto = readFileSync(join(dirArquivo, nome), 'utf8') } catch { continue }
     let globs: string[] = []
     let mencao = ''
     let corpo = bruto

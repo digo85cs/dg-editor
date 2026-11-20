@@ -4,6 +4,7 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { dirEmpacotado } from '../paths'
 
 export interface Skill {
   id: string
@@ -39,8 +40,7 @@ function parseMd(arquivo: string, brutoIn: string): Skill {
   return { id, titulo, gatilho, instrucao: corpo.trim(), arquivo }
 }
 
-export function listarSkills(raiz: string): Skill[] {
-  const dir = dirSkills(raiz)
+function lerDir(dir: string): Skill[] {
   if (!fs.existsSync(dir)) return []
   return fs.readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
@@ -50,6 +50,17 @@ export function listarSkills(raiz: string): Skill[] {
       s.arquivo = abs
       return s
     })
+}
+
+export function listarSkills(raiz: string): Skill[] {
+  // Local primeiro; app empacotado adiciona os defaults do pacote
+  // (raiz=userData nao tem .dg-editor). Ids locais vencem em conflito.
+  const locais = lerDir(dirSkills(raiz))
+  const emb = dirEmpacotado('skills')
+  const pacote = emb ? lerDir(emb) : []
+  if (!locais.length && !pacote.length) return []
+  const vistos = new Set(locais.map((s) => s.id))
+  return [...locais, ...pacote.filter((s) => !vistos.has(s.id))]
 }
 
 export function lerSkill(raiz: string, id: string): Skill | null {

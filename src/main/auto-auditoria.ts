@@ -805,6 +805,23 @@ function checarAgentesArea(): Achado[] {
 function checarMcp(): Achado[] {
   const out: Achado[] = []
   const raiz = resolverRaizProjeto()
+  // App empacotado: sem src/ — valida o bundle resources/mcp-server.cjs.
+  if (!fs.existsSync(path.join(raiz, 'src'))) {
+    const rp = (process as { resourcesPath?: string }).resourcesPath
+    const bundle = rp ? path.join(rp, 'mcp-server.cjs') : ''
+    const ok = !!bundle && fs.existsSync(bundle)
+    out.push({
+      id: 'mcp:bundle',
+      area: 'mcp',
+      titulo: ok ? 'MCP empacotado presente (mcp-server.cjs)' : 'MCP empacotado ausente',
+      detalhe: bundle || 'resourcesPath indisponivel',
+      severidade: ok ? 'ok' : 'erro',
+      corrigivel: !ok,
+      status: ok ? 'nao-aplicavel' : 'falhou',
+      acao: ok ? undefined : 'reinstalar o app'
+    })
+    return out
+  }
   try {
     const serverSrc = path.join(raiz, 'src', 'main', 'mcp', 'server.ts')
     const txt = fs.readFileSync(serverSrc, 'utf8')
@@ -871,6 +888,19 @@ function checarMcp(): Achado[] {
 function checarPipeline(): Achado[] {
   const out: Achado[] = []
   const raiz = resolverRaizProjeto()
+  // App empacotado nao carrega src/ — checks estruturais so no repo de dev.
+  if (!fs.existsSync(path.join(raiz, 'src'))) {
+    out.push({
+      id: 'pipeline:fonte-indisponivel',
+      area: 'pipeline',
+      titulo: 'Verificacao de pipeline pulada (app empacotado)',
+      severidade: 'warn',
+      detalhe: 'src/ so existe no repositorio de desenvolvimento',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    return out
+  }
   try {
     const agentSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'brain', 'agent.ts'), 'utf8')
     const serverSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'mcp', 'server.ts'), 'utf8')
@@ -927,13 +957,18 @@ function checarBuild(): Achado[] {
     { id: 'build:main', rel: path.join('out', 'main', 'index.js') },
     { id: 'build:mcp', rel: path.join('.dg-editor', 'bin', 'main', 'mcp', 'server.js') }
   ]
+  // App empacotado: MCP vai como bundle unico em resources/mcp-server.cjs.
+  const rp = (process as { resourcesPath?: string }).resourcesPath
+  const empacotado = !!(rp && !process.defaultApp)
   for (const a of alvos) {
-    const p = path.join(raiz, a.rel)
+    const p = a.id === 'build:mcp' && empacotado
+      ? path.join(rp as string, 'mcp-server.cjs')
+      : path.join(raiz, a.rel)
     if (!fs.existsSync(p)) {
       out.push({
         id: a.id,
         area: 'build',
-        titulo: a.rel + ' ausente',
+        titulo: (a.id === 'build:mcp' && empacotado ? 'resources/mcp-server.cjs' : a.rel) + ' ausente',
         severidade: 'erro',
         corrigivel: true,
         status: 'falhou',
@@ -1040,7 +1075,17 @@ function checarIntegridadeCompleta(): Achado[] {
     })
   }
 
-  try {
+  // Sem .git (app empacotado / pasta solta): nao e falha — so informa.
+  if (!fs.existsSync(path.join(raiz, '.git'))) {
+    out.push({
+      id: 'integridade:git',
+      area: 'integridade',
+      titulo: 'Sem repositorio git nesta pasta',
+      severidade: 'ok',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } else try {
     const { execFileSync } = require('child_process') as typeof import('child_process')
     const st = execFileSync('git', ['status', '--porcelain'], {
       cwd: raiz,

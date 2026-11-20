@@ -1,7 +1,7 @@
 {
   "name": "dg-editor",
   "productName": "DG Editor",
-  "version": "0.9.13",
+  "version": "0.9.14",
   "description": "DG Editor Ã¢â‚¬â€ editor de sistemas com IA local",
   "author": {
     "name": "Rodrigo Soares",
@@ -18,10 +18,11 @@
     "test:mcp-ollama": "npm run build:mcp && node test/ollama-mcp.cjs && node test/mcp-ollama-stdio.cjs && node test/mcp-ollama-stdio.cjs --external-config",
     "typecheck": "tsc --noEmit",
     "build:mcp": "tsc -p src/main/mcp/tsconfig.mcp.json --pretty false & node -e \"require('fs').accessSync('.dg-editor/bin/main/mcp/server.js');console.log('[build:mcp] ok')\"",
+    "build:mcp-bundle": "esbuild src/main/mcp/server.ts --bundle --platform=node --format=cjs --target=node18 --outfile=resources/mcp-server.cjs --external:electron",
     "mcp": "npm run build:mcp && node .dg-editor/bin/main/mcp/server.js",
     "mcp:http": "tsc -p src/main/mcp/tsconfig.mcp.json && node .dg-editor/bin/main/mcp/http-server.js",
     "indice": "node scripts/gerar-indice.cjs",
-    "prebuild": "npm run build:mcp && node scripts/sincronizar-skills.cjs",
+    "prebuild": "npm run build:mcp && npm run build:mcp-bundle && node scripts/sincronizar-skills.cjs",
     "skills:sync": "node scripts/sincronizar-skills.cjs",
     "postbuild": "node scripts/dossie.cjs",
     "dossie": "node scripts/dossie.cjs",
@@ -88,6 +89,7 @@
       "resources/**/*",
       "!resources/bin/**",
       "!resources/python/**",
+      "!resources/mcp-server.cjs",
       "package.json"
     ],
     "extraResources": [
@@ -108,6 +110,31 @@
       {
         "from": "resources/ferramentas.json",
         "to": "ferramentas.json"
+      },
+      {
+        "from": "resources/mcp-server.cjs",
+        "to": "mcp-server.cjs"
+      },
+      {
+        "from": ".dg-editor/skills",
+        "to": "dg-editor/skills",
+        "filter": [
+          "**/*.md"
+        ]
+      },
+      {
+        "from": ".dg-editor/agentes",
+        "to": "dg-editor/agentes",
+        "filter": [
+          "**/*.md"
+        ]
+      },
+      {
+        "from": ".dg-editor/regras",
+        "to": "dg-editor/regras",
+        "filter": [
+          "**/*.md"
+        ]
       }
     ],
     "extraMetadata": {

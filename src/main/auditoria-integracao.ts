@@ -25,8 +25,16 @@ function linhaDe(texto: string, trecho: string): number {
 
 function ler(raiz: string, rel: string): string {
   const abs = join(raiz, rel)
-  if (!existsSync(abs)) return ''
-  return readFileSync(abs, 'utf8')
+  if (existsSync(abs)) return readFileSync(abs, 'utf8')
+  // App empacotado: defaults de .dg-editor/<sub> vivem em resources/dg-editor/.
+  if (rel.startsWith('.dg-editor/')) {
+    const rp = (process as { resourcesPath?: string }).resourcesPath
+    if (rp && !process.defaultApp) {
+      const emb = join(rp, 'dg-editor', rel.slice('.dg-editor/'.length))
+      if (existsSync(emb)) return readFileSync(emb, 'utf8')
+    }
+  }
+  return ''
 }
 
 function achado(
@@ -87,6 +95,20 @@ function handlerDoCanal(raiz: string, canal: string): { arquivo: string; linha: 
 
 export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
   const out: AchadoIntegracao[] = []
+  // App empacotado nao carrega src/ — checks de codigo-fonte so fazem
+  // sentido no repo de dev. Reporta um aviso unico em vez de ~50 erros falsos.
+  if (!existsSync(join(raiz, 'src'))) {
+    out.push({
+      id: 'integracao:fonte-indisponivel',
+      area: 'integracao',
+      titulo: 'Verificacao de codigo-fonte pulada (app empacotado)',
+      severidade: 'warn',
+      detalhe: 'src/ so existe no repositorio de desenvolvimento',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    return out
+  }
   const pontos: Array<[string, string, string, string]> = [
     ['integracao:registro-vault', 'Handlers do Vault registrados no boot', 'src/main/index.ts', 'registerVaultIpc();'],
     ['integracao:registro-openclaw', 'Handlers do OpenClaw registrados no boot', 'src/main/index.ts', 'registerOpenClawIpc();'],

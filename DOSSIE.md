@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 10:49:21** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.12** · branch `integra-13-11` · último commit: 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
+> Gerado automaticamente em **20/11/2026, 10:54:46** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.13** · branch `integra-13-11` · último commit: c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
 - 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
 - 85e3275 2026-11-20 feat(agent): tools inline de fallback quando MCP nao responde
 - 8016bbb 2026-11-20 chore: dossiê v0.9.10
@@ -346,7 +347,6 @@ Utilitários locais relevantes:
 - 796da79 2026-11-20 chore: dossiê v0.9.8
 - f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
 - 6f4cc2c 2026-11-20 chore: dossiê v0.9.7
-- 7749572 2026-11-20 fix(agent): pedido de acao sem tool retorna erro honesto, nao tutorial generico
 
 ## 16. Como atualizar este dossiê
 

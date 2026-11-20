@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { askOllama } from './ollama'
 import { dglog } from '../dglog'
+import { dirEmpacotado } from '../paths'
 
 export interface AgenteDef {
   id: string
@@ -56,8 +57,7 @@ export function validarAgente(a: AgenteDef): { ok: boolean; erros: string[] } {
   return { ok: erros.length === 0, erros }
 }
 
-export function listarAgentes(raiz: string): AgenteDef[] {
-  const dir = dirAgentes(raiz)
+function lerDir(dir: string): AgenteDef[] {
   if (!fs.existsSync(dir)) return []
   return fs.readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
@@ -73,6 +73,16 @@ export function listarAgentes(raiz: string): AgenteDef[] {
       return a
     })
     .filter((a): a is AgenteDef => a !== null)
+}
+
+export function listarAgentes(raiz: string): AgenteDef[] {
+  // Local primeiro; app empacotado adiciona os defaults do pacote.
+  const locais = lerDir(dirAgentes(raiz))
+  const emb = dirEmpacotado('agentes')
+  const pacote = emb ? lerDir(emb) : []
+  if (!locais.length && !pacote.length) return []
+  const vistos = new Set(locais.map((a) => a.id))
+  return [...locais, ...pacote.filter((a) => !vistos.has(a.id))]
 }
 
 export function lerAgente(raiz: string, id: string): AgenteDef | null {
