@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 10:17:33** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.9** · branch `integra-13-11` · último commit: da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
+> Gerado automaticamente em **20/11/2026, 10:25:57** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.10** · branch `integra-13-11` · último commit: 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
 > Alterações locais não commitadas: 1 arquivo(s).
 
 ## 1. O que é
@@ -337,6 +337,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
+- 7f9ca8a 2026-11-20 chore: dossiê v0.9.9
 - da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
 - 796da79 2026-11-20 chore: dossiê v0.9.8
 - f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
@@ -345,8 +347,6 @@ Utilitários locais relevantes:
 - 3fd981e 2026-11-20 chore: dossiê v0.9.6
 - e6e349d 2026-11-20 fix(chat): injeta identidade real do DG Editor nos system prompts
 - 0766362 2026-11-20 chore: dossiê v0.9.5
-- a724c5b 2026-11-20 fix(chat): forca pt-BR em visao, agente e chat mesmo com pedido/conteudo em outro idioma
-- 66260a8 2026-11-20 chore: dossiê v0.9.4
 
 ## 16. Como atualizar este dossiê
 
