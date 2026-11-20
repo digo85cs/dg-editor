@@ -1,7 +1,7 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 11:21:38** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.14** · branch `integra-13-11` · último commit: 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
+> Gerado automaticamente em **20/11/2026, 11:56:26** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.15** · branch `integra-13-11` · último commit: 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
 > Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
@@ -338,6 +338,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 73eac5f 2026-11-20 fix(agente): nao explorar userData do app como se fosse projeto
+- 15b101a 2026-11-20 docs: registra arquitetura de defaults empacotados
 - 59e2901 2026-11-20 fix(empacotado): MCP server + skills/agentes/regras via resources
 - c388b26 2026-11-20 fix(agent): digest real quando tools rodaram mas keywords nao batem
 - 7461790 2026-11-20 fix(ui): relatorio da auto-auditoria em modal com scroll
@@ -346,8 +348,6 @@ Utilitários locais relevantes:
 - 2d6ae0a 2026-11-20 feat(brain): fila descobre modelos Ollama instalados (ex.: qwen3-coder:30b)
 - 7f9ca8a 2026-11-20 chore: dossiê v0.9.9
 - da80e6e 2026-11-20 feat(brain): fila de modelos se adapta aos modelos Ollama instalados no PC
-- 796da79 2026-11-20 chore: dossiê v0.9.8
-- f1d201c 2026-11-20 fix(agent): timeout 60s->300s p/ tarefas de acao + escalonamento em 'sem acao util'
 
 ## 16. Como atualizar este dossiê
 

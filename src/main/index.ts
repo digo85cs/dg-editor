@@ -200,6 +200,7 @@ function abrirNavegadorAncorado(url?: string): { ok: boolean } {
 }
 
 function createWindow(): void {
+  dglog('[janela] createWindow inicio icon=' + (resolverIconeApp() ? 'ok' : 'default'));
   const icon = resolverIconeApp();
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -220,6 +221,7 @@ function createWindow(): void {
   });
 
   const rendererUrl = process.env.ELECTRON_RENDERER_URL;
+  dglog('[janela] carregando ' + (rendererUrl || 'file://' + join(__dirname, '..', 'renderer', 'index.html')));
   if (rendererUrl) {
     mainWindow.loadURL(rendererUrl);
   } else {
@@ -231,9 +233,14 @@ function createWindow(): void {
   })
   mainWindow.webContents.on('did-fail-load', (_e, errCode, errDesc, validatedURL) => {
     console.error('[main] did-fail-load:', errCode, errDesc, validatedURL || '')
+    dglog('[janela] did-fail-load code=' + errCode + ' desc=' + errDesc + ' url=' + (validatedURL || ''))
   })
   mainWindow.webContents.on('render-process-gone', (_e, details) => {
     console.error('[main] render-process-gone:', details?.reason, details)
+    dglog('[janela] render-process-gone reason=' + (details?.reason || '?'))
+  })
+  mainWindow.webContents.on('did-finish-load', () => {
+    dglog('[janela] renderer carregado (did-finish-load)')
   })
 
   definirJanelaPrincipalNavegador(mainWindow);
@@ -272,6 +279,15 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  dglog(
+    '[boot] whenReady electron=' + process.versions.electron +
+    ' chrome=' + process.versions.chrome +
+    ' node=' + process.versions.node +
+    ' packaged=' + String(app.isPackaged) +
+    ' safeMode=' + String(SAFE_MODE) +
+    ' cwd=' + process.cwd() +
+    ' DG_ROOT=' + (process.env.DG_ROOT || '(vazio)')
+  );
   if (SAFE_MODE) {
     dglog('[boot] SAFE MODE - sem agentes/MCP/watcher/health');
   }
@@ -357,10 +373,12 @@ app.whenReady().then(() => {
 
   // Criar janela principal
   createWindow();
+  dglog('[boot] janela criada, registrando handlers IPC');
 
   // Registrar handlers IPC (precisa estar pronto antes do primeiro render)
   setMainWindow(mainWindow);
   registrarTodosHandlers();
+  dglog('[boot] handlers IPC registrados');
   registerVaultIpc();
   registerOpenClawIpc();
   registerAgentExtrasIpc();

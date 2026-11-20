@@ -81539,11 +81539,11 @@ ${lanes.join("\n")}
             if (i < rootLength) {
               return void 0;
             }
-            const sep2 = directory.lastIndexOf(directorySeparator, i - 1);
-            if (sep2 === -1) {
+            const sep3 = directory.lastIndexOf(directorySeparator, i - 1);
+            if (sep3 === -1) {
               return void 0;
             }
-            return directory.substr(0, Math.max(sep2, rootLength));
+            return directory.substr(0, Math.max(sep3, rootLength));
           }
         }
       }
@@ -246317,6 +246317,16 @@ function resolverRaizChat(rootPayload) {
     if (!(0, import_fs7.existsSync)(abs)) {
       return { ok: false, erro: "Pasta do repositorio nao encontrada: " + abs };
     }
+    try {
+      const ud = (0, import_path7.resolve)(userDataDir());
+      if (abs === ud || abs.startsWith(ud + import_path7.sep)) {
+        return {
+          ok: false,
+          erro: "A pasta ativa e o diretorio de dados do DG Editor (" + ud + "), nao um projeto. Selecione a pasta do seu projeto no Bloco 1 e envie de novo."
+        };
+      }
+    } catch {
+    }
     definirRaizWorkspace(abs);
     return { ok: true, abs };
   } catch (e) {
@@ -246330,6 +246340,7 @@ var init_workspace_raiz = __esm({
     import_fs7 = require("fs");
     import_path7 = require("path");
     init_dglog();
+    init_paths();
     raizAtiva = null;
   }
 });
@@ -251681,7 +251692,39 @@ var init_tools_inline = __esm({
     import_child_process5 = require("child_process");
     import_util9 = require("util");
     execFileAsync = (0, import_util9.promisify)(import_child_process5.execFile);
-    IGNORAR_DIRS2 = /* @__PURE__ */ new Set(["node_modules", "out", ".git", "dist", "dist-app", ".dg-editor"]);
+    IGNORAR_DIRS2 = /* @__PURE__ */ new Set([
+      "node_modules",
+      "out",
+      ".git",
+      "dist",
+      "dist-app",
+      ".dg-editor",
+      // Perfil Electron/userData — nunca e conteudo de projeto
+      "Cache",
+      "Code Cache",
+      "GPUCache",
+      "DawnGraphiteCache",
+      "DawnWebGPUCache",
+      "blob_storage",
+      "Local Storage",
+      "Session Storage",
+      "Shared Dictionary",
+      "WebStorage",
+      "IndexedDB",
+      "leveldb",
+      "Network",
+      "Partitions",
+      "Dictionaries",
+      "Crashpad",
+      "ShaderCache",
+      "GrShaderCache",
+      "component_crx_cache",
+      "dg-mcp",
+      "dg-modes",
+      "dg-perm",
+      "dg-skills",
+      "dgnav"
+    ]);
     EXT_TEXTO = /* @__PURE__ */ new Set([
       ".ts",
       ".tsx",
@@ -274294,7 +274337,38 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     }
     if (name === "projeto_arvore") {
       const { maxProfundidade = 3, filtro } = args;
-      const ignorar = /* @__PURE__ */ new Set(["node_modules", "out", ".git", "dist", ".dg-editor"]);
+      const ignorar = /* @__PURE__ */ new Set([
+        "node_modules",
+        "out",
+        ".git",
+        "dist",
+        ".dg-editor",
+        // Perfil Electron/userData — nunca e conteudo de projeto
+        "Cache",
+        "Code Cache",
+        "GPUCache",
+        "DawnGraphiteCache",
+        "DawnWebGPUCache",
+        "blob_storage",
+        "Local Storage",
+        "Session Storage",
+        "Shared Dictionary",
+        "WebStorage",
+        "IndexedDB",
+        "leveldb",
+        "Network",
+        "Partitions",
+        "Dictionaries",
+        "Crashpad",
+        "ShaderCache",
+        "GrShaderCache",
+        "component_crx_cache",
+        "dg-mcp",
+        "dg-modes",
+        "dg-perm",
+        "dg-skills",
+        "dgnav"
+      ]);
       const linhas = [];
       async function walk2(dir, nivel) {
         if (nivel > maxProfundidade)
