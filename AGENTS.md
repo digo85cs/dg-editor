@@ -34,3 +34,10 @@
 - `extraResources` leva `.dg-editor/{skills,agentes,regras}/*.md` → `resources/dg-editor/`.
 - Auditoria: checks de `src/` pulam com warn único quando empacotado; `checarMcp` valida o bundle; git check ok sem `.git`.
 - Auditoria no instalado deve mostrar ~23 OK / poucos warns reais (providers sem chave etc.), não 58 erros.
+
+## Armadilhas de diagnóstico (20/11/2026)
+
+- **`ELECTRON_RUN_AS_NODE=1`**: o Devin CLI (Electron) exporta essa var; shells filhos a herdam e **qualquer exe Electron lançado dali vira Node puro** (`DG Editor.exe --version` → `v20.18.1`). Sintoma: app "morre em <1s, exit 0, sem logs". Sempre `Remove-Item Env:ELECTRON_RUN_AS_NODE` antes de testar o app empacotado.
+- **Requires literais `require('./x')`/`require('../x')` em `src/main` NÃO são bundlados** pelo electron-vite — viram require em runtime e quebram porque `out/main/` só tem `index.js`+`chunks/`. Auditar com scan de `require("..")` vs filesystem após build. Corrigido em v0.9.17: agendador (scheduler nunca subia no instalado) e segredos-providers (vault de chaves ilegível → Gemini/Devin/OpenAI falhavam em silêncio).
+- `await import()` de módulo já inline pode virar `require()` quebrado no output CJS — preferir import estático quando o módulo já entra no bundle.
+- Logs do app: `dglog`/`Xt` escrevem em `<cwd>/.dg-editor/logs/dg-log.jsonl` (não userData); logs estruturados em `%APPDATA%/DG Editor/logs/dg-*.jsonl`.
