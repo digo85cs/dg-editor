@@ -23,7 +23,9 @@ function promptVisao(pedido: string): string {
     'Descreva as imagens em detalhe suficiente para atender ao pedido: ' +
     'texto legivel (transcreva), elementos de UI, erros, codigo, dados, contexto. ' +
     'Se o pedido for uma pergunta sobre a imagem, responda diretamente a pergunta. ' +
-    'Responda em portugues do Brasil, objetivo, sem enrolacao.'
+    'Responda SEMPRE em portugues do Brasil — mesmo que o pedido ou o texto da imagem ' +
+    'estejam em outro idioma. Transcreva textos estrangeiros como estao, mas comente em pt-BR. ' +
+    'Objetivo, sem enrolacao.'
   )
 }
 

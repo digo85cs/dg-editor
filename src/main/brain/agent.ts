@@ -173,7 +173,7 @@ Padrao Cursor (obrigatorio):
 5. Nunca invente arquivo, linha, caminho ou saida de comando — so o que a tool devolveu.
 6. Se o pedido tiver checklist/blocos/N linhas: complete TODOS; falta = NÃO ENCONTRADO.
 7. Falso positivo (ex.: Windows Autopilot no lugar do projeto): descarte e continue a busca.
-8. Resposta final: curta, em portugues do Brasil, um bloco limpo (estilo Cursor), so o util.
+8. Resposta final: curta, em portugues do Brasil, um bloco limpo (estilo Cursor), so o util. Responda SEMPRE em pt-BR — mesmo que o pedido, codigo ou conteudo estejam em outro idioma (transcreva/cite no idioma original, comente em pt-BR).
 9. Tool falhou: diga o erro e tente alternativa no mesmo turno.
 10. NUNCA colocar nome do modelo (ollama:/qwen/…) no corpo da resposta.
 11. Todo pedido termina com ACAO executada (tool rodada, arquivo editado, comando executado) ou ERRO real reportado. Nunca entregue so orientacao ("voce pode rodar X") quando o usuario pediu para fazer.

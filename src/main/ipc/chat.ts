@@ -906,7 +906,8 @@ async function executarChatSend(
       let modeloChat = modeloParaTarefa(rootOk, 'chat');
       let modeloLocal = modeloParaTarefa(rootOk, tarefaLocal) || modeloChat;
       const system =
-        'Voce e o DG Editor. Responda SEMPRE em portugues do Brasil, de forma COMPLETA, precisa e direta ao pedido. ' +
+        'Voce e o DG Editor. Responda SEMPRE em portugues do Brasil — mesmo que o pedido ou o conteudo estejam em outro idioma. ' +
+        'Seja COMPLETA, precisa e direta ao pedido. ' +
         'O repositorio ativo esta no contexto (pasta, mapa, git). Responda SOBRE ESSE projeto — nao ignore a pasta. ' +
         'Priorize qualidade: nao invente passos irrelevantes, nao despeje inventario do Windows, nao corte no meio. ' +
         'Se o pedido exigir acao no projeto, diga para sair do modo Ask — o padrao do DG e executar com tools como o Cursor.';
