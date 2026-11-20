@@ -16,6 +16,7 @@ import {
 import { filaGlobal, configParaProvider } from './providers-registry'
 import { lerChave } from './segredos-providers'
 import { limitesPorHardware } from '../hardware-profile'
+import { totalmem } from 'os'
 
 export type TipoModelo = 'local' | 'online'
 export type TarefaModelo = 'chat' | 'chat-rapido' | 'analise' | 'analisar' | 'codigo' | 'raciocinio' | 'revisao'
@@ -70,6 +71,63 @@ export async function sincronizarModelosInstalados(): Promise<void> {
 function modeloOllamaInstalado(nome: string): boolean {
   if (!ollamaInstalados) return true
   return matchModelo(ollamaInstalados.tags, nome) !== null
+}
+
+/** Porte estimado em "bilhoes de parametros" a partir do nome da tag. */
+function pesoModeloOllama(nome: string): number {
+  const m = String(nome || '').match(/(\d+(?:\.\d+)?)\s*b\b/i)
+  if (m) return parseFloat(m[1])
+  if (/llama3\.2|tinyllama|smollm|phi-|gemma.*:2b|qwen.*:1\.5b/i.test(nome)) return 3
+  return 8
+}
+
+/** O modelo cabe na RAM desta maquina? Q4 ~0.6GB/bilhao + 4GB de folga p/ SO/contexto. */
+function modeloCabeNaRam(p: ProviderConfig): boolean {
+  if (p.tipo !== 'local' || p.formato !== 'ollama') return true
+  const totalGb = totalmem() / (1024 ** 3)
+  return pesoModeloOllama(p.modelo) * 0.6 + 4 <= totalGb + 0.5
+}
+
+/**
+ * Descobre modelos Ollama instalados nesta maquina que NAO estao na fila
+ * estatica (ex.: qwen3-coder:30b) e os insere no bloco local ordenado por
+ * porte decrescente — o melhor modelo instalado sempre vem primeiro.
+ * Modelos de embedding/visao-only sao ignorados.
+ */
+function enriquecerLocais(padrao: ProviderConfig[]): ProviderConfig[] {
+  const tags = ollamaInstalados?.tags
+  if (!tags?.length) return padrao
+  const locais = padrao.filter((p) => p.tipo === 'local' && p.formato === 'ollama')
+  const nomesLocais = locais.map((p) => p.modelo)
+  const dynamic: ProviderConfig[] = []
+  for (const tag of tags) {
+    if (/embed|bge-|e5-|nomic|minicpm|^\s*$/.test(tag)) continue
+    if (matchModelo(nomesLocais, tag)) continue
+    dynamic.push(
+      cfg({
+        id: 'ollama:' + tag,
+        tipo: 'local',
+        formato: 'ollama',
+        modelo: tag,
+        baseUrl: OLLAMA_BASE,
+        numPredict: 1024,
+        timeoutMs: 300_000
+      })
+    )
+  }
+  if (!dynamic.length) return padrao
+  const todos = [...locais, ...dynamic].sort(
+    (a, b) => pesoModeloOllama(b.modelo) - pesoModeloOllama(a.modelo)
+  )
+  const posLocais = padrao.map((p, i) => (p.tipo === 'local' ? i : -1)).filter((i) => i >= 0)
+  if (!posLocais.length) return [...padrao, ...todos]
+  const out = [...padrao]
+  posLocais.forEach((pos, k) => {
+    if (k < todos.length) out[pos] = todos[k]
+  })
+  const extras = todos.slice(posLocais.length)
+  if (extras.length) out.splice(Math.max(...posLocais) + 1, 0, ...extras)
+  return out
 }
 
 const REGISTRO_BASE: ModeloReg[] = [
@@ -509,7 +567,7 @@ function filaPadraoDeModelos(tarefa: Tarefa | string): ProviderConfig[] {
 /** A escolha explícita nunca altera a ordem automática já estabelecida. */
 export function filaDeModelos(tarefa: Tarefa | string, opcoes?: OpcoesFila): ProviderConfig[] {
   const t = normalizarTarefa(String(tarefa))
-  const padrao = filaPadraoDeModelos(t)
+  const padrao = enriquecerLocais(filaPadraoDeModelos(t))
   if (!opcoes?.provider || opcoes.provider === 'auto') return padrao
   const locais = padrao.filter((p) => p.tipo === 'local' && p.formato === 'ollama' && !modeloPesadoDemais(t, p))
   return opcoes.provider === 'codex' ? [cfgCodexCli(), ...locais] : locais
@@ -522,6 +580,9 @@ export function filaDeModelos(tarefa: Tarefa | string, opcoes?: OpcoesFila): Pro
 function modeloPesadoDemais(tarefa: TarefaModelo, p: ProviderConfig): boolean {
   if (p.tipo !== 'local') return false
   if (tarefa !== 'chat' && tarefa !== 'chat-rapido' && tarefa !== 'analise' && tarefa !== 'analisar') return false
+  // Qualquer modelo >=7b e pesado demais para chat/análise em CPU.
+  const m = p.modelo.match(/:(\d+(?:\.\d+)?)b\b/i)
+  if (m) return parseFloat(m[1]) >= 7
   return /:(?:7b|14b)\b/.test(p.modelo)
 }
 
@@ -529,6 +590,7 @@ export function primeiroProvider(tarefa: Tarefa | string, opcoes?: OpcoesFila): 
   const t = normalizarTarefa(String(tarefa))
   for (const p of filaDeModelos(t, opcoes)) {
     if (modeloPesadoDemais(t, p)) continue
+    if (!modeloCabeNaRam(p)) continue
     if (disponivel(p) === 'ok') return p
   }
   return null
@@ -543,6 +605,11 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
     if (modeloPesadoDemais(t, p)) {
       logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=modelo-grande')
       motivos.push(p.id + '=modelo-grande')
+      continue
+    }
+    if (!modeloCabeNaRam(p)) {
+      logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=ram-insuficiente')
+      motivos.push(p.id + '=ram-insuficiente')
       continue
     }
     // Free online raso: so como ultimo recurso (depois do Ollama)
