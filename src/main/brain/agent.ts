@@ -2,6 +2,7 @@ import path from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
 import { obterPromptRapido } from './fast-chat'
 import { chamarTool, listarTools, garantirMcpNaRaiz, type McpTool } from '../mcp/client'
+import { ferramentasInlineDefs, executarToolInline } from './tools-inline'
 import { montarContexto, blocoMemoria } from '../memory/hybrid'
 import { indexarTurno } from '../memory/embeddings'
 import { dglog } from '../dglog'
@@ -567,6 +568,8 @@ async function rodarLoopComProvider(
     onEvent?: (ev: EventoAgente) => void
     signal?: AbortSignal
     modo?: string
+    /** true = tools[] sao defs inline (MCP fora) — executarToolInline no lugar de chamarTool */
+    inlineTools?: boolean
   }
 ): Promise<RespostaAgente> {
   const mensagens: Message[] = [
@@ -965,7 +968,9 @@ async function rodarLoopComProvider(
             /* best-effort */
           }
         }
-        const res = await chamarTool(nome, args)
+        const res = opts?.inlineTools
+          ? await executarToolInline(raiz, nome, args)
+          : await chamarTool(nome, args)
         textoRes = res.texto
       }
 
@@ -1268,6 +1273,7 @@ export async function executarAgente(
       (extra ? '\n\n' + extra : '')
 
     let tools: McpTool[] = []
+    let toolsInline = false
     if (modo === 'agent') {
       try {
         process.env.DG_ROOT = path.resolve(raiz)
@@ -1278,6 +1284,13 @@ export async function executarAgente(
         dglog('[agente] ' + tools.length + ' tools disponiveis (sem agente_executar) raiz=' + raiz)
       } catch (e) {
         dglog('[agente] MCP indisponivel: ' + String(e))
+      }
+      // MCP vazio/fora: fallback para tools basicas embutidas (ler/listar/
+      // buscar/exec) — o agente continua util em PCs onde o server nao sobe.
+      if (!tools.length) {
+        toolsInline = true
+        tools = ferramentasInlineDefs() as unknown as McpTool[]
+        dglog('[agente] MCP sem tools — usando ' + tools.length + ' tools inline de fallback')
       }
     } else {
       dglog('[agente] modo plan — tools desligadas')
@@ -1361,7 +1374,8 @@ export async function executarAgente(
             pastas: opcoes.pastas,
             onEvent: opcoes.onEvent,
             signal: opcoes.signal,
-            modo: opcoes.modo
+            modo: opcoes.modo,
+            inlineTools: toolsInline
           })
           const ms = Date.now() - t0
           // Pedido de acao respondido com "sem acao util" = modelo fraco
