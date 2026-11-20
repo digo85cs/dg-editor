@@ -25,3 +25,12 @@
 
 - Não tocar produção AutoPartz (FTP/DB/deploy) — fronteira combinada.
 - Não commitar segredos; `.dg-editor/` runtime (chats, resposta-cache, relatorios, midia) é gitignored.
+
+## App empacotado (v0.9.14) — defaults via resources
+
+- `resolverRaizDGEditor()` em app instalado retorna **userData** (não o repo). Sem `src/`, `.dg-editor/bin`, skills ou agentes.
+- MCP stdio usa `resources/mcp-server.cjs` (bundle esbuild único, gerado por `npm run build:mcp-bundle` no prebuild; testado com initialize OK).
+- `dirEmpacotado(sub)` em `paths.ts` → `resourcesPath/dg-editor/<sub>`; `listarSkills`/`listarAgentes`/`regrasParaContexto` **mesclam** local + pacote (local vence por id).
+- `extraResources` leva `.dg-editor/{skills,agentes,regras}/*.md` → `resources/dg-editor/`.
+- Auditoria: checks de `src/` pulam com warn único quando empacotado; `checarMcp` valida o bundle; git check ok sem `.git`.
+- Auditoria no instalado deve mostrar ~23 OK / poucos warns reais (providers sem chave etc.), não 58 erros.
