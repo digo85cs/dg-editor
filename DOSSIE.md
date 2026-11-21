@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 21:02:34** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.24** · branch `integra-13-11` · último commit: b71abb0 2026-11-20 chore: bump 0.9.24
-> Árvore de trabalho limpa.
+> Gerado automaticamente em **20/11/2026, 21:08:19** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.25** · branch `integra-13-11` · último commit: 0acb8a5 2026-11-20 chore: bump 0.9.25
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -339,6 +339,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 0acb8a5 2026-11-20 chore: bump 0.9.25
+- 1125eea 2026-11-20 fix(skills): conteudo padrao completo para estilo-cursor e inventario-disco
 - b71abb0 2026-11-20 chore: bump 0.9.24
 - e3ac5cd 2026-11-20 fix(skills): restaurar estrutura completa de estilo-cursor e inventario-disco
 - c036080 2026-11-20 docs: registrar fix de shims npm/npx no Windows
@@ -347,8 +349,6 @@ Utilitários locais relevantes:
 - 545498c 2026-11-20 fix(auditoria): skills/agentes checados na raiz de dados + skills expandidas (v0.9.22)
 - dcfa0b5 2026-11-20 docs: pendencias — estado pos v0.9.21
 - e20f860 2026-11-20 chore(qa): script smoke:mcp para tools/call reais do bundle MCP
-- 3262e14 2026-11-20 fix(mcp): tools do bloco midia inacessiveis + smoke de tools/call (v0.9.21)
-- 3f7e0b2 2026-11-20 feat(ui): restaura modais removidos na refatoracao + fix teardown QA (v0.9.20)
 
 ## 16. Como atualizar este dossiê
 
