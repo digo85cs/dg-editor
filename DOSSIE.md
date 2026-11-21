@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 20:55:23** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.23** · branch `integra-13-11` · último commit: 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 21:02:34** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.24** · branch `integra-13-11` · último commit: b71abb0 2026-11-20 chore: bump 0.9.24
+> Árvore de trabalho limpa.
 
 ## 1. O que é
 
@@ -339,6 +339,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- b71abb0 2026-11-20 chore: bump 0.9.24
+- e3ac5cd 2026-11-20 fix(skills): restaurar estrutura completa de estilo-cursor e inventario-disco
+- c036080 2026-11-20 docs: registrar fix de shims npm/npx no Windows
 - 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
 - a0a18d0 2026-11-20 docs: armadilhas da auditoria empacotada e skills
 - 545498c 2026-11-20 fix(auditoria): skills/agentes checados na raiz de dados + skills expandidas (v0.9.22)
@@ -346,9 +349,6 @@ Utilitários locais relevantes:
 - e20f860 2026-11-20 chore(qa): script smoke:mcp para tools/call reais do bundle MCP
 - 3262e14 2026-11-20 fix(mcp): tools do bloco midia inacessiveis + smoke de tools/call (v0.9.21)
 - 3f7e0b2 2026-11-20 feat(ui): restaura modais removidos na refatoracao + fix teardown QA (v0.9.20)
-- 4728fb7 2026-11-20 chore: v0.9.19 — custo diario + gitignore midias + dossie
-- 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
-- 0d2fc3e 2026-11-20 chore: dossie v0.9.18
 
 ## 16. Como atualizar este dossiê
 
