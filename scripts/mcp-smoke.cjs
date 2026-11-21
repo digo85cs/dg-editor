@@ -40,7 +40,11 @@ const TOOLS = [
   ['apps_status', {}],
   ['qualidade_checar', {}],
   ['testes_rodar', {}],
-  ['dossie_snapshot', {}]
+  ['dossie_snapshot', {}],
+  // args reais, somente leitura/diagnostico
+  ['codigo_ler', { nome: 'package.json' }],
+  ['skill_ler', { id: 'estilo-cursor' }],
+  ['terminal_exec', { comando: 'node', args: ['--version'] }]
 ]
 
 let nextId = 1

@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 20:38:05** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.22** · branch `integra-13-11` · último commit: dcfa0b5 2026-11-20 docs: pendencias — estado pos v0.9.21
-> Alterações locais não commitadas: 29 arquivo(s).
+> Gerado automaticamente em **20/11/2026, 20:55:23** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.23** · branch `integra-13-11` · último commit: 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -339,6 +339,9 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
+- a0a18d0 2026-11-20 docs: armadilhas da auditoria empacotada e skills
+- 545498c 2026-11-20 fix(auditoria): skills/agentes checados na raiz de dados + skills expandidas (v0.9.22)
 - dcfa0b5 2026-11-20 docs: pendencias — estado pos v0.9.21
 - e20f860 2026-11-20 chore(qa): script smoke:mcp para tools/call reais do bundle MCP
 - 3262e14 2026-11-20 fix(mcp): tools do bloco midia inacessiveis + smoke de tools/call (v0.9.21)
@@ -346,9 +349,6 @@ Utilitários locais relevantes:
 - 4728fb7 2026-11-20 chore: v0.9.19 — custo diario + gitignore midias + dossie
 - 8986bd4 2026-11-20 feat(custo): resumo diario de tokens/custo no chat (IPC custo:diario)
 - 0d2fc3e 2026-11-20 chore: dossie v0.9.18
-- 2f8892d 2026-11-20 docs: armadilha helper $ em modulos renderer extraidos
-- 34d39e9 2026-11-20 fix(renderer): helper $ ausente em config-contas.js quebrava modais Config/Contas
-- bfb2beb 2026-11-20 chore: dossie v0.9.17
 
 ## 16. Como atualizar este dossiê
 
