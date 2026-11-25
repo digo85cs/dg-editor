@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **20/11/2026, 21:08:19** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.25** · branch `integra-13-11` · último commit: 0acb8a5 2026-11-20 chore: bump 0.9.25
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **25/11/2026, 08:54:15** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.26** · branch `integra-13-11` · último commit: 7d74aca 2026-11-25 chore: bump 0.9.26
+> Alterações locais não commitadas: 2 arquivo(s).
 
 ## 1. O que é
 
@@ -231,7 +231,7 @@ Artefatos locais em `dist-apps/`:
 
 Utilitários locais relevantes:
 
-- ffmpeg — mídia: **presente**
+- ffmpeg — mídia: ausente
 - ImageMagick — imagem (ImageMagick): ausente
 - pandoc — documentos: **presente**
 - yt-dlp — download de vídeo: ausente
@@ -339,16 +339,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 7d74aca 2026-11-25 chore: bump 0.9.26
+- f575fcd 2026-11-25 fix(auditoria): auto-restart do Ollama usava execFile com timeout
+- c93a17b 2026-11-20 chore: radar diario + skills regeneradas com conteudo completo
+- 2c32f26 2026-11-20 chore: pos-release 0.9.25 — dossie, skills sincronizadas, nota AGENTS
 - 0acb8a5 2026-11-20 chore: bump 0.9.25
 - 1125eea 2026-11-20 fix(skills): conteudo padrao completo para estilo-cursor e inventario-disco
 - b71abb0 2026-11-20 chore: bump 0.9.24
 - e3ac5cd 2026-11-20 fix(skills): restaurar estrutura completa de estilo-cursor e inventario-disco
 - c036080 2026-11-20 docs: registrar fix de shims npm/npx no Windows
 - 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
-- a0a18d0 2026-11-20 docs: armadilhas da auditoria empacotada e skills
-- 545498c 2026-11-20 fix(auditoria): skills/agentes checados na raiz de dados + skills expandidas (v0.9.22)
-- dcfa0b5 2026-11-20 docs: pendencias — estado pos v0.9.21
-- e20f860 2026-11-20 chore(qa): script smoke:mcp para tools/call reais do bundle MCP
 
 ## 16. Como atualizar este dossiê
 
