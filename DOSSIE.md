@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **25/11/2026, 14:24:21** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.27** · branch `integra-13-11` · último commit: d5be6e5 2026-11-25 chore: release 0.9.27
-> Alterações locais não commitadas: 3 arquivo(s).
+> Gerado automaticamente em **25/11/2026, 15:47:10** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.28** · branch `integra-13-11` · último commit: 9ea76db 2026-11-25 chore: versiona scripts de aceite e alinha validador ao NSIS por-usuario
+> Alterações locais não commitadas: 4 arquivo(s).
 
 ## 1. O que é
 
@@ -202,7 +202,7 @@ Módulos: `__tests__/arquivos-doc.test.ts`, `__tests__/atualizacoes.test.ts`, `_
 
 Artefatos locais em `dist-apps/`:
 
-  - DG-Apps-0.1.0.apk (4.164 KB)
+  - DG-Apps-0.1.0.apk (4.194 KB)
 
 ## 9. MCP
 
@@ -339,16 +339,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 9ea76db 2026-11-25 chore: versiona scripts de aceite e alinha validador ao NSIS por-usuario
+- 4465158 2026-11-25 build(instalador): perMachine false — instala por usuario sem UAC
+- 9912552 2026-11-25 fix(chat): elimina agentes duplicados no seletor do chat
+- 83995ac 2026-11-25 fix(openclaw): store de propostas passa a pertencer ao projeto
+- 57ab83c 2026-11-25 chore: pos-release 0.9.27 — dossie, radar, bundle mcp
 - d5be6e5 2026-11-25 chore: release 0.9.27
 - 98f422b 2026-11-25 chore: ignora store de propostas e snapshot de QA (runtime)
 - 9cde038 2026-11-25 fix(chat): persiste turnos do painel Agente no historico da conversa
 - 91d2d15 2026-11-25 fix(openclaw): persiste propostas pendentes em .dg-editor/openclaw/pendentes.json
 - f950379 2026-11-25 chore: pos-release 0.9.26 — dossie, radar, skills, nota AGENTS
-- 7d74aca 2026-11-25 chore: bump 0.9.26
-- f575fcd 2026-11-25 fix(auditoria): auto-restart do Ollama usava execFile com timeout
-- c93a17b 2026-11-20 chore: radar diario + skills regeneradas com conteudo completo
-- 2c32f26 2026-11-20 chore: pos-release 0.9.25 — dossie, skills sincronizadas, nota AGENTS
-- 0acb8a5 2026-11-20 chore: bump 0.9.25
 
 ## 16. Como atualizar este dossiê
 

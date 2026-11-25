@@ -253506,11 +253506,22 @@ function storePath() {
   return (0, import_path27.join)(resolverRaizDGEditor(), ".dg-editor", "openclaw", "pendentes.json");
 }
 function carregarStore() {
-  if (storeCarregado)
+  const raiz = resolverRaizDGEditor();
+  if (raiz === raizStore)
     return;
-  storeCarregado = true;
-  const p = storePath();
+  if (raizStore !== null) {
+    visitados.set(raizStore, pendentes);
+    pendentes = /* @__PURE__ */ new Map();
+  }
+  const conhecido = visitados.get(raiz);
+  if (conhecido) {
+    pendentes = conhecido;
+    raizStore = raiz;
+    return;
+  }
+  raizStore = raiz;
   try {
+    const p = storePath();
     if (!(0, import_fs25.existsSync)(p))
       return;
     const j = JSON.parse((0, import_fs25.readFileSync)(p, "utf8"));
@@ -253523,6 +253534,8 @@ function carregarStore() {
         continue;
       if (item.status !== "pendente")
         continue;
+      if (pendentes.has(item.id))
+        continue;
       pendentes.set(item.id, item);
       n++;
     }
@@ -253531,7 +253544,7 @@ function carregarStore() {
   } catch (e) {
     dglog("[propostas] store corrompido, renomeando para .corrompido", { erro: String(e) }, "warn");
     try {
-      (0, import_fs25.renameSync)(p, p + ".corrompido");
+      (0, import_fs25.renameSync)(storePath(), storePath() + ".corrompido");
     } catch {
     }
   }
@@ -253596,6 +253609,7 @@ function registrarUm(e, pastas, origem, okList, rejeitados) {
   okList.push(p);
 }
 function adicionarPendentes(edits, pastas, origem = "agent") {
+  carregarStore();
   const okList = [];
   const rejeitados = [];
   for (const e of edits) {
@@ -253749,7 +253763,7 @@ function alvoDesatualizado(p, abs) {
     return "arquivo alvo passou a existir depois da proposta \u2014 recusado";
   return null;
 }
-var import_fs25, import_path27, import_crypto2, pendentes, storeCarregado;
+var import_fs25, import_path27, import_crypto2, pendentes, visitados, raizStore;
 var init_diffs = __esm({
   "src/main/openclaw/diffs.ts"() {
     "use strict";
@@ -253761,7 +253775,8 @@ var init_diffs = __esm({
     init_dglog();
     init_hunks();
     pendentes = /* @__PURE__ */ new Map();
-    storeCarregado = false;
+    visitados = /* @__PURE__ */ new Map();
+    raizStore = null;
   }
 });
 
