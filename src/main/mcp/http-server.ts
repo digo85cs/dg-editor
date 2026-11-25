@@ -1,7 +1,8 @@
 /**
- * Servidor MCP HTTP do DG Editor (somente leitura).
+ * Servidor MCP HTTP do DG Editor.
  * Requer DG_MCP_TOKEN. Escuta em 127.0.0.1:7331.
- * Expõe apenas 11 ferramentas de leitura.
+ * Gate por ALLOWED_TOOLS; a implementacao das tools e a MESMA do stdio
+ * (./dispatch), exceto as ferramentas locais HTTP-only.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'http'
@@ -9,16 +10,14 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
 import { lerDossie, dossieSnapshot } from '../dossie'
-import { projectStateDir, resolverRaizDGEditor } from '../paths'
-import { obterRaizWorkspace } from '../workspace-raiz'
+import { resolverRaizProjeto } from '../paths'
 import { loadChat } from '../chatstore'
 import { buscarSimbolos, lerSimbolo } from '../brain/indice'
 import { gitStatus, gitDiff, gitCommit, gitPush, qualidadeChecar, resultadoAvaliar, terminalExec, codigoEditar, testesRodar, projetoSmoke, lerMemoriaProjeto, gravarMemoriaProjeto } from '../autonomia-tools'
-import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
 import { listarSkills } from '../brain/skills'
 import { listarAgentes } from '../brain/agentes'
 import { gerarImagemAuto } from '../midia/cascata'
@@ -27,11 +26,31 @@ import { pdfOperar, planilhaOperar } from '../midia/arquivos-doc'
 import { narrar } from '../midia/core'
 import { gerarMeme, sincronizarMemes } from '../midia/memes'
 import { chamarControle } from './navegador-client'
+import { resumoUso, custoDiaUsd, limiteCustoDia } from '../midia/guarda-custo'
+import { TOOLS as TOOLS_MCP, executarToolCall, raizMcp, vaultMcp, definirProvedorRaiz } from './dispatch'
 
-const raizWS = obterRaizWorkspace()
-const RAIZ = resolve(process.env.DG_ROOT || (raizWS ?? resolverRaizDGEditor()))
-const VAULT = projectStateDir(RAIZ)
 const TOKEN = process.env.DG_MCP_TOKEN
+
+// Raiz do HTTP: acompanha o projeto ativo do app. O app grava
+// %APPDATA%\DG Editor\workspace.json -> pastaAtual a cada troca de
+// projeto; sem arquivo valido, cai no DG_ROOT do boot (comportamento
+// anterior). Lido a cada chamada via syncRaiz do dispatch.
+function raizHttp(): string {
+  try {
+    const appData = process.env.APPDATA
+    const p = appData ? join(appData, 'DG Editor', 'workspace.json') : ''
+    if (p && existsSync(p)) {
+      const j = JSON.parse(readFileSync(p, 'utf8')) as { pastaAtual?: string | null }
+      const pasta = typeof j.pastaAtual === 'string' ? j.pastaAtual.trim() : ''
+      if (pasta && existsSync(pasta)) return resolve(pasta)
+    }
+  } catch { /* segue para o fallback */ }
+  const env = process.env.DG_ROOT
+  if (env && env.trim()) return resolve(env.trim())
+  return resolverRaizProjeto()
+}
+
+definirProvedorRaiz(raizHttp)
 
 if (!TOKEN) {
   console.error('DG_MCP_TOKEN ausente')
@@ -43,7 +62,11 @@ const server = new Server(
   { capabilities: { tools: {} } }
 )
 
+// Gate de exposicao: ferramentas visiveis via HTTP. As 36 originais +
+// grupos liberados na Rodada 5. O que nao esta aqui responde
+// "ferramenta nao exposta neste servidor".
 const ALLOWED_TOOLS = new Set([
+  // --- originais (36) ---
   'dossie_read', 'dossie_snapshot', 'vault_list', 'vault_read',
   'projeto_arvore', 'codigo_buscar', 'codigo_ler', 'codigo_editar',
   'git_status', 'git_diff', 'git_commit', 'git_push', 'terminal_exec', 'testes_rodar', 'projeto_smoke',
@@ -51,18 +74,49 @@ const ALLOWED_TOOLS = new Set([
   'skills_listar', 'agentes_listar', 'chat_historico', 'midia_imagem_auto', 'midia_video_auto',
   'doc_pdf', 'doc_planilha', 'midia_narrar', 'midia_meme_gerar', 'midia_memes_listar',
   'navegador_status', 'navegador_abrir', 'navegador_ler', 'navegador_clicar',
-  'navegador_preencher', 'navegador_baixar'
+  'navegador_preencher', 'navegador_baixar',
+  // --- GRUPO 1: leitura pura ---
+  'agente_listar', 'agentes_externos_status', 'conector_listar',
+  'disco_buscar', 'disco_inspecionar', 'skill_ler', 'skill_listar',
+  'midia_status', 'midia_custo', 'midia_atualizacoes',
+  'portabilidade_status', 'provisionamento_status', 'apps_status',
+  'midia_comfyui_status', 'reversa_status', 'midia_vozes_listar',
+  'midia_musicas', 'midia_musicas_livres', 'notas_mapa_mental',
+  'tela_gravacoes', 'dossie_write',
+  // --- GRUPO 2: execucao local ---
+  'ollama_ask', 'ollama_script', 'automacao_listar', 'automacao_executar',
+  'midia_diagrama', 'midia_documento_converter', 'midia_legendas',
+  'midia_linha_tempo', 'midia_audio', 'midia_video_cortar', 'midia_video_efeito',
+  'midia_video_juntar', 'midia_video_capa', 'midia_voz_efeito',
+  'midia_foto_video', 'midia_fotos_video', 'midia_estoque',
+  'midia_imagem_qualidade', 'midia_video_qualidade', 'midia_imagem_melhorar',
+  'midia_transcrever', 'imagens_iso', 'receber_lan',
+  // --- GRUPO 3: provedor externo pago (com guarda de custo diaria) ---
+  'midia_imagem_cf', 'midia_imagem_editar_gemini', 'midia_imagem_gemini',
+  'midia_imagem_gerar', 'midia_imagem_getimg', 'midia_imagem_hf',
+  'midia_imagem_horde', 'midia_imagem_openai', 'midia_imagem_segmind',
+  'midia_video_gemini', 'midia_video_json2video', 'midia_tts_openai',
+  'midia_planilha', 'midia_pdf'
 ])
 
-function logCall(toolName: string, args: unknown): void {
+// Ferramentas que chamam provedor pago: bloqueadas quando o teto diario estoura.
+const GRUPO3_PAGOS = new Set([
+  'midia_imagem_cf', 'midia_imagem_editar_gemini', 'midia_imagem_gemini',
+  'midia_imagem_gerar', 'midia_imagem_getimg', 'midia_imagem_hf',
+  'midia_imagem_horde', 'midia_imagem_openai', 'midia_imagem_segmind',
+  'midia_video_gemini', 'midia_video_json2video', 'midia_tts_openai',
+  'midia_planilha', 'midia_pdf'
+])
+
+function logCall(toolName: string, args: unknown, raiz: string): void {
   const ts = new Date().toISOString()
   const argsSummary = JSON.stringify(args).slice(0, 200)
-  console.error(`[${ts}] mcp:http tool=${toolName} args=${argsSummary}`)
+  console.error(`[${ts}] mcp:http tool=${toolName} raiz=${raiz} args=${argsSummary}`)
 }
 
 function dentroDoVault(p: string): boolean {
   const abs = resolve(p)
-  const rel = relative(VAULT, abs)
+  const rel = relative(vaultMcp(), abs)
   return !rel.startsWith('..') && !rel.includes('..')
 }
 
@@ -94,6 +148,34 @@ function caminhoEhProtegido(caminho: string): boolean {
     if (nomeProtegido(seg)) return true
   }
   return false
+}
+
+// Guarda HTTP: varre os argumentos recursivamente e devolve o primeiro
+// valor com cara de caminho que aponte para arquivo protegido.
+// "Com cara de caminho" = token unico (sem espaco) OU contem separador
+// de caminho — prompts textuais com espacos nao sao tratados como path.
+function pareceCaminho(v: string): boolean {
+  return !/\s/.test(v) || /[/\\]/.test(v)
+}
+
+function primeiroCaminhoProtegido(valor: unknown): string | null {
+  if (typeof valor === 'string') {
+    return pareceCaminho(valor) && caminhoEhProtegido(valor) ? valor : null
+  }
+  if (Array.isArray(valor)) {
+    for (const item of valor) {
+      const achou = primeiroCaminhoProtegido(item)
+      if (achou) return achou
+    }
+    return null
+  }
+  if (valor && typeof valor === 'object') {
+    for (const v of Object.values(valor as Record<string, unknown>)) {
+      const achou = primeiroCaminhoProtegido(v)
+      if (achou) return achou
+    }
+  }
+  return null
 }
 
 const TOOLS = [
@@ -461,7 +543,15 @@ const TOOLS = [
   }
 ]
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
+// Tools com handler local neste arquivo (as 36 originais). Todo o resto
+// do ALLOWED_TOOLS e delegado ao dispatch compartilhado do stdio.
+const LOCAL_TOOLS = new Set(TOOLS.map((t) => t.name))
+
+// Definicoes expostas no tools/list: as locais + as do dispatch que o
+// gate permite (novas ferramentas da Rodada 5).
+const EXTRA_TOOLS = TOOLS_MCP.filter((t) => ALLOWED_TOOLS.has(t.name) && !LOCAL_TOOLS.has(t.name))
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...TOOLS, ...EXTRA_TOOLS] }))
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params
@@ -473,7 +563,50 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     }
   }
 
-  logCall(name, args)
+  // Reavalia a raiz a cada chamada (mesmo syncRaiz do stdio):
+  // trocar de projeto no app passa a valer na proxima chamada HTTP.
+  const raiz = raizMcp()
+  const vault = vaultMcp()
+
+  logCall(name, args, raiz)
+
+  const protegido = primeiroCaminhoProtegido(args)
+  if (protegido) {
+    return {
+      content: [{ type: 'text', text: 'arquivo protegido: ' + protegido }],
+      isError: true
+    }
+  }
+
+  if (GRUPO3_PAGOS.has(name)) {
+    const limite = limiteCustoDia(raiz)
+    if (limite > 0 && custoDiaUsd(raiz) >= limite) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Teto de custo diario atingido no HTTP: ~US$${custoDiaUsd(raiz).toFixed(2)} >= US$${limite.toFixed(2)}. ` +
+            'Ajuste .dg-editor/custo-limite.json ou DG_CUSTO_LIMITE_DIA_USD, ou use um motor gratuito.'
+        }],
+        isError: true
+      }
+    }
+  }
+
+  // dossie_write do dispatch aceita root livre; no HTTP o root e sempre
+  // o projeto ativo (mesma regra das demais tools).
+  if (name === 'dossie_write') {
+    const rootArg = (args as { root?: unknown }).root
+    if (typeof rootArg === 'string' && resolve(rootArg) !== raiz) {
+      return {
+        content: [{ type: 'text', text: 'dossie_write: root deve ser o projeto ativo (DG_ROOT)' }],
+        isError: true
+      }
+    }
+  }
+
+  if (!LOCAL_TOOLS.has(name)) {
+    return executarToolCall(name, args)
+  }
 
   try {
     if (name === 'dossie_read') {
@@ -483,13 +616,13 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     if (name === 'dossie_snapshot') {
       const snap = await dossieSnapshot()
-      const resposta = { ...(snap || {}), root: RAIZ }
+      const resposta = { ...(snap || {}), root: raiz }
       return { content: [{ type: 'text', text: JSON.stringify(resposta, null, 2) }] }
     }
 
     if (name === 'vault_list') {
       const sub = (args as { subpasta?: string }).subpasta
-      const base = sub ? join(VAULT, sub) : VAULT
+      const base = sub ? join(vault, sub) : vault
       if (!dentroDoVault(base)) throw new Error('caminho fora do vault')
       const entradas = await fs.readdir(base, { withFileTypes: true })
       const linhas = entradas.map((e) => {
@@ -503,7 +636,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     if (name === 'vault_read') {
       const p = (args as { caminho: string }).caminho
-      const abs = join(VAULT, p)
+      const abs = join(vault, p)
       if (!dentroDoVault(abs)) throw new Error('caminho fora do vault')
       if (caminhoEhProtegido(p)) {
         return { content: [{ type: 'text', text: 'arquivo protegido: ' + p }], isError: true }
@@ -533,7 +666,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           if (e.isDirectory()) await walk(join(dir, e.name), nivel + 1)
         }
       }
-      await walk(RAIZ, 0)
+      await walk(raiz, 0)
       return { content: [{ type: 'text', text: linhas.join('\n') || '(vazio)' }] }
     }
 
@@ -542,7 +675,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         termo: z.string(),
         tipo: z.enum(['funcao', 'classe', 'tipo', 'todos']).optional()
       }).parse(args)
-      const hits = buscarSimbolos(RAIZ, parsed.termo, parsed.tipo || 'todos')
+      const hits = buscarSimbolos(raiz, parsed.termo, parsed.tipo || 'todos')
       const hitsFiltrados = hits.filter((h) => !caminhoEhProtegido(h.arquivo))
       return { content: [{ type: 'text', text: JSON.stringify(hitsFiltrados, null, 2) }] }
     }
@@ -552,7 +685,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       if (caminhoEhProtegido(parsed.nome)) {
         return { content: [{ type: 'text', text: 'arquivo protegido: ' + parsed.nome }], isError: true }
       }
-      const hit = lerSimbolo(RAIZ, parsed.nome)
+      const hit = lerSimbolo(raiz, parsed.nome)
       if (!hit) {
         return { content: [{ type: 'text', text: 'simbolo nao encontrado: ' + parsed.nome }], isError: true }
       }
@@ -569,7 +702,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       if (caminhoEhProtegido(parsed.arquivo)) {
         return { content: [{ type: 'text', text: 'arquivo protegido: ' + parsed.arquivo }], isError: true }
       }
-      const r = await codigoEditar(RAIZ, parsed.arquivo, parsed.ancora, parsed.novo, parsed.verificar ?? true)
+      const r = await codigoEditar(raiz, parsed.arquivo, parsed.ancora, parsed.novo, parsed.verificar ?? true)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
@@ -579,7 +712,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         args: z.array(z.string()).optional(),
         confirmado: z.boolean().optional()
       }).parse(args)
-      const r = await terminalExec(RAIZ, parsed.comando, parsed.args || [], parsed.confirmado ?? false)
+      const r = await terminalExec(raiz, parsed.comando, parsed.args || [], parsed.confirmado ?? false)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
@@ -588,28 +721,28 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         mensagem: z.string(),
         confirmado: z.boolean().optional()
       }).parse(args)
-      const r = await gitCommit(RAIZ, parsed.mensagem, parsed.confirmado ?? false)
+      const r = await gitCommit(raiz, parsed.mensagem, parsed.confirmado ?? false)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'git_push') {
       const parsed = z.object({ confirmado: z.boolean().optional() }).parse(args)
-      const r = await gitPush(RAIZ, parsed.confirmado ?? false)
+      const r = await gitPush(raiz, parsed.confirmado ?? false)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }], isError: !r.ok }
     }
 
     if (name === 'testes_rodar') {
-      const r = await testesRodar(RAIZ)
+      const r = await testesRodar(raiz)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'projeto_smoke') {
-      const r = await projetoSmoke(RAIZ)
+      const r = await projetoSmoke(raiz)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'git_status') {
-      const r = await gitStatus(RAIZ)
+      const r = await gitStatus(raiz)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
@@ -618,38 +751,38 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       if (parsed.caminho && caminhoEhProtegido(parsed.caminho)) {
         return { content: [{ type: 'text', text: 'arquivo protegido: ' + parsed.caminho }], isError: true }
       }
-      const r = await gitDiff(RAIZ, parsed.caminho)
+      const r = await gitDiff(raiz, parsed.caminho)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'qualidade_checar') {
-      const r = await qualidadeChecar(RAIZ)
+      const r = await qualidadeChecar(raiz)
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'custo_resumo') {
       const r = {
-        custoDiaUsd: custoDiaUsd(RAIZ),
-        limiteDiaUsd: limiteCustoDia(RAIZ),
-        porMotor: resumoUso(RAIZ)
+        custoDiaUsd: custoDiaUsd(raiz),
+        limiteDiaUsd: limiteCustoDia(raiz),
+        porMotor: resumoUso(raiz)
       }
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 
     if (name === 'skills_listar') {
-      const lista = listarSkills(RAIZ).map((s) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }))
+      const lista = listarSkills(raiz).map((s) => ({ id: s.id, titulo: s.titulo, gatilho: s.gatilho }))
       return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
     }
 
     if (name === 'agentes_listar') {
-      const lista = listarAgentes(RAIZ).map((a) => ({ id: a.id, nome: a.nome, especialidade: a.especialidade, skills: a.skills }))
+      const lista = listarAgentes(raiz).map((a) => ({ id: a.id, nome: a.nome, especialidade: a.especialidade, skills: a.skills }))
       return { content: [{ type: 'text', text: JSON.stringify(lista, null, 2) }] }
     }
 
     if (name === 'chat_historico') {
       const parsed = z.object({ limite: z.number().optional() }).parse(args)
       const limite = Math.min(Math.max(parsed.limite ?? 20, 1), 50)
-      const msgs = loadChat(RAIZ).slice(-limite).map((m) => ({
+      const msgs = loadChat(raiz).slice(-limite).map((m) => ({
         role: m.role,
         content: String(m.content || '').slice(0, 2000)
       }))
@@ -665,7 +798,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         saida: z.string().optional(),
         incluirPago: z.boolean().optional()
       }).parse(args)
-      const r = await gerarImagemAuto(RAIZ, { ...parsed, incluirPago: parsed.incluirPago ?? false })
+      const r = await gerarImagemAuto(raiz, { ...parsed, incluirPago: parsed.incluirPago ?? false })
       const { previewBase64: _omit, ...resto } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto, null, 2) }], isError: !r.ok }
     }
@@ -679,7 +812,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         saida: z.string().optional(),
         incluirPago: z.boolean().optional()
       }).parse(args)
-      const r = await gerarVideoAuto(RAIZ, {
+      const r = await gerarVideoAuto(raiz, {
         ...parsed,
         cenas: parsed.cenas as never,
         incluirPago: parsed.incluirPago ?? false
@@ -695,7 +828,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         taxa: z.string().optional(),
         saida: z.string().optional()
       }).parse(args)
-      const r = await narrar(RAIZ, parsed)
+      const r = await narrar(raiz, parsed)
       const { previewBase64: _omit5, ...resto5 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto5, null, 2) }], isError: !r.ok }
     }
@@ -715,7 +848,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         baixo: z.string().optional(),
         saida: z.string().optional()
       }).parse(args)
-      const r = await gerarMeme(RAIZ, parsed)
+      const r = await gerarMeme(raiz, parsed)
       const { previewBase64: _omit6, ...resto6 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto6, null, 2) }], isError: !r.ok }
     }
@@ -730,7 +863,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         campos: z.record(z.string(), z.string()).optional(),
         saida: z.string().optional()
       }).parse(args)
-      const r = await pdfOperar(RAIZ, parsed)
+      const r = await pdfOperar(raiz, parsed)
       const { previewBase64: _omit3, ...resto3 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto3, null, 2) }], isError: !r.ok }
     }
@@ -743,7 +876,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         aba: z.string().optional(),
         linhas: z.array(z.array(z.union([z.string(), z.number()]))).optional()
       }).parse(args)
-      const r = await planilhaOperar(RAIZ, parsed)
+      const r = await planilhaOperar(raiz, parsed)
       const { previewBase64: _omit4, ...resto4 } = r as Record<string, unknown>
       return { content: [{ type: 'text', text: JSON.stringify(resto4, null, 2) }], isError: !r.ok }
     }
@@ -756,7 +889,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       if (Buffer.byteLength(parsed.conteudo, 'utf8') > 512 * 1024) {
         return { content: [{ type: 'text', text: 'conteudo excede 512KB' }], isError: true }
       }
-      const abs = join(VAULT, parsed.caminho)
+      const abs = join(vault, parsed.caminho)
       if (!dentroDoVault(abs)) throw new Error('caminho fora do vault')
       await fs.mkdir(join(abs, '..'), { recursive: true })
       await fs.writeFile(abs, parsed.conteudo, 'utf8')
@@ -772,8 +905,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         notas: z.string().optional()
       }).parse(args)
       const r = parsed.gravar
-        ? gravarMemoriaProjeto(RAIZ, parsed)
-        : lerMemoriaProjeto(RAIZ) || gravarMemoriaProjeto(RAIZ, {})
+        ? gravarMemoriaProjeto(raiz, parsed)
+        : lerMemoriaProjeto(raiz) || gravarMemoriaProjeto(raiz, {})
       return { content: [{ type: 'text', text: JSON.stringify(r, null, 2) }] }
     }
 

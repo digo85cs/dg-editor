@@ -272071,6 +272071,8 @@ var StdioServerTransport = class {
 
 // src/main/mcp/server.ts
 init_types();
+
+// src/main/mcp/dispatch.ts
 var import_node_fs44 = require("node:fs");
 var import_node_child_process11 = require("node:child_process");
 var import_node_util = require("node:util");
@@ -272153,7 +272155,7 @@ async function dossieSnapshot() {
   };
 }
 
-// src/main/mcp/server.ts
+// src/main/mcp/dispatch.ts
 init_paths();
 init_chatstore();
 
@@ -272574,7 +272576,7 @@ function editarPorAncora(raiz, arquivo2, ancora, novo, verificar = true) {
   }
 }
 
-// src/main/mcp/server.ts
+// src/main/mcp/dispatch.ts
 init_skills();
 init_agentes();
 init_agent();
@@ -272969,7 +272971,7 @@ async function executeOllamaTool(name, args, root, runtime = {}) {
   throw new Error("Nenhum modelo respondeu e n\xE3o h\xE1 fallback local dispon\xEDvel. " + attempts.map((a) => a.backend + "/" + a.model + ": " + (a.error || "falhou")).join(" | "));
 }
 
-// src/main/mcp/server.ts
+// src/main/mcp/dispatch.ts
 var execFileAsync4 = (0, import_node_util.promisify)(import_node_child_process11.execFile);
 var execAsync = (0, import_node_util.promisify)(import_node_child_process11.exec);
 var SHIM_CLI_JS = { npm: "npm-cli.js", npx: "npx-cli.js" };
@@ -272989,11 +272991,20 @@ function resolverCliJsShim(cmd) {
   return null;
 }
 function raizAtual() {
+  if (provedorRaiz) {
+    try {
+      const r = provedorRaiz();
+      if (r && r.trim())
+        return (0, import_node_path32.resolve)(r.trim());
+    } catch {
+    }
+  }
   const env = process.env.DG_ROOT;
   if (env && env.trim())
     return (0, import_node_path32.resolve)(env.trim());
   return resolverRaizProjeto();
 }
+var provedorRaiz = null;
 var RAIZ2 = raizAtual();
 var VAULT = projectStateDir(RAIZ2);
 garantirSkillsPadrao(RAIZ2);
@@ -274367,17 +274378,12 @@ var TOOLS = [
     inputSchema: { type: "object", properties: {}, required: [] }
   }
 ];
-var server2 = new Server(
-  { name: "dg-editor-vault", version: "1.0.0" },
-  { capabilities: { tools: {} } }
-);
-server2.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
-server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
-  const { name, arguments: args = {} } = req.params;
+async function executarToolCall(name, argsRaw, signal) {
+  const args = argsRaw ?? {};
   syncRaiz();
   try {
     if (name === "ollama_ask" || name === "ollama_script") {
-      const result = await executeOllamaTool(name, args, RAIZ2, { signal: extra.signal });
+      const result = await executeOllamaTool(name, args, RAIZ2, { signal });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
     if (name === "dossie_read") {
@@ -275949,6 +275955,16 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
   } catch (e) {
     return { content: [{ type: "text", text: "ERRO: " + e.message }], isError: true };
   }
+}
+
+// src/main/mcp/server.ts
+var server2 = new Server(
+  { name: "dg-editor-vault", version: "1.0.0" },
+  { capabilities: { tools: {} } }
+);
+server2.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
+  return executarToolCall(req.params.name, req.params.arguments, extra?.signal);
 });
 async function main() {
   const transport2 = new StdioServerTransport();
