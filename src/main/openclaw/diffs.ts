@@ -19,10 +19,15 @@ export type EditPendente = EditProposta & {
   alvoExistia?: boolean
 }
 
-const pendentes = new Map<string, EditPendente>()
+let pendentes = new Map<string, EditPendente>()
+
+// Estado por projeto ja visitado na sessao: trocar de raiz (DG_ROOT) nao pode
+// misturar propostas — cada projeto tem o seu .dg-editor/openclaw/pendentes.json.
+const visitados = new Map<string, Map<string, EditPendente>>()
+let raizStore: string | null = null
 
 // ---------------------------------------------------------------------------
-// Persistencia em disco: .dg-editor/openclaw/pendentes.json (raiz DG Editor).
+// Persistencia em disco: <projeto>/.dg-editor/openclaw/pendentes.json.
 // Sobrevive a fechar/abrir o app. Gravacao atomica (.tmp + rename) e carga
 // tolerante a JSON corrompido (renomeia para .corrompido e segue vazio).
 // ---------------------------------------------------------------------------
@@ -31,13 +36,27 @@ function storePath(): string {
   return join(resolverRaizDGEditor(), '.dg-editor', 'openclaw', 'pendentes.json')
 }
 
-let storeCarregado = false
-
 function carregarStore(): void {
-  if (storeCarregado) return
-  storeCarregado = true
-  const p = storePath()
+  const raiz = resolverRaizDGEditor()
+  if (raiz === raizStore) return
+  if (raizStore !== null) {
+    // guarda o estado do projeto anterior em memoria antes de trocar
+    visitados.set(raizStore, pendentes)
+    pendentes = new Map()
+  }
+  // primeira visita a esta raiz na sessao: se ja foi vista, restaura da memoria
+  // (sem reler o disco — o disco so e fonte na primeira visita)
+  const conhecido = visitados.get(raiz)
+  if (conhecido) {
+    pendentes = conhecido
+    raizStore = raiz
+    return
+  }
+  raizStore = raiz
+  // Se raizStore era null (primeira chamada do processo), `pendentes` pode ja
+  // conter registros feitos antes da primeira gravacao — NAO zerar; so mesclar.
   try {
+    const p = storePath()
     if (!existsSync(p)) return
     const j = JSON.parse(readFileSync(p, 'utf8'))
     const lista = Array.isArray(j) ? j : j?.pendentes
@@ -46,13 +65,14 @@ function carregarStore(): void {
     for (const item of lista) {
       if (!item || typeof item.id !== 'string' || typeof item.absPath !== 'string') continue
       if (item.status !== 'pendente') continue // so recarrega o que ainda espera aprovacao
+      if (pendentes.has(item.id)) continue
       pendentes.set(item.id, item as EditPendente)
       n++
     }
     if (n) dglog('[propostas] ' + n + ' pendente(s) restaurada(s) do disco')
   } catch (e) {
     dglog('[propostas] store corrompido, renomeando para .corrompido', { erro: String(e) }, 'warn')
-    try { renameSync(p, p + '.corrompido') } catch { /* */ }
+    try { renameSync(storePath(), storePath() + '.corrompido') } catch { /* */ }
   }
 }
 
@@ -147,6 +167,7 @@ export function adicionarPendentes(
   pastas: string[],
   origem: EditPendente['origem'] = 'agent'
 ): { ok: boolean; pendentes: EditPendente[]; rejeitados: Array<{ path: string; erro: string }> } {
+  carregarStore()
   const okList: EditPendente[] = []
   const rejeitados: Array<{ path: string; erro: string }> = []
   for (const e of edits) {
