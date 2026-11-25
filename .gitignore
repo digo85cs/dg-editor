@@ -92,6 +92,10 @@ tmp/
 # Historico de chats (runtime)
 .dg-editor/chats/
 
+# Propostas de edicao pendentes e snapshot de QA (runtime)
+.dg-editor/openclaw/
+.dg-editor/qa-snapshot.json
+
 # Midia gerada pelo Estudio de midia (runtime)
 .dg-editor/midia/
 
