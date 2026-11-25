@@ -1,7 +1,9 @@
-import { promises as fsp } from 'fs'
-import { dirname, resolve } from 'path'
+import { promises as fsp, existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'fs'
+import { dirname, resolve, join } from 'path'
 import { randomBytes, createHash } from 'crypto'
 import { caminhoSeguro } from '../ipc-seguro'
+import { resolverRaizDGEditor } from '../paths'
+import { dglog } from '../dglog'
 import type { EditProposta } from './cliente'
 import { filtrarHunks, listarHunks, type HunkInfo } from './hunks'
 
@@ -11,16 +13,80 @@ export type EditPendente = EditProposta & {
   status: 'pendente' | 'aplicado' | 'rejeitado'
   /** origem da proposta — fila unificada Agent/OpenClaw */
   origem?: 'agent' | 'openclaw' | 'manual'
+  /** sha256(16) do arquivo no momento da proposta; ausente = arquivo nao existia ou legado */
+  hashAlvo?: string
+  /** true se o arquivo existia ao registrar; false se nao existia (diff de criacao); undefined = legado */
+  alvoExistia?: boolean
 }
 
 const pendentes = new Map<string, EditPendente>()
 
+// ---------------------------------------------------------------------------
+// Persistencia em disco: .dg-editor/openclaw/pendentes.json (raiz DG Editor).
+// Sobrevive a fechar/abrir o app. Gravacao atomica (.tmp + rename) e carga
+// tolerante a JSON corrompido (renomeia para .corrompido e segue vazio).
+// ---------------------------------------------------------------------------
+
+function storePath(): string {
+  return join(resolverRaizDGEditor(), '.dg-editor', 'openclaw', 'pendentes.json')
+}
+
+let storeCarregado = false
+
+function carregarStore(): void {
+  if (storeCarregado) return
+  storeCarregado = true
+  const p = storePath()
+  try {
+    if (!existsSync(p)) return
+    const j = JSON.parse(readFileSync(p, 'utf8'))
+    const lista = Array.isArray(j) ? j : j?.pendentes
+    if (!Array.isArray(lista)) throw new Error('formato inesperado')
+    let n = 0
+    for (const item of lista) {
+      if (!item || typeof item.id !== 'string' || typeof item.absPath !== 'string') continue
+      if (item.status !== 'pendente') continue // so recarrega o que ainda espera aprovacao
+      pendentes.set(item.id, item as EditPendente)
+      n++
+    }
+    if (n) dglog('[propostas] ' + n + ' pendente(s) restaurada(s) do disco')
+  } catch (e) {
+    dglog('[propostas] store corrompido, renomeando para .corrompido', { erro: String(e) }, 'warn')
+    try { renameSync(p, p + '.corrompido') } catch { /* */ }
+  }
+}
+
+function persistirStore(): void {
+  try {
+    carregarStore()
+    const p = storePath()
+    mkdirSync(dirname(p), { recursive: true })
+    const lista = [...pendentes.values()].filter((x) => x.status === 'pendente')
+    const tmp = p + '.tmp'
+    writeFileSync(tmp, JSON.stringify({ pendentes: lista }, null, 1), 'utf8')
+    renameSync(tmp, p)
+  } catch (e) {
+    dglog('[propostas] falha ao gravar store', { erro: String(e) }, 'warn')
+  }
+}
+
 export function limparPendentes(): void {
+  carregarStore()
   pendentes.clear()
+  persistirStore()
 }
 
 export function listarPendentes(): EditPendente[] {
+  carregarStore()
   return [...pendentes.values()].filter((p) => p.status === 'pendente')
+}
+
+function hashArquivo(abs: string): { existia: boolean; hash?: string } {
+  try {
+    return { existia: true, hash: hashConteudo(readFileSync(abs, 'utf8')) }
+  } catch {
+    return { existia: false }
+  }
 }
 
 function registrarUm(
@@ -30,43 +96,36 @@ function registrarUm(
   okList: EditPendente[],
   rejeitados: Array<{ path: string; erro: string }>
 ): void {
+  let absFinal: string | null = null
   const seg = caminhoSeguro(e.path, pastas)
   if (!seg.ok) {
-    let resolvido: ReturnType<typeof caminhoSeguro> | null = null
     for (const raiz of pastas) {
       const cand = resolve(raiz, e.path)
       const s = caminhoSeguro(cand, pastas)
       if (s.ok) {
-        resolvido = s
+        absFinal = s.abs
         break
       }
     }
-    if (!resolvido || !resolvido.ok) {
+    if (!absFinal) {
       const erroSeg = 'erro' in seg ? String(seg.erro) : 'path fora das pastas'
       rejeitados.push({ path: e.path, erro: erroSeg })
       return
     }
-    const id = randomBytes(8).toString('hex')
-    const p: EditPendente = {
-      id,
-      path: e.path,
-      unifiedDiff: e.unifiedDiff,
-      absPath: resolvido.abs,
-      status: 'pendente',
-      origem
-    }
-    pendentes.set(id, p)
-    okList.push(p)
-    return
+  } else {
+    absFinal = seg.abs
   }
   const id = randomBytes(8).toString('hex')
+  const alvo = hashArquivo(absFinal)
   const p: EditPendente = {
     id,
     path: e.path,
     unifiedDiff: e.unifiedDiff,
-    absPath: seg.abs,
+    absPath: absFinal,
     status: 'pendente',
-    origem
+    origem,
+    hashAlvo: alvo.hash,
+    alvoExistia: alvo.existia
   }
   pendentes.set(id, p)
   okList.push(p)
@@ -93,22 +152,26 @@ export function adicionarPendentes(
   for (const e of edits) {
     registrarUm(e, pastas, origem, okList, rejeitados)
   }
+  persistirStore()
   return { ok: true, pendentes: okList, rejeitados }
 }
 
 export function obterPendente(id: string): EditPendente | null {
+  carregarStore()
   return pendentes.get(id) || null
 }
 
 export function marcarRejeitado(id: string): boolean {
+  carregarStore()
   const p = pendentes.get(id)
   if (!p || p.status !== 'pendente') return false
   p.status = 'rejeitado'
+  persistirStore()
   return true
 }
 
 export function listarHunksPendente(id: string): { ok: boolean; erro?: string; hunks?: HunkInfo[] } {
-  const p = pendentes.get(id)
+  const p = obterPendente(id)
   if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
   return { ok: true, hunks: listarHunks(p.unifiedDiff) }
 }
@@ -118,15 +181,17 @@ export function definirHunksPendente(
   id: string,
   indicesAceitos: number[]
 ): { ok: boolean; erro?: string; pendente?: EditPendente; rejeitado?: boolean } {
-  const p = pendentes.get(id)
+  const p = obterPendente(id)
   if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
   if (!indicesAceitos.length) {
     p.status = 'rejeitado'
+    persistirStore()
     return { ok: true, rejeitado: true, pendente: p }
   }
   const novo = filtrarHunks(p.unifiedDiff, indicesAceitos)
   if (!novo.trim()) return { ok: false, erro: 'diff vazio apos filtro' }
   p.unifiedDiff = novo
+  persistirStore()
   return { ok: true, pendente: p }
 }
 
@@ -134,9 +199,10 @@ export function atualizarDiffPendente(
   id: string,
   unifiedDiff: string
 ): { ok: boolean; erro?: string; pendente?: EditPendente } {
-  const p = pendentes.get(id)
+  const p = obterPendente(id)
   if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
   p.unifiedDiff = String(unifiedDiff || '')
+  persistirStore()
   return { ok: true, pendente: p }
 }
 
@@ -255,7 +321,7 @@ export async function previewPendente(
   linhasDel?: number[]
   linhasAdd?: number[]
 }> {
-  const p = pendentes.get(id)
+  const p = obterPendente(id)
   if (!p) return { ok: false, erro: 'pendente inexistente' }
   if (p.status !== 'pendente') return { ok: false, erro: 'ja processado: ' + p.status }
   const seg = caminhoSeguro(p.absPath, pastas)
@@ -303,14 +369,14 @@ export async function aplicarPendenteAprovado(
   id: string,
   pastas: string[]
 ): Promise<{ ok: boolean; erro?: string; absPath?: string; hashAntes?: string; hashDepois?: string }> {
-  const p = pendentes.get(id)
-  if (!p) return { ok: false, erro: 'pendente inexistente' }
-  if (p.status !== 'pendente') return { ok: false, erro: 'ja processado: ' + p.status }
+  const p = obterPendente(id)
+  if (!p || p.status !== 'pendente') return { ok: false, erro: 'pendente inexistente' }
   const seg = caminhoSeguro(p.absPath, pastas)
   if (!seg.ok) {
     return { ok: false, erro: 'erro' in seg ? String(seg.erro) : 'path fora das pastas' }
   }
-
+  const stale = alvoDesatualizado(p, seg.abs)
+  if (stale) return { ok: false, erro: stale }
   let original = ''
   try {
     original = await fsp.readFile(seg.abs, 'utf8')
@@ -319,7 +385,6 @@ export async function aplicarPendenteAprovado(
   }
   const applied = aplicarUnifiedDiff(original, p.unifiedDiff)
   if (!applied.ok || applied.resultado == null) return { ok: false, erro: applied.erro || 'falha ao aplicar' }
-
   const hashAntes = hashConteudo(original)
   const hashDepois = hashConteudo(applied.resultado)
   try {
@@ -329,5 +394,19 @@ export async function aplicarPendenteAprovado(
     return { ok: false, erro: String((e as Error).message || e) }
   }
   p.status = 'aplicado'
+  persistirStore()
   return { ok: true, absPath: seg.abs, hashAntes, hashDepois }
+}
+
+/** Recusa diff velho: o arquivo mudou (ou passou a existir/deixar de existir) depois da proposta. */
+function alvoDesatualizado(p: EditPendente, abs: string): string | null {
+  if (p.alvoExistia === undefined) return null // legado sem rastreio
+  const atual = hashArquivo(abs)
+  if (p.alvoExistia) {
+    if (!atual.existia) return 'arquivo alvo foi removido depois da proposta — recusado'
+    if (atual.hash !== p.hashAlvo) return 'arquivo alvo mudou depois da proposta — recusado'
+    return null
+  }
+  if (atual.existia) return 'arquivo alvo passou a existir depois da proposta — recusado'
+  return null
 }
