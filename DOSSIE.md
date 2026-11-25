@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **25/11/2026, 08:54:15** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.26** · branch `integra-13-11` · último commit: 7d74aca 2026-11-25 chore: bump 0.9.26
-> Alterações locais não commitadas: 2 arquivo(s).
+> Gerado automaticamente em **25/11/2026, 14:24:21** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.27** · branch `integra-13-11` · último commit: d5be6e5 2026-11-25 chore: release 0.9.27
+> Alterações locais não commitadas: 3 arquivo(s).
 
 ## 1. O que é
 
@@ -231,7 +231,7 @@ Artefatos locais em `dist-apps/`:
 
 Utilitários locais relevantes:
 
-- ffmpeg — mídia: ausente
+- ffmpeg — mídia: **presente**
 - ImageMagick — imagem (ImageMagick): ausente
 - pandoc — documentos: **presente**
 - yt-dlp — download de vídeo: ausente
@@ -339,16 +339,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- d5be6e5 2026-11-25 chore: release 0.9.27
+- 98f422b 2026-11-25 chore: ignora store de propostas e snapshot de QA (runtime)
+- 9cde038 2026-11-25 fix(chat): persiste turnos do painel Agente no historico da conversa
+- 91d2d15 2026-11-25 fix(openclaw): persiste propostas pendentes em .dg-editor/openclaw/pendentes.json
+- f950379 2026-11-25 chore: pos-release 0.9.26 — dossie, radar, skills, nota AGENTS
 - 7d74aca 2026-11-25 chore: bump 0.9.26
 - f575fcd 2026-11-25 fix(auditoria): auto-restart do Ollama usava execFile com timeout
 - c93a17b 2026-11-20 chore: radar diario + skills regeneradas com conteudo completo
 - 2c32f26 2026-11-20 chore: pos-release 0.9.25 — dossie, skills sincronizadas, nota AGENTS
 - 0acb8a5 2026-11-20 chore: bump 0.9.25
-- 1125eea 2026-11-20 fix(skills): conteudo padrao completo para estilo-cursor e inventario-disco
-- b71abb0 2026-11-20 chore: bump 0.9.24
-- e3ac5cd 2026-11-20 fix(skills): restaurar estrutura completa de estilo-cursor e inventario-disco
-- c036080 2026-11-20 docs: registrar fix de shims npm/npx no Windows
-- 63c86bd 2026-11-20 fix(mcp): resolver shims npm/npx no Windows sem depender do .cmd
 
 ## 16. Como atualizar este dossiê
 

@@ -31212,7 +31212,7 @@ var require_util2 = __commonJS({
       return path10;
     }
     exports2.normalize = normalize5;
-    function join58(aRoot, aPath) {
+    function join59(aRoot, aPath) {
       if (aRoot === "") {
         aRoot = ".";
       }
@@ -31244,7 +31244,7 @@ var require_util2 = __commonJS({
       }
       return joined;
     }
-    exports2.join = join58;
+    exports2.join = join59;
     exports2.isAbsolute = function(aPath) {
       return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
     };
@@ -31417,7 +31417,7 @@ var require_util2 = __commonJS({
             parsed.path = parsed.path.substring(0, index + 1);
           }
         }
-        sourceURL = join58(urlGenerate(parsed), sourceURL);
+        sourceURL = join59(urlGenerate(parsed), sourceURL);
       }
       return normalize5(sourceURL);
     }
@@ -253502,47 +253502,95 @@ var init_hunks = __esm({
 });
 
 // src/main/openclaw/diffs.ts
+function storePath() {
+  return (0, import_path27.join)(resolverRaizDGEditor(), ".dg-editor", "openclaw", "pendentes.json");
+}
+function carregarStore() {
+  if (storeCarregado)
+    return;
+  storeCarregado = true;
+  const p = storePath();
+  try {
+    if (!(0, import_fs25.existsSync)(p))
+      return;
+    const j = JSON.parse((0, import_fs25.readFileSync)(p, "utf8"));
+    const lista = Array.isArray(j) ? j : j?.pendentes;
+    if (!Array.isArray(lista))
+      throw new Error("formato inesperado");
+    let n = 0;
+    for (const item of lista) {
+      if (!item || typeof item.id !== "string" || typeof item.absPath !== "string")
+        continue;
+      if (item.status !== "pendente")
+        continue;
+      pendentes.set(item.id, item);
+      n++;
+    }
+    if (n)
+      dglog("[propostas] " + n + " pendente(s) restaurada(s) do disco");
+  } catch (e) {
+    dglog("[propostas] store corrompido, renomeando para .corrompido", { erro: String(e) }, "warn");
+    try {
+      (0, import_fs25.renameSync)(p, p + ".corrompido");
+    } catch {
+    }
+  }
+}
+function persistirStore() {
+  try {
+    carregarStore();
+    const p = storePath();
+    (0, import_fs25.mkdirSync)((0, import_path27.dirname)(p), { recursive: true });
+    const lista = [...pendentes.values()].filter((x) => x.status === "pendente");
+    const tmp = p + ".tmp";
+    (0, import_fs25.writeFileSync)(tmp, JSON.stringify({ pendentes: lista }, null, 1), "utf8");
+    (0, import_fs25.renameSync)(tmp, p);
+  } catch (e) {
+    dglog("[propostas] falha ao gravar store", { erro: String(e) }, "warn");
+  }
+}
 function listarPendentes() {
+  carregarStore();
   return [...pendentes.values()].filter((p) => p.status === "pendente");
 }
+function hashArquivo(abs) {
+  try {
+    return { existia: true, hash: hashConteudo((0, import_fs25.readFileSync)(abs, "utf8")) };
+  } catch {
+    return { existia: false };
+  }
+}
 function registrarUm(e, pastas, origem, okList, rejeitados) {
+  let absFinal = null;
   const seg = caminhoSeguro(e.path, pastas);
   if (!seg.ok) {
-    let resolvido = null;
     for (const raiz of pastas) {
       const cand = (0, import_path27.resolve)(raiz, e.path);
       const s = caminhoSeguro(cand, pastas);
       if (s.ok) {
-        resolvido = s;
+        absFinal = s.abs;
         break;
       }
     }
-    if (!resolvido || !resolvido.ok) {
+    if (!absFinal) {
       const erroSeg = "erro" in seg ? String(seg.erro) : "path fora das pastas";
       rejeitados.push({ path: e.path, erro: erroSeg });
       return;
     }
-    const id2 = (0, import_crypto2.randomBytes)(8).toString("hex");
-    const p2 = {
-      id: id2,
-      path: e.path,
-      unifiedDiff: e.unifiedDiff,
-      absPath: resolvido.abs,
-      status: "pendente",
-      origem
-    };
-    pendentes.set(id2, p2);
-    okList.push(p2);
-    return;
+  } else {
+    absFinal = seg.abs;
   }
   const id = (0, import_crypto2.randomBytes)(8).toString("hex");
+  const alvo = hashArquivo(absFinal);
   const p = {
     id,
     path: e.path,
     unifiedDiff: e.unifiedDiff,
-    absPath: seg.abs,
+    absPath: absFinal,
     status: "pendente",
-    origem
+    origem,
+    hashAlvo: alvo.hash,
+    alvoExistia: alvo.existia
   };
   pendentes.set(id, p);
   okList.push(p);
@@ -253553,16 +253601,20 @@ function adicionarPendentes(edits, pastas, origem = "agent") {
   for (const e of edits) {
     registrarUm(e, pastas, origem, okList, rejeitados);
   }
+  persistirStore();
   return { ok: true, pendentes: okList, rejeitados };
 }
 function obterPendente(id) {
+  carregarStore();
   return pendentes.get(id) || null;
 }
 function marcarRejeitado(id) {
+  carregarStore();
   const p = pendentes.get(id);
   if (!p || p.status !== "pendente")
     return false;
   p.status = "rejeitado";
+  persistirStore();
   return true;
 }
 function aplicarUnifiedDiff(original, diff) {
@@ -253651,15 +253703,16 @@ function hashConteudo(s) {
   return (0, import_crypto2.createHash)("sha256").update(s, "utf8").digest("hex").slice(0, 16);
 }
 async function aplicarPendenteAprovado(id, pastas) {
-  const p = pendentes.get(id);
-  if (!p)
+  const p = obterPendente(id);
+  if (!p || p.status !== "pendente")
     return { ok: false, erro: "pendente inexistente" };
-  if (p.status !== "pendente")
-    return { ok: false, erro: "ja processado: " + p.status };
   const seg = caminhoSeguro(p.absPath, pastas);
   if (!seg.ok) {
     return { ok: false, erro: "erro" in seg ? String(seg.erro) : "path fora das pastas" };
   }
+  const stale = alvoDesatualizado(p, seg.abs);
+  if (stale)
+    return { ok: false, erro: stale };
   let original = "";
   try {
     original = await import_fs25.promises.readFile(seg.abs, "utf8");
@@ -253678,9 +253731,25 @@ async function aplicarPendenteAprovado(id, pastas) {
     return { ok: false, erro: String(e.message || e) };
   }
   p.status = "aplicado";
+  persistirStore();
   return { ok: true, absPath: seg.abs, hashAntes, hashDepois };
 }
-var import_fs25, import_path27, import_crypto2, pendentes;
+function alvoDesatualizado(p, abs) {
+  if (p.alvoExistia === void 0)
+    return null;
+  const atual = hashArquivo(abs);
+  if (p.alvoExistia) {
+    if (!atual.existia)
+      return "arquivo alvo foi removido depois da proposta \u2014 recusado";
+    if (atual.hash !== p.hashAlvo)
+      return "arquivo alvo mudou depois da proposta \u2014 recusado";
+    return null;
+  }
+  if (atual.existia)
+    return "arquivo alvo passou a existir depois da proposta \u2014 recusado";
+  return null;
+}
+var import_fs25, import_path27, import_crypto2, pendentes, storeCarregado;
 var init_diffs = __esm({
   "src/main/openclaw/diffs.ts"() {
     "use strict";
@@ -253688,8 +253757,11 @@ var init_diffs = __esm({
     import_path27 = require("path");
     import_crypto2 = require("crypto");
     init_ipc_seguro();
+    init_paths();
+    init_dglog();
     init_hunks();
     pendentes = /* @__PURE__ */ new Map();
+    storeCarregado = false;
   }
 });
 
@@ -255230,11 +255302,11 @@ async function rodarLoopComProvider(raiz, pergunta, cfg2, tarefa, tools, systemE
           bloqueio = nome + " bloqueado (permitirMcp=false)";
         if (!bloqueio) {
           try {
-            const { readFileSync: readFileSync42, existsSync: existsSync59 } = await import("fs");
-            const { join: join58 } = await import("path");
-            const arqBloq = join58(raiz, ".dg-editor", "tools-bloqueadas.json");
-            if (existsSync59(arqBloq)) {
-              const j = JSON.parse(readFileSync42(arqBloq, "utf8"));
+            const { readFileSync: readFileSync43, existsSync: existsSync60 } = await import("fs");
+            const { join: join59 } = await import("path");
+            const arqBloq = join59(raiz, ".dg-editor", "tools-bloqueadas.json");
+            if (existsSync60(arqBloq)) {
+              const j = JSON.parse(readFileSync43(arqBloq, "utf8"));
               const padroes = Array.isArray(j.padroes) ? j.padroes.map(String) : [];
               const alvo = String(nome).toLowerCase();
               for (const p of padroes) {
@@ -260238,9 +260310,9 @@ async function baixarArquivo(url2, destino) {
   const { Readable: Readable4 } = await import("node:stream");
   const { pipeline: pipeline5 } = await import("node:stream/promises");
   await pipeline5(Readable4.fromWeb(res.body), createWriteStream5(parcial));
-  const { renameSync: renameSync5, rmSync: rmSync11 } = await import("node:fs");
+  const { renameSync: renameSync6, rmSync: rmSync11 } = await import("node:fs");
   try {
-    renameSync5(parcial, destino);
+    renameSync6(parcial, destino);
   } catch {
     rmSync11(parcial, { force: true });
     throw new Error("n\xE3o foi poss\xEDvel finalizar " + destino);
@@ -274811,12 +274883,12 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
         parsed.criterios || []
       );
       try {
-        const { appendFileSync: appendFileSync4, mkdirSync: mkdirSync39 } = await import("node:fs");
-        const { join: join58 } = await import("node:path");
-        const dir = join58(RAIZ2, ".dg-editor");
-        mkdirSync39(dir, { recursive: true });
+        const { appendFileSync: appendFileSync4, mkdirSync: mkdirSync40 } = await import("node:fs");
+        const { join: join59 } = await import("node:path");
+        const dir = join59(RAIZ2, ".dg-editor");
+        mkdirSync40(dir, { recursive: true });
         appendFileSync4(
-          join58(dir, "avaliacoes.jsonl"),
+          join59(dir, "avaliacoes.jsonl"),
           JSON.stringify({
             ts: (/* @__PURE__ */ new Date()).toISOString(),
             pedido: parsed.pedido.slice(0, 200),
@@ -275529,9 +275601,9 @@ server2.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
       if (name === "reversa_strings") {
         const p = external_exports.object({ arquivo: external_exports.string().min(1), minimo: external_exports.number().optional() }).parse(args);
         const rv = await Promise.resolve().then(() => (init_reversa(), reversa_exports));
-        const { readFileSync: readFileSync42 } = await import("node:fs");
+        const { readFileSync: readFileSync43 } = await import("node:fs");
         const abs = caminho2(p.arquivo);
-        const strings = rv.extrairStrings(readFileSync42(abs), p.minimo ?? 5);
+        const strings = rv.extrairStrings(readFileSync43(abs), p.minimo ?? 5);
         return await responder({ ok: true, arquivo: p.arquivo, total: strings.length, strings });
       }
       if (name === "reversa_asar") {
