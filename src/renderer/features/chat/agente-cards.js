@@ -5,7 +5,7 @@ import { anunciar } from '../ui/live-region.js'
 import { lerPreferenciasA11y } from '../ui/acessibilidade.js'
 import { agenteEstado } from './agente-estado.js'
 import { atualizarStatusAgent, agenteSelecionadoUi, carregarAgentesUi } from './agente-seletor.js'
-import { setChatLiveStatus, setChatSendMode, adicionarBolha, limparUiAgenteChat } from './chat-core.js'
+import { setChatLiveStatus, setChatSendMode, adicionarBolha, limparUiAgenteChat, obterHistChat } from './chat-core.js'
 import {
   renderChatPlanoCard,
   renderChatApplyCard,
@@ -188,7 +188,10 @@ export async function executarPlanoDoChat(soProximo) {
       alert(r?.erro || 'Falha ao executar plano')
       return
     }
-    if (r.texto) adicionarBolha('assistant', organizarRespostaCursor(r.texto), r.modelo || 'agente')
+    if (r.texto) {
+      adicionarBolha('assistant', organizarRespostaCursor(r.texto), r.modelo || 'agente')
+      persistirTurnoAgente('assistant', r.texto, r.modelo || 'agente')
+    }
     renderAgentTrace(r.passos || [])
     mostrarPropostasAgent(r.propostas || [])
     atualizarChatApplyCard(r.propostas || [])
@@ -486,6 +489,19 @@ export async function refrescarPlanoUi() {
   renderPlanoChecklist(r?.plano)
 }
 
+// Persiste o turno do painel Agente no mesmo historico do chat (chat:salvar via histChat).
+// Texto consolidado final — nunca token a token. Falha vira warn no console, nao trava a UI.
+function persistirTurnoAgente(role, conteudo, provider) {
+  try {
+    const hist = obterHistChat()
+    if (!hist?.registrarMensagem) return
+    hist.registrarMensagem(role, String(conteudo || ''), provider || 'agente')
+    void hist.flushSalvar?.()
+  } catch (e) {
+    console.warn('[agente] falha ao persistir historico:', e)
+  }
+}
+
 export async function executarAgentUi(orquestrar) {
   if (!state.pastaAtual) {
     alert('Abra uma pasta primeiro.')
@@ -494,6 +510,7 @@ export async function executarAgentUi(orquestrar) {
   const input = $('agent-input')
   const texto = input?.value?.trim()
   if (!texto) return
+  persistirTurnoAgente('user', texto, 'agente')
   const plan =
     $('agent-plan-mode')?.checked ||
     document.getElementById('chat-mode-select')?.value === 'plan'
@@ -516,11 +533,11 @@ export async function executarAgentUi(orquestrar) {
     let r
     if (orquestrar) {
       r = await window.api.invoke('agente:orquestrar', state.pastaAtual, texto)
-      if (out) {
-        out.textContent = (r?.passos || [])
-          .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
-          .join('\n\n')
-      }
+      const consolidado = (r?.passos || [])
+        .map((p) => '## ' + p.agente + (p.ok ? '' : ' (erro)') + '\n' + (p.texto || p.erro || ''))
+        .join('\n\n')
+      if (out) out.textContent = consolidado
+      persistirTurnoAgente('assistant', consolidado, 'agente')
       const todos = []
       for (const p of r?.passos || []) {
         if (p.passos) todos.push(...p.passos)
@@ -546,12 +563,12 @@ export async function executarAgentUi(orquestrar) {
         if (out) out.textContent = 'Erro: ' + (r?.erro || 'falha')
         return
       }
-      if (out) {
-        out.textContent =
-          (plan ? '[PLAN]\n\n' : '') +
-          (r.texto || '') +
-          (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
-      }
+      const consolidado =
+        (plan ? '[PLAN]\n\n' : '') +
+        (r.texto || '') +
+        (r.duracaoMs ? '\n\n— ' + r.duracaoMs + ' ms · ' + (r.modelo || '') : '')
+      if (out) out.textContent = consolidado
+      persistirTurnoAgente('assistant', consolidado, r.modelo || 'agente')
       renderAgentTrace(r.passos || [])
       mostrarPropostasAgent(r.propostas || [])
       atualizarStatusAgent(r.modelo, r.duracaoMs, r.fila)
@@ -621,6 +638,7 @@ export function ligarPainelAgente() {
       return
     }
     if (out) out.textContent = r.texto || ''
+    if (r.texto) persistirTurnoAgente('assistant', r.texto, r.modelo || 'agente')
     renderAgentTrace(r.passos || [])
     mostrarPropostasAgent(r.propostas || [])
     atualizarChatApplyCard(r.propostas || [])
@@ -646,6 +664,7 @@ export function ligarPainelAgente() {
       out.textContent =
         (r.passoExecutado ? '[Passo] ' + r.passoExecutado.texto + '\n\n' : '') + (r.texto || '')
     }
+    if (r.texto) persistirTurnoAgente('assistant', out?.textContent || r.texto, r.modelo || 'agente')
     renderAgentTrace(r.passos || [])
     mostrarPropostasAgent(r.propostas || [])
     atualizarChatApplyCard(r.propostas || [])
