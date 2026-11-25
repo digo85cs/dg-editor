@@ -133,6 +133,8 @@ _ed*.js
 .dg-editor/smoke/
 scripts/*.mjs
 !scripts/*.mjs.example
+!scripts/verificar-persistencia.mjs
+!scripts/verificar-store-projeto.mjs
 .dg-editor/relatorios/
 .dg-editor/resposta-cache/
 .dg-editor/midias/

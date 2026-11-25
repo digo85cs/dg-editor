@@ -23,7 +23,7 @@ if ($pub -and ($pub | Where-Object { $_.provider -eq 'github' -and $_.repo -eq '
 # 3) NSIS: pasta editavel + desktop
 $nsis = $pkg.build.nsis
 if ($nsis.allowToChangeInstallationDirectory -eq $true) { Ok 'NSIS permite escolher pasta' } else { Falha 'NSIS sem allowToChangeInstallationDirectory' }
-if ($nsis.perMachine -eq $true) { Ok 'NSIS perMachine (Program Files)' } else { Falha 'NSIS sem perMachine' }
+if ($nsis.perMachine -eq $false) { Ok 'NSIS por-usuario (%LOCALAPPDATA%\Programs, sem UAC)' } else { Falha 'NSIS perMachine (config antiga — exige UAC)' }
 if ($nsis.createDesktopShortcut -eq $true) { Ok 'NSIS cria atalho Desktop' } else { Falha 'NSIS createDesktopShortcut desligado' }
 $side = Join-Path $raiz 'resources\installer-sidebar.bmp'
 if (Test-Path $side) { Ok 'installer-sidebar.bmp presente' } else { Falha 'faltando installer-sidebar.bmp' }
