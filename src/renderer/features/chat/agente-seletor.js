@@ -53,19 +53,27 @@ export async function carregarOpcoesAgenteChat(raiz = state.pastaAtual) {
   autoOpt.textContent = 'Automático'
   agentSel.appendChild(autoOpt)
 
+  const idsBackend = new Set(list.map((a) => a.id))
+
   const grpFree = document.createElement('optgroup')
   grpFree.label = 'Agentes gratuitos'
+  // So entram os que o backend NAO tem — os free-* ja vem em `list` e
+  // repetir aqui duplicava as opcoes do seletor.
   for (const a of agentesGratisPadrao) {
+    if (idsBackend.has(a.id)) continue
     const o = document.createElement('option')
     o.value = a.id
     o.textContent = a.nome
     grpFree.appendChild(o)
   }
-  agentSel.appendChild(grpFree)
+  if (grpFree.children.length) agentSel.appendChild(grpFree)
 
   const grpLocal = document.createElement('optgroup')
   grpLocal.label = 'Agentes locais'
+  const idsVistos = new Set()
   for (const a of list) {
+    if (idsVistos.has(a.id)) continue
+    idsVistos.add(a.id)
     const o = document.createElement('option')
     o.value = a.id
     o.textContent = a.nome || a.id
