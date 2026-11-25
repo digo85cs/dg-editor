@@ -135,6 +135,7 @@ scripts/*.mjs
 !scripts/*.mjs.example
 !scripts/verificar-persistencia.mjs
 !scripts/verificar-store-projeto.mjs
+!scripts/verificar-mcp-http.mjs
 .dg-editor/relatorios/
 .dg-editor/resposta-cache/
 .dg-editor/midias/
