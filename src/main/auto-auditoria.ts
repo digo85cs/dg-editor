@@ -105,8 +105,13 @@ async function checarOllama(subir = true): Promise<Achado[]> {
       out.push({ id: 'ollama:servico', area: 'ia', titulo: 'Ollama indisponivel', severidade: 'warn', corrigivel: false, status: 'nao-aplicavel', detalhe: 'boot nao sobe ollama serve' })
       return out
     }
-    try { await execFileP('ollama', ['serve'], { timeout: 6000, windowsHide: true } as any) } catch {}
-    await new Promise((r) => setTimeout(r, 2500))
+    // ollama serve e processo permanente — execFile com timeout o mataria.
+    // ensureOllama (ollama-keeper) faz spawn destacado e espera ficar no ar.
+    try {
+      const { ensureOllama } = await import('./ollama-keeper')
+      await ensureOllama()
+    } catch {}
+    await new Promise((r) => setTimeout(r, 1500))
     try {
       const r2 = await execFileP('ollama', ['list'], { timeout: 12000, windowsHide: true })
       const n2 = r2.stdout.trim().split(/\r?\n/).filter(Boolean).slice(1).length

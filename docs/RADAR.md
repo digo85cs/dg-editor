@@ -1,7 +1,7 @@
 # Radar Diario — DG Editor
 
-Data: 2026-11-21T00:13:15.220Z
-Provider usado: cloudflare-workers-ai
+Data: 2026-11-25T11:51:40.234Z
+Provider usado: cloudflare-workers-ai(cache)
 Custo estimado total: $0.000000 USD
 
 > **Aviso:** Este relatorio e gerado automaticamente pelo radar diario do DG Editor.
@@ -24,7 +24,7 @@ Custo estimado total: $0.000000 USD
 
 #### Query: IDE com inteligencia artificial para programacao comparativa
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 Aqui estão as análises dos resultados de busca:
 
@@ -73,7 +73,7 @@ Em resumo, o DG Editor pode se beneficiar da integração de funcionalidades de 
 
 #### Query: agente de programacao que executa tarefas sozinho
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 **Análise de Resultados de Busca: Agentes de Código Autônomos**
 
@@ -114,7 +114,7 @@ Em resumo, o DG Editor pode se beneficiar da integração de funcionalidades de 
 
 #### Query: agente com memoria de longo prazo contexto persistente
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 **Análise de Resultados de Busca**
 
@@ -147,7 +147,7 @@ Em resumo, o DG Editor pode se beneficiar da integração de funcionalidades de 
 
 #### Query: tecnicas de resumo e compressao para modelos de linguagem
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 Aqui estão as análises dos resultados de busca:
 
@@ -182,7 +182,7 @@ Essas são minhas análises. Se tiver mais alguma pergunta ou precisar de mais i
 
 #### Query: servidores MCP para ferramentas de desenvolvimento
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 **Análise de Resultados de Busca: MCP Servers**
 
@@ -215,7 +215,7 @@ Essas são minhas análises. Se tiver mais alguma pergunta ou precisar de mais i
 
 #### Query: editor de codigo com copilot integrado alternativas
 
-### Analise do provider (cloudflare-workers-ai)
+### Analise do provider (cloudflare-workers-ai(cache))
 
 **Análise de Resultados de Busca**
 
@@ -251,4 +251,4 @@ Ordenadas por impacto. Cada item entra em modo plan e exige aprovacao do usuario
 5. Mapear MCP servers uteis e expor via IPC do DG Editor
 
 ---
-*Gerado pelo Radar Diario do DG Editor — 2026-11-21T00:13:15.220Z*
+*Gerado pelo Radar Diario do DG Editor — 2026-11-25T11:51:40.234Z*
