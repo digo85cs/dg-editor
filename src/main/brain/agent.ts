@@ -79,6 +79,23 @@ export interface PassoAgente {
   codigoSaida?: number
 }
 
+/** Iteração real de uma missão agent — base do artefato em .dg-editor/missoes. */
+export interface IteracaoMissao {
+  iteracao: number
+  oQueTentou: string
+  comando?: string
+  codigoSaida?: number
+  saidaReal?: string
+}
+
+/** Reconstrói a linha de comando completa (comando + args) de uma tool terminal_exec. */
+function comandoCompletoTool(args?: Record<string, unknown>): string {
+  if (!args) return ''
+  const cmd = String(args.comando || '').trim()
+  const argv = Array.isArray(args.args) ? (args.args as unknown[]).map(String).join(' ').trim() : ''
+  return (cmd + (argv ? ' ' + argv : '')).trim()
+}
+
 export interface TentativaProvider {
   provider: string
   resultado: string
@@ -179,7 +196,7 @@ export interface OpcoesExecutarAgente {
   /** Objetivo da missão (o que precisa ser verdade no fim) — modo agent */
   objetivo?: string
   /** Criterio de pronto: comando verificável ou condição checável — modo agent */
-  criterioDePronto?: string
+  criterioDePronto?: string | { comando: string; esperado?: number; timeoutMs?: number }
   /** Teto de iterações (padrão 15) e tempo (padrão 10min) — modo agent */
   tetoIteracoes?: number
   tetoTempoMs?: number
@@ -517,7 +534,8 @@ async function finalizarAgente(
   modelo: string,
   texto: string,
   passos: PassoAgente[],
-  opts?: OpcoesExecutarAgente
+  opts?: OpcoesExecutarAgente,
+  iteracoesMissao?: IteracaoMissao[]
 ): Promise<RespostaAgente> {
   let final = texto
   if (
@@ -562,9 +580,10 @@ async function finalizarAgente(
   // FASE 2/3: verifica critério no modo agent e grava artefato
   if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
     const veredito = await verificarCriterio(raiz, opts.criterioDePronto, passos)
-    gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, veredito, passos)
+    gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, veredito, passos, iteracoesMissao)
+    const critStr = typeof opts.criterioDePronto === 'string' ? opts.criterioDePronto : opts.criterioDePronto.comando
     if (veredito === 'sucesso') {
-      final += '\n\n✓ Critério atingido: ' + opts.criterioDePronto
+      final += '\n\n✓ Critério atingido: ' + critStr
     } else if (veredito === 'nao-provado') {
       final += '\n\n⚠ Critério não foi executado nesta missão.'
     } else {
@@ -575,18 +594,29 @@ async function finalizarAgente(
   return { texto: final, modelo, passos }
 }
 
-async function verificarCriterio(raiz: string, criterio: string, passos: PassoAgente[]): Promise<'sucesso' | 'falha' | 'nao-provado'> {
-  const crit = criterio.trim()
-  const passoExec = passos.find((p) => p.tipo === 'tool' && p.nome === 'terminal_exec')
-  if (!passoExec) return 'nao-provado'
-  const cmd = String(passoExec.args?.comando || '')
-  if (cmd.includes(crit)) {
-    return passoExec.codigoSaida === 0 ? 'sucesso' : 'falha'
+export async function verificarCriterio(raiz: string, criterio: string | { comando: string; esperado?: number; timeoutMs?: number }, passos: PassoAgente[]): Promise<'sucesso' | 'falha' | 'nao-provado'> {
+  // FASE 1: criterio como objeto { comando, esperado?, timeoutMs? } ou string (atalho que so preenche comando)
+  let comandoEsperado: string | null = null
+  let exitEsperado = 0
+  if (typeof criterio === 'string') {
+    comandoEsperado = criterio.trim() || null
+  } else if (criterio && typeof criterio === 'object' && criterio.comando) {
+    comandoEsperado = criterio.comando.trim()
+    exitEsperado = criterio.esperado ?? 0
   }
-  return 'nao-provado'
+
+  if (!comandoEsperado) return 'nao-provado'
+
+  // FASE 1 (D2): pega o ÚLTIMO terminal_exec cujo comando COMPLETO casa exato
+  // (comando + args reconstruidos — ex.: "npx" + ["vitest","run"] = "npx vitest run")
+  const execs = passos.filter((p) => p.tipo === 'tool' && p.nome === 'terminal_exec')
+  const ultimo = [...execs].reverse().find((p) => comandoCompletoTool(p.args) === comandoEsperado)
+  if (!ultimo) return 'nao-provado'
+  if (ultimo.codigoSaida === undefined || ultimo.codigoSaida === null) return 'nao-provado'
+  return ultimo.codigoSaida === exitEsperado ? 'sucesso' : 'falha'
 }
 
-function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[]): void {
+export function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string | { comando: string; esperado?: number; timeoutMs?: number }, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[], iteracoesMissao?: IteracaoMissao[]): void {
   try {
     const dirBase = path.join(raiz, '.dg-editor', 'missoes')
     require('fs').mkdirSync(dirBase, { recursive: true })
@@ -594,29 +624,49 @@ function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string, 
     const dirMissao = path.join(dirBase, id)
     require('fs').mkdirSync(dirMissao, { recursive: true })
 
-    // FASE 5: iteracoes.json com exitCode real
-    const iteracoes = passos.map((p, i) => ({
-      iteracao: i + 1,
-      oQueTentou: p.tipo === 'tool' ? p.nome + (p.args ? ' ' + JSON.stringify(p.args).slice(0, 100) : '') : p.texto?.slice(0, 200) || '',
-      comando: p.tipo === 'tool' && p.nome === 'terminal_exec' ? String(p.args?.comando) : undefined,
-      exitCode: p.codigoSaida,
-      trechoReal: p.resultado ? p.resultado.slice(0, 2000) : undefined
-    }))
+    // FASE 3: usa iteracoesMissao (lista real) se disponível, senão reconstrói de passos
+    const iteracoes = iteracoesMissao && iteracoesMissao.length > 0
+      ? iteracoesMissao.map((it) => ({
+          iteracao: it.iteracao,
+          oQueTentou: it.oQueTentou,
+          comando: it.comando,
+          exitCode: it.codigoSaida ?? null,
+          trechoReal: it.saidaReal ? it.saidaReal.slice(0, 2000) : null
+        }))
+      : passos.map((p, i) => ({
+          iteracao: i + 1,
+          oQueTentou: p.tipo === 'tool' ? p.nome + (p.args ? ' ' + JSON.stringify(p.args).slice(0, 100) : '') : p.texto?.slice(0, 200) || '',
+          comando: p.tipo === 'tool' && p.nome === 'terminal_exec' ? comandoCompletoTool(p.args) || undefined : undefined,
+          exitCode: p.codigoSaida ?? null,
+          trechoReal: p.resultado ? p.resultado.slice(0, 2000) : null
+        }))
+
     require('fs').writeFileSync(
       path.join(dirMissao, 'iteracoes.json'),
       JSON.stringify({ id, objetivo, iteracoes }, null, 2),
       'utf8'
     )
 
-    // FASE 5: veredito.json com criterio executado ou não
-    const criterioExecutado = passos.some((p) => p.tipo === 'tool' && p.nome === 'terminal_exec' && p.codigoSaida !== undefined)
-    const vereditoFinal = criterioExecutado ? veredito : 'nao-provado'
+    // FASE 3: veredito.json com criterio, comando esperado, esperado, executado, obtido, resultado
+    const criterioObj = typeof criterio === 'object' ? criterio : { comando: criterio }
+    const execTerminal = passos.filter((p) => p.tipo === 'tool' && p.nome === 'terminal_exec')
+    const ultimoExec = [...execTerminal].reverse().find((p) => comandoCompletoTool(p.args) === String(criterioObj.comando || '').trim())
+    const obtido = ultimoExec?.codigoSaida ?? null
+    const executado = obtido !== null && obtido !== undefined
+    const resultado = executado ? (obtido === (criterioObj.esperado ?? 0) ? 'sucesso' : 'falha') : 'nao-provado'
+
     const vereditoJson = {
       id,
-      criterio,
-      executado: criterioExecutado,
-      resultado: vereditoFinal,
-      motivo: criterioExecutado ? 'criterio executado' : 'criterio não foi executado nesta missão'
+      criterio: criterioObj.comando,
+      esperado: criterioObj.esperado ?? 0,
+      executado,
+      obtido,
+      resultado,
+      motivo: executado
+        ? 'criterio executado'
+        : typeof criterio === 'string'
+          ? 'criterio sem formato de comando verificavel — use { comando, esperado }'
+          : 'criterio não foi executado nesta missão'
     }
     require('fs').writeFileSync(
       path.join(dirMissao, 'veredito.json'),
@@ -725,7 +775,7 @@ async function rodarLoopComProvider(
     tetoTempoMs = opts?.tetoTempoMs ?? 600_000
   }
   const t0 = Date.now()
-  const iteracoesMissao: Array<{ iteracao: number; oQueTentou: string; comando?: string; codigoSaida?: number; saidaReal?: string }> = []
+  const iteracoesMissao: IteracaoMissao[] = []
 
   try {
     const { ehPedidoInventarioDisco } = await import('../disco-inventario')
@@ -746,7 +796,7 @@ async function rodarLoopComProvider(
       const msg = 'Teto de tempo estourado (' + (tetoTempoMs / 1000) + 's)'
       emit({ tipo: 'status', texto: msg })
       if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
-        gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, 'falha', passos)
+        gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, 'falha', passos, iteracoesMissao)
       }
       return {
         texto: msg,
@@ -774,10 +824,6 @@ async function rodarLoopComProvider(
       emit({ tipo: 'status', texto: 'Objetivo: ' + opts.objetivo + ' | Critério: ' + opts.criterioDePronto })
     }
 
-    if (temObjetivo) {
-      const tentativa = (passos[passos.length - 1]?.texto || '').slice(0, 200)
-      iteracoesMissao.push({ iteracao: passoN, oQueTentou: tentativa })
-    }
     emit({
       tipo: 'status',
       texto: 'Passo ' + passoN + ' de ' + maxIter + ' — chamando ' + labelModelo + '…',
@@ -885,7 +931,7 @@ async function rodarLoopComProvider(
 
     if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(r.content || '')) {
       dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -926,7 +972,7 @@ async function rodarLoopComProvider(
       // "voce pode...") nao e resposta — sintetiza erro honesto em vez de
       // devolver tutorial generico que parece resultado.
       const textoFinal = ehAcao && !jaUsouTool ? '' : r.content || ''
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos, opts)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos, opts, iteracoesMissao)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -985,8 +1031,12 @@ async function rodarLoopComProvider(
         else if ((categoriaPerm === 'explore' || categoriaPerm === 'search') && !perm.permitirLeitura)
           bloqueio = nome + ' bloqueado (permitirLeitura=false)'
         else if (/^ext_|^mcp_/i.test(nome) && !perm.permitirMcp) bloqueio = nome + ' bloqueado (permitirMcp=false)'
-        // FASE 1/2: PreToolUse hook decide permissão (sandbox-permissao)
-        const decisaoHook = executarPreToolUse(raiz, nome, args)
+        // FASE 1/2: PreToolUse hook decide permissão (sandbox-permissao).
+        // terminal_exec chega com comando=binario e args[]=argv — o sandbox
+        // avalia a linha completa, entao reconstruimos antes de consultar.
+        const argsHook =
+          nome === 'terminal_exec' ? { ...args, comando: comandoCompletoTool(args) } : args
+        const decisaoHook = executarPreToolUse(raiz, nome, argsHook)
         if (decisaoHook.acao === 'bloquear') {
           bloqueio = nome + ' bloqueado pelo hook PreToolUse: ' + decisaoHook.motivo
         } else if (decisaoHook.acao === 'perguntar') {
@@ -1075,6 +1125,7 @@ async function rodarLoopComProvider(
       emit({ tipo: 'stats', ...statsAcc })
 
       let textoRes = ''
+      let exitCodeTool: number | undefined
       const propostasMod = await import('../agent/propostas')
       const { ehToolEscrita, proporCodigoEditar, proporEscritaCompleta } = propostasMod
       if (opts?.proposeWrites && ehToolEscrita(nome)) {
@@ -1133,13 +1184,8 @@ async function rodarLoopComProvider(
           ? await executarToolInline(raiz, nome, args)
           : await chamarTool(nome, args)
         textoRes = res.texto
-        // FASE 5: captura exitCode real do terminal_exec
-        if (nome === 'terminal_exec' && 'exitCode' in res) {
-          const exitCode = (res as { exitCode?: number }).exitCode
-          if (exitCode !== undefined) {
-            (passos[passos.length - 1] as PassoAgente).codigoSaida = exitCode
-          }
-        }
+        // FASE 2: captura exitCode real devolvido pela tool (MCP ou inline)
+        exitCodeTool = nome === 'terminal_exec' ? (res as { exitCode?: number }).exitCode : undefined
       }
 
       try {
@@ -1175,13 +1221,17 @@ async function rodarLoopComProvider(
 
       emit({ tipo: 'tool', nome, fase: 'fim', detalhe: textoRes.slice(0, 200) })
       passos.push({ tipo: 'tool', nome, args, resultado: textoRes })
-      // FASE 2/3: registrar em iteracoesMissao se modo agent
+      // FASE 2.3 (D4): grava codigoSaida no passo recem-inserido, nunca no anterior
+      if (exitCodeTool !== undefined) {
+        (passos[passos.length - 1] as PassoAgente).codigoSaida = exitCodeTool
+      }
+      // FASE 2/3: registrar em iteracoesMissao se modo agent — exitCode real, sem inferencia
       if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
         iteracoesMissao.push({
           iteracao: passoN,
           oQueTentou: nome + (args ? ' ' + JSON.stringify(args).slice(0, 100) : ''),
-          comando: nome === 'terminal_exec' ? String(args?.comando) : undefined,
-          codigoSaida: nome === 'terminal_exec' ? (textoRes?.includes('"ok":false') ? 1 : 0) : undefined,
+          comando: nome === 'terminal_exec' ? comandoCompletoTool(args) || undefined : undefined,
+          codigoSaida: exitCodeTool,
           saidaReal: textoRes.slice(0, 500)
         })
       }
@@ -1228,7 +1278,7 @@ async function rodarLoopComProvider(
             batchIdx.map((t) => processarChamada(t, chamadas[t]))
           )
           if (resultados.includes('loop')) {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1243,7 +1293,7 @@ async function rodarLoopComProvider(
         } else {
           const r1 = await processarChamada(batchIdx[0], chamadas[batchIdx[0]])
           if (r1 === 'loop') {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1260,7 +1310,7 @@ async function rodarLoopComProvider(
         const r1 = await processarChamada(tiCursor, chamadas[tiCursor])
         tiCursor++
         if (r1 === 'loop') {
-          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
+          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
           return {
             ...fin,
             propostas: propostasAcc,
@@ -1277,7 +1327,7 @@ async function rodarLoopComProvider(
   }
 
   dglog('[agente] limite de iteracoes; sintetizando')
-  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
+  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
   return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente atingiu o limite de etapas.', acao: 'Divida o pedido em partes menores e tente novamente.' } as any }
 }
 

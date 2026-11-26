@@ -146,7 +146,7 @@ export async function listarTools(): Promise<McpTool[]> {
 export async function chamarTool(
   nome: string,
   args: Record<string, unknown>
-): Promise<{ ok: boolean; texto: string; bruto?: unknown }> {
+): Promise<{ ok: boolean; texto: string; bruto?: unknown; exitCode?: number }> {
   try {
     if (nome.startsWith('ext_')) {
       const { chamarToolExterna } = await import('./externos')
@@ -163,7 +163,18 @@ export async function chamarTool(
       .filter((p) => p.type === 'text' && typeof p.text === 'string')
       .map((p) => p.text as string)
       .join('\n')
-    return { ok: !(r as { isError?: boolean }).isError, texto, bruto: r }
+    // FASE 2: extrai exitCode do JSON retornado pelo terminal_exec
+    let exitCode: number | undefined
+    if (nome === 'terminal_exec') {
+      try {
+        const parsed = JSON.parse(texto)
+        if (typeof parsed.exitCode === 'number') exitCode = parsed.exitCode
+        else if (typeof parsed.codigoSaida === 'number') exitCode = parsed.codigoSaida
+      } catch {
+        /* texto não é JSON */
+      }
+    }
+    return { ok: !(r as { isError?: boolean }).isError, texto, bruto: r, exitCode }
   } catch (e) {
     dglog('[mcp-client] erro em ' + nome + ': ' + String(e))
     return { ok: false, texto: 'falha ao chamar ' + nome + ': ' + String(e) }

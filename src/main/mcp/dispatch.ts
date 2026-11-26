@@ -1877,8 +1877,12 @@ export async function executarToolCall(name: string, argsRaw: unknown, signal?: 
       const cmd = parsed.comando.trim()
       const argv = parsed.args || []
       const linha = (cmd + ' ' + argv.join(' ')).toLowerCase()
-      // FASE 2: PreToolUse hook decide permissão (sandbox-permissao)
-      const decisaoHook = executarPreToolUse(RAIZ, 'terminal_exec', { comando: cmd, args: argv })
+      // FASE 2: PreToolUse hook decide permissão (sandbox-permissao).
+      // O sandbox avalia a linha completa (comando + args), nao so o binario.
+      const decisaoHook = executarPreToolUse(RAIZ, 'terminal_exec', {
+        comando: (cmd + ' ' + argv.join(' ')).trim(),
+        args: argv
+      })
       if (decisaoHook.acao === 'bloquear') {
         dglog('[dispatch] terminal_exec bloqueado pelo hook PreToolUse: ' + decisaoHook.motivo)
         return {
@@ -1963,17 +1967,19 @@ export async function executarToolCall(name: string, argsRaw: unknown, signal?: 
         }
         const texto = (String(stdout || '') + (stderr ? '\n' + String(stderr) : '')).slice(0, 12000)
         return {
-          content: [{ type: 'text', text: JSON.stringify({ ok: true, texto }, null, 2) }]
+          content: [{ type: 'text', text: JSON.stringify({ ok: true, texto, exitCode: 0 }, null, 2) }]
         }
       } catch (e: unknown) {
-        const err = e as { message?: string; stdout?: string; stderr?: string }
+        const err = e as { message?: string; stdout?: string; stderr?: string; code?: number | string }
+        const exitCode = typeof err.code === 'number' ? err.code : 1
         return {
           content: [{
             type: 'text',
             text: JSON.stringify({
               ok: false,
               erro: String(err.stderr || err.message || e).slice(0, 800),
-              stdout: String(err.stdout || '').slice(0, 4000)
+              stdout: String(err.stdout || '').slice(0, 4000),
+              exitCode
             })
           }],
           isError: true

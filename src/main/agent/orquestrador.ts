@@ -59,7 +59,7 @@ export async function orquestrarAgentes(
   pedido: string,
   fila?: string[],
   contextoExtra?: string,
-  opts?: { pararNoPrimeiroSucesso?: boolean; tarefa?: string; objetivo?: string; criterioDePronto?: string }
+  opts?: { pararNoPrimeiroSucesso?: boolean; tarefa?: string; objetivo?: string; criterioDePronto?: string | { comando: string; esperado?: number; timeoutMs?: number } }
 ): Promise<ResultadoOrquestracao> {
   inicializarMetricas(raiz)
   const disponiveis = listarAgentes(raiz).map((a) => a.id)
