@@ -1764,6 +1764,26 @@ function checarLoopAgent(): Achado[] {
         status: 'nao-aplicavel'
       })
     }
+    // FASE 5: check loop:criterio-real — criterio deve comparar comando exato
+    // + exitCode real; proibido sucesso por comparacao de texto (includes).
+    const mCriterio = src.match(/async function verificarCriterio[\s\S]*?\n}/)
+    const corpoCriterio = mCriterio ? mCriterio[0] : ''
+    const criterioRuim =
+      !corpoCriterio ||
+      !/codigoSaida/.test(corpoCriterio) ||
+      /\.includes\(/.test(corpoCriterio) ||
+      !/comandoEsperado/.test(corpoCriterio) ||
+      !/reverse\(\)/.test(corpoCriterio)
+    if (criterioRuim) {
+      achados.push({
+        area: 'loop',
+        id: 'loop:criterio-real',
+        titulo: 'criterio de pronto deve usar ultimo terminal_exec com exitCode real',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
   } catch (e) {
     achados.push({
       area: 'loop',
