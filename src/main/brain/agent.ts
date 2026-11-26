@@ -740,9 +740,22 @@ async function rodarLoopComProvider(
 ): Promise<RespostaAgente> {
   // FASE 1: SessionStart hook carrega AGENTS.md e skills
   executarSessionStart(raiz)
+  // FASE 4: o modelo precisa saber o criterio verificavel para powering a missao
+  let perguntaEfetiva = pergunta
+  if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
+    const crit = opts.criterioDePronto
+    const critStr = typeof crit === 'string' ? crit : crit.comando
+    const esperado = typeof crit === 'object' ? (crit.esperado ?? 0) : 0
+    perguntaEfetiva =
+      pergunta +
+      '\n\n[MISSAO AGENTE — objetivo: ' + opts.objetivo +
+      '. Criterio de pronto verificavel: execute o comando `' + critStr +
+      '` via terminal_exec; ele precisa sair com codigo ' + esperado +
+      ' para a missao ser considerada provada. Sem isso o veredito e "nao provado".]'
+  }
   const mensagens: Message[] = [
     { role: 'system', content: SYSTEM + systemExtra },
-    { role: 'user', content: pergunta }
+    { role: 'user', content: perguntaEfetiva }
   ]
   const toolDefs: ToolDef[] | undefined = tools.length
     ? tools.map((t) => ({
@@ -1503,6 +1516,12 @@ export async function executarAgente(
     let tools: McpTool[] = []
     let toolsInline = false
     if (modo === 'agent') {
+      if (opcoes.inlineTools) {
+        // Override explicito: forca tools inline sem subir o MCP (testes/E2E)
+        toolsInline = true
+        tools = ferramentasInlineDefs() as unknown as McpTool[]
+        dglog('[agente] inlineTools forcado — ' + tools.length + ' tools inline')
+      } else {
       try {
         process.env.DG_ROOT = path.resolve(raiz)
         await garantirMcpNaRaiz(raiz)
@@ -1519,6 +1538,7 @@ export async function executarAgente(
         toolsInline = true
         tools = ferramentasInlineDefs() as unknown as McpTool[]
         dglog('[agente] MCP sem tools — usando ' + tools.length + ' tools inline de fallback')
+      }
       }
     } else {
       dglog('[agente] modo plan — tools desligadas')
@@ -1603,7 +1623,11 @@ export async function executarAgente(
             onEvent: opcoes.onEvent,
             signal: opcoes.signal,
             modo: opcoes.modo,
-            inlineTools: toolsInline
+            inlineTools: toolsInline,
+            objetivo: opcoes.objetivo,
+            criterioDePronto: opcoes.criterioDePronto,
+            tetoIteracoes: opcoes.tetoIteracoes,
+            tetoTempoMs: opcoes.tetoTempoMs
           })
           const ms = Date.now() - t0
           // Pedido de acao respondido com "sem acao util" = modelo fraco

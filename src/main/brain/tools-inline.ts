@@ -240,7 +240,7 @@ export async function executarToolInline(
               erro: String(err.stderr || err.message || e).slice(0, 800),
               stdout: String(err.stdout || '').slice(0, 4000)
             }),
-            exitCode: err.code ?? 1
+            exitCode: typeof err.code === 'number' ? err.code : 1
           }
         }
       }
