@@ -1491,6 +1491,7 @@ async function executarChecagens(opcoes: {
   achados.push(...(await checarRadar()))
   achados.push(...checarSandbox())
   achados.push(...checarLoopAgent())
+  achados.push(...checarHooks())
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
@@ -1687,7 +1688,7 @@ function checarSandbox(): Achado[] {
   return achados
 }
 
-/** FASE 6: check loop agent aceita objetivo+criterio e grava artefato com código de saída */
+/** FASE 4: check loop agent aceita objetivo+criterio e grava artefato com código de saída */
 function checarLoopAgent(): Achado[] {
   const achados: Achado[] = []
   try {
@@ -1724,11 +1725,63 @@ function checarLoopAgent(): Achado[] {
         status: 'nao-aplicavel'
       })
     }
+    // FASE 4: check loop:nao-mente — sem criterio executado, veredito nao e "concluido"
+    if (!/nao-provado/.test(src) || !/criterioDePronto/.test(src)) {
+      achados.push({
+        area: 'loop',
+        id: 'loop:nao-mente',
+        titulo: 'loop deve retornar "nao provado" quando criterio nao executado',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
   } catch (e) {
     achados.push({
       area: 'loop',
       id: 'loop:modulo',
       titulo: 'agent.ts não carrega',
+      severidade: 'erro',
+      detalhe: String((e as Error)?.message || e),
+      corrigivel: true,
+      status: 'nao-aplicavel'
+    })
+  }
+  return achados
+}
+
+/** FASE 4: check hooks PreToolUse bloqueia de verdade */
+function checarHooks(): Achado[] {
+  const achados: Achado[] = []
+  try {
+    const mod = require('../hooks')
+    if (typeof mod.executarPreToolUse !== 'function') {
+      achados.push({
+        area: 'hooks',
+        id: 'hooks:funcao',
+        titulo: 'hooks.ts exporta executarPreToolUse',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // Testa bloqueio de rm -rf via hook
+    const dec = mod.executarPreToolUse(process.cwd(), 'terminal_exec', { comando: 'rm -rf /tmp/x' })
+    if (dec.acao !== 'bloquear') {
+      achados.push({
+        area: 'hooks',
+        id: 'hooks:bloqueio',
+        titulo: 'hook PreToolUse deve bloquear rm -rf',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e) {
+    achados.push({
+      area: 'hooks',
+      id: 'hooks:modulo',
+      titulo: 'hooks.ts não carrega',
       severidade: 'erro',
       detalhe: String((e as Error)?.message || e),
       corrigivel: true,
