@@ -12,7 +12,8 @@ import { dglog } from './dglog'
 import { checarIntegracaoFerramentas } from './auditoria-integracao'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
-import { resolverRaizDGEditor } from './paths'
+import { resolverRaizDGEditor, resolverRaizProjeto as resolverRaizProjetoPaths } from './paths'
+import { buscaWebDuckDuckGo } from './radar/busca-web'
 import {
   detectarShell,
   listarShells,
@@ -831,8 +832,15 @@ function checarMcp(): Achado[] {
     return out
   }
   try {
-    const serverSrc = path.join(raiz, 'src', 'main', 'mcp', 'server.ts')
-    const txt = fs.readFileSync(serverSrc, 'utf8')
+    // As definicoes de tools moram em dispatch.ts (compartilhado stdio/HTTP);
+    // server.ts virou so transporte. Le os dois para nao dar falso negativo.
+    const mcpDir = path.join(raiz, 'src', 'main', 'mcp')
+    const txt = ['server.ts', 'dispatch.ts']
+      .map((f) => {
+        const p = path.join(mcpDir, f)
+        return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''
+      })
+      .join('\n')
     const nomes = [...txt.matchAll(/name:\s*'([a-z0-9_]+)'/g)].map((m) => m[1])
     const unicos = [...new Set(nomes)]
     const esperadas = [
@@ -911,7 +919,13 @@ function checarPipeline(): Achado[] {
   }
   try {
     const agentSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'brain', 'agent.ts'), 'utf8')
-    const serverSrc = fs.readFileSync(path.join(raiz, 'src', 'main', 'mcp', 'server.ts'), 'utf8')
+    const mcpDir = path.join(raiz, 'src', 'main', 'mcp')
+    const serverSrc = ['server.ts', 'dispatch.ts']
+      .map((f) => {
+        const p = path.join(mcpDir, f)
+        return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''
+      })
+      .join('\n')
     const temExec = /export async function executarAgente/.test(agentSrc)
     const temMcp = /name:\s*'agente_executar'/.test(serverSrc)
     const antiRec =
@@ -1340,6 +1354,109 @@ function checarTerminal(): Achado[] {
   return out
 }
 
+/**
+ * Checks do artefato RADAR.md — o ponto cego que deixou o relatorio repetir o
+ * mesmo texto por dias sem nenhum check perceber.
+ *   radar:recente    - data do cabecalho nao pode ter mais de 36h
+ *   radar:fontes     - cada secao "## Tema:" precisa de ao menos 1 link http
+ *   radar:sem-cache  - relatorio nao pode conter "(cache)" no provider
+ *   radar:busca-viva - query fixa devolve >=1 resultado com URL (timeout 38s)
+ */
+async function checarRadar(): Promise<Achado[]> {
+  const out: Achado[] = []
+  const area = 'radar'
+  const radarPath = path.join(resolverRaizProjetoPaths(), 'docs', 'RADAR.md')
+  const QUERY_FIXA = 'ferramentas de IA para desenvolvimento 2026'
+
+  if (!fs.existsSync(radarPath)) {
+    const titulo = 'RADAR.md ausente em ' + radarPath
+    for (const id of ['radar:recente', 'radar:fontes', 'radar:sem-cache']) {
+      out.push({ id, area, titulo, severidade: 'erro', corrigivel: false, status: 'nao-aplicavel' })
+    }
+  } else {
+    const conteudo = fs.readFileSync(radarPath, 'utf8')
+
+    const mData = /^Data:\s*(\S+)/m.exec(conteudo)
+    const dataRel = mData ? new Date(mData[1]) : null
+    const idadeH = dataRel && !isNaN(dataRel.getTime())
+      ? (Date.now() - dataRel.getTime()) / 3600000
+      : Infinity
+    out.push({
+      id: 'radar:recente',
+      area,
+      titulo: dataRel && !isNaN(dataRel.getTime())
+        ? 'RADAR.md datado de ' + mData![1] + ' (' + idadeH.toFixed(1) + 'h)'
+        : 'RADAR.md sem data valida no cabecalho',
+      detalhe: idadeH <= 36 ? undefined : 'mais de 36h desde a geracao',
+      severidade: idadeH <= 36 ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+
+    const secoes = conteudo.split(/^## Tema: /m).slice(1)
+    const semFonte = secoes
+      .filter((s) => !/\]\(https?:\/\/[^)\s]+\)/.test(s))
+      .map((s) => s.split('\n')[0].trim().slice(0, 60))
+    out.push({
+      id: 'radar:fontes',
+      area,
+      titulo: semFonte.length === 0
+        ? secoes.length + ' tema(s) com ao menos 1 link'
+        : semFonte.length + ' tema(s) sem fonte: ' + semFonte.join(', '),
+      severidade: semFonte.length === 0 ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+
+    const temCache = conteudo.includes('(cache)')
+    out.push({
+      id: 'radar:sem-cache',
+      area,
+      titulo: temCache ? 'relatorio contem "(cache)" — resposta servida do cache' : 'relatorio sem "(cache)"',
+      severidade: temCache ? 'erro' : 'ok',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  }
+
+  // Busca viva: prova que a esteira de busca funciona AGORA, nao so no papel.
+  // Timeout duro de 38s para nao travar a auditoria.
+  let timerBusca: NodeJS.Timeout | null = null
+  try {
+    const resultados = await Promise.race([
+      buscaWebDuckDuckGo(QUERY_FIXA),
+      new Promise<never>((_, rej) => {
+        timerBusca = setTimeout(() => rej(new Error('timeout 38s na busca viva')), 38000)
+      })
+    ])
+    const comUrl = resultados.filter((r) => /^https?:\/\//i.test(r.url))
+    out.push({
+      id: 'radar:busca-viva',
+      area,
+      titulo: comUrl.length >= 1
+        ? 'busca viva retornou ' + comUrl.length + ' resultado(s) com URL'
+        : 'busca viva retornou 0 resultado(s) com URL',
+      severidade: comUrl.length >= 1 ? 'ok' : 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } catch (e) {
+    out.push({
+      id: 'radar:busca-viva',
+      area,
+      titulo: 'busca viva falhou',
+      erro: String((e as Error)?.message || e).slice(0, 200),
+      severidade: 'erro',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+  } finally {
+    if (timerBusca) clearTimeout(timerBusca)
+  }
+
+  return out
+}
+
 async function executarChecagens(opcoes: {
   autoAtualizar?: boolean
   bootLeve?: boolean
@@ -1370,6 +1487,7 @@ async function executarChecagens(opcoes: {
   achados.push(...checarIntegridadeCompleta())
   achados.push(...checarIntegracaoFerramentas(resolverRaizProjeto()))
   achados.push(...checarTerminal())
+  achados.push(...(await checarRadar()))
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
