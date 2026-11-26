@@ -127,7 +127,7 @@ export function checarIntegracaoFerramentas(raiz: string): AchadoIntegracao[] {
     ['integracao:aplicar', 'Aceitar diff tem handler', 'src/main/agent/ipc.ts', "ipcMain.handle('agente:aplicar-proposta'"],
     ['integracao:commit', 'Diff aceito vira commit local', 'src/main/agent/propostas.ts', "git', ['commit'"],
     ['integracao:stream', 'Agente emite texto-delta', 'src/main/brain/agent.ts', "tipo: 'texto-delta'"],
-    ['integracao:stream-ui', 'Tela do agente recebe texto-delta', 'src/renderer/app.js', "ev.tipo === 'texto-delta'"],
+    ['integracao:stream-ui', 'Tela do agente recebe texto-delta', 'src/renderer/features/chat/agente-cards.js', "ev.tipo === 'texto-delta'"],
     ['integracao:fila-guardiao', 'Fila espera o guardiao', 'src/main/agent/fila.ts', 'aguardarRecursos'],
     ['integracao:agente-guardiao', 'Agente pula 7b/14b se o guardiao segurou', 'src/main/brain/agent.ts', 'guardianPodeOperar']
   ]

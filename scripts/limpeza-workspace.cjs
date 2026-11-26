@@ -239,7 +239,7 @@ function limpezaBase() {
 
   if (!LEVE) {
     // bin/ = MCP compilado (npm run build:mcp) — nao apagar
-    for (const sub of ['backup', '_backups', 'chats', 'avaliacoes', 'memoria', 'logs', 'downloads']) {
+    for (const sub of ['backup', '_backups', 'chats', 'avaliacoes', 'memoria', 'logs', 'downloads', 'resposta-cache']) {
       rm(path.join('.dg-editor', sub), '.dg-editor/' + sub)
     }
   } else {
