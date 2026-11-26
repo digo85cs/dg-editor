@@ -7,13 +7,23 @@
 import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { resolverRaizProjeto } from '../paths'
+import { userDataDir } from '../paths'
 
 const CACHE_DIR_NAME = 'resposta-cache'
 const TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 dias
 
+// Quando true, lerRespostaCache nunca devolve entrada gravada — usado pelo
+// Radar Diario, que nao pode servir analise de outro dia (chave igual).
+// gravarRespostaCache continua ativo: a resposta nova e regravada.
+let ignorarCacheLeitura = false
+
+export function ignorarCacheRespostas(ignorar: boolean): void {
+  ignorarCacheLeitura = ignorar
+}
+
 function cacheDir(): string {
-  return join(resolverRaizProjeto(), '.dg-editor', CACHE_DIR_NAME)
+  // userData do app: nao mistura projetos nem depende da raiz resolvida.
+  return join(userDataDir(), CACHE_DIR_NAME)
 }
 
 function hashEntrada(modelo: string, mensagens: unknown, tools?: unknown): string {
@@ -37,6 +47,7 @@ export function lerRespostaCache(
   mensagens: unknown,
   tools?: unknown
 ): { texto: string } | null {
+  if (ignorarCacheLeitura) return null
   try {
     const hash = hashEntrada(modelo, mensagens, tools)
     const arq = arquivoCache(hash)

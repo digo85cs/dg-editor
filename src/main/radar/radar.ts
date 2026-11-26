@@ -20,6 +20,7 @@ import { proximoDisponivel } from '../brain/roteador-cota'
 import type { ProviderConfig } from '../brain/providers'
 import { normalizarTarefa, type Tarefa } from '../brain/registry'
 import { gerarMarkdown } from './relatorio'
+import { ignorarCacheRespostas } from '../brain/resposta-cache'
 
 const INTERVALO_MS = 24 * 60 * 60 * 1000
 
@@ -134,6 +135,11 @@ export async function executarRadar(deps: {
     dglog('[radar] provider selecionado: ' + cfg.id + ' / ' + cfg.modelo)
 
     // 2. Para cada tema, fazer busca e chamar provider
+    // O radar NUNCA serve resposta de cache: a analise e diaria e a chave do
+    // cache nao carrega data — sem o bypass, todo dia repetiria o mesmo texto.
+    // A resposta nova continua sendo gravada no cache (regravar).
+    ignorarCacheRespostas(true)
+    try {
     for (const tema of temas) {
       const temaBuscas: RadarResultadoBusca[] = []
 
@@ -154,7 +160,7 @@ export async function executarRadar(deps: {
       buscas.push(...temaBuscas)
 
       // 3. Chamar o provider para analisar os resultados do tema
-      const prompt = construirPromptTema(tema, temaBuscas)
+      const prompt = construirPromptTema(tema, temaBuscas, data)
       try {
         const chamada = await chamarProvider(prompt, tema.nome)
         custoTotal += chamada.custoEstimadoUSD
@@ -181,6 +187,9 @@ export async function executarRadar(deps: {
         })
       }
     }
+    } finally {
+      ignorarCacheRespostas(false)
+    }
 
     // 4. Gerar e gravar o relatorio
     const relatorio = gerarMarkdown({
@@ -189,7 +198,8 @@ export async function executarRadar(deps: {
       custoTotalEstimadoUSD: custoTotal,
       temas,
       buscas,
-      chamadas
+      chamadas,
+      cache: 'Cache: nao utilizado nesta execucao'
     })
 
     const caminhoRelatorio = join(caminhoSaida, 'RADAR.md')
@@ -243,9 +253,10 @@ export async function executarRadar(deps: {
   }
 }
 
-function construirPromptTema(tema: RadarTema, buscas: RadarResultadoBusca[]): string {
+function construirPromptTema(tema: RadarTema, buscas: RadarResultadoBusca[], dataIso: string): string {
   const linhas: string[] = []
   linhas.push('Voce e um analista de mercado de ferramentas de IA para desenvolvedores.')
+  linhas.push('Data da execucao: ' + dataIso.slice(0, 10))
   linhas.push('Tema: ' + tema.nome)
   linhas.push('')
   linhas.push('Resultados de busca obtidos:')
