@@ -13,6 +13,7 @@ import { checarIntegracaoFerramentas } from './auditoria-integracao'
 import { listarSkills } from './brain/skills'
 import { listarAgentes } from './brain/agentes'
 import { resolverRaizDGEditor, resolverRaizProjeto as resolverRaizProjetoPaths } from './paths'
+import { caminhoRadarReport } from './radar/radar-boot'
 import { buscaWebDuckDuckGo } from './radar/busca-web'
 import {
   detectarShell,
@@ -1365,7 +1366,7 @@ function checarTerminal(): Achado[] {
 async function checarRadar(): Promise<Achado[]> {
   const out: Achado[] = []
   const area = 'radar'
-  const radarPath = path.join(resolverRaizProjetoPaths(), 'docs', 'RADAR.md')
+  const radarPath = caminhoRadarReport()
   const QUERY_FIXA = 'ferramentas de IA para desenvolvimento 2026'
 
   if (!fs.existsSync(radarPath)) {
@@ -1488,6 +1489,8 @@ async function executarChecagens(opcoes: {
   achados.push(...checarIntegracaoFerramentas(resolverRaizProjeto()))
   achados.push(...checarTerminal())
   achados.push(...(await checarRadar()))
+  achados.push(...checarSandbox())
+  achados.push(...checarLoopAgent())
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
@@ -1631,4 +1634,106 @@ export function iniciarAuditoriaPeriodica(intervaloMs = 1800000) {
 
 export function pararAuditoriaPeriodica() {
   if (timer) { clearInterval(timer); timer = null }
+}
+
+/** FASE 6: check sandbox-permissao existe e decide por allowlist/bloqueio destrutivo */
+function checarSandbox(): Achado[] {
+  const achados: Achado[] = []
+  try {
+    const mod = require('../sandbox-permissao')
+    if (typeof mod.decidirPermissaoTool !== 'function') {
+      achados.push({
+        area: 'sandbox',
+        id: 'sandbox:funcao',
+        titulo: 'sandbox-permissao exporta decidirPermissaoTool',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    const dec = mod.decidirPermissaoTool('terminal_exec', { comando: 'rm -rf' })
+    if (dec.permissao !== 'bloquear') {
+      achados.push({
+        area: 'sandbox',
+        id: 'sandbox:bloqueio-destrutivo',
+        titulo: 'sandbox deve bloquear rm -rf mesmo com aprovação',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    const dec2 = mod.decidirPermissaoTool('terminal_exec', { comando: 'npm test' })
+    if (dec2.permissao !== 'permitir') {
+      achados.push({
+        area: 'sandbox',
+        id: 'sandbox:allowlist',
+        titulo: 'sandbox allowlist deve conter npm test',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e) {
+    achados.push({
+      area: 'sandbox',
+      id: 'sandbox:modulo',
+      titulo: 'sandbox-permissao.ts não carrega',
+      severidade: 'erro',
+      detalhe: String((e as Error)?.message || e),
+      corrigivel: true,
+      status: 'nao-aplicavel'
+    })
+  }
+  return achados
+}
+
+/** FASE 6: check loop agent aceita objetivo+criterio e grava artefato com código de saída */
+function checarLoopAgent(): Achado[] {
+  const achados: Achado[] = []
+  try {
+    const mod = require('../brain/agent')
+    if (typeof mod.executarAgente !== 'function') {
+      achados.push({
+        area: 'loop',
+        id: 'loop:executarAgente',
+        titulo: 'agent.ts exporta executarAgente',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // Verifica contrato de OpcoesExecutarAgente (objtivo/criterio/teto)
+    const src = require('fs').readFileSync(path.join(__dirname, '../brain/agent.ts'), 'utf8')
+    if (!/objetivo\?:\s*string/.test(src) || !/criterioDePronto\?:\s*string/.test(src)) {
+      achados.push({
+        area: 'loop',
+        id: 'loop:objetivo',
+        titulo: 'modo agent deve aceitar objetivo+criterioDePronto',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    if (!/ArtefatoMissao/.test(src) || !/gravarArtefatoMissao/.test(src)) {
+      achados.push({
+        area: 'loop',
+        id: 'loop:prova',
+        titulo: 'loop deve gravar artefato de missão com código de saída',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+  } catch (e) {
+    achados.push({
+      area: 'loop',
+      id: 'loop:modulo',
+      titulo: 'agent.ts não carrega',
+      severidade: 'erro',
+      detalhe: String((e as Error)?.message || e),
+      corrigivel: true,
+      status: 'nao-aplicavel'
+    })
+  }
+  return achados
 }

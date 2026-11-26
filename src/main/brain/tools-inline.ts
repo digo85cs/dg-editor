@@ -33,6 +33,12 @@ export interface ToolInline {
   inputSchema: Record<string, unknown>
 }
 
+export interface RespostaToolInline {
+  ok: boolean
+  texto: string
+  exitCode?: number
+}
+
 export function ferramentasInlineDefs(): ToolInline[] {
   return [
     {
@@ -106,12 +112,12 @@ function* walk(dir: string, profundidade: number, nivel = 0): Generator<{ abs: s
   }
 }
 
-function ok(texto: string): { ok: boolean; texto: string } {
-  return { ok: true, texto: JSON.stringify({ ok: true, texto }) }
+function ok(texto: string, exitCode = 0): { ok: boolean; texto: string; exitCode?: number } {
+  return { ok: true, texto: JSON.stringify({ ok: true, texto }), exitCode }
 }
 
-function falha(erro: string): { ok: boolean; texto: string } {
-  return { ok: false, texto: JSON.stringify({ ok: false, erro }) }
+function falha(erro: string): { ok: boolean; texto: string; exitCode?: number } {
+  return { ok: false, texto: JSON.stringify({ ok: false, erro }), exitCode: 1 }
 }
 
 /** Executa uma tool inline. Retorna { ok, texto } no mesmo formato de chamarTool. */
@@ -119,7 +125,7 @@ export async function executarToolInline(
   raiz: string,
   nome: string,
   args: Record<string, unknown>
-): Promise<{ ok: boolean; texto: string }> {
+): Promise<{ ok: boolean; texto: string; exitCode?: number }> {
   const r = path.resolve(String(raiz || ''))
   try {
     switch (nome) {
@@ -224,16 +230,17 @@ export async function executarToolInline(
             encoding: 'utf8'
           })
           const texto = (String(stdout || '') + (stderr ? '\n' + String(stderr) : '')).slice(0, 12000)
-          return ok(texto || '(sem saida)')
+          return ok(texto || '(sem saida)', 0)
         } catch (e) {
-          const err = e as { message?: string; stdout?: string; stderr?: string }
+          const err = e as { message?: string; stdout?: string; stderr?: string; code?: number }
           return {
             ok: false,
             texto: JSON.stringify({
               ok: false,
               erro: String(err.stderr || err.message || e).slice(0, 800),
               stdout: String(err.stdout || '').slice(0, 4000)
-            })
+            }),
+            exitCode: err.code ?? 1
           }
         }
       }

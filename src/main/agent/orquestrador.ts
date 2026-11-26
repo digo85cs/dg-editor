@@ -31,6 +31,8 @@ export type PassoOrquestracao = {
   passos?: PassoAgente[]
   duracaoMs?: number
   erro?: string
+  /** FASE 4: critério de pronto atingido */
+  criterioAtingido?: boolean
 }
 
 export type ResultadoOrquestracao = {
@@ -57,7 +59,7 @@ export async function orquestrarAgentes(
   pedido: string,
   fila?: string[],
   contextoExtra?: string,
-  opts?: { pararNoPrimeiroSucesso?: boolean; tarefa?: string }
+  opts?: { pararNoPrimeiroSucesso?: boolean; tarefa?: string; objetivo?: string; criterioDePronto?: string }
 ): Promise<ResultadoOrquestracao> {
   inicializarMetricas(raiz)
   const disponiveis = listarAgentes(raiz).map((a) => a.id)
@@ -99,7 +101,9 @@ export async function orquestrarAgentes(
         agente: id,
         modo: 'agent',
         contextoExtra,
-        signal: controller.signal
+        signal: controller.signal,
+        objetivo: opts?.objetivo,
+        criterioDePronto: opts?.criterioDePronto
       })
 
       // Promise.race: quem vencer (resposta ou timeout) resolve primeiro.
@@ -128,13 +132,17 @@ export async function orquestrarAgentes(
           ultimoTexto
         )
       const respostaFake = pediuMidia && !usouTool && placeholder
+      const temCritEAtendido = opts?.criterioDePronto ? (r.passos || []).some((p) =>
+        p.tipo === 'tool' && p.nome === 'terminal_exec' && p.codigoSaida === 0
+      ) : true
       out.push({
         agente: id,
-        ok: r.ok !== false && !respostaFake,
+        ok: r.ok !== false && !respostaFake && temCritEAtendido,
         texto: ultimoTexto,
         modelo: r.modelo,
         passos: r.passos,
         duracaoMs: r.duracaoMs || Date.now() - t0,
+        criterioAtingido: opts?.criterioDePronto ? temCritEAtendido : undefined,
         ...(respostaFake ? { erro: 'respondeu placeholder sem chamar tool de midia' } : {})
       })
       registrarMetricaAgente(raiz, id, { ok: r.ok !== false && !respostaFake, duracaoMs: Date.now() - t0, foiTimeout: false })

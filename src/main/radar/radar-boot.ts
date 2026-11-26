@@ -18,6 +18,14 @@ import { dglog, dglogError } from '../dglog'
 import * as fs from 'fs'
 import * as path from 'path'
 
+/** FASE 5: helper único de caminho do RADAR.md — sempre userData/docs/RADAR.md */
+export function caminhoRadarReport(): string {
+  const userData = userDataDir()
+  const docsDir = path.join(userData, 'docs')
+  fs.mkdirSync(docsDir, { recursive: true })
+  return path.join(docsDir, 'RADAR.md')
+}
+
 /**
  * Dispara o radar no boot se ja passaram 24h.
  * Nao bloqueia a UI: disparado e esquecido, com try/catch global.
@@ -34,11 +42,22 @@ export function dispararRadarNoBoot(raizProjeto: string): void {
     // Disparar em background, sem await bloqueante
     void (async () => {
       try {
+        const caminhoSaida = caminhoRadarReport()
+        // FASE 5: migrar docs/RADAR.md do projeto para userData se existir
+        const raizDocs = path.join(raizProjeto, 'docs', 'RADAR.md')
+        if (fs.existsSync(raizDocs) && !fs.existsSync(caminhoSaida)) {
+          try {
+            fs.copyFileSync(raizDocs, caminhoSaida)
+            dglog('[radar:boot] RADAR.md migrado de projeto para userData: ' + caminhoSaida)
+          } catch (e) {
+            dglog('[radar:boot] falha ao migrar RADAR.md: ' + String((e as Error)?.message || e))
+          }
+        }
         const resultado = await executarRadar({
           userDataPath,
           busca: buscaWebDuckDuckGo,
           chamarProvider: criarChamadaProviderReal(),
-          caminhoSaida: path.join(raizProjeto, 'docs'),
+          caminhoSaida: path.dirname(caminhoSaida),
           temas: TEMAS_RADAR
         })
 

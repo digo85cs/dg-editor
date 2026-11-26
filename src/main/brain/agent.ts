@@ -27,6 +27,7 @@ import { streamOllamaChat, streamOpenAIChat } from './stream-chat'
 import { garantirSkillsPadrao, skillsAtivasParaTurno } from './skills'
 import { garantirAgentesPadrao, lerAgente } from './agentes'
 import { normalizarArgs, validarChamadaTool } from './tool-call-validation'
+import { executarPreToolUse, executarSessionStart } from '../hooks'
 
 /**
  * Agente do DG Editor: fila hibrida (OpenRouter → Ollama) com failover.
@@ -74,11 +75,30 @@ export interface PassoAgente {
   args?: Record<string, unknown>
   resultado?: string
   texto?: string
+  /** Código de saída do comando (para critério) */
+  codigoSaida?: number
 }
 
 export interface TentativaProvider {
   provider: string
   resultado: string
+}
+
+/** Artefato de missão com evidência de cada iteração. */
+export interface ArtefatoMissao {
+  id: string
+  objetivo: string
+  criterioDePronto: string
+  veredito: 'sucesso' | 'falha' | 'nao-provado'
+  iteracoes: Array<{
+    iteracao: number
+    oQueTentou: string
+    comando?: string
+    codigoSaida?: number
+    saidaReal?: string
+  }>
+  inicio: string
+  fim: string
 }
 
 /** Categoria para faixa de progresso estilo Cursor Agent. */
@@ -156,6 +176,15 @@ export interface OpcoesExecutarAgente {
   pastas?: string[]
   onEvent?: (ev: EventoAgente) => void
   signal?: AbortSignal
+  /** Objetivo da missão (o que precisa ser verdade no fim) — modo agent */
+  objetivo?: string
+  /** Criterio de pronto: comando verificável ou condição checável — modo agent */
+  criterioDePronto?: string
+  /** Teto de iterações (padrão 15) e tempo (padrão 10min) — modo agent */
+  tetoIteracoes?: number
+  tetoTempoMs?: number
+  /** true = tools[] sao defs inline (MCP fora) — executarToolInline no lugar de chamarTool */
+  inlineTools?: boolean
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
@@ -487,7 +516,8 @@ async function finalizarAgente(
   pergunta: string,
   modelo: string,
   texto: string,
-  passos: PassoAgente[]
+  passos: PassoAgente[],
+  opts?: OpcoesExecutarAgente
 ): Promise<RespostaAgente> {
   let final = texto
   if (
@@ -528,7 +558,60 @@ async function finalizarAgente(
   appendChat(raiz, { role: 'assistant', content: final, at: Date.now(), provider: modelo })
   await indexarTurno(raiz, 'user', pergunta)
   await indexarTurno(raiz, 'assistant', final)
+
+  // FASE 2/3: verifica critério no modo agent e grava artefato
+  if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
+    const veredito = await verificarCriterio(raiz, opts.criterioDePronto, passos)
+    gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, veredito, passos)
+    if (veredito === 'sucesso') {
+      final += '\n\n✓ Critério atingido: ' + opts.criterioDePronto
+    } else if (veredito === 'nao-provado') {
+      final += '\n\n⚠ Critério não foi executado nesta missão.'
+    } else {
+      final += '\n\n✗ Critério não atingido.'
+    }
+  }
+
   return { texto: final, modelo, passos }
+}
+
+async function verificarCriterio(raiz: string, criterio: string, passos: PassoAgente[]): Promise<'sucesso' | 'falha' | 'nao-provado'> {
+  const crit = criterio.trim()
+  const passoExec = passos.find((p) => p.tipo === 'tool' && p.nome === 'terminal_exec')
+  if (!passoExec) return 'nao-provado'
+  const cmd = String(passoExec.args?.comando || '')
+  if (cmd.includes(crit)) {
+    return passoExec.codigoSaida === 0 ? 'sucesso' : 'falha'
+  }
+  return 'nao-provado'
+}
+
+function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[]): void {
+  try {
+    const dir = path.join(raiz, '.dg-editor', 'missoes')
+    require('fs').mkdirSync(dir, { recursive: true })
+    const id = Date.now().toString(36)
+    const iteracoes = passos.map((p, i) => ({
+      iteracao: i + 1,
+      oQueTentou: p.tipo === 'tool' ? p.nome + (p.args ? ' ' + JSON.stringify(p.args).slice(0, 100) : '') : p.texto?.slice(0, 200) || '',
+      comando: p.tipo === 'tool' && p.nome === 'terminal_exec' ? String(p.args?.comando) : undefined,
+      codigoSaida: p.codigoSaida,
+      saidaReal: p.resultado ? p.resultado.slice(0, 500) : undefined
+    }))
+    const artefato: ArtefatoMissao = {
+      id,
+      objetivo,
+      criterioDePronto: criterio,
+      veredito,
+      iteracoes,
+      inicio: new Date().toISOString(),
+      fim: new Date().toISOString()
+    }
+    require('fs').writeFileSync(path.join(dir, id + '.json'), JSON.stringify(artefato, null, 2), 'utf8')
+    dglog('[missao] artefato gravado: ' + id)
+  } catch (e) {
+    dglog('[missao] falha ao gravar artefato: ' + String((e as Error)?.message || e))
+  }
 }
 
 async function responderRodada(
@@ -587,16 +670,10 @@ async function rodarLoopComProvider(
   tarefa: Tarefa,
   tools: McpTool[],
   systemExtra: string,
-  opts?: {
-    proposeWrites?: boolean
-    pastas?: string[]
-    onEvent?: (ev: EventoAgente) => void
-    signal?: AbortSignal
-    modo?: string
-    /** true = tools[] sao defs inline (MCP fora) — executarToolInline no lugar de chamarTool */
-    inlineTools?: boolean
-  }
+  opts?: OpcoesExecutarAgente
 ): Promise<RespostaAgente> {
+  // FASE 1: SessionStart hook carrega AGENTS.md e skills
+  executarSessionStart(raiz)
   const mensagens: Message[] = [
     { role: 'system', content: SYSTEM + systemExtra },
     { role: 'user', content: pergunta }
@@ -625,6 +702,15 @@ async function rodarLoopComProvider(
   }
 
   let maxIter = MAX_ITER
+  let tetoIteracoes = 15
+  let tetoTempoMs = 600_000
+  if (opts?.modo === 'agent') {
+    tetoIteracoes = opts?.tetoIteracoes ?? 15
+    tetoTempoMs = opts?.tetoTempoMs ?? 600_000
+  }
+  const t0 = Date.now()
+  const iteracoesMissao: Array<{ iteracao: number; oQueTentou: string; comando?: string; codigoSaida?: number; saidaReal?: string }> = []
+
   try {
     const { ehPedidoInventarioDisco } = await import('../disco-inventario')
     if (ehPedidoInventarioDisco(pergunta)) maxIter = MAX_ITER_INVENTARIO
@@ -640,6 +726,20 @@ async function rodarLoopComProvider(
   }
 
   for (let i = 0; i < maxIter; i++) {
+    if (Date.now() - t0 > tetoTempoMs) {
+      const msg = 'Teto de tempo estourado (' + (tetoTempoMs / 1000) + 's)'
+      emit({ tipo: 'status', texto: msg })
+      if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
+        gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, 'falha', passos)
+      }
+      return {
+        texto: msg,
+        modelo: labelModelo,
+        passos,
+        propostas: propostasAcc,
+        ok: false
+      }
+    }
     if (opts?.signal?.aborted) {
       emit({ tipo: 'status', texto: 'cancelado' })
       return {
@@ -651,6 +751,17 @@ async function rodarLoopComProvider(
       }
     }
     const passoN = i + 1
+    const agenteModo = opts?.modo === 'agent' ? 'agent' : 'chat'
+    const temObjetivo = opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto
+
+    if (temObjetivo && i === 0) {
+      emit({ tipo: 'status', texto: 'Objetivo: ' + opts.objetivo + ' | Critério: ' + opts.criterioDePronto })
+    }
+
+    if (temObjetivo) {
+      const tentativa = (passos[passos.length - 1]?.texto || '').slice(0, 200)
+      iteracoesMissao.push({ iteracao: passoN, oQueTentou: tentativa })
+    }
     emit({
       tipo: 'status',
       texto: 'Passo ' + passoN + ' de ' + maxIter + ' — chamando ' + labelModelo + '…',
@@ -758,7 +869,7 @@ async function rodarLoopComProvider(
 
     if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(r.content || '')) {
       dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -799,7 +910,7 @@ async function rodarLoopComProvider(
       // "voce pode...") nao e resposta — sintetiza erro honesto em vez de
       // devolver tutorial generico que parece resultado.
       const textoFinal = ehAcao && !jaUsouTool ? '' : r.content || ''
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos, opts)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -847,6 +958,7 @@ async function rodarLoopComProvider(
 
       // Permissoes do app (dg:permissoes:*): leitura/edicao/bash/mcp.
       // Antes disto os flags existiam so na UI — nada era aplicado no loop.
+      // FASE 1/2: integra hooks.ts com PreToolUse que chama sandbox-permissao.
       try {
         const { obterPermissoes } = await import('../permissoes')
         const perm = obterPermissoes()
@@ -857,6 +969,14 @@ async function rodarLoopComProvider(
         else if ((categoriaPerm === 'explore' || categoriaPerm === 'search') && !perm.permitirLeitura)
           bloqueio = nome + ' bloqueado (permitirLeitura=false)'
         else if (/^ext_|^mcp_/i.test(nome) && !perm.permitirMcp) bloqueio = nome + ' bloqueado (permitirMcp=false)'
+        // FASE 1/2: PreToolUse hook decide permissão (sandbox-permissao)
+        const decisaoHook = executarPreToolUse(raiz, nome, args)
+        if (decisaoHook.acao === 'bloquear') {
+          bloqueio = nome + ' bloqueado pelo hook PreToolUse: ' + decisaoHook.motivo
+        } else if (decisaoHook.acao === 'perguntar') {
+          // FASE 1: pergunta ao usuário — por enquanto bloqueia (solicitação aprovada)
+          bloqueio = nome + ' exige aprovação humana: ' + decisaoHook.motivo
+        }
         // Deny-list por tool/padrão: .dg-editor/tools-bloqueadas.json { "padroes": ["git_push", "ftp_*"] }
         if (!bloqueio) {
           try {
@@ -1032,6 +1152,16 @@ async function rodarLoopComProvider(
 
       emit({ tipo: 'tool', nome, fase: 'fim', detalhe: textoRes.slice(0, 200) })
       passos.push({ tipo: 'tool', nome, args, resultado: textoRes })
+      // FASE 2/3: registrar em iteracoesMissao se modo agent
+      if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
+        iteracoesMissao.push({
+          iteracao: passoN,
+          oQueTentou: nome + (args ? ' ' + JSON.stringify(args).slice(0, 100) : ''),
+          comando: nome === 'terminal_exec' ? String(args?.comando) : undefined,
+          codigoSaida: nome === 'terminal_exec' ? (textoRes?.includes('"ok":false') ? 1 : 0) : undefined,
+          saidaReal: textoRes.slice(0, 500)
+        })
+      }
       mensagens.push({
         role: 'tool',
         tool_name: nome,
@@ -1075,7 +1205,7 @@ async function rodarLoopComProvider(
             batchIdx.map((t) => processarChamada(t, chamadas[t]))
           )
           if (resultados.includes('loop')) {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1090,7 +1220,7 @@ async function rodarLoopComProvider(
         } else {
           const r1 = await processarChamada(batchIdx[0], chamadas[batchIdx[0]])
           if (r1 === 'loop') {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1107,7 +1237,7 @@ async function rodarLoopComProvider(
         const r1 = await processarChamada(tiCursor, chamadas[tiCursor])
         tiCursor++
         if (r1 === 'loop') {
-          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
           return {
             ...fin,
             propostas: propostasAcc,
@@ -1124,7 +1254,7 @@ async function rodarLoopComProvider(
   }
 
   dglog('[agente] limite de iteracoes; sintetizando')
-  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos)
+  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts)
   return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente atingiu o limite de etapas.', acao: 'Divida o pedido em partes menores e tente novamente.' } as any }
 }
 
