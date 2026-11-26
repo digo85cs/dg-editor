@@ -33,32 +33,37 @@ export interface DecisaoHook {
   hookId?: string
 }
 
-let hooksCache: HookConfig[] | null = null
+const hooksCachePorRaiz = new Map<string, HookConfig[]>()
 
 function carregarHooks(raiz: string): HookConfig[] {
-  if (hooksCache) return hooksCache
+  const chave = path.resolve(raiz)
+  if (hooksCachePorRaiz.has(chave)) return hooksCachePorRaiz.get(chave)!
   try {
     const arq = path.join(raiz, '.dg-editor', 'hooks.json')
     if (!fs.existsSync(arq)) {
-      hooksCache = []
-      return hooksCache
+      hooksCachePorRaiz.set(chave, [])
+      return []
     }
     const raw = fs.readFileSync(arq, 'utf8')
     const parsed = JSON.parse(raw) as { hooks?: HookConfig[] }
     if (Array.isArray(parsed.hooks)) {
-      hooksCache = parsed.hooks.filter((h) => h && h.tipo && h.nome)
+      hooksCachePorRaiz.set(chave, parsed.hooks.filter((h) => h && h.tipo && h.nome))
     } else {
-      hooksCache = []
+      hooksCachePorRaiz.set(chave, [])
     }
   } catch (e) {
     dglog('[hooks] hooks.json corrompido: ' + String((e as Error)?.message || e))
-    hooksCache = []
+    hooksCachePorRaiz.set(chave, [])
   }
-  return hooksCache
+  return hooksCachePorRaiz.get(chave)!
 }
 
-export function limparCacheHooks(): void {
-  hooksCache = null
+export function limparCacheHooks(raiz?: string): void {
+  if (raiz) {
+    hooksCachePorRaiz.delete(path.resolve(raiz))
+  } else {
+    hooksCachePorRaiz.clear()
+  }
 }
 
 export function executarPreToolUse(raiz: string, toolNome: string, toolArgs?: Record<string, unknown>): DecisaoHook {

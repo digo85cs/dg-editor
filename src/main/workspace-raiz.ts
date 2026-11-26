@@ -18,6 +18,15 @@ export function definirRaizWorkspace(pasta: string | null | undefined): string |
       dglog('[workspace-raiz] pasta inexistente: ' + abs)
       return raizAtiva
     }
+    if (raizAtiva !== abs) {
+      // FASE 4: limpa cache de hooks ao trocar de raiz
+      try {
+        const { limparCacheHooks } = require('./hooks')
+        limparCacheHooks()
+      } catch {
+        /* hooks pode não estar disponível */
+      }
+    }
     raizAtiva = abs
     process.env.DG_ROOT = abs
     return abs
