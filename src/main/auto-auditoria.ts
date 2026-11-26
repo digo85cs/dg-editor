@@ -1674,6 +1674,34 @@ function checarSandbox(): Achado[] {
         status: 'nao-aplicavel'
       })
     }
+    // FASE 6: check destrutivo repetido — 3 chamadas seguidas devem bloquear
+    let bloqueios = 0
+    for (let i = 0; i < 3; i++) {
+      const d = mod.decidirPermissaoTool('terminal_exec', { comando: 'rm -rf /tmp/x' })
+      if (d.permissao === 'bloquear') bloqueios++
+    }
+    if (bloqueios < 3) {
+      achados.push({
+        area: 'sandbox',
+        id: 'sandbox:destrutivo-repetido',
+        titulo: 'sandbox deve bloquear destrutivo em 3 chamadas seguidas',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // FASE 6: check default pergunta — tool desconhecida deve perguntar
+    const dUnknown = mod.decidirPermissaoTool('tool_que_nao_existe')
+    if (dUnknown.permissao !== 'perguntar') {
+      achados.push({
+        area: 'sandbox',
+        id: 'sandbox:default-pergunta',
+        titulo: 'sandbox deve perguntar para ferramenta não classificada',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
   } catch (e) {
     achados.push({
       area: 'sandbox',

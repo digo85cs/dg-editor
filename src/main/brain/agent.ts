@@ -588,27 +588,43 @@ async function verificarCriterio(raiz: string, criterio: string, passos: PassoAg
 
 function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[]): void {
   try {
-    const dir = path.join(raiz, '.dg-editor', 'missoes')
-    require('fs').mkdirSync(dir, { recursive: true })
+    const dirBase = path.join(raiz, '.dg-editor', 'missoes')
+    require('fs').mkdirSync(dirBase, { recursive: true })
     const id = Date.now().toString(36)
+    const dirMissao = path.join(dirBase, id)
+    require('fs').mkdirSync(dirMissao, { recursive: true })
+
+    // FASE 5: iteracoes.json com exitCode real
     const iteracoes = passos.map((p, i) => ({
       iteracao: i + 1,
       oQueTentou: p.tipo === 'tool' ? p.nome + (p.args ? ' ' + JSON.stringify(p.args).slice(0, 100) : '') : p.texto?.slice(0, 200) || '',
       comando: p.tipo === 'tool' && p.nome === 'terminal_exec' ? String(p.args?.comando) : undefined,
-      codigoSaida: p.codigoSaida,
-      saidaReal: p.resultado ? p.resultado.slice(0, 500) : undefined
+      exitCode: p.codigoSaida,
+      trechoReal: p.resultado ? p.resultado.slice(0, 2000) : undefined
     }))
-    const artefato: ArtefatoMissao = {
+    require('fs').writeFileSync(
+      path.join(dirMissao, 'iteracoes.json'),
+      JSON.stringify({ id, objetivo, iteracoes }, null, 2),
+      'utf8'
+    )
+
+    // FASE 5: veredito.json com criterio executado ou não
+    const criterioExecutado = passos.some((p) => p.tipo === 'tool' && p.nome === 'terminal_exec' && p.codigoSaida !== undefined)
+    const vereditoFinal = criterioExecutado ? veredito : 'nao-provado'
+    const vereditoJson = {
       id,
-      objetivo,
-      criterioDePronto: criterio,
-      veredito,
-      iteracoes,
-      inicio: new Date().toISOString(),
-      fim: new Date().toISOString()
+      criterio,
+      executado: criterioExecutado,
+      resultado: vereditoFinal,
+      motivo: criterioExecutado ? 'criterio executado' : 'criterio não foi executado nesta missão'
     }
-    require('fs').writeFileSync(path.join(dir, id + '.json'), JSON.stringify(artefato, null, 2), 'utf8')
-    dglog('[missao] artefato gravado: ' + id)
+    require('fs').writeFileSync(
+      path.join(dirMissao, 'veredito.json'),
+      JSON.stringify(vereditoJson, null, 2),
+      'utf8'
+    )
+
+    dglog('[missao] artefato gravado em ' + dirMissao)
   } catch (e) {
     dglog('[missao] falha ao gravar artefato: ' + String((e as Error)?.message || e))
   }
@@ -1117,6 +1133,13 @@ async function rodarLoopComProvider(
           ? await executarToolInline(raiz, nome, args)
           : await chamarTool(nome, args)
         textoRes = res.texto
+        // FASE 5: captura exitCode real do terminal_exec
+        if (nome === 'terminal_exec' && 'exitCode' in res) {
+          const exitCode = (res as { exitCode?: number }).exitCode
+          if (exitCode !== undefined) {
+            (passos[passos.length - 1] as PassoAgente).codigoSaida = exitCode
+          }
+        }
       }
 
       try {
