@@ -11,6 +11,8 @@ import { exec, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { dirname, join, relative, resolve } from 'node:path'
 import { z } from 'zod'
+import { executarPreToolUse } from '../hooks'
+import { dglog } from '../dglog'
 
 const execFileAsync = promisify(execFile)
 const execAsync = promisify(exec)
@@ -1875,6 +1877,22 @@ export async function executarToolCall(name: string, argsRaw: unknown, signal?: 
       const cmd = parsed.comando.trim()
       const argv = parsed.args || []
       const linha = (cmd + ' ' + argv.join(' ')).toLowerCase()
+      // FASE 2: PreToolUse hook decide permissão (sandbox-permissao)
+      const decisaoHook = executarPreToolUse(RAIZ, 'terminal_exec', { comando: cmd, args: argv })
+      if (decisaoHook.acao === 'bloquear') {
+        dglog('[dispatch] terminal_exec bloqueado pelo hook PreToolUse: ' + decisaoHook.motivo)
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'terminal_exec bloqueado: ' + decisaoHook.motivo }) }],
+          isError: true
+        }
+      }
+      if (decisaoHook.acao === 'perguntar') {
+        dglog('[dispatch] terminal_exec exige aprovação humana: ' + decisaoHook.motivo)
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'terminal_exec exige aprovação humana: ' + decisaoHook.motivo }) }],
+          isError: true
+        }
+      }
       const destrutivo =
         /\b(rm|del|rmdir|unlink|format|shutdown|reboot)\b/.test(linha) ||
         /\b(install|uninstall|remove)\b/.test(linha) ||
