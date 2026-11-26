@@ -34,10 +34,16 @@ const userData = path.join(root, 'qa-artifacts', 'userdata-audit')
   if (!rel || rel.ok === false) {
     console.log('[auditoria] FALHOU:', JSON.stringify(rel).slice(0, 500))
   } else {
-    const itens = rel.itens || rel.checks || rel.pendencias || []
+    // FASE 1: usar chave real "achados" com fallback
+    const itens = rel.achados || rel.itens || rel.checks || rel.pendencias || []
+    if (!itens.length) {
+      console.error('AUDITORIA NAO RETORNOU ACHADOS')
+      process.exit(1)
+    }
     const porSev = {}
     for (const i of itens) porSev[i.severidade || i.nivel || '?'] = (porSev[i.severidade || i.nivel || '?'] || 0) + 1
     console.log('[auditoria] resumo:', JSON.stringify({ ok: rel.ok, total: itens.length, porSev, chaves: Object.keys(rel) }))
+    if (rel.resumo) console.log('[auditoria] resumo detalhado:', JSON.stringify(rel.resumo))
     const ruins = itens.filter(i => /erro|error|falha/i.test(String(i.severidade || i.nivel || '')))
     for (const i of ruins.slice(0, 30)) console.log('  ERRO:', i.id || i.nome || '', '-', String(i.titulo || i.mensagem || i.detalhe || '').slice(0, 140))
     fs.writeFileSync(path.join(userData, 'auditoria-result.json'), JSON.stringify(rel, null, 2))
