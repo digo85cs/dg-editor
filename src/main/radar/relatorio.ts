@@ -18,10 +18,12 @@ export interface RelatorioEntrada {
   temas: RadarTema[]
   buscas: RadarResultadoBusca[]
   chamadas: RadarChamadaProvider[]
+  /** Linha de rodape sobre o cache (ex.: "Cache: nao utilizado nesta execucao"). */
+  cache?: string
 }
 
 export function gerarMarkdown(entrada: RelatorioEntrada): string {
-  const { data, providerUsado, custoTotalEstimadoUSD, temas, buscas, chamadas } = entrada
+  const { data, providerUsado, custoTotalEstimadoUSD, temas, buscas, chamadas, cache } = entrada
 
   const linhas: string[] = []
 
@@ -30,6 +32,7 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
   linhas.push('Data: ' + data)
   linhas.push('Provider usado: ' + providerUsado)
   linhas.push('Custo estimado total: $' + custoTotalEstimadoUSD.toFixed(6) + ' USD')
+  if (cache) linhas.push(cache)
   linhas.push('')
   linhas.push('> **Aviso:** Este relatorio e gerado automaticamente pelo radar diario do DG Editor.')
   linhas.push('> Ele nunca escreve codigo-fonte e nunca instala dependencias.')
@@ -42,6 +45,11 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
   const totalBuscas = buscas.length
   const buscasComErro = buscas.filter((b) => b.erro).length
   const chamadasComSucesso = chamadas.filter((c) => c.resposta && !c.erro).length
+  const totalLinks = buscas.reduce((acc, b) => acc + b.resultados.length, 0)
+  if (totalLinks === 0) {
+    linhas.push('**NENHUM LINK DE FONTE OBTIDO NESTA EXECUCAO — o resumo abaixo reflete buscas sem resultado.**')
+    linhas.push('')
+  }
   linhas.push('- Temas analisados: ' + temas.length)
   linhas.push('- Buscas realizadas: ' + totalBuscas + (buscasComErro > 0 ? ' (' + buscasComErro + ' com erro)' : ''))
   linhas.push('- Chamadas ao provider com sucesso: ' + chamadasComSucesso + ' de ' + chamadas.length)
@@ -60,12 +68,19 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
     }
     linhas.push('')
 
+    const temaTemFonte = temaBuscas.some((b) => b.resultados.length > 0)
+
     if (temaBuscas.length > 0) {
       linhas.push('### Achados da busca')
       for (const b of temaBuscas) {
         linhas.push('#### Query: ' + b.query)
-        if (b.erro) {
+        if (b.resultados.length === 0) {
+          linhas.push('- Busca sem resultado (motivo: ' + (b.erro || 'nenhum resultado retornado') + ')')
+        } else if (b.erro) {
           linhas.push('- Erro na busca: ' + b.erro)
+          for (const r of b.resultados) {
+            linhas.push('- [' + r.titulo + '](' + r.url + ')' + (r.resumo ? ' — ' + r.resumo : ''))
+          }
         } else {
           for (const r of b.resultados) {
             linhas.push('- [' + r.titulo + '](' + r.url + ')' + (r.resumo ? ' — ' + r.resumo : ''))
@@ -73,6 +88,11 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
         }
         linhas.push('')
       }
+    }
+
+    if (!temaTemFonte) {
+      linhas.push('**TEMA SEM FONTE** — nenhuma busca deste tema retornou link; nenhuma prioridade sera gerada para ele.')
+      linhas.push('')
     }
 
     if (temaChamada) {
@@ -101,9 +121,13 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
   linhas.push('')
   linhas.push('Ordenadas por impacto. Cada item entra em modo plan e exige aprovacao do usuario.')
   linhas.push('')
-  const prioridades = gerarPrioridades(temas, chamadas)
-  for (let i = 0; i < prioridades.length; i++) {
-    linhas.push((i + 1) + '. ' + prioridades[i])
+  const prioridades = gerarPrioridades(temas, buscas)
+  if (prioridades.length === 0) {
+    linhas.push('Nenhuma prioridade gerada: nenhuma busca retornou fonte com link.')
+  } else {
+    for (let i = 0; i < prioridades.length; i++) {
+      linhas.push((i + 1) + '. ' + prioridades[i])
+    }
   }
   linhas.push('')
 
@@ -113,31 +137,20 @@ export function gerarMarkdown(entrada: RelatorioEntrada): string {
   return linhas.join('\n')
 }
 
-function gerarPrioridades(temas: RadarTema[], chamadas: RadarChamadaProvider[]): string[] {
+function gerarPrioridades(temas: RadarTema[], buscas: RadarResultadoBusca[]): string[] {
+  // Prioridade so existe com base em resultado de busca com link — nunca por
+  // frase fixa ou por tema sem fonte.
   const prioridades: string[] = []
-
-  // Heuristica simples baseada nos temas e nas chamadas com sucesso
-  const temasComSucesso = chamadas.filter((c) => c.resposta && !c.erro).map((c) => c.tema)
-
-  if (temasComSucesso.includes('editores de codigo com IA')) {
-    prioridades.push('Avaliar recursos de IA nativa em editores concorrentes para integrar ao DG Editor')
+  for (const tema of temas) {
+    const comLink = buscas.find(
+      (b) => b.tema === tema.nome && b.resultados.length > 0
+    )
+    if (!comLink) continue
+    const r = comLink.resultados[0]
+    prioridades.push(
+      'Aprofundar achado de "' + tema.nome + '": ' + r.titulo + ' (' + r.url + ')'
+    )
+    if (prioridades.length >= 5) break
   }
-  if (temasComSucesso.includes('agentes de codigo autonomos')) {
-    prioridades.push('Estudar agentes autonomos para estender o Devin Planner/Executor/Validator do DG Editor')
-  }
-  if (temasComSucesso.includes('memoria persistente para agentes')) {
-    prioridades.push('Implementar memoria persistente de longo prazo para agentes do DG Editor')
-  }
-  if (temasComSucesso.includes('compressao de contexto')) {
-    prioridades.push('Adicionar compressao de contexto para reduzir custo e ampliar janela de analise')
-  }
-  if (temasComSucesso.includes('MCP servers')) {
-    prioridades.push('Mapear MCP servers uteis e expor via IPC do DG Editor')
-  }
-  if (temasComSucesso.includes('IDEs com IA integrada')) {
-    prioridades.push('Comparar features de IA integrada em IDEs e priorizar diferenciais para o DG Editor')
-  }
-
-  // Garante no maximo 5
-  return prioridades.slice(0, 5)
+  return prioridades
 }
