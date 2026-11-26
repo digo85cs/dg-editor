@@ -252175,7 +252175,7 @@ var init_roteador_cota = __esm({
 
 // src/main/brain/resposta-cache.ts
 function cacheDir() {
-  return (0, import_path21.join)(resolverRaizProjeto(), ".dg-editor", CACHE_DIR_NAME);
+  return (0, import_path21.join)(userDataDir(), CACHE_DIR_NAME);
 }
 function hashEntrada(modelo, mensagens, tools) {
   const payload = JSON.stringify({ modelo, mensagens, tools: tools || null });
@@ -252185,6 +252185,8 @@ function arquivoCache(hash2) {
   return (0, import_path21.join)(cacheDir(), hash2 + ".json");
 }
 function lerRespostaCache(modelo, mensagens, tools) {
+  if (ignorarCacheLeitura)
+    return null;
   try {
     const hash2 = hashEntrada(modelo, mensagens, tools);
     const arq = arquivoCache(hash2);
@@ -252223,7 +252225,7 @@ function gravarRespostaCache(modelo, mensagens, texto, tools, ttlMs) {
   } catch {
   }
 }
-var import_crypto, import_fs20, import_path21, CACHE_DIR_NAME, TTL_MS;
+var import_crypto, import_fs20, import_path21, CACHE_DIR_NAME, TTL_MS, ignorarCacheLeitura;
 var init_resposta_cache = __esm({
   "src/main/brain/resposta-cache.ts"() {
     "use strict";
@@ -252233,6 +252235,7 @@ var init_resposta_cache = __esm({
     init_paths();
     CACHE_DIR_NAME = "resposta-cache";
     TTL_MS = 7 * 24 * 60 * 60 * 1e3;
+    ignorarCacheLeitura = false;
   }
 });
 

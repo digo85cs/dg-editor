@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **25/11/2026, 15:47:10** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.28** · branch `integra-13-11` · último commit: 9ea76db 2026-11-25 chore: versiona scripts de aceite e alinha validador ao NSIS por-usuario
-> Alterações locais não commitadas: 4 arquivo(s).
+> Gerado automaticamente em **26/11/2026, 11:27:26** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.29** · branch `integra-13-11` · último commit: e007cd5 2026-11-26 fecha ultimo erro da auditoria e limpa cache orfao do radar
+> Alterações locais não commitadas: 7 arquivo(s).
 
 ## 1. O que é
 
@@ -206,13 +206,13 @@ Artefatos locais em `dist-apps/`:
 
 ## 9. MCP
 
-- **101** ferramentas registradas em `src/main/mcp/server.ts`.
+- **0** ferramentas registradas em `src/main/mcp/server.ts`.
 - Build: `npm run build:mcp` → `.dg-editor/bin/main/mcp/server.js`; HTTP: `npm run mcp:http`.
 - Despacho por prefixo cobre `midia_`, `apps_`, `reversa_` e as ferramentas `imagens_iso`, `notas_mapa_mental`, `tela_gravacoes` e `receber_lan`. A ferramenta `imagens_iso` é somente leitura: não grava pendrive.
 
 <details><summary>Ferramentas</summary>
 
-`agente_executar`, `agente_invocar`, `agente_listar`, `agentes_externos_status`, `apps_build`, `apps_setup`, `apps_status`, `automacao_executar`, `automacao_listar`, `codigo_buscar`, `codigo_editar`, `codigo_ler`, `conector_listar`, `disco_buscar`, `disco_inspecionar`, `dossie_read`, `dossie_snapshot`, `dossie_write`, `ftp_deploy`, `ftp_listar`, `git_diff`, `git_status`, `imagens_iso`, `midia_atualizacoes`, `midia_audio`, `midia_comfy_instalar`, `midia_comfyui_imagem`, `midia_comfyui_status`, `midia_comfyui_video`, `midia_custo`, `midia_diagrama`, `midia_documento_converter`, `midia_estoque`, `midia_foto_video`, `midia_fotos_video`, `midia_hardware`, `midia_imagem_auto`, `midia_imagem_cf`, `midia_imagem_editar_gemini`, `midia_imagem_gemini`, `midia_imagem_gerar`, `midia_imagem_getimg`, `midia_imagem_hf`, `midia_imagem_horde`, `midia_imagem_melhorar`, `midia_imagem_openai`, `midia_imagem_qualidade`, `midia_imagem_segmind`, `midia_legendas`, `midia_linha_tempo`, `midia_meme_gerar`, `midia_memes_listar`, `midia_memes_sincronizar`, `midia_musica_baixar`, `midia_musica_mixar`, `midia_musicas`, `midia_musicas_livres`, `midia_narrar`, `midia_pdf`, `midia_planilha`, `midia_status`, `midia_transcrever`, `midia_tts_openai`, `midia_video_auto`, `midia_video_capa`, `midia_video_cortar`, `midia_video_efeito`, `midia_video_gemini`, `midia_video_json2video`, `midia_video_juntar`, `midia_video_qualidade`, `midia_voz_efeito`, `midia_vozes_listar`, `navegador_abrir`, `navegador_baixar`, `navegador_clicar`, `navegador_ler`, `navegador_preencher`, `notas_mapa_mental`, `portabilidade_status`, `projeto_arvore`, `projeto_smoke`, `provisionamento_atualizar`, `provisionamento_status`, `qoder_executar`, `qualidade_checar`, `receber_lan`, `resultado_avaliar`, `reversa_analisar`, `reversa_asar`, `reversa_status`, `reversa_strings`, `skill_ler`, `skill_listar`, `tela_gravacoes`, `terminal_exec`, `testes_rodar`, `trae_executar`, `vault_list`, `vault_read`, `vault_write`
+
 
 </details>
 
@@ -339,16 +339,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- e007cd5 2026-11-26 fecha ultimo erro da auditoria e limpa cache orfao do radar
+- 73b911e 2026-11-26 radar: relatorio diario regenerado com fontes reais
+- b8e1d18 2026-11-26 fecha ponto cego do radar na auditoria e repara checks do MCP
+- e979f02 2026-11-26 torna o relatorio do radar honesto: sem fonte, sem prioridade
+- 294c5f8 2026-11-26 desliga cache de resposta no radar e isola o cache no userData
+- 35e6403 2026-11-26 corrige busca do radar: cascata ddg-lite/bing/mojeek com erro legivel
+- ce34262 2026-11-25 adiciona aceite do MCP HTTP (verificar-mcp-http.mjs) e versiona o script
+- d4b40f6 2026-11-25 refatora MCP: extrai dispatch compartilhado e faz o HTTP delegar as tools do stdio
+- bf59361 2026-11-25 release: v0.9.28
 - 9ea76db 2026-11-25 chore: versiona scripts de aceite e alinha validador ao NSIS por-usuario
-- 4465158 2026-11-25 build(instalador): perMachine false — instala por usuario sem UAC
-- 9912552 2026-11-25 fix(chat): elimina agentes duplicados no seletor do chat
-- 83995ac 2026-11-25 fix(openclaw): store de propostas passa a pertencer ao projeto
-- 57ab83c 2026-11-25 chore: pos-release 0.9.27 — dossie, radar, bundle mcp
-- d5be6e5 2026-11-25 chore: release 0.9.27
-- 98f422b 2026-11-25 chore: ignora store de propostas e snapshot de QA (runtime)
-- 9cde038 2026-11-25 fix(chat): persiste turnos do painel Agente no historico da conversa
-- 91d2d15 2026-11-25 fix(openclaw): persiste propostas pendentes em .dg-editor/openclaw/pendentes.json
-- f950379 2026-11-25 chore: pos-release 0.9.26 — dossie, radar, skills, nota AGENTS
 
 ## 16. Como atualizar este dossiê
 
