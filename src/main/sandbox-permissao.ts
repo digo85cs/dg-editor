@@ -21,25 +21,29 @@ export interface DecisaoPermissao {
   categoria: 'leitura' | 'escrita' | 'comando' | 'destrutivo' | 'rede'
 }
 
-/** Allowlist de comandos considerados seguros para execução automática. */
-const ALLOWLIST = new Set([
+/** Allowlist de comandos considerados seguros para execução automática (prefixo). */
+const ALLOWLIST_PREFIXOS = [
   'npm test',
+  'npm run',
   'npm run build',
   'npx tsc --noEmit',
   'npx vitest',
   'git status',
   'git diff',
   'git log',
+  'git show',
+  'git branch',
+  'git remote -v',
   'ls',
   'dir',
   'type',
   'cat',
   'node -v',
-  'npm -v',
-  'git branch',
-  'git show',
-  'git remote -v'
-])
+  'npm -v'
+]
+
+/** Operadores de encadeamento que negam herança de permissão. */
+const ENCADEAMENTO = /&&|\|\||;|\||>/g
 
 /** Ferramentas de leitura: automáticas. */
 const TOOLS_LEITURA = new Set([
@@ -65,7 +69,7 @@ const TOOLS_LEITURA = new Set([
 const TOOLS_ESCRITA = new Set(['codigo_editar', 'vault_write', 'dossie_write'])
 
 /** Padrões destrutivos detectados em comandos. */
-const DESTRUTIVOS = /rm\s+-rf|rmdir\s+-s|del\s+[\/]?q|drop\s+table|truncate|format|git\s+reset\s+--hard|git\s+checkout\s+--[^s]|git\s+clean/gi
+const DESTRUTIVOS = /rm\s+-rf|rmdir\s+-s|del\s+[\/]?q|drop\s+table|truncate|format|git\s+reset\s+--hard|git\s+checkout\s+--[^s]|git\s+clean/i
 
 /** Ferramentas de rede sensíveis. */
 const TOOLS_REDE = new Set(['ftp_deploy', 'midia_pdf', 'midia_planilha', 'apps_build', 'provisionamento_atualizar'])
@@ -85,8 +89,13 @@ export function decidirPermissaoTool(nome: string, args?: Record<string, unknown
 
   if (nome === 'terminal_exec' && args?.comando) {
     const cmd = String(args.comando).trim()
-    if (ALLOWLIST.has(cmd)) {
-      return { permissao: 'permitir', motivo: 'comando na allowlist', categoria: 'comando' }
+    // FASE 2: allowlist por prefixo com validação de encadeamento
+    const temEncadeamento = ENCADEAMENTO.test(cmd)
+    if (!temEncadeamento) {
+      const prefixoOk = ALLOWLIST_PREFIXOS.some((p) => cmd === p || cmd.startsWith(p + ' '))
+      if (prefixoOk) {
+        return { permissao: 'permitir', motivo: 'comando na allowlist (prefixo)', categoria: 'comando' }
+      }
     }
     if (DESTRUTIVOS.test(cmd)) {
       return { permissao: 'bloquear', motivo: 'comando destrutivo bloqueado mesmo com aprovação', categoria: 'destrutivo' }
@@ -94,5 +103,6 @@ export function decidirPermissaoTool(nome: string, args?: Record<string, unknown
     return { permissao: 'perguntar', motivo: 'comando fora da allowlist exige aprovação', categoria: 'comando' }
   }
 
-  return { permissao: 'permitir', motivo: 'ferramenta não classificada, permitida por padrão', categoria: 'leitura' }
+  // FASE 3: ferramenta não classificada exige aprovação
+  return { permissao: 'perguntar', motivo: 'ferramenta não classificada exige aprovação', categoria: 'comando' }
 }
