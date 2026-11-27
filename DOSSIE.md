@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **26/11/2026, 11:27:26** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.29** · branch `integra-13-11` · último commit: e007cd5 2026-11-26 fecha ultimo erro da auditoria e limpa cache orfao do radar
-> Alterações locais não commitadas: 7 arquivo(s).
+> Gerado automaticamente em **27/11/2026, 11:39:39** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.30** · branch `integra-13-11` · último commit: 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
+> Alterações locais não commitadas: 13 arquivo(s).
 
 ## 1. O que é
 
@@ -339,16 +339,16 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
-- e007cd5 2026-11-26 fecha ultimo erro da auditoria e limpa cache orfao do radar
-- 73b911e 2026-11-26 radar: relatorio diario regenerado com fontes reais
-- b8e1d18 2026-11-26 fecha ponto cego do radar na auditoria e repara checks do MCP
-- e979f02 2026-11-26 torna o relatorio do radar honesto: sem fonte, sem prioridade
-- 294c5f8 2026-11-26 desliga cache de resposta no radar e isola o cache no userData
-- 35e6403 2026-11-26 corrige busca do radar: cascata ddg-lite/bing/mojeek com erro legivel
-- ce34262 2026-11-25 adiciona aceite do MCP HTTP (verificar-mcp-http.mjs) e versiona o script
-- d4b40f6 2026-11-25 refatora MCP: extrai dispatch compartilhado e faz o HTTP delegar as tools do stdio
-- bf59361 2026-11-25 release: v0.9.28
-- 9ea76db 2026-11-25 chore: versiona scripts de aceite e alinha validador ao NSIS por-usuario
+- 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
+- 0841ec8 2026-11-27 feat(auditoria): checks hardware:vram-lida, hardware:teto-modelo, tools:rescue-valida
+- e4c3c0d 2026-11-27 feat(brain): rescue de tool_call emitido como JSON no content
+- f8989f2 2026-11-27 feat(hardware): perfil enxerga VRAM medida e aplica teto de modelo
+- 8e26f96 2026-11-27 feat(agent): codigo_criar — arquivo novo vira proposta com protecoes
+- 23a62ac 2026-11-27 test(brain): prova live de abort cancelando geracao no Ollama
+- 8997677 2026-11-27 fix(brain): num_ctx derivado do prompt + cap num_predict em tool_call
+- 8ec196d 2026-11-27 chore(agent): instrumentacao de tempo por iteracao (DG_AGENT_TIMING)
+- dbcc92b 2026-11-27 feat(auditoria): checks de escrita/proposta e missao honesta
+- 7c9d57b 2026-11-27 feat(agent): escrita em missao vira proposta, nao bloqueio
 
 ## 16. Como atualizar este dossiê
 
