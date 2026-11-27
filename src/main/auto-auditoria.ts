@@ -1784,6 +1784,61 @@ function checarLoopAgent(): Achado[] {
         status: 'nao-aplicavel'
       })
     }
+    // FASE 3 (missao escrita): 'perguntar' de tool de escrita em modo agent
+    // nao pode virar bloqueio — deve seguir para o fluxo de proposta.
+    const mPerguntar = src.match(/decisaoHook\.acao === 'perguntar'[\s\S]{0,700}/)
+    const blocoPerguntar = mPerguntar ? mPerguntar[0] : ''
+    if (!/ehToolEscrita/.test(blocoPerguntar) || !/modo === 'agent'/.test(blocoPerguntar)) {
+      achados.push({
+        area: 'escrita',
+        id: 'escrita:gera-proposta',
+        titulo: 'codigo_editar em modo agent deve gerar proposta, nao bloqueio',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // FASE 3: sem aprovacao o disco NAO muda — o ramo de escrita do agent.ts
+    // nao pode executar a tool direto, e propostas.ts nao pode gravar arquivo.
+    const mRamoEscrita = src.match(/if \(ehToolEscrita\(nome\)[\s\S]*?\n {6}\} else \{/)
+    const ramoEscrita = mRamoEscrita ? mRamoEscrita[0] : ''
+    const srcPropostas = (() => {
+      try {
+        return require('fs').readFileSync(path.join(__dirname, 'agent/propostas.ts'), 'utf8')
+      } catch {
+        return ''
+      }
+    })()
+    if (
+      !ramoEscrita ||
+      /chamarTool|executarToolInline|executarToolCall/.test(ramoEscrita) ||
+      !/proporCodigoEditar|proporEscritaCompleta/.test(ramoEscrita) ||
+      /writeFileSync|appendFileSync|writeFile\(/.test(srcPropostas)
+    ) {
+      achados.push({
+        area: 'escrita',
+        id: 'escrita:nao-grava',
+        titulo: 'sem aprovacao o arquivo em disco NAO pode mudar (so proposta/diff)',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // FASE 3: escrita pendente de aprovacao => veredito 'nao-provado', nunca sucesso.
+    if (
+      !/propostasPendentes/.test(src) ||
+      !/aguardandoAprovacao/.test(src) ||
+      !/if \(aguardandoAprovacao\) veredito = 'nao-provado'/.test(src)
+    ) {
+      achados.push({
+        area: 'missao',
+        id: 'missao:veredito-honesto',
+        titulo: 'escrita pendente de aprovacao deve derrubar veredito para nao-provado',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
   } catch (e) {
     achados.push({
       area: 'loop',

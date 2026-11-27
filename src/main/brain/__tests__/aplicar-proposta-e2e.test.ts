@@ -1,25 +1,41 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import path from 'path'
 import fs from 'fs'
-import { aplicarPropostaComCheckpoint, obterPendente, listarPendentes } from '../../agent/propostas'
+import os from 'os'
+import { proporCodigoEditar, aplicarPropostaComCheckpoint, obterPendente } from '../../agent/propostas'
 
-// Prova FASE 2: aprovar a proposta gerada pela missao E2E e verificar o disco.
-describe('FASE 2 — aplicar proposta da missao real', () => {
-  it('aplica a proposta pendente e o arquivo muda no disco', async () => {
-    const raiz = path.resolve(process.cwd(), '.dg-editor', 'qa', 'fase3')
-    const alvo = path.join(raiz, 'soma.test.ts')
-    const antes = fs.readFileSync(alvo, 'utf8')
-    expect(antes).toContain('return a - b')
+// FASE 2 — fluxo completo: missao gera PROPOSTA (disco intacto),
+// aprovacao aplica via checkpoint e o arquivo muda.
+describe('FASE 2 — escrita em missao vira proposta, nao gravacao direta', () => {
+  let raiz = '';
+  let alvo = ''
+  const CONTEUDO_ANTES = 'function soma(a: number, b: number): number {\n  return a - b\n}\n'
+  const CONTEUDO_DEPOIS = 'function soma(a: number, b: number): number {\n  return a + b\n}\n'
 
-    const pend = listarPendentes().find((p) => p.path === alvo && p.status === 'pendente')
-    expect(pend, 'proposta pendente nao encontrada').toBeTruthy()
+  beforeAll(() => {
+    raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-prop-'))
+    alvo = path.join(raiz, 'soma.ts')
+    fs.writeFileSync(alvo, CONTEUDO_ANTES, 'utf8')
+  })
 
-    const r = await aplicarPropostaComCheckpoint(pend!.id, [raiz])
+  afterAll(() => {
+    try { fs.rmSync(raiz, { recursive: true, force: true }) } catch { /* */ }
+  })
+
+  it('proposta nao grava no disco; aprovar aplica o diff', async () => {
+    const p = proporCodigoEditar(raiz, { arquivo: 'soma.ts', ancora: 'return a - b', novo: 'return a + b' }, [raiz])
+    expect(p.ok).toBe(true)
+    expect(p.pendente?.id).toBeTruthy()
+    expect(p.pendente?.unifiedDiff).toContain('return a + b')
+
+    // sem aprovacao: disco NAO mudou
+    expect(fs.readFileSync(alvo, 'utf8')).toBe(CONTEUDO_ANTES)
+
+    const r = await aplicarPropostaComCheckpoint(p.pendente!.id, [raiz])
     expect(r.ok).toBe(true)
+    expect(r.checkpointId).toBeTruthy()
 
-    const depois = fs.readFileSync(alvo, 'utf8')
-    expect(depois).toContain('return a + b')
-    expect(depois).not.toContain('return a - b')
-    expect(obterPendente(pend!.id)?.status).not.toBe('pendente')
+    expect(fs.readFileSync(alvo, 'utf8')).toBe(CONTEUDO_DEPOIS)
+    expect(obterPendente(p.pendente!.id)?.status).not.toBe('pendente')
   })
 })

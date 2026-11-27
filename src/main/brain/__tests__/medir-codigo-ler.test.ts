@@ -44,10 +44,12 @@ describe('FASE 1 — medir codigo_ler / lerSimbolo', () => {
 
     process.env.DG_ROOT = RAIZ_DG
     const t0 = Date.now()
-    r = await executarToolCall('codigo_ler', { nome: 'soma.test.ts' })
+    r = await executarToolCall('codigo_ler', { nome: 'agent.ts' })
     const ms = Date.now() - t0
-    j = JSON.parse((r.content as Array<{ text: string }>)[0].text)
-    console.log('[TEMPO] dispatch codigo_ler DGEditor soma.test.ts => ' + ms + 'ms isError=' + r.isError + ' texto=' + JSON.stringify(j).slice(0, 160))
+    const txt = (r.content as Array<{ text: string }>)[0].text
+    let j2: Record<string, unknown> = {}
+    try { j2 = JSON.parse(txt) } catch { j2 = { bruto: txt.slice(0, 120) } }
+    console.log('[TEMPO] dispatch codigo_ler DGEditor agent.ts => ' + ms + 'ms isError=' + r.isError + ' texto=' + JSON.stringify(j2).slice(0, 160))
     delete process.env.DG_ROOT
   }, 120000)
 })
