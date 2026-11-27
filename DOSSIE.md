@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **27/11/2026, 12:19:14** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.31** · branch `integra-13-11` · último commit: 92e471a 2026-11-27 fix(auditoria): checks sandbox/loop/hooks com path e import corretos
-> Alterações locais não commitadas: 12 arquivo(s).
+> Gerado automaticamente em **27/11/2026, 13:15:39** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.32** · branch `integra-13-11` · último commit: f38b717 2026-11-27 docs(agents): VRAM/rescue/auditoria-empacotada/armadilhas do instalador
+> Alterações locais não commitadas: 17 arquivo(s).
 
 ## 1. O que é
 
@@ -235,7 +235,7 @@ Utilitários locais relevantes:
 - ImageMagick — imagem (ImageMagick): ausente
 - pandoc — documentos: **presente**
 - yt-dlp — download de vídeo: ausente
-- 7z — arquivos (7-Zip): ausente
+- 7z — arquivos (7-Zip): **presente**
 - tesseract — OCR: ausente
 - qemu-system-x86_64 — teste de boot (QEMU): ausente
 - soffice — LibreOffice: ausente
@@ -339,6 +339,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- f38b717 2026-11-27 docs(agents): VRAM/rescue/auditoria-empacotada/armadilhas do instalador
+- 065cf6e 2026-11-27 release: v0.9.31
 - 92e471a 2026-11-27 fix(auditoria): checks sandbox/loop/hooks com path e import corretos
 - 8864b8e 2026-11-27 release: v0.9.30
 - 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
@@ -347,8 +349,6 @@ Utilitários locais relevantes:
 - f8989f2 2026-11-27 feat(hardware): perfil enxerga VRAM medida e aplica teto de modelo
 - 8e26f96 2026-11-27 feat(agent): codigo_criar — arquivo novo vira proposta com protecoes
 - 23a62ac 2026-11-27 test(brain): prova live de abort cancelando geracao no Ollama
-- 8997677 2026-11-27 fix(brain): num_ctx derivado do prompt + cap num_predict em tool_call
-- 8ec196d 2026-11-27 chore(agent): instrumentacao de tempo por iteracao (DG_AGENT_TIMING)
 
 ## 16. Como atualizar este dossiê
 

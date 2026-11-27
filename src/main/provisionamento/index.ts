@@ -350,7 +350,8 @@ export async function statusProvisionamento(): Promise<StatusProvisionamento> {
 
   const instalados = vp.ok ? await pacotesInstalados(py) : null
   const alvo = manifesto.python.pacotes || []
-  const faltando = instalados ? alvo.filter((p) => !instalados[p.toLowerCase()]) : alvo.slice()
+  const nomeBase = (spec: string) => spec.toLowerCase().split(/[<>=!~;\s]/)[0]
+  const faltando = instalados ? alvo.filter((p) => !instalados[nomeBase(p)]) : alvo.slice()
   itens.push({
     id: 'pacotes',
     nome: 'Pacotes de voz/transcrição',

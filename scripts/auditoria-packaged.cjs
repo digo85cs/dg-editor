@@ -5,11 +5,24 @@ const path = require('path')
 const fs = require('fs')
 
 const root = path.join(__dirname, '..')
-const exe = path.join(root, 'dist-app', 'win-unpacked', 'DG Editor.exe')
+const argExe = process.argv.find((a) => a.startsWith('--exe='))
+const pkgVer = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version } catch { return '' }
+})()
+const candidatosExe = [
+  argExe ? argExe.slice(6) : null,
+  pkgVer ? path.join(root, 'tmp', `dist-release-${pkgVer}`, 'win-unpacked', 'DG Editor.exe') : null,
+  process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs', 'DG Editor', 'DG Editor.exe') : null,
+  path.join(root, 'dist-app', 'win-unpacked', 'DG Editor.exe')
+].filter(Boolean)
+const exe = candidatosExe.find((p) => fs.existsSync(p)) || path.join(root, 'dist-app', 'win-unpacked', 'DG Editor.exe')
 const userData = path.join(root, 'qa-artifacts', 'userdata-audit')
 
 ;(async () => {
   if (!fs.existsSync(exe)) { console.error('exe nao encontrado:', exe); process.exit(1) }
+  const asar = path.join(path.dirname(exe), 'resources', 'app.asar')
+  const asarInfo = fs.existsSync(asar) ? fs.statSync(asar).mtime.toISOString() : 'sem-asar'
+  console.log('[auditoria] alvo:', exe, '| app.asar:', asarInfo)
   fs.rmSync(userData, { recursive: true, force: true })
   fs.mkdirSync(path.join(userData, '.dg-editor'), { recursive: true })
   // Copia skills/agentes do repo para o userData isolado (override local vence o pacote)

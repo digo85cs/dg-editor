@@ -6,6 +6,7 @@ const FIX_BOM = process.argv.includes('--fix-nobom');
 const exts = new Set(['.ts', '.js', '.mjs', '.cjs', '.css', '.html', '.json', '.md', '.ps1']);
 const skipDirNames = new Set(['node_modules', '.git', 'dist', 'dist-app']);
 const roots = [path.join(ROOT, 'src'), path.join(ROOT, 'scripts'), path.join(ROOT, 'out', 'renderer')];
+const rootFiles = ['package.json', 'README.md', 'AGENTS.md', '.dgrules'].map((f) => path.join(ROOT, f));
 const findings = [];
 let scanned = 0;
 
@@ -82,6 +83,7 @@ function checkFile(full) {
 }
 
 for (const r of roots) if (fs.existsSync(r)) walk(r);
+for (const rf of rootFiles) if (fs.existsSync(rf)) checkFile(rf);
 
 if (findings.length) {
   console.log(`verificar:encoding — ${findings.length} achado(s) em ${scanned} arquivo(s):`);

@@ -1,4 +1,4 @@
-﻿# Regras do sistema (DG Editor)
+# Regras do sistema (DG Editor)
 # Instrucoes permanentes. Chat, analise e Agent respeitam este arquivo.
 # Uma regra por linha, com hifen. Secoes com titulo # === ... ===.
 
@@ -39,7 +39,7 @@
 
 # === 7. ENGENHARIA REVERSA (SEGURO) ===
 
-- Automatizar quebra de licenca, DRM, ofuscacao maliciosa, exploracao ou bypass.
+- Nao automatizar quebra de licenca, DRM, ofuscacao maliciosa, exploracao ou bypass.
 - Conclusao exige evidence_id: caminho do arquivo e trecho lido, ou comando e saida que sustentam a frase.
 
 # === 8. CLEAN-ROOM ===
@@ -59,7 +59,7 @@
 
 # === FILA DE PROVEDORES ===
 - Ordem de preferencia: tier 1 gratuito (OpenRouter :free, Gemini Flash-Lite, Z.AI direto, Groq) antes de tier 2 pago.
-- Sempre hardcodar chave de API; usar o cofre criptografado (canal providers:configurar).
+- Nunca hardcodar chave de API; usar o cofre criptografado (canal providers:configurar).
 - Antes de propor um modelo novo, consultar providers:fila.
 - Se um provider retornar 429/402, nao insistir: o roteador ja marca esgotado e desce a fila.
 - O piso garantido e Ollama local (qwen2.5-coder:7b) quando todos os provedores online estiverem esgotados.

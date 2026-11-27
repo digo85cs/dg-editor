@@ -1,4 +1,6 @@
-import { describe, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import {
   carregarIndiceCodigo,
@@ -9,7 +11,21 @@ import {
 import { executarToolCall } from '../../mcp/dispatch'
 
 const RAIZ_DG = path.resolve(process.cwd())
-const RAIZ_QA = path.resolve(process.cwd(), '.dg-editor', 'qa', 'fase3')
+let RAIZ_QA = ''
+
+beforeAll(() => {
+  RAIZ_QA = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-medir-codigo-ler-'))
+  fs.writeFileSync(
+    path.join(RAIZ_QA, 'soma.test.ts'),
+    'export function soma(a: number, b: number) { return a + b }\n',
+    'utf8'
+  )
+})
+
+afterAll(() => {
+  delete process.env.DG_ROOT
+  if (RAIZ_QA) fs.rmSync(RAIZ_QA, { recursive: true, force: true })
+})
 
 function t(label: string, fn: () => unknown) {
   const t0 = Date.now()
@@ -40,6 +56,7 @@ describe('FASE 1 — medir codigo_ler / lerSimbolo', () => {
     process.env.DG_ROOT = RAIZ_QA
     let r = await executarToolCall('codigo_ler', { nome: 'soma.test.ts' })
     let j = JSON.parse((r.content as Array<{ text: string }>)[0].text)
+    expect(j.arquivo).toContain('soma.test.ts')
     console.log('[TEMPO] dispatch codigo_ler qa/fase3 soma.test.ts => modo=' + j.modo + ' arquivo=' + j.arquivo)
 
     process.env.DG_ROOT = RAIZ_DG

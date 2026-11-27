@@ -6,6 +6,7 @@ import { existsSync } from 'fs'
 import { resolve, sep } from 'path'
 import { dglog } from './dglog'
 import { userDataDir } from './paths'
+import { limparCacheHooks } from './hooks'
 
 let raizAtiva: string | null = null
 
@@ -21,7 +22,6 @@ export function definirRaizWorkspace(pasta: string | null | undefined): string |
     if (raizAtiva !== abs) {
       // FASE 4: limpa cache de hooks ao trocar de raiz
       try {
-        const { limparCacheHooks } = require('./hooks')
         limparCacheHooks()
       } catch {
         /* hooks pode não estar disponível */

@@ -415,21 +415,24 @@ async function checarModelos(): Promise<Achado[]> {
       status: 'nao-aplicavel'
     })
 
-    // Mais forte disponivel para codigo no registry
+    // Mais forte disponivel para codigo no registry (respeitando teto de VRAM do hardware)
+    const { modeloExcedeTetoVram, medirVramMb } = await import('./hardware-profile')
+    const vramInfo = medirVramMb()
     const candidatos = listarRegistry()
       .filter((m) => m.tipo === 'local' && m.tarefas.includes('codigo'))
       .filter((m) => instalados.some((d) => d === m.nome || d.startsWith(m.nome)))
+      .filter((m) => !modeloExcedeTetoVram(m.nome, 'codigo', vramInfo.vramMb))
       .sort((a, b) => b.forca - a.forca)
     const maisForte = candidatos[0]
     const regEscolhido = listarRegistry().find((m) => escolhido === m.nome || escolhido.startsWith(m.nome))
     if (maisForte && regEscolhido && regEscolhido.forca < maisForte.forca - 2) {
       // 7b (7) vs 14b (9) = diff 2 → nao alerta (7b e o padrao intencional)
-      // 3b (5) vs 14b (9) = diff 4 → alerta
+      // 3b (5) vs 14b (9) = diff 4 → alerta (so quando 14b cabe na VRAM)
       out.push({
         id: 'modelos:codigo-fraco',
         area: 'modelos',
         titulo: 'Modelo de codigo mais fraco que o teto disponivel',
-        detalhe: 'escolhido=' + escolhido + ' (forca ' + regEscolhido.forca + ') vs maisForte=' + maisForte.nome + ' (forca ' + maisForte.forca + '). Padrao e 7b; use preferirQualidade para 14b.',
+        detalhe: 'escolhido=' + escolhido + ' (forca ' + regEscolhido.forca + ') vs maisForte=' + maisForte.nome + ' (forca ' + maisForte.forca + ', vram=' + vramInfo.vramMb + 'MB).',
         severidade: regEscolhido.forca < 7 ? 'warn' : 'ok',
         corrigivel: false,
         status: 'nao-aplicavel'
@@ -438,8 +441,8 @@ async function checarModelos(): Promise<Achado[]> {
       out.push({
         id: 'modelos:codigo-equilibrio',
         area: 'modelos',
-        titulo: 'Politica codigo OK (7b padrao / 14b sob demanda)',
-        detalhe: 'escolhido=' + escolhido + (maisForte ? ' | teto=' + maisForte.nome : ''),
+        titulo: 'Politica codigo OK dentro do teto de VRAM',
+        detalhe: 'escolhido=' + escolhido + (maisForte ? ' | teto=' + maisForte.nome : '') + ' | vram=' + vramInfo.vramMb + 'MB',
         severidade: 'ok',
         corrigivel: false,
         status: 'nao-aplicavel'

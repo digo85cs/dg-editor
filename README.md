@@ -3,7 +3,7 @@ Editor de sistemas com IA local.
 
 ## Abrir no Windows
 
-**Pasta oficial (somente local):** `D:\CURSOR\DG Editor`  
+**Pasta oficial (somente local):** `C:\dev\DGEditor`  
 O DG Editor roda **só no PC** (Electron). Atalho: `wscript` + `abrir-dg-editor.vbs` (sem console). Não abra `node_modules\electron\dist`.
 
 Certificação: `npm run certificar`. Faxina: `npm run limpeza:organica`.
