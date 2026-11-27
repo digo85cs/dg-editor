@@ -15,7 +15,7 @@ import {
 } from './providers'
 import { filaGlobal, configParaProvider } from './providers-registry'
 import { lerChave } from './segredos-providers'
-import { limitesPorHardware } from '../hardware-profile'
+import { limitesPorHardware, modeloExcedeTetoVram } from '../hardware-profile'
 import { totalmem } from 'os'
 
 export type TipoModelo = 'local' | 'online'
@@ -579,6 +579,10 @@ export function filaDeModelos(tarefa: Tarefa | string, opcoes?: OpcoesFila): Pro
  */
 function modeloPesadoDemais(tarefa: TarefaModelo, p: ProviderConfig): boolean {
   if (p.tipo !== 'local') return false
+  // Teto de VRAM medida: modelo que nao cabe na GPU sai da fila em qualquer tarefa.
+  try {
+    if (modeloExcedeTetoVram(p.modelo, tarefa)) return true
+  } catch { /* perfil indisponivel: segue a regra abaixo */ }
   if (tarefa !== 'chat' && tarefa !== 'chat-rapido' && tarefa !== 'analise' && tarefa !== 'analisar') return false
   // Qualquer modelo >=7b e pesado demais para chat/análise em CPU.
   const m = p.modelo.match(/:(\d+(?:\.\d+)?)b\b/i)
