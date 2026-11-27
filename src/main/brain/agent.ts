@@ -1223,6 +1223,24 @@ async function rodarLoopComProvider(
             })
             emit({ tipo: 'proposta', id: p.pendente.id, path: p.pendente.path })
           }
+        } else if (nome === 'codigo_criar') {
+          const p = propostasMod.proporCodigoCriar(
+            raiz,
+            args as { caminho?: string; conteudo?: string },
+            pastas
+          )
+          textoRes =
+            p.texto +
+            ' Nao chame esta tool de novo neste turno — a escrita so acontece apos aprovacao humana.'
+          if (p.pendente) {
+            propostasAcc.push({
+              id: p.pendente.id,
+              path: p.pendente.path,
+              absPath: p.pendente.absPath,
+              unifiedDiff: p.pendente.unifiedDiff
+            })
+            emit({ tipo: 'proposta', id: p.pendente.id, path: p.pendente.path })
+          }
         } else {
           const caminho = String(
             (args as { caminho?: string }).caminho || (args as { path?: string }).path || ''

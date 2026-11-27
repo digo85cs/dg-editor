@@ -3,7 +3,7 @@
  * agente MCP em modo propose não escreve; acumula unified diffs.
  */
 import { readFileSync, existsSync } from 'fs'
-import { resolve, join, relative } from 'path'
+import { resolve, join, relative, isAbsolute } from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import {
@@ -17,7 +17,7 @@ import {
 import { gerarDiffUnificado } from '../openclaw/hunks'
 import { criarCheckpoint } from './checkpoint'
 
-const WRITE_TOOLS = new Set(['codigo_editar', 'vault_write', 'dossie_write'])
+const WRITE_TOOLS = new Set(['codigo_editar', 'codigo_criar', 'vault_write', 'dossie_write'])
 
 export function ehToolEscrita(nome: string): boolean {
   return WRITE_TOOLS.has(nome)
@@ -54,6 +54,37 @@ export function proporCodigoEditar(
     texto: 'PROPOSTA registrada id=' + reg.pendentes[0].id + ' path=' + rel + ' (aguardando aprovacao humana)',
     pendente: reg.pendentes[0]
   }
+}
+
+/** Basename que nunca vira proposta de criacao (segredos/certificados). */
+const CAMINHO_PROIBIDO_CRIAR = /^(\.env($|\..*)|.*\.(pem|key|p12|pfx|jks|keystore)|id_rsa|id_ed25519|credentials.*|secrets?\..*|.*secret.*\.(json|ya?ml|env))$/i
+
+/**
+ * codigo_criar: arquivo novo inteiro. Recusa se ja existe (usar
+ * codigo_editar), se sai da raiz ou se e segredo/certificado.
+ */
+export function proporCodigoCriar(
+  raiz: string,
+  args: { caminho?: string; path?: string; conteudo?: string },
+  pastas: string[]
+): { ok: boolean; texto: string; pendente?: EditPendente } {
+  const caminho = String(args.caminho || args.path || '')
+  const conteudo = String(args.conteudo ?? '')
+  if (!caminho) return { ok: false, texto: 'caminho vazio' }
+  const abs = resolve(caminho.startsWith('/') || /^[A-Za-z]:/.test(caminho) ? caminho : join(raiz, caminho))
+  const relCheck = relative(resolve(raiz), abs)
+  if (relCheck.startsWith('..') || isAbsolute(relCheck)) {
+    return { ok: false, texto: 'caminho fora da raiz do projeto: ' + caminho }
+  }
+  const relSimples = relCheck.replace(/\\/g, '/') || abs
+  const base = relSimples.split('/').pop() || relSimples
+  if (CAMINHO_PROIBIDO_CRIAR.test(base)) {
+    return { ok: false, texto: 'caminho protegido (.env/segredo/certificado): ' + caminho }
+  }
+  if (existsSync(abs)) {
+    return { ok: false, texto: 'arquivo ja existe: ' + relSimples + ' — use codigo_editar para alterar' }
+  }
+  return proporEscritaCompleta(raiz, caminho, conteudo, pastas)
 }
 
 export function proporEscritaCompleta(

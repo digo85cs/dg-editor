@@ -6,7 +6,7 @@
  */
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { promises as fs, existsSync } from 'node:fs'
+import { promises as fs, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { exec, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -209,6 +209,19 @@ export const TOOLS = [
         verificar: { type: 'boolean', description: 'Rodar typecheck apos editar (default true)' }
       },
       required: ['arquivo', 'ancora', 'novo']
+    }
+  },
+  {
+    name: 'codigo_criar',
+    description:
+      'Cria um arquivo novo com o conteudo inteiro. Recusa se o arquivo ja existe (use codigo_editar), se o caminho sai da raiz ou se e .env/segredo/certificado.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        caminho: { type: 'string', description: 'Caminho relativo a raiz do projeto (arquivo novo)' },
+        conteudo: { type: 'string', description: 'Conteudo completo do arquivo' }
+      },
+      required: ['caminho', 'conteudo']
     }
   },
   {
@@ -1650,6 +1663,30 @@ export async function executarToolCall(name: string, argsRaw: unknown, signal?: 
       return {
         content: [{ type: 'text', text: JSON.stringify(res, null, 2) }],
         isError: !res.ok
+      }
+    }
+
+    if (name === 'codigo_criar') {
+      const parsed = z.object({ caminho: z.string(), conteudo: z.string() }).parse(args)
+      const { abs, rel } = caminhoDentroDaRaiz(RAIZ, parsed.caminho)
+      const PROIBIDO = /^(\.env($|\..*)|.*\.(pem|key|p12|pfx|jks|keystore)|id_rsa|id_ed25519|credentials.*|secrets?\..*|.*secret.*\.(json|ya?ml|env))$/i
+      const baseCria = rel.split('/').pop() || rel
+      if (PROIBIDO.test(baseCria)) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'caminho protegido (.env/segredo/certificado): ' + rel }) }],
+          isError: true
+        }
+      }
+      if (existsSync(abs)) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({ ok: false, erro: 'arquivo ja existe — use codigo_editar: ' + rel }) }],
+          isError: true
+        }
+      }
+      mkdirSync(dirname(abs), { recursive: true })
+      writeFileSync(abs, parsed.conteudo, 'utf8')
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ok: true, criado: rel, bytes: Buffer.byteLength(parsed.conteudo, 'utf8') }) }]
       }
     }
 

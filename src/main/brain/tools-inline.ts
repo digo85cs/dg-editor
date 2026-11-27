@@ -106,6 +106,18 @@ export function ferramentasInlineDefs(): ToolInline[] {
       }
     },
     {
+      name: 'codigo_criar',
+      description: 'Cria um arquivo novo com o conteudo inteiro (gera proposta de edicao). Recusa se ja existe, fora da raiz ou .env/segredo.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          caminho: { type: 'string', description: 'Caminho relativo a raiz do projeto (arquivo novo)' },
+          conteudo: { type: 'string', description: 'Conteudo completo do arquivo' }
+        },
+        required: ['caminho', 'conteudo']
+      }
+    },
+    {
       name: 'terminal_exec',
       description: 'Executa um comando no terminal do workspace (cwd=raiz). Comandos destrutivos exigem confirmado=true.',
       inputSchema: {
@@ -243,6 +255,11 @@ export async function executarToolInline(
         // Em modo agent/missao o agent.ts intercepta esta tool e gera
         // PROPOSTA (nunca executa). Se chegar aqui, escrita direta e proibida.
         return falha('codigo_editar nao executa direto — use o fluxo de proposta de edicao')
+
+      case 'codigo_criar':
+        // Idem codigo_editar: agent.ts intercepta e gera PROPOSTA com o
+        // arquivo inteiro no diff. Se chegar aqui, escrita direta e proibida.
+        return falha('codigo_criar nao executa direto — use o fluxo de proposta de edicao')
 
       case 'terminal_exec': {
         const cmd = String(args.comando || '').trim()
