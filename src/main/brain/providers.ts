@@ -187,6 +187,69 @@ function parseArgs(raw: unknown): Record<string, unknown> {
   return {}
 }
 
+/** Blocos {...} balanceados do texto (resiste a objetos aninhados). */
+function blocosJson(texto: string): string[] {
+  const saida: string[] = []
+  for (let i = 0; i < texto.length; i++) {
+    if (texto[i] !== '{') continue
+    let prof = 0
+    let emStr = false
+    let esc = false
+    for (let j = i; j < texto.length; j++) {
+      const ch = texto[j]
+      if (emStr) {
+        if (esc) esc = false
+        else if (ch === '\\') esc = true
+        else if (ch === '"') emStr = false
+        continue
+      }
+      if (ch === '"') emStr = true
+      else if (ch === '{') prof++
+      else if (ch === '}') {
+        prof--
+        if (prof === 0) {
+          saida.push(texto.slice(i, j + 1))
+          break
+        }
+      }
+    }
+  }
+  return saida
+}
+
+/**
+ * Rescue: modelos pequenos (1.5b/3b) as vezes emitem o tool_call como JSON
+ * no content em vez de msg.tool_calls. So aceita se o nome existir no
+ * pacote de tools enviado — JSON solto ou nome desconhecido e texto.
+ * Formas: {"name":"X","arguments"|"parameters":{...}} e {"tool":"X",...}.
+ */
+export function resgatarToolCallDoContent(
+  content: string,
+  nomesTools: Set<string>
+): Array<{ function: { name: string; arguments: Record<string, unknown> } }> {
+  if (!content || nomesTools.size === 0) return []
+  let limpo = content.trim()
+  const cerca = limpo.match(/^```(?:json|JSON)?\s*([\s\S]*?)```\s*$/)
+  if (cerca) limpo = cerca[1].trim()
+
+  const candidatos = [limpo, ...blocosJson(limpo)]
+  for (const raw of candidatos) {
+    let obj: unknown
+    try {
+      obj = JSON.parse(raw)
+    } catch {
+      continue
+    }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) continue
+    const o = obj as Record<string, unknown>
+    const nome = typeof o.name === 'string' ? o.name : typeof o.tool === 'string' ? (o.tool as string) : ''
+    if (!nome || !nomesTools.has(nome)) continue
+    const args = o.arguments ?? o.parameters
+    return [{ function: { name: nome, arguments: parseArgs(args) } }]
+  }
+  return []
+}
+
 async function adapterOllama(
   cfg: ProviderConfig,
   mensagens: Message[],
@@ -259,7 +322,7 @@ async function adapterOllama(
   }
 
   const msg = json.message || {}
-  const tool_calls = (msg.tool_calls || [])
+  let tool_calls = (msg.tool_calls || [])
     .map((c) => ({
       function: {
         name: String(c.function?.name || ''),
@@ -267,6 +330,16 @@ async function adapterOllama(
       }
     }))
     .filter((c) => c.function.name)
+
+  // Rescue: tool_call emitido como JSON no content (modelos pequenos).
+  if (tool_calls.length === 0 && toolsEfetivas.length > 0) {
+    const nomes = new Set(toolsEfetivas.map((t) => t.name))
+    const resgatados = resgatarToolCallDoContent(msg.content || '', nomes)
+    if (resgatados.length > 0) {
+      dglog('[rescue] tool_call extraido do content: ' + resgatados.map((c) => c.function.name).join(','))
+      tool_calls = resgatados
+    }
+  }
 
   return {
     content: msg.content || '',
