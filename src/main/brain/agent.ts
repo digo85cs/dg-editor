@@ -781,6 +781,15 @@ async function rodarLoopComProvider(
       }))
     : undefined
 
+  // FASE 1 (medicao): separa prep/prompt, serializacao de tools,
+  // chamada do provider e parse da resposta por iteracao.
+  const TIMING = !!process.env.DG_AGENT_TIMING
+  if (TIMING && toolDefs) {
+    const tj = Date.now()
+    const js = JSON.stringify(toolDefs)
+    console.log('[TIMING] tools=' + toolDefs.length + ' serialize=' + (Date.now() - tj) + 'ms bytes=' + js.length)
+  }
+
   const passos: PassoAgente[] = []
   const propostasAcc: NonNullable<RespostaAgente['propostas']> = []
   const assinaturasFeitas = new Set<string>()
@@ -846,6 +855,7 @@ async function rodarLoopComProvider(
       }
     }
     const passoN = i + 1
+    const tIter0 = TIMING ? Date.now() : 0
     const agenteModo = opts?.modo === 'agent' ? 'agent' : 'chat'
     const temObjetivo = opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto
 
@@ -917,20 +927,30 @@ async function rodarLoopComProvider(
         elapsedMs
       })
     }, 2500)
+    const tPrepMs = TIMING ? Date.now() - tIter0 : 0
     let r: Awaited<ReturnType<typeof responderRodada>>
+    const tProv0 = TIMING ? Date.now() : 0
     try {
       r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal)
     } finally {
       clearInterval(hb)
     }
+    const tProvMs = TIMING ? Date.now() - tProv0 : 0
     if (r.content) emit({ tipo: 'texto', texto: r.content.slice(0, 2000) })
 
+    const tParse0 = TIMING ? Date.now() : 0
     let chamadas = r.tool_calls
       .map((c) => {
         const name = typeof c.function?.name === 'string' ? c.function.name.trim() : ''
         return { function: { name, arguments: normalizarArgs(c.function.arguments) } }
       })
       .filter((c) => c.function.name.length > 0 && c.function.name.length <= 128)
+    const tParseMs = TIMING ? Date.now() - tParse0 : 0
+    if (TIMING) {
+      console.log(
+        '[TIMING] iter=' + i + ' prep=' + tPrepMs + 'ms provider=' + tProvMs + 'ms parse=' + tParseMs + 'ms tools=' + (toolsAgora?.length ?? 0)
+      )
+    }
 
     dglog(
       '[agente] iter=' + i + ' provider=' + cfg.id +
