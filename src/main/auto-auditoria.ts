@@ -1489,9 +1489,9 @@ async function executarChecagens(opcoes: {
   achados.push(...checarIntegracaoFerramentas(resolverRaizProjeto()))
   achados.push(...checarTerminal())
   achados.push(...(await checarRadar()))
-  achados.push(...checarSandbox())
-  achados.push(...checarLoopAgent())
-  achados.push(...checarHooks())
+  achados.push(...(await checarSandbox()))
+  achados.push(...(await checarLoopAgent()))
+  achados.push(...(await checarHooks()))
 
   let reiniciarPendente = false
   let motivoReinicio: string | undefined
@@ -1638,10 +1638,22 @@ export function pararAuditoriaPeriodica() {
 }
 
 /** FASE 6: check sandbox-permissao existe e decide por allowlist/bloqueio destrutivo */
-function checarSandbox(): Achado[] {
+async function checarSandbox(): Promise<Achado[]> {
   const achados: Achado[] = []
+  // App empacotado nao carrega src/ — check estrutural so no repo de dev.
+  if (!fs.existsSync(path.join(__dirname, 'sandbox-permissao.ts'))) {
+    achados.push({
+      area: 'sandbox',
+      id: 'sandbox:fonte-indisponivel',
+      titulo: 'Verificacao de sandbox pulada (app empacotado)',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    return achados
+  }
   try {
-    const mod = require('../sandbox-permissao')
+    const mod = await import('./sandbox-permissao')
     if (typeof mod.decidirPermissaoTool !== 'function') {
       achados.push({
         area: 'sandbox',
@@ -1717,10 +1729,22 @@ function checarSandbox(): Achado[] {
 }
 
 /** FASE 4: check loop agent aceita objetivo+criterio e grava artefato com código de saída */
-function checarLoopAgent(): Achado[] {
+async function checarLoopAgent(): Promise<Achado[]> {
   const achados: Achado[] = []
+  // App empacotado nao carrega src/ — checks estruturais so no repo de dev.
+  if (!fs.existsSync(path.join(__dirname, 'brain/agent.ts'))) {
+    achados.push({
+      area: 'loop',
+      id: 'loop:fonte-indisponivel',
+      titulo: 'Verificacao do loop de agente pulada (app empacotado)',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    return achados
+  }
   try {
-    const mod = require('../brain/agent')
+    const mod = await import('./brain/agent')
     if (typeof mod.executarAgente !== 'function') {
       achados.push({
         area: 'loop',
@@ -1732,7 +1756,7 @@ function checarLoopAgent(): Achado[] {
       })
     }
     // Verifica contrato de OpcoesExecutarAgente (objtivo/criterio/teto)
-    const src = require('fs').readFileSync(path.join(__dirname, '../brain/agent.ts'), 'utf8')
+    const src = require('fs').readFileSync(path.join(__dirname, 'brain/agent.ts'), 'utf8')
     if (!/objetivo\?:\s*string/.test(src) || !/criterioDePronto\?:\s*string/.test(src)) {
       achados.push({
         area: 'loop',
@@ -1928,10 +1952,22 @@ function checarLoopAgent(): Achado[] {
 }
 
 /** FASE 4: check hooks PreToolUse bloqueia de verdade */
-function checarHooks(): Achado[] {
+async function checarHooks(): Promise<Achado[]> {
   const achados: Achado[] = []
+  // App empacotado nao carrega src/ — check estrutural so no repo de dev.
+  if (!fs.existsSync(path.join(__dirname, 'hooks.ts'))) {
+    achados.push({
+      area: 'hooks',
+      id: 'hooks:fonte-indisponivel',
+      titulo: 'Verificacao de hooks pulada (app empacotado)',
+      severidade: 'warn',
+      corrigivel: false,
+      status: 'nao-aplicavel'
+    })
+    return achados
+  }
   try {
-    const mod = require('../hooks')
+    const mod = await import('./hooks')
     if (typeof mod.executarPreToolUse !== 'function') {
       achados.push({
         area: 'hooks',
