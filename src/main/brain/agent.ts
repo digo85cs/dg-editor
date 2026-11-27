@@ -535,7 +535,8 @@ async function finalizarAgente(
   texto: string,
   passos: PassoAgente[],
   opts?: OpcoesExecutarAgente,
-  iteracoesMissao?: IteracaoMissao[]
+  iteracoesMissao?: IteracaoMissao[],
+  propostasPendentes?: number
 ): Promise<RespostaAgente> {
   let final = texto
   if (
@@ -579,15 +580,30 @@ async function finalizarAgente(
 
   // FASE 2/3: verifica critério no modo agent e grava artefato
   if (opts?.modo === 'agent' && opts?.objetivo && opts?.criterioDePronto) {
-    const veredito = await verificarCriterio(raiz, opts.criterioDePronto, passos)
-    gravarArtefatoMissao(raiz, opts.objetivo, opts.criterioDePronto, veredito, passos, iteracoesMissao)
+    let veredito = await verificarCriterio(raiz, opts.criterioDePronto, passos)
+    // FASE 2: escrita proposta pendente de aprovacao => nunca sucesso nem falha
+    // (o criterio rodou sobre o disco SEM a escrita — resultado nao e final)
+    const aguardandoAprovacao = (propostasPendentes ?? 0) > 0
+    if (aguardandoAprovacao) veredito = 'nao-provado'
+    gravarArtefatoMissao(
+      raiz,
+      opts.objetivo,
+      opts.criterioDePronto,
+      veredito,
+      passos,
+      iteracoesMissao,
+      aguardandoAprovacao ? 'aguardando aprovacao humana' : undefined
+    )
     const critStr = typeof opts.criterioDePronto === 'string' ? opts.criterioDePronto : opts.criterioDePronto.comando
+    if (aguardandoAprovacao) {
+      final += '\n\n⏸ Há escrita proposta aguardando aprovação humana.'
+    }
     if (veredito === 'sucesso') {
       final += '\n\n✓ Critério atingido: ' + critStr
-    } else if (veredito === 'nao-provado') {
-      final += '\n\n⚠ Critério não foi executado nesta missão.'
-    } else {
+    } else if (veredito === 'falha') {
       final += '\n\n✗ Critério não atingido.'
+    } else if (!aguardandoAprovacao) {
+      final += '\n\n⚠ Critério não foi executado nesta missão.'
     }
   }
 
@@ -616,7 +632,7 @@ export async function verificarCriterio(raiz: string, criterio: string | { coman
   return ultimo.codigoSaida === exitEsperado ? 'sucesso' : 'falha'
 }
 
-export function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string | { comando: string; esperado?: number; timeoutMs?: number }, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[], iteracoesMissao?: IteracaoMissao[]): void {
+export function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: string | { comando: string; esperado?: number; timeoutMs?: number }, veredito: 'sucesso' | 'falha' | 'nao-provado', passos: PassoAgente[], iteracoesMissao?: IteracaoMissao[], motivoAprovacao?: string): void {
   try {
     const dirBase = path.join(raiz, '.dg-editor', 'missoes')
     require('fs').mkdirSync(dirBase, { recursive: true })
@@ -653,20 +669,20 @@ export function gravarArtefatoMissao(raiz: string, objetivo: string, criterio: s
     const ultimoExec = [...execTerminal].reverse().find((p) => comandoCompletoTool(p.args) === String(criterioObj.comando || '').trim())
     const obtido = ultimoExec?.codigoSaida ?? null
     const executado = obtido !== null && obtido !== undefined
-    const resultado = executado ? (obtido === (criterioObj.esperado ?? 0) ? 'sucesso' : 'falha') : 'nao-provado'
-
     const vereditoJson = {
       id,
       criterio: criterioObj.comando,
       esperado: criterioObj.esperado ?? 0,
       executado,
       obtido,
-      resultado,
-      motivo: executado
-        ? 'criterio executado'
-        : typeof criterio === 'string'
-          ? 'criterio sem formato de comando verificavel — use { comando, esperado }'
-          : 'criterio não foi executado nesta missão'
+      resultado: veredito,
+      motivo:
+        motivoAprovacao ??
+        (executado
+          ? 'criterio executado'
+          : typeof criterio === 'string'
+            ? 'criterio sem formato de comando verificavel — use { comando, esperado }'
+            : 'criterio não foi executado nesta missão')
     }
     require('fs').writeFileSync(
       path.join(dirMissao, 'veredito.json'),
@@ -944,7 +960,7 @@ async function rodarLoopComProvider(
 
     if (chamadas.length === 0 && jaUsouTool && pareceJsonTool(r.content || '')) {
       dglog('[agente] modelo repetiu JSON apos tool; sintetizando')
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao, propostasAcc.length)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -985,7 +1001,7 @@ async function rodarLoopComProvider(
       // "voce pode...") nao e resposta — sintetiza erro honesto em vez de
       // devolver tutorial generico que parece resultado.
       const textoFinal = ehAcao && !jaUsouTool ? '' : r.content || ''
-      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos, opts, iteracoesMissao)
+      const fin = await finalizarAgente(raiz, pergunta, labelModelo, textoFinal, passos, opts, iteracoesMissao, propostasAcc.length)
       return { ...fin, propostas: propostasAcc }
     }
 
@@ -1053,8 +1069,13 @@ async function rodarLoopComProvider(
         if (decisaoHook.acao === 'bloquear') {
           bloqueio = nome + ' bloqueado pelo hook PreToolUse: ' + decisaoHook.motivo
         } else if (decisaoHook.acao === 'perguntar') {
-          // FASE 1: pergunta ao usuário — por enquanto bloqueia (solicitação aprovada)
-          bloqueio = nome + ' exige aprovação humana: ' + decisaoHook.motivo
+          // FASE 2: escrita em missao nao bloqueia — vira PROPOSTA com diff
+          // aguardando aprovacao humana (nunca grava direto no disco).
+          const { ehToolEscrita } = await import('../agent/propostas')
+          const escritaViraProposta = opts?.modo === 'agent' && ehToolEscrita(nome)
+          if (!escritaViraProposta) {
+            bloqueio = nome + ' exige aprovação humana: ' + decisaoHook.motivo
+          }
         }
         // Deny-list por tool/padrão: .dg-editor/tools-bloqueadas.json { "padroes": ["git_push", "ftp_*"] }
         if (!bloqueio) {
@@ -1141,11 +1162,14 @@ async function rodarLoopComProvider(
       let exitCodeTool: number | undefined
       const propostasMod = await import('../agent/propostas')
       const { ehToolEscrita, proporCodigoEditar, proporEscritaCompleta } = propostasMod
-      if (opts?.proposeWrites && ehToolEscrita(nome)) {
-        const pastas = opts.pastas?.length ? opts.pastas : [raiz]
+      // Modo agent (missao): escrita SEMPRE vira proposta — nunca grava direto.
+      if (ehToolEscrita(nome) && (opts?.modo === 'agent' || opts?.proposeWrites !== false)) {
+        const pastas = opts?.pastas?.length ? opts.pastas : [raiz]
         if (nome === 'codigo_editar') {
           const p = proporCodigoEditar(raiz, args as { arquivo?: string; ancora?: string; novo?: string }, pastas)
-          textoRes = p.texto
+          textoRes =
+            p.texto +
+            ' Nao chame esta tool de novo neste turno — a escrita so acontece apos aprovacao humana.'
           if (p.pendente) {
             propostasAcc.push({
               id: p.pendente.id,
@@ -1161,7 +1185,9 @@ async function rodarLoopComProvider(
           )
           const conteudo = String((args as { conteudo?: string }).conteudo ?? '')
           const p = proporEscritaCompleta(raiz, caminho, conteudo, pastas)
-          textoRes = p.texto
+          textoRes =
+            p.texto +
+            ' Nao chame esta tool de novo neste turno — a escrita so acontece apos aprovacao humana.'
           if (p.pendente) {
             propostasAcc.push({
               id: p.pendente.id,
@@ -1291,7 +1317,7 @@ async function rodarLoopComProvider(
             batchIdx.map((t) => processarChamada(t, chamadas[t]))
           )
           if (resultados.includes('loop')) {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao, propostasAcc.length)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1306,7 +1332,7 @@ async function rodarLoopComProvider(
         } else {
           const r1 = await processarChamada(batchIdx[0], chamadas[batchIdx[0]])
           if (r1 === 'loop') {
-            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
+            const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao, propostasAcc.length)
             return {
               ...fin,
               propostas: propostasAcc,
@@ -1323,7 +1349,7 @@ async function rodarLoopComProvider(
         const r1 = await processarChamada(tiCursor, chamadas[tiCursor])
         tiCursor++
         if (r1 === 'loop') {
-          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
+          const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao, propostasAcc.length)
           return {
             ...fin,
             propostas: propostasAcc,
@@ -1340,7 +1366,7 @@ async function rodarLoopComProvider(
   }
 
   dglog('[agente] limite de iteracoes; sintetizando')
-  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao)
+  const fin = await finalizarAgente(raiz, pergunta, labelModelo, '', passos, opts, iteracoesMissao, propostasAcc.length)
   return { ...fin, propostas: propostasAcc, ok: false, erro: { codigo: 'ERR_TOOL_LOOP_CAP', mensagem: 'O agente atingiu o limite de etapas.', acao: 'Divida o pedido em partes menores e tente novamente.' } as any }
 }
 

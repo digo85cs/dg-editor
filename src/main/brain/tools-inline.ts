@@ -9,8 +9,27 @@ import fs from 'fs'
 import path from 'path'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { existsSync } from 'fs'
 
 const execFileAsync = promisify(execFile)
+
+// npm/npx no Windows: resolve o CLI JS real (node node_modules/npm/bin/*-cli.js)
+// — o shim .cmd expandiria %~dp0 para o CWD e acharia node_modules/npm errado.
+// Mesma tecnica do dispatch.ts (MCP).
+const SHIM_CLI_JS: Record<string, string> = { npm: 'npm-cli.js', npx: 'npx-cli.js' }
+function resolverCliJsShim(cmd: string): string | null {
+  const cli = SHIM_CLI_JS[cmd.toLowerCase()]
+  if (!cli || /electron|dg editor/i.test(process.execPath)) return null
+  const dirs = [
+    path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin'),
+    process.env.APPDATA ? path.join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin') : ''
+  ].filter(Boolean)
+  for (const d of dirs) {
+    const p = path.join(d, cli)
+    if (existsSync(p)) return p
+  }
+  return null
+}
 
 const IGNORAR_DIRS = new Set([
   'node_modules', 'out', '.git', 'dist', 'dist-app', '.dg-editor',
@@ -71,6 +90,19 @@ export function ferramentasInlineDefs(): ToolInline[] {
           caminho: { type: 'string', description: 'Subpasta opcional' }
         },
         required: ['termo']
+      }
+    },
+    {
+      name: 'codigo_editar',
+      description: 'Substitui uma ancora unica num arquivo do projeto (gera proposta de edicao).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          arquivo: { type: 'string', description: 'Caminho relativo a raiz do projeto' },
+          ancora: { type: 'string', description: 'Trecho existente que deve aparecer exatamente 1 vez' },
+          novo: { type: 'string', description: 'Texto que substitui a ancora' }
+        },
+        required: ['arquivo', 'ancora', 'novo']
       }
     },
     {
@@ -207,9 +239,14 @@ export async function executarToolInline(
         return ok(hits.join('\n') || 'NENHUM resultado para: ' + termo)
       }
 
+      case 'codigo_editar':
+        // Em modo agent/missao o agent.ts intercepta esta tool e gera
+        // PROPOSTA (nunca executa). Se chegar aqui, escrita direta e proibida.
+        return falha('codigo_editar nao executa direto — use o fluxo de proposta de edicao')
+
       case 'terminal_exec': {
         const cmd = String(args.comando || '').trim()
-        const argv = Array.isArray(args.args) ? (args.args as unknown[]).map(String) : []
+        let argv = Array.isArray(args.args) ? (args.args as unknown[]).map(String) : []
         if (!cmd) return falha('comando vazio')
         const linha = (cmd + ' ' + argv.join(' ')).toLowerCase()
         const destrutivo =
@@ -220,8 +257,17 @@ export async function executarToolInline(
           return falha('comando destrutivo — peça confirmação ao usuário e chame de novo com confirmado=true')
         }
         if (!/^[a-zA-Z0-9._+\-]+$/.test(cmd)) return falha('comando invalido')
+        let execCmd = cmd
+        let execArgv = argv
+        if (process.platform === 'win32') {
+          const cliJs = resolverCliJsShim(cmd)
+          if (cliJs) {
+            execCmd = process.execPath
+            execArgv = [cliJs, ...argv]
+          }
+        }
         try {
-          const { stdout, stderr } = await execFileAsync(cmd, argv, {
+          const { stdout, stderr } = await execFileAsync(execCmd, execArgv, {
             cwd: r,
             timeout: 30000,
             windowsHide: true,

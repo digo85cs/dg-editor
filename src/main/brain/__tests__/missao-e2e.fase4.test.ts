@@ -21,9 +21,10 @@ describe.skipIf(!RUN)('FASE 4 — missao real ponta a ponta', () => {
         signal: controller.signal,
         agente: 'dg-engenheiro',
         modeloForcado: process.env.DG_MISSAO_MODELO || 'qwen2.5-coder:7b',
-        inlineTools: true
+        inlineTools: process.env.DG_MISSAO_INLINE === '1'
       })
       console.log('[E2E] ok=' + r.ok + ' modelo=' + r.modelo)
+      console.log('[E2E] propostas=' + JSON.stringify((r.propostas || []).map((p) => ({ id: p.id, path: p.path }))))
       console.log('[E2E] texto final (cauda):\n' + String(r.texto || '').slice(-1200))
       for (const p of r.passos || []) {
         if (p.tipo === 'tool') {
