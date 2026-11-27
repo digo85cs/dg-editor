@@ -66,7 +66,12 @@ function serverJs(): string {
 }
 
 export async function conectarMcp(raizForcada?: string): Promise<Client> {
-  const raizAlvo = path.resolve(String(raizForcada || resolverRaizProjeto()))
+  // FASE 1: DG_ROOT (definido por garantirMcpNaRaiz) tem prioridade — sem isso
+  // listarTools/chamarTool reconectavam em resolverRaizProjeto() (cwd) e as
+  // tools rodavam na raiz errada, desfazendo a raiz da missao.
+  const raizAlvo = path.resolve(
+    String(raizForcada || process.env.DG_ROOT || resolverRaizProjeto())
+  )
   if (client && raizMcpConectada === raizAlvo) return client
   if (client && raizMcpConectada && raizMcpConectada !== raizAlvo) {
     await desconectarMcp()
