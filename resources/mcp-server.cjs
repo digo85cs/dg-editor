@@ -31,7 +31,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/zod/v4/core/util.js
 var util_exports = {};
@@ -31100,13 +31099,6 @@ var init_sandbox_permissao = __esm({
 });
 
 // src/main/hooks.ts
-var hooks_exports = {};
-__export(hooks_exports, {
-  executarPostToolUse: () => executarPostToolUse,
-  executarPreToolUse: () => executarPreToolUse,
-  executarSessionStart: () => executarSessionStart,
-  limparCacheHooks: () => limparCacheHooks
-});
 function carregarHooks(raiz) {
   const chave = import_path3.default.resolve(raiz);
   if (hooksCachePorRaiz.has(chave))
@@ -31176,18 +31168,6 @@ function executarHookPre(raiz, hook, toolNome, toolArgs) {
     return { acao: "permitir", motivo: "hook comando n\xE3o bloqueou" };
   }
   return { acao: "permitir", motivo: "hook sem regra ou comando" };
-}
-function executarPostToolUse(raiz, toolNome, resultado) {
-  const hooks = carregarHooks(raiz).filter((h) => h.tipo === "PostToolUse");
-  for (const hook of hooks) {
-    try {
-      if (hook.regra === "bloquear" && resultado.includes('"ok":false')) {
-        dglog("[hooks] " + hook.id + " PostToolUse bloqueou resultado de " + toolNome);
-      }
-    } catch (e) {
-      dglog("[hooks] PostToolUse erro: " + String(e?.message || e));
-    }
-  }
 }
 function executarSessionStart(raiz) {
   const hooks = carregarHooks(raiz).filter((h) => h.tipo === "SessionStart");
@@ -33542,7 +33522,7 @@ var require_typescript = __commonJS({
         }
         return to;
       };
-      var __toCommonJS2 = (mod) => (__copyProps2, mod);
+      var __toCommonJS = (mod) => (__copyProps2, mod);
       var typescript_exports = {};
       __export2(typescript_exports, {
         ANONYMOUS: () => ANONYMOUS,
@@ -35790,7 +35770,7 @@ var require_typescript = __commonJS({
         writeFileEnsuringDirectories: () => writeFileEnsuringDirectories,
         zipWith: () => zipWith
       });
-      module3.exports = __toCommonJS2(typescript_exports);
+      module3.exports = __toCommonJS(typescript_exports);
       var versionMajorMinor = "5.9";
       var version2 = "5.9.3";
       var Comparison = /* @__PURE__ */ ((Comparison3) => {
@@ -246512,8 +246492,7 @@ function definirRaizWorkspace(pasta) {
     }
     if (raizAtiva !== abs) {
       try {
-        const { limparCacheHooks: limparCacheHooks2 } = (init_hooks(), __toCommonJS(hooks_exports));
-        limparCacheHooks2();
+        limparCacheHooks();
       } catch {
       }
     }
@@ -246572,6 +246551,7 @@ var init_workspace_raiz = __esm({
     import_path8 = require("path");
     init_dglog();
     init_paths();
+    init_hooks();
     raizAtiva = null;
   }
 });
@@ -263204,7 +263184,8 @@ async function statusProvisionamento() {
   });
   const instalados = vp.ok ? await pacotesInstalados(py) : null;
   const alvo = manifesto.python.pacotes || [];
-  const faltando = instalados ? alvo.filter((p) => !instalados[p.toLowerCase()]) : alvo.slice();
+  const nomeBase = (spec) => spec.toLowerCase().split(/[<>=!~;\s]/)[0];
+  const faltando = instalados ? alvo.filter((p) => !instalados[nomeBase(p)]) : alvo.slice();
   itens.push({
     id: "pacotes",
     nome: "Pacotes de voz/transcri\xE7\xE3o",
