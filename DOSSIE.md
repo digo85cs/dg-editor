@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **27/11/2026, 11:39:39** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.30** · branch `integra-13-11` · último commit: 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
-> Alterações locais não commitadas: 13 arquivo(s).
+> Gerado automaticamente em **27/11/2026, 12:19:14** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.31** · branch `integra-13-11` · último commit: 92e471a 2026-11-27 fix(auditoria): checks sandbox/loop/hooks com path e import corretos
+> Alterações locais não commitadas: 12 arquivo(s).
 
 ## 1. O que é
 
@@ -339,6 +339,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 92e471a 2026-11-27 fix(auditoria): checks sandbox/loop/hooks com path e import corretos
+- 8864b8e 2026-11-27 release: v0.9.30
 - 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
 - 0841ec8 2026-11-27 feat(auditoria): checks hardware:vram-lida, hardware:teto-modelo, tools:rescue-valida
 - e4c3c0d 2026-11-27 feat(brain): rescue de tool_call emitido como JSON no content
@@ -347,8 +349,6 @@ Utilitários locais relevantes:
 - 23a62ac 2026-11-27 test(brain): prova live de abort cancelando geracao no Ollama
 - 8997677 2026-11-27 fix(brain): num_ctx derivado do prompt + cap num_predict em tool_call
 - 8ec196d 2026-11-27 chore(agent): instrumentacao de tempo por iteracao (DG_AGENT_TIMING)
-- dbcc92b 2026-11-27 feat(auditoria): checks de escrita/proposta e missao honesta
-- 7c9d57b 2026-11-27 feat(agent): escrita em missao vira proposta, nao bloqueio
 
 ## 16. Como atualizar este dossiê
 
