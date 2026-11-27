@@ -1590,18 +1590,21 @@ export async function executarAgente(
       /* */
     }
 
+    // Ordem determinística para Prefix Caching (Ollama/llama.cpp):
+    // 1) Prefixo estático do workspace/agente/modo (reaproveitado no KV cache entre turnos)
+    // 2) Sufixo volátil por pergunta (regras/skills ativadas, RAG, inventário, contextoExtra)
     const systemExtra =
       ancoraWorkspace +
-      blocoInventario +
       blocoAgente +
       blocoRegrasGerais +
-      (memoria ? '\n\n' + memoria : '') +
       blocoFatos +
-      blocoSkills +
       blocoPlan +
       blocoMidia +
       blocoPropose +
       blocoMapa +
+      blocoSkills +
+      (memoria ? '\n\n' + memoria : '') +
+      blocoInventario +
       (extra ? '\n\n' + extra : '')
 
     let tools: McpTool[] = []

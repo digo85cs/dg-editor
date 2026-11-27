@@ -20,6 +20,25 @@ import { anexarMinimapa } from './features/editor/minimap.js'
 
 const langCompartment = new Compartment()
 const themeCompartment = new Compartment()
+const wrapCompartment = new Compartment()
+
+/** Limites para modo arquivo grande (desativa lineWrapping para manter 60fps). */
+const ARQUIVO_GRANDE_BYTES = 500_000
+const LINHA_LONGA_CHARS = 10_000
+
+function deveQuebrarLinha(docTexto) {
+  const s = String(docTexto || '')
+  if (s.length > ARQUIVO_GRANDE_BYTES) return false
+  let inicio = 0
+  while (inicio < s.length) {
+    const fim = s.indexOf('\n', inicio)
+    const len = (fim === -1 ? s.length : fim) - inicio
+    if (len > LINHA_LONGA_CHARS) return false
+    if (fim === -1) break
+    inicio = fim + 1
+  }
+  return true
+}
 
 const setDiffMarks = StateEffect.define()
 
@@ -419,7 +438,7 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
     doc: '',
     extensions: [
       basicSetup,
-      EditorView.lineWrapping,
+      wrapCompartment.of(EditorView.lineWrapping),
       keymap.of(searchKeymap),
       saveKey,
       tabSugestao,
@@ -585,10 +604,12 @@ export function criarEditor(parent, { onChange, onSave, onDiagnostics } = {}) {
       fimDeLinha = detectarFimDeLinha(conteudo)
       const doc = paraDocumento(conteudo)
       salvo = doc
+      const grande = !deveQuebrarLinha(doc)
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: doc },
         effects: [
-          langCompartment.reconfigure(langPorExt(caminho)),
+          langCompartment.reconfigure(grande ? [] : langPorExt(caminho)),
+          wrapCompartment.reconfigure(grande ? [] : EditorView.lineWrapping),
           themeCompartment.reconfigure(temaEditor()),
           setDiffMarks.of(CMDecoration.none)
         ]

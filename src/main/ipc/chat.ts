@@ -416,6 +416,9 @@ async function executarChatSend(
         modoValido !== 'code' &&
         modoValido !== 'debug' &&
         modoValido !== 'agent');
+    // Ordem determinística para Prefix Caching (Ollama/llama.cpp):
+    // 1) Bloco estático do repositório/regras/modo (reaproveitado no KV cache)
+    // 2) Bloco volátil por turno (git status, escopo do pedido, briefing, skill, rota, anexos)
     let context = '';
     // Ancora obrigatoria: SEMPRE a pasta do repositorio ligado no Bloco 1
     context +=
@@ -444,6 +447,31 @@ async function executarChatSend(
       /* memoria projeto opcional */
     }
     try {
+      const { obterRegrasAtivas } = await import('../regras-gerais');
+      const rg = obterRegrasAtivas();
+      if (rg) context += '\nREGRAS GERAIS:\n' + rg + '\n';
+    } catch { /* opcional */ }
+    try {
+      const { proporMemoria, textoMemoriasAceitas } = await import('../memorias');
+      const pedidoMemoria = textoPedido.match(/^(?:lembre|memorize|guarde)(?:\s+que)?\s+(.{8,400})$/i);
+      if (pedidoMemoria) proporMemoria(rootOk, pedidoMemoria[1]);
+      const fatos = textoMemoriasAceitas(rootOk);
+      if (fatos) context += '\nFATOS ACEITOS:\n' + fatos + '\n';
+    } catch { /* memoria e opcional */ }
+    context +=
+      '\nCOMPORTAMENTO (espelho Cursor — obrigatorio em inventariar/modificar/corrigir/melhorar/editar): ' +
+      'tools no mesmo turno; ler antes de editar; resultado real; checklist completo; ' +
+      'falso positivo Windows = descartar; falta = NÃO ENCONTRADO; resposta curta em um bloco limpo. ' +
+      'Nao diga que vai fazer — faca.\n';
+    if (modoValido === 'debug') context += '\nMODO DEBUG: investigue causas provaveis, reproduza mentalmente o fluxo e priorize correcoes pequenas e verificaveis.\n';
+    if (modoValido === 'code' || modoValido === 'agent') {
+      context +=
+        '\nMODO AGENT: encadeie explorar → editar → validar no mesmo turno sem pedir confirmacao a cada passo. ' +
+        'Implementacao concreta, padroes e testes existentes. Pare so em risco alto.\n'
+    }
+    if (modoValido === 'ask') context += '\nMODO ASK: explique e responda sem propor alteracoes de arquivos.\n';
+    // --- Bloco volátil do turno (após o prefixo estático cacheável) ---
+    try {
       const { analisarWorkspace } = await import('../brain/hibrido');
       const snap = analisarWorkspace(rootOk, rootOk);
       context +=
@@ -464,18 +492,6 @@ async function executarChatSend(
     } catch {
       if (rules) context += `\nREGRAS DO PROJETO (.dgrules - respeite):\n${rules.slice(0, chatLeve ? 1800 : 12000)}\n`;
     }
-    try {
-      const { obterRegrasAtivas } = await import('../regras-gerais');
-      const rg = obterRegrasAtivas();
-      if (rg) context += '\nREGRAS GERAIS:\n' + rg + '\n';
-    } catch { /* opcional */ }
-    try {
-      const { proporMemoria, textoMemoriasAceitas } = await import('../memorias');
-      const pedidoMemoria = textoPedido.match(/^(?:lembre|memorize|guarde)(?:\s+que)?\s+(.{8,400})$/i);
-      if (pedidoMemoria) proporMemoria(rootOk, pedidoMemoria[1]);
-      const fatos = textoMemoriasAceitas(rootOk);
-      if (fatos) context += '\nFATOS ACEITOS:\n' + fatos + '\n';
-    } catch { /* memoria e opcional */ }
     // Briefing do repo sempre — inclusive modo ask/leve (sem isso o chat "nao sabe" a pasta)
     try {
       const { contextoChatHibrido } = await import('../brain/hibrido');
@@ -498,18 +514,6 @@ async function executarChatSend(
         context += '\nSKILL ATIVA: ' + skillId + '\n'
       }
     }
-    context +=
-      '\nCOMPORTAMENTO (espelho Cursor — obrigatorio em inventariar/modificar/corrigir/melhorar/editar): ' +
-      'tools no mesmo turno; ler antes de editar; resultado real; checklist completo; ' +
-      'falso positivo Windows = descartar; falta = NÃO ENCONTRADO; resposta curta em um bloco limpo. ' +
-      'Nao diga que vai fazer — faca.\n';
-    if (modoValido === 'debug') context += '\nMODO DEBUG: investigue causas provaveis, reproduza mentalmente o fluxo e priorize correcoes pequenas e verificaveis.\n';
-    if (modoValido === 'code' || modoValido === 'agent') {
-      context +=
-        '\nMODO AGENT: encadeie explorar → editar → validar no mesmo turno sem pedir confirmacao a cada passo. ' +
-        'Implementacao concreta, padroes e testes existentes. Pare so em risco alto.\n'
-    }
-    if (modoValido === 'ask') context += '\nMODO ASK: explique e responda sem propor alteracoes de arquivos.\n';
     contextoUso = context + '\n' + textoPedido;
 
     // === VISAO: imagem anexada → modelo VL interpreta conforme o pedido ===

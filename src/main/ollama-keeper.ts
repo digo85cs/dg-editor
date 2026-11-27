@@ -193,20 +193,27 @@ export async function checkOllama(): Promise<OllamaCheck> {
   return { ativo, instalado: ativo ? true : ollamaInstalado() }
 }
 
+/** Monta variáveis de ambiente otimizadas para `ollama serve` (Flash Attention + KV cache q8_0). */
+export function envOllamaServe(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return Object.assign({}, baseEnv, {
+    OLLAMA_FLASH_ATTENTION: baseEnv.OLLAMA_FLASH_ATTENTION || '1',
+    OLLAMA_KV_CACHE_TYPE: baseEnv.OLLAMA_KV_CACHE_TYPE || 'q8_0',
+    OLLAMA_NUM_PARALLEL: baseEnv.OLLAMA_NUM_PARALLEL || '1',
+    OLLAMA_MAX_LOADED_MODELS: baseEnv.OLLAMA_MAX_LOADED_MODELS || '1',
+    OLLAMA_KEEP_ALIVE: baseEnv.OLLAMA_KEEP_ALIVE || '10m'
+  })
+}
+
 export async function startOllama(): Promise<OllamaCheck> {
   const ativo = await ollamaAlive()
   if (ativo) return { ativo: true, instalado: true }
   const instalado = ollamaInstalado()
   if (!instalado) return { ativo: false, instalado: false }
-  dglog('[keeper] startOllama solicitado pelo usuário...')
+  dglog('[keeper] startOllama solicitado pelo usuário (FlashAttn=1, KV=q8_0)...')
   const exe = ollamaBin()
   try {
     keeperProc = spawn(exe, ['serve'], {
-      env: Object.assign({}, process.env, {
-        OLLAMA_NUM_PARALLEL: '1',
-        OLLAMA_MAX_LOADED_MODELS: '1',
-        OLLAMA_KEEP_ALIVE: '5m'
-      }),
+      env: envOllamaServe(process.env),
       detached: true,
       stdio: 'ignore',
       windowsHide: true

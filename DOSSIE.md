@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **27/11/2026, 13:15:39** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.32** · branch `integra-13-11` · último commit: f38b717 2026-11-27 docs(agents): VRAM/rescue/auditoria-empacotada/armadilhas do instalador
-> Alterações locais não commitadas: 17 arquivo(s).
+> Gerado automaticamente em **27/11/2026, 13:52:33** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.33** · branch `integra-13-11` · último commit: 21515bd 2026-11-27 chore(release): atualiza bundle resources/mcp-server.cjs para v0.9.32
+> Alterações locais não commitadas: 21 arquivo(s).
 
 ## 1. O que é
 
@@ -339,6 +339,8 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 21515bd 2026-11-27 chore(release): atualiza bundle resources/mcp-server.cjs para v0.9.32
+- eda190f 2026-11-27 fix(auditoria): corrige bundle hooks, provisionamento av<14, teto VRAM, encoding e release v0.9.32
 - f38b717 2026-11-27 docs(agents): VRAM/rescue/auditoria-empacotada/armadilhas do instalador
 - 065cf6e 2026-11-27 release: v0.9.31
 - 92e471a 2026-11-27 fix(auditoria): checks sandbox/loop/hooks com path e import corretos
@@ -347,8 +349,6 @@ Utilitários locais relevantes:
 - 0841ec8 2026-11-27 feat(auditoria): checks hardware:vram-lida, hardware:teto-modelo, tools:rescue-valida
 - e4c3c0d 2026-11-27 feat(brain): rescue de tool_call emitido como JSON no content
 - f8989f2 2026-11-27 feat(hardware): perfil enxerga VRAM medida e aplica teto de modelo
-- 8e26f96 2026-11-27 feat(agent): codigo_criar — arquivo novo vira proposta com protecoes
-- 23a62ac 2026-11-27 test(brain): prova live de abort cancelando geracao no Ollama
 
 ## 16. Como atualizar este dossiê
 

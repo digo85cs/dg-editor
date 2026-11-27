@@ -4041,3 +4041,36 @@ body.tema-escuro .tree-ctx-item.is-perigo { color: #f07178; }
 .auto-presets { display: flex; gap: 6px; margin-top: 6px; }
 #btn-chat-voz.gravando { color: var(--dg-danger, #e5534b); animation: dg-pulse 1.2s ease-in-out infinite; }
 @keyframes dg-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }
+
+/* === Onda 1: Isolamento de layout (CSS containment) e janela de chat === */
+#sidebar,
+#center-panel,
+#right-panel {
+  contain: layout style;
+}
+#chat-messages,
+#terminal-panel,
+#editor-host {
+  contain: layout style paint;
+}
+#chat-messages .msg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+.chat-load-older {
+  align-self: center;
+  margin: 4px auto 10px;
+  padding: 5px 12px;
+  font-size: var(--dg-fs-xs, 11px);
+  color: var(--dg-text-muted);
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-md, 6px);
+  cursor: pointer;
+  transition: background var(--dg-duration-fast, 120ms) var(--dg-ease-standard, ease);
+}
+.chat-load-older:hover,
+.chat-load-older:focus-visible {
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+}

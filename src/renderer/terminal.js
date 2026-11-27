@@ -4,8 +4,51 @@
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { apiTerm, cssVar, formatShellLabel, gravarPerfis, lerPerfis, resumirScrollback, rotuloDoShellId, shellIdFromInfo, temaXterm, LS_LAYOUT, MAX_SCROLLBACK_LINHAS, MAX_SCROLLBACK_CHARS, serializarLayout, parseLayoutSnapshot, escreverScrollbackRestaurado } from './terminal-utils.js'
+
+const MAX_BUFFER_RAF_BYTES = 65536
+
+/** Carrega WebGL no xterm com fallback silencioso para DOM/canvas se indisponivel ou perder contexto. */
+function anexarWebglSeguro(xterm) {
+  try {
+    const webgl = new WebglAddon()
+    webgl.onContextLoss(() => {
+      try { webgl.dispose() } catch { /* fallback automatico para renderer padrao */ }
+    })
+    xterm.loadAddon(webgl)
+    return webgl
+  } catch {
+    return null
+  }
+}
+
+/** Agrupa escritas de alta frequencia do PTY em um unico write por frame (60fps). */
+function criarBufferEscritaXterm(xterm) {
+  let pendente = ''
+  let rafId = 0
+  const flush = () => {
+    if (rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = 0
+    }
+    if (!pendente) return
+    const chunk = pendente
+    pendente = ''
+    try { xterm.write(chunk) } catch { /* terminal descartado */ }
+  }
+  const push = (data) => {
+    if (!data) return
+    pendente += data
+    if (pendente.length >= MAX_BUFFER_RAF_BYTES) {
+      flush()
+      return
+    }
+    if (!rafId) rafId = requestAnimationFrame(flush)
+  }
+  return { push, flush }
+}
 
 const LS_HEIGHT = 'dg-terminal-height'
 const LS_MODE = 'dg-terminal-mode'
@@ -404,6 +447,8 @@ export function initTerminalPanel() {
     xterm.loadAddon(fit)
     xterm.loadAddon(new WebLinksAddon())
     xterm.open(pane)
+    anexarWebglSeguro(xterm)
+    const writeBuf = criarBufferEscritaXterm(xterm)
     xterm.onData((data) => apiTerm().write(id, data))
 
     /** @type {Aba} */
@@ -418,7 +463,8 @@ export function initTerminalPanel() {
       pane,
       tabBtn,
       unsubData: null,
-      unsubExit: null
+      unsubExit: null,
+      writeBuf
     }
     g.abas.set(id, entry)
     wireDrag(g, entry)
@@ -455,7 +501,7 @@ export function initTerminalPanel() {
 
     entry.unsubData = apiTerm().onData(({ id: sid, data }) => {
       if (sid !== id) return
-      xterm.write(data)
+      entry.writeBuf.push(data)
       if (scrollPendente) {
         if (timerScroll) clearTimeout(timerScroll)
         timerScroll = setTimeout(aplicarScroll, 300)
@@ -463,7 +509,10 @@ export function initTerminalPanel() {
       agendarSnapshotOcioso()
     })
     entry.unsubExit = apiTerm().onExit(({ id: sid, code }) => {
-      if (sid === id) xterm.writeln(`\r\n[exit ${code}]`)
+      if (sid === id) {
+        entry.writeBuf.flush()
+        xterm.writeln(`\r\n[exit ${code}]`)
+      }
     })
 
     await ativarAba(g, id)
@@ -472,6 +521,7 @@ export function initTerminalPanel() {
   }
 
   async function reiniciarAbaComShell(g, a, shellId) {
+    a.writeBuf?.flush()
     a.unsubData?.()
     a.unsubExit?.()
     try {
@@ -489,11 +539,14 @@ export function initTerminalPanel() {
     if (created?.erro) a.xterm.writeln('\r\n[erro] ' + created.erro)
     a.unsubData = apiTerm().onData(({ id: sid, data }) => {
       if (sid !== a.id) return
-      a.xterm.write(data)
+      a.writeBuf ? a.writeBuf.push(data) : a.xterm.write(data)
       agendarSnapshotOcioso()
     })
     a.unsubExit = apiTerm().onExit(({ id: sid, code }) => {
-      if (sid === a.id) a.xterm.writeln(`\r\n[exit ${code}]`)
+      if (sid === a.id) {
+        a.writeBuf?.flush()
+        a.xterm.writeln(`\r\n[exit ${code}]`)
+      }
     })
     fitEResize(g, a.id)
     a.xterm.focus()
@@ -502,6 +555,7 @@ export function initTerminalPanel() {
   }
 
   async function destruirAbaObj(g, a) {
+    a.writeBuf?.flush()
     a.unsubData?.()
     a.unsubExit?.()
     try {

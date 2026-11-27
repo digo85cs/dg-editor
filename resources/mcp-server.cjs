@@ -256418,7 +256418,7 @@ async function executarAgente(raiz, pergunta, modeloForcadoOuOpcoes) {
         blocoInventario = blocoPromptInventario2();
     } catch {
     }
-    const systemExtra = ancoraWorkspace + blocoInventario + blocoAgente + blocoRegrasGerais + (memoria ? "\n\n" + memoria : "") + blocoFatos + blocoSkills + blocoPlan + blocoMidia + blocoPropose + blocoMapa + (extra ? "\n\n" + extra : "");
+    const systemExtra = ancoraWorkspace + blocoAgente + blocoRegrasGerais + blocoFatos + blocoPlan + blocoMidia + blocoPropose + blocoMapa + blocoSkills + (memoria ? "\n\n" + memoria : "") + blocoInventario + (extra ? "\n\n" + extra : "");
     let tools = [];
     let toolsInline = false;
     if (modo === "agent") {

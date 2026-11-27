@@ -117,8 +117,27 @@ export function garantirEmptyStateChat() {
   ligarEmptyStateChat()
 }
 
+const JANELA_CHAT_INICIAL = 40
+const JANELA_CHAT_LOTE = 40
+let observerChatTopo = null
+
+function criarBolhaElemento(role, content, provider) {
+  const div = document.createElement('div')
+  const texto =
+    role === 'assistant' ? organizarRespostaCursor(content) : String(content ?? '')
+  const b = bolhaHtml(role, texto, provider)
+  div.className = b.cls
+  div.innerHTML = b.html
+  ligarAcoesBolha(div, role, content)
+  return div
+}
+
 export function renderizarChat(msgs) {
   const area = $('chat-messages')
+  if (observerChatTopo) {
+    observerChatTopo.disconnect()
+    observerChatTopo = null
+  }
   area.innerHTML = ''
   const lista = normalizarMensagensChat(msgs)
   recontarUsoChat(lista)
@@ -128,9 +147,61 @@ export function renderizarChat(msgs) {
     ligarEmptyStateChat()
     return
   }
-  for (const m of lista) adicionarBolha(m.role, m.content, m.provider)
+
+  let cursorInicio = Math.max(0, lista.length - JANELA_CHAT_INICIAL)
+  const frag = document.createDocumentFragment()
+
+  /** Botão/sentinela no topo para carregar mensagens antigas sob demanda (mantém DOM leve). */
+  let btnAntigas = null
+  const carregarMaisAntigas = () => {
+    if (cursorInicio <= 0 || !btnAntigas) return
+    const novoInicio = Math.max(0, cursorInicio - JANELA_CHAT_LOTE)
+    const lote = lista.slice(novoInicio, cursorInicio)
+    cursorInicio = novoInicio
+    const alturaAntes = area.scrollHeight
+    const scrollAntes = area.scrollTop
+    const loteFrag = document.createDocumentFragment()
+    for (const m of lote) loteFrag.appendChild(criarBolhaElemento(m.role, m.content, m.provider))
+    btnAntigas.after(loteFrag)
+    const delta = area.scrollHeight - alturaAntes
+    area.scrollTop = scrollAntes + delta
+    if (cursorInicio <= 0) {
+      if (observerChatTopo) { observerChatTopo.disconnect(); observerChatTopo = null }
+      btnAntigas.remove()
+      btnAntigas = null
+    } else {
+      btnAntigas.textContent = `Carregar mensagens anteriores (${cursorInicio} restante${cursorInicio > 1 ? 's' : ''})`
+    }
+  }
+
+  if (cursorInicio > 0) {
+    btnAntigas = document.createElement('button')
+    btnAntigas.type = 'button'
+    btnAntigas.className = 'chat-load-older'
+    btnAntigas.textContent = `Carregar mensagens anteriores (${cursorInicio} restante${cursorInicio > 1 ? 's' : ''})`
+    btnAntigas.addEventListener('click', carregarMaisAntigas)
+    frag.appendChild(btnAntigas)
+  }
+
+  for (let i = cursorInicio; i < lista.length; i++) {
+    const m = lista[i]
+    frag.appendChild(criarBolhaElemento(m.role, m.content, m.provider))
+  }
+  area.appendChild(frag)
   marcarChatComMsgs()
   area.scrollTop = area.scrollHeight
+
+  if (btnAntigas && typeof IntersectionObserver === 'function') {
+    observerChatTopo = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && area.scrollTop < 80) {
+          carregarMaisAntigas()
+        }
+      },
+      { root: area, threshold: 0.1 }
+    )
+    observerChatTopo.observe(btnAntigas)
+  }
 }
 
 export function marcarChatComMsgs() {
@@ -180,13 +251,7 @@ export async function reeditarMensagemUsuario(div) {
 
 export function adicionarBolha(role, content, provider) {
   const area = $('chat-messages')
-  const div = document.createElement('div')
-  const texto =
-    role === 'assistant' ? organizarRespostaCursor(content) : String(content ?? '')
-  const b = bolhaHtml(role, texto, provider)
-  div.className = b.cls
-  div.innerHTML = b.html
-  ligarAcoesBolha(div, role, content)
+  const div = criarBolhaElemento(role, content, provider)
   area.appendChild(div)
   marcarChatComMsgs()
   animarEntradaMsg(div, role)
