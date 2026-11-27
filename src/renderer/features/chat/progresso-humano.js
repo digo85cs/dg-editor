@@ -93,6 +93,7 @@ function garantirEstruturaCartao(card) {
       '<button type="button" class="chat-work-head chat-work-toggle" aria-expanded="false">' +
       '<span class="chat-work-pulse" aria-hidden="true"></span>' +
       '<strong class="chat-work-title">Trabalhando…</strong>' +
+      '<span class="chat-work-count" hidden></span>' +
       '<span class="chat-work-chev" aria-hidden="true"></span>' +
       '</button>' +
       '<p class="chat-work-step-one"></p>' +
@@ -182,6 +183,13 @@ export function atualizarCartaoTrabalho(area, opt) {
       li.textContent = String(opt.log)
       ul.appendChild(li)
       while (ul.children.length > 24) ul.firstChild?.remove()
+      const total = Number(card.dataset.dgStepCount || '0') + 1
+      card.dataset.dgStepCount = String(total)
+      const countEl = card.querySelector('.chat-work-count')
+      if (countEl) {
+        countEl.textContent = total === 1 ? '1 etapa' : `${total} etapas`
+        countEl.hidden = false
+      }
       if (card.classList.contains('is-expanded')) ul.hidden = false
     }
   }

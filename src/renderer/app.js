@@ -115,6 +115,7 @@ import { ligarBotaoPainel, rodarAutoAuditoria, atualizarIconeMax } from './featu
 import { ligarAtalhosTeclado } from './features/ui/atalhos-teclado.js'
 import { ligarTituloBarra } from './features/ui/titulo-barra.js'
 import { ligarStatusWorkspace } from './features/ui/status-workspace.js'
+import { configurarPerspectivas, initPerspectivas } from './features/ui/perspectivas.js'
 import { garantirTerminal, prepararTerminalLazy } from './features/ui/terminal-lazy.js'
 import { ligarRestauracaoWorkspace } from './features/ui/workspace-restaurar.js'
 import { caminhoNoVault, nomeArquivo, nomePastaUi, caminhoRelativo, extIcon } from './utils/rotulos-arquivo.js'
@@ -569,6 +570,12 @@ carregarPastas()
 initResizers()
 initActivityBar()
 bootstrapComandos()
+configurarPerspectivas({
+  focarPainelIa: (p) => focarPainelIa(p),
+  ativarPainelCentro: (p) => ativarPainelCentro(p),
+  abrirVault: () => executarComandoLocal('abrir-vault')
+})
+initPerspectivas()
 initMenubar()
 ligarComandosUi()
 ligarAnuncioEtapasAgente()

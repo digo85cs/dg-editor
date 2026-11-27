@@ -41,6 +41,8 @@ import { abrirOrientadorPrompt } from '../chat/historico-orientador.js'
 import { renderizarChat } from '../chat/chat-core.js'
 import { mostrarToast } from './toast.js'
 import { anunciar } from './live-region.js'
+import { abrirInlineEdit } from '../editor/inline-edit.js'
+import { aplicarPerspectiva, alternarModoZen } from './perspectivas.js'
 
 const $ = (id) => document.getElementById(id)
 
@@ -119,7 +121,13 @@ export function bootstrapComandos() {
     { id: 'orientar-prompt', titulo: 'Assistente de prompt', atalho: 'Ctrl+Alt+P', fn: () => abrirOrientadorPrompt() },
     { id: 'guardian', titulo: 'Guardiao', fn: () => abrirContas() },
     { id: 'salvar', titulo: 'Salvar', atalho: 'Ctrl+S', fn: () => salvarArquivoAtivo() },
+    { id: 'editor-inline-edit', titulo: 'Edição inline com IA', atalho: 'Ctrl+K', fn: () => abrirInlineEdit(deps.getEditor?.()) },
     { id: 'formatar', titulo: 'Formatar documento', atalho: 'Shift+Alt+F', fn: () => void formatarDocumentoAtivo() },
+    { id: 'perspectiva-codigo', titulo: 'Perspectiva: Código', fn: () => aplicarPerspectiva('codigo') },
+    { id: 'perspectiva-agente', titulo: 'Perspectiva: Agente', fn: () => aplicarPerspectiva('agente') },
+    { id: 'perspectiva-midia', titulo: 'Perspectiva: Estúdio de Mídia', fn: () => aplicarPerspectiva('midia') },
+    { id: 'perspectiva-vault', titulo: 'Perspectiva: Vault & Notas', fn: () => aplicarPerspectiva('vault') },
+    { id: 'perspectiva-zen', titulo: 'Alternar Modo Zen', atalho: 'Ctrl+Alt+Z', fn: () => alternarModoZen() },
     { id: 'openclaw-pedir', titulo: 'Pedir ao OpenClaw', fn: () => void pedirOpenClawUi() },
     {
       id: 'agent-panel',

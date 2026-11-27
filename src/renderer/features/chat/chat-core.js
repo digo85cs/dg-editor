@@ -57,6 +57,12 @@ export function markupEmptyStateChat() {
       '<h2>Vamos começar</h2>' +
       '<p>Abra um repositório para o agente ler o código, analisar e executar tarefas.</p>' +
       '<button id="btn-empty-open" class="btn-primary">Adicionar repositório</button>' +
+      '<div class="empty-shortcuts">' +
+      '<span><kbd>Ctrl+Shift+P</kbd> Paleta</span>' +
+      '<span><kbd>Ctrl+K</kbd> Edição inline</span>' +
+      '<span><kbd>Ctrl+`</kbd> Terminal</span>' +
+      '<span><kbd>Ctrl+Alt+Z</kbd> Modo Zen</span>' +
+      '</div>' +
       '</div>'
     )
   }

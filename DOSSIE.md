@@ -1,8 +1,8 @@
 # Dossiê completo do DG Editor
 
-> Gerado automaticamente em **27/11/2026, 13:52:33** por `npm run dossie` (também roda no `postbuild`).
-> Versão **0.9.33** · branch `integra-13-11` · último commit: 21515bd 2026-11-27 chore(release): atualiza bundle resources/mcp-server.cjs para v0.9.32
-> Alterações locais não commitadas: 21 arquivo(s).
+> Gerado automaticamente em **27/11/2026, 14:12:47** por `npm run dossie` (também roda no `postbuild`).
+> Versão **0.9.34** · branch `integra-13-11` · último commit: 6d9c9d7 2026-11-27 feat(perf): Onda 1 — FlashAttn/q8_0, Prefix Caching, WebGL+rAF, chat janelado, lazy midia-ui e v0.9.33
+> Alterações locais não commitadas: 24 arquivo(s).
 
 ## 1. O que é
 
@@ -29,8 +29,8 @@ MCP para integração externa. Nenhuma chave paga é necessária.
 
 ## 4. IPC
 
-- Canais registrados no main: **392**.
-- Canais expostos pelo preload: **377**.
+- Canais registrados no main: **393**.
+- Canais expostos pelo preload: **378**.
 
 <details><summary>Canais de mídia</summary>
 
@@ -339,6 +339,7 @@ Utilitários locais relevantes:
 
 ## 15. Histórico recente
 
+- 6d9c9d7 2026-11-27 feat(perf): Onda 1 — FlashAttn/q8_0, Prefix Caching, WebGL+rAF, chat janelado, lazy midia-ui e v0.9.33
 - 21515bd 2026-11-27 chore(release): atualiza bundle resources/mcp-server.cjs para v0.9.32
 - eda190f 2026-11-27 fix(auditoria): corrige bundle hooks, provisionamento av<14, teto VRAM, encoding e release v0.9.32
 - f38b717 2026-11-27 docs(agents): VRAM/rescue/auditoria-empacotada/armadilhas do instalador
@@ -348,7 +349,6 @@ Utilitários locais relevantes:
 - 6a54341 2026-11-27 feat(brain): teto VRAM tambem no catalogo + provider local na missao
 - 0841ec8 2026-11-27 feat(auditoria): checks hardware:vram-lida, hardware:teto-modelo, tools:rescue-valida
 - e4c3c0d 2026-11-27 feat(brain): rescue de tool_call emitido como JSON no content
-- f8989f2 2026-11-27 feat(hardware): perfil enxerga VRAM medida e aplica teto de modelo
 
 ## 16. Como atualizar este dossiê
 

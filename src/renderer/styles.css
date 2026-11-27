@@ -4074,3 +4074,239 @@ body.tema-escuro .tree-ctx-item.is-perigo { color: #f07178; }
   background: var(--dg-surface-raised);
   color: var(--dg-text);
 }
+
+/* === Onda 2: Perspectivas 1-clique, Ctrl+K Inline Edit, Command Bar e polish Linear/Zed === */
+.dg-perspectivas {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 10px;
+  padding: 2px;
+  border-radius: var(--dg-radius-md, 6px);
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border-subtle);
+}
+.dg-persp-btn {
+  border: none;
+  background: transparent;
+  color: var(--dg-text-muted);
+  font-size: var(--dg-fs-xs, 11px);
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background var(--dg-duration-fast, 120ms) var(--dg-ease-standard, ease),
+              color var(--dg-duration-fast, 120ms) var(--dg-ease-standard, ease);
+}
+.dg-persp-btn:hover {
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+}
+.dg-persp-btn.ativo {
+  background: var(--dg-active);
+  color: var(--dg-text);
+  font-weight: 600;
+}
+body.perspectiva-midia {
+  --dg-sidebar-w: min(520px, 48vw);
+}
+body.perspectiva-zen #activity-bar,
+body.perspectiva-zen #sidebar,
+body.perspectiva-zen #right-panel,
+body.perspectiva-zen #exec-panel,
+body.perspectiva-zen .resizer {
+  display: none !important;
+}
+.dg-zen-exit {
+  position: fixed;
+  top: 46px;
+  right: 16px;
+  z-index: 32000;
+  padding: 5px 12px;
+  font-size: var(--dg-fs-xs, 11px);
+  color: var(--dg-text);
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border);
+  border-radius: 999px;
+  box-shadow: var(--dg-shadow-2);
+  cursor: pointer;
+}
+.dg-zen-exit:hover {
+  background: var(--dg-surface-raised);
+}
+
+/* Ctrl+K Inline Edit (flutuante sobre o CodeMirror 6) */
+.dg-inline-edit {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 28px));
+  z-index: 40;
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-lg, 8px);
+  box-shadow: var(--dg-shadow-3);
+  backdrop-filter: blur(8px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dg-ie-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--dg-fs-xs, 11px);
+}
+.dg-ie-badge {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--dg-active);
+  color: var(--dg-text);
+}
+.dg-ie-meta {
+  color: var(--dg-text-muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg-ie-close {
+  border: none;
+  background: transparent;
+  color: var(--dg-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.dg-ie-close:hover {
+  background: var(--dg-surface-raised);
+  color: var(--dg-text);
+}
+.dg-ie-row {
+  display: flex;
+  gap: 6px;
+}
+.dg-ie-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: var(--dg-fs-md, 13px);
+  color: var(--dg-text);
+  background: var(--dg-bg);
+  border: 1px solid var(--dg-border);
+  border-radius: var(--dg-radius-md, 6px);
+}
+.dg-ie-input:focus {
+  outline: 2px solid var(--dg-accent);
+  outline-offset: -1px;
+}
+.dg-ie-status {
+  font-size: var(--dg-fs-xs, 11px);
+}
+.dg-ie-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dg-ie-code {
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 140px;
+  overflow: auto;
+  font-family: var(--fonte-mono);
+  font-size: var(--dg-fs-sm, 12px);
+  border-radius: var(--dg-radius-sm, 4px);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dg-ie-before {
+  background: rgba(248, 81, 73, 0.1);
+  border-left: 3px solid var(--dg-danger);
+  color: var(--dg-text-muted);
+}
+.dg-ie-after {
+  background: rgba(61, 214, 140, 0.12);
+  border-left: 3px solid var(--dg-accent);
+  color: var(--dg-text);
+}
+.dg-ie-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* Command Bar Universal (badges + kbd) */
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.palette-left,
+.palette-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.palette-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--dg-surface-raised);
+  border: 1px solid var(--dg-border-subtle);
+  color: var(--dg-text-muted);
+  flex-shrink: 0;
+}
+.palette-kbd {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dg-bg);
+  border: 1px solid var(--dg-border);
+  color: var(--dg-text-muted);
+  flex-shrink: 0;
+}
+.chat-work-count {
+  margin-left: auto;
+  margin-right: 6px;
+  font-size: var(--dg-fs-xs, 11px);
+  color: var(--dg-text-muted);
+  font-weight: 500;
+}
+.empty-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: var(--dg-fs-xs, 11px);
+  color: var(--dg-text-muted);
+}
+.empty-shortcuts kbd {
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-border);
+  color: var(--dg-text);
+  margin-right: 3px;
+}
+body.tema-escuro #palette .palette-box,
+body.tema-escuro .modal-box {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+}

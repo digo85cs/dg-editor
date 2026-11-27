@@ -26,7 +26,7 @@ export function abrirPaletaComandos() {
   fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Digite um comando...'
+  $('palette-input').placeholder = 'Digite um comando ou @arquivo…'
   renderizarPaleta('')
   $('palette-input').focus()
 }
@@ -36,7 +36,7 @@ export function abrirPaletaArquivos() {
   fecharBuscaGlobal()
   $('palette').classList.remove('hidden')
   $('palette-input').value = ''
-  $('palette-input').placeholder = 'Abrir arquivo — digite o nome…'
+  $('palette-input').placeholder = 'Abrir arquivo — ou digite >comando…'
   renderizarPaleta('')
   $('palette-input').focus()
 }
@@ -65,14 +65,32 @@ export function fecharBuscaGlobal() {
   }
 }
 
+function categoriaComando(id) {
+  const s = String(id || '')
+  if (s.startsWith('perspectiva-')) return 'Perspectiva'
+  if (/inline|salvar|formatar|aba|colar-markdown/.test(s)) return 'Editor'
+  if (/agent|chat|openclaw|orientar|analis/.test(s)) return 'IA'
+  if (/midia|gravador|reversa|mapa-mental|vault/.test(s)) return 'Estúdio'
+  return ''
+}
+
 export async function renderizarPaleta(filtro) {
   const lista = $('palette-list')
   lista.innerHTML = ''
   paletaSel = 0
-  const f = (filtro || '').trim()
+  const bruto = (filtro || '').trim()
+  let modoEfetivo = modoPaleta
+  let f = bruto
+  if (bruto.startsWith('@')) {
+    modoEfetivo = 'arquivos'
+    f = bruto.slice(1).trim()
+  } else if (bruto.startsWith('>')) {
+    modoEfetivo = 'comandos'
+    f = bruto.slice(1).trim()
+  }
   paletaItens = []
 
-  if (modoPaleta === 'comandos') {
+  if (modoEfetivo === 'comandos') {
     let cmds = listarComandosLocais()
     try {
       const remoto = await window.api.invoke('comandos:listar')
@@ -92,8 +110,15 @@ export async function renderizarPaleta(filtro) {
     const fl = f.toLowerCase()
     cmds = cmds.filter((c) => !fl || (c.titulo || '').toLowerCase().includes(fl) || c.id.includes(fl))
     for (const c of cmds) {
-        paletaItens.push({ tipo: 'cmd', id: c.id, label: c.titulo, hint: c.hint || c.atalho || '' })
-      }
+      paletaItens.push({
+        tipo: 'cmd',
+        id: c.id,
+        label: c.titulo,
+        badge: categoriaComando(c.id),
+        atalho: c.atalho || '',
+        hint: c.hint && c.hint !== c.atalho ? c.hint : ''
+      })
+    }
   } else {
     const raiz = state.pastaAtual || state.pastasRecentes[0]
     if (raiz) {
@@ -108,6 +133,8 @@ export async function renderizarPaleta(filtro) {
               tipo: 'file',
               caminho: e.caminho,
               label: nomeAmigavelArquivo(nome, rel),
+              badge: 'Arquivo',
+              atalho: '',
               hint: pasta === '.' ? rel : pasta
             })
           }
@@ -122,21 +149,29 @@ export async function renderizarPaleta(filtro) {
     lista.innerHTML = '<div class="palette-item muted">Nenhum resultado</div>'
     return
   }
+  const frag = document.createDocumentFragment()
   for (let i = 0; i < paletaItens.length; i++) {
     const c = paletaItens[i]
     const div = document.createElement('div')
     div.className = 'palette-item' + (i === 0 ? ' selecionado' : '')
     div.innerHTML =
+      '<span class="palette-left">' +
+      (c.badge ? '<span class="palette-badge">' + escapar(c.badge) + '</span>' : '') +
       '<span class="palette-label">' +
       escapar(c.label) +
       '</span>' +
-      (c.hint ? '<span class="palette-hint">' + escapar(c.hint) + '</span>' : '')
+      '</span>' +
+      '<span class="palette-right">' +
+      (c.hint ? '<span class="palette-hint">' + escapar(c.hint) + '</span>' : '') +
+      (c.atalho ? '<kbd class="palette-kbd">' + escapar(c.atalho) + '</kbd>' : '') +
+      '</span>'
     div.addEventListener('click', () => {
       fecharPaleta()
       executarItemPaleta(c)
     })
-    lista.appendChild(div)
+    frag.appendChild(div)
   }
+  lista.appendChild(frag)
 }
 
 export function executarItemPaleta(c) {

@@ -23,7 +23,7 @@ const invokeChannels = [
   'tema:get', 'tema:set',
   'dossie:ler', 'dossie:gravar', 'dossie:snapshot', 'dossie:caminho',
   'skills:listar', 'skills:criar', 'mcp:tools', 'mcp:status', 'mcp:set-habilitado', 'mcp:smoke', 'mcp:catalogo', 'mcp:instalar', 'memoria:status',
-  'memoria:listar', 'memoria:propor', 'memoria:decidir', 'editor:completar',
+  'memoria:listar', 'memoria:propor', 'memoria:decidir', 'editor:completar', 'editor:editar-inline',
   'adapta:status', 'adapta:gerar', 'adapta:ler-continuidade', 'adapta:abrir',
   'roteador:planejar',
   'diagnostico:rodar',

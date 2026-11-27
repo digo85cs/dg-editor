@@ -10,6 +10,8 @@ import { alternarTerminalNoBloco3 } from '../layout/paineis.js'
 import { desktopPermitido, pedirPermissaoDesktop } from '../arquivos/desktop-vault.js'
 import { abrirNavegadorNoBloco3 } from './activity-browser.js'
 import { executarComandoLocal } from '../../comandos.js'
+import { inlineEditAberto, fecharInlineEdit } from '../editor/inline-edit.js'
+import { obterPerspectivaAtual, alternarModoZen } from './perspectivas.js'
 
 export function ligarAtalhosTeclado() {
   document.addEventListener(
@@ -18,6 +20,20 @@ export function ligarAtalhosTeclado() {
       if (e.key === 'Escape' && atalhosTecladoAbertos()) {
         e.preventDefault()
         fecharAtalhosTeclado()
+        return
+      }
+      if (e.key === 'Escape' && inlineEditAberto()) {
+        e.preventDefault()
+        fecharInlineEdit(true)
+        return
+      }
+      if (
+        e.key === 'Escape' &&
+        obterPerspectivaAtual() === 'zen' &&
+        !document.querySelector('.modal:not(.hidden), #palette:not(.hidden), #busca-global:not(.hidden)')
+      ) {
+        e.preventDefault()
+        alternarModoZen()
         return
       }
       const alvoTecla = e.target
@@ -100,6 +116,19 @@ export function ligarAtalhosTeclado() {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault()
         focarPainelIa('chat')
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        const noEditor = alvoTecla instanceof HTMLElement && !!alvoTecla.closest?.('.cm-editor')
+        if (!digitando || noEditor) {
+          e.preventDefault()
+          executarComandoLocal('editor-inline-edit')
+          return
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.altKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        executarComandoLocal('perspectiva-zen')
+        return
       }
     },
     true
