@@ -18,7 +18,14 @@ describe('FASE 3 — checks escrita/missao na auto-auditoria', () => {
     const rel = await rodarAuditoriaConsolidada()
     const achados: Array<{ id?: string; status?: string; titulo?: string }> =
       (rel as { achados?: typeof achados }).achados || []
-    for (const id of ['escrita:gera-proposta', 'escrita:nao-grava', 'missao:veredito-honesto']) {
+    for (const id of [
+      'escrita:gera-proposta',
+      'escrita:nao-grava',
+      'missao:veredito-honesto',
+      'hardware:vram-lida',
+      'hardware:teto-modelo',
+      'tools:rescue-valida',
+    ]) {
       const a = achados.find((x) => x.id === id)
       console.log('[AUDIT]', id, '=>', a ? 'ACHADO: ' + a.status + ' ' + (a.titulo || '') : 'OK (sem achado)')
       expect(a, 'check ' + id + ' nao pode falhar').toBeUndefined()

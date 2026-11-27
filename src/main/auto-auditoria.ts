@@ -1839,6 +1839,80 @@ function checarLoopAgent(): Achado[] {
         status: 'nao-aplicavel'
       })
     }
+    // FASE 4 (vram): perfil deve medir VRAM de verdade (nvidia-smi/wmic),
+    // nunca chutar por nome de GPU; nao-medido = conservador + dglog.
+    const srcHw = (() => {
+      try {
+        return require('fs').readFileSync(path.join(__dirname, 'hardware-profile.ts'), 'utf8')
+      } catch {
+        return ''
+      }
+    })()
+    if (
+      !srcHw ||
+      !/vramMb/.test(srcHw) ||
+      !/nvidia-smi/.test(srcHw) ||
+      !/win32_VideoController|wmic/.test(srcHw) ||
+      !/vramMedida/.test(srcHw) ||
+      !/nao medida|nao-medida/.test(srcHw)
+    ) {
+      achados.push({
+        area: 'hardware',
+        id: 'hardware:vram-lida',
+        titulo: 'perfil deve medir VRAM via nvidia-smi/wmic e logar quando nao medir',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // FASE 4 (teto): modelo acima do teto de VRAM nao pode passar pela fila.
+    const srcReg = (() => {
+      try {
+        return require('fs').readFileSync(path.join(__dirname, 'brain/registry.ts'), 'utf8')
+      } catch {
+        return ''
+      }
+    })()
+    if (
+      !/tetoBPorVram/.test(srcHw) ||
+      !/modeloExcedeTetoVram/.test(srcHw) ||
+      !srcReg ||
+      !/modeloExcedeTetoVram/.test(srcReg) ||
+      !/modeloPesadoDemais/.test(srcReg)
+    ) {
+      achados.push({
+        area: 'hardware',
+        id: 'hardware:teto-modelo',
+        titulo: 'fila deve excluir modelo local acima do teto de VRAM medida',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
+    // FASE 4 (rescue): tool_call resgatado do content so vale com nome
+    // existente no pacote de tools enviado naquela chamada.
+    const srcProv = (() => {
+      try {
+        return require('fs').readFileSync(path.join(__dirname, 'brain/providers.ts'), 'utf8')
+      } catch {
+        return ''
+      }
+    })()
+    if (
+      !/resgatarToolCallDoContent/.test(srcProv) ||
+      !/nomesTools\.has\(nome\)/.test(srcProv) ||
+      !/\[rescue\]/.test(srcProv) ||
+      !/msg\.tool_calls/.test(srcProv)
+    ) {
+      achados.push({
+        area: 'tools',
+        id: 'tools:rescue-valida',
+        titulo: 'rescue de tool_call deve exigir nome existente no pacote enviado',
+        severidade: 'erro',
+        corrigivel: true,
+        status: 'nao-aplicavel'
+      })
+    }
   } catch (e) {
     achados.push({
       area: 'loop',
