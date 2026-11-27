@@ -606,6 +606,11 @@ export function filaPronta(tarefa: Tarefa | string, opcoes?: OpcoesFila): Provid
   const ok: ProviderConfig[] = []
   const motivos: string[] = []
   for (const p of bruta) {
+    if (p.tipo === 'local' && modeloExcedeTetoVram(p.modelo, t)) {
+      logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=teto-vram')
+      motivos.push(p.id + '=teto-vram')
+      continue
+    }
     if (modeloPesadoDemais(t, p)) {
       logStderr('[dg-fila] pulando ' + p.id + '/' + p.modelo + ' motivo=modelo-grande')
       motivos.push(p.id + '=modelo-grande')

@@ -13,7 +13,7 @@ import {
   consultarVersoesRemotas
 } from './ollama'
 import { dglog } from '../dglog'
-import { modeloLocalSugerido } from '../hardware-profile'
+import { modeloLocalSugerido, modeloExcedeTetoVram } from '../hardware-profile'
 
 export type Capacidade = 'chat' | 'codigo' | 'analise' | 'completo' | 'embedding'
 export type Porte = 'pequeno' | 'padrao' | 'grande' | 'longo'
@@ -596,27 +596,37 @@ export function modeloParaTarefaComMotivo(
 ): { modelo: string | null; motivo: string } {
   const cat = lerCatalogo(raiz)
   const excluirEmbedding = TAREFAS_SEM_EMBEDDING.has(tarefa) || !tarefa
+  // Teto de VRAM medida: modelo que nao cabe na GPU nao pode ser sugerido,
+  // mesmo que modelosPorTarefa/roteamento apontem para ele.
+  const cabeVram = (id: string): boolean => {
+    try {
+      return !modeloExcedeTetoVram(id, tarefa)
+    } catch {
+      return true
+    }
+  }
   const modeloPreferido = cat.modelosPorTarefa?.[tarefa]
   const preferido =
     modeloPreferido &&
+    cabeVram(modeloPreferido) &&
     cat.modelos.find((m) => m.id === modeloPreferido && usavelParaChat(m, excluirEmbedding))
   if (preferido) {
     return { modelo: preferido.id, motivo: 'mapeado em modelosPorTarefa:' + tarefa }
   }
   const porte = cat.roteamento[tarefa] || cat.roteamento.codigo || 'padrao'
   const cand = cat.modelos.find(
-    (m) => usavelParaChat(m, excluirEmbedding) && m.porte === porte
+    (m) => usavelParaChat(m, excluirEmbedding) && m.porte === porte && cabeVram(m.id)
   )
   if (cand) {
     return { modelo: cand.id, motivo: 'porte ' + porte + ' (roteamento:' + tarefa + ')' }
   }
   if (cat.ativo) {
-    const a = cat.modelos.find((m) => m.id === cat.ativo)
+    const a = cat.modelos.find((m) => m.id === cat.ativo && cabeVram(m.id))
     if (a && usavelParaChat(a, excluirEmbedding)) {
       return { modelo: cat.ativo, motivo: 'modelo ativo do catálogo' }
     }
   }
-  const qualquer = cat.modelos.find((m) => usavelParaChat(m, excluirEmbedding))
+  const qualquer = cat.modelos.find((m) => usavelParaChat(m, excluirEmbedding) && cabeVram(m.id))
   if (qualquer) {
     return { modelo: qualquer.id, motivo: 'primeiro modelo instalado disponível' }
   }
@@ -634,6 +644,7 @@ export function modeloParaTarefaComMotivo(
   }
   // Hard fallback: modelos conhecidos neste PC (mesmo se catálogo ficou sujo)
   for (const id of FALLBACKS_CHAT) {
+    if (!cabeVram(id)) continue
     const hit = cat.modelos.find((m) => m.id === id)
     if (!hit || hit.instalado !== false) {
       return { modelo: id, motivo: 'fallback hard ' + id }

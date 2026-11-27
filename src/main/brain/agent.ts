@@ -13,7 +13,8 @@ import {
   disponivel,
   appendFailoverLog,
   garantirCatalogoOpenRouter,
-  type Tarefa
+  type Tarefa,
+  type ProvedorEscolhido
 } from './registry'
 import {
   ErroProvider,
@@ -202,6 +203,8 @@ export interface OpcoesExecutarAgente {
   tetoTempoMs?: number
   /** true = tools[] sao defs inline (MCP fora) — executarToolInline no lugar de chamarTool */
   inlineTools?: boolean
+  /** Restringe a fila a um provedor ('ollama' = so local) sem forcar modelo */
+  provider?: ProvedorEscolhido
 }
 
 export { escolherModelo, detectarGpu } from './ollama'
@@ -1638,7 +1641,7 @@ export async function executarAgente(
     try {
       const { sincronizarModelosInstalados } = await import('./registry')
       await sincronizarModelosInstalados()
-      fila = filaPronta(tarefa, { pedido: pergunta })
+      fila = filaPronta(tarefa, { pedido: pergunta, provider: opcoes.provider })
     } catch (e) {
       throw e
     }
