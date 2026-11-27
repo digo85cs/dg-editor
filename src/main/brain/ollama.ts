@@ -396,19 +396,35 @@ export async function askOllama(
   dglog('[ollama] ask modelo=' + model + ' tarefa=' + tarefa +
     ' num_predict=' + numPredict + ' timeoutMs=' + timeoutMs + ' via=modeloParaTarefa')
   const cfg = loadDgConfig()
+  const mensagensAsk = [
+    {
+      role: 'system' as const,
+      content:
+        requestOptions.systemPrompt ||
+        'Voce e o DG Editor: app desktop Electron para Windows criado no Brasil, que edita codigo/sistemas com IA local e provedores online. NAO e produto coreano nem Hancom/HWP. Responda SEMPRE em portugues do Brasil, completo e alinhado ao pedido — sem cortar a resposta.'
+    },
+    {
+      role: 'user' as const,
+      content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}`
+    }
+  ]
+  // num_ctx derivado do prompt real (piso 4096, teto = contexto do modelo).
+  let numCtxAsk = leve ? 4096 : 8192
+  try {
+    const { ajustarCtxOllama } = await import('./num-ctx')
+    numCtxAsk = (
+      await ajustarCtxOllama({ modelo: model, mensagens: mensagensAsk })
+    ).numCtx
+  } catch {
+    /* fallback: valores historicos */
+  }
   const corpo = {
     model,
-    messages: [
-      {
-        role: 'system',
-        content: requestOptions.systemPrompt || 'Voce e o DG Editor: app desktop Electron para Windows criado no Brasil, que edita codigo/sistemas com IA local e provedores online. NAO e produto coreano nem Hancom/HWP. Responda SEMPRE em portugues do Brasil, completo e alinhado ao pedido — sem cortar a resposta.'
-      },
-      { role: 'user', content: (context ? `Contexto:\n${context}\n\n` : '') + `Pedido: ${prompt}` }
-    ],
+    messages: mensagensAsk,
     stream: false,
     keep_alive: leve ? '5m' : cfg.ollama?.keepAlive || '5m',
     options: {
-      num_ctx: leve ? 4096 : 8192,
+      num_ctx: numCtxAsk,
       temperature: 0.3,
       num_predict: numPredict
     }

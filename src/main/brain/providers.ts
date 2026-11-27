@@ -194,6 +194,15 @@ async function adapterOllama(
   signal?: AbortSignal
 ): Promise<RespostaProvider> {
   const base = cfg.baseUrl.replace(/\/$/, '') || OLLAMA_URL
+  // num_ctx derivado do prompt real; se nao couber no contexto do modelo,
+  // o pacote de tools e reduzido (as menos relevantes saem, com log).
+  const { ajustarCtxOllama } = await import('./num-ctx')
+  const ajuste = await ajustarCtxOllama({
+    modelo: cfg.modelo,
+    mensagens,
+    tools: tools as ToolDef[] | undefined,
+    baseUrl: base
+  })
   const corpo: Record<string, unknown> = {
     model: cfg.modelo,
     messages: mensagens.map((m) => {
@@ -205,12 +214,13 @@ async function adapterOllama(
     stream: false,
     options: {
       temperature: 0.3,
-      num_ctx: 8192,
+      num_ctx: ajuste.numCtx,
       num_predict: cfg.numPredict
     }
   }
-  if (tools && tools.length > 0) {
-    corpo.tools = tools.map((t) => ({
+  const toolsEfetivas = ajuste.toolsEfetivas as ToolDef[]
+  if (toolsEfetivas.length > 0) {
+    corpo.tools = toolsEfetivas.map((t) => ({
       type: 'function',
       function: {
         name: t.name,

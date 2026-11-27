@@ -19,11 +19,17 @@ import { lerRespostaCache, gravarRespostaCache } from './resposta-cache'
 
 const MAX_TENTATIVAS = 8
 
+export interface OpcoesCascata {
+  /** teto de num_predict para esta chamada (ex.: 400 em iteracao de tool_call) */
+  numPredictCap?: number
+}
+
 export async function chamarComCascata(
   tarefa: Tarefa,
   mensagens: Message[],
   tools?: ToolDef[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  opcoes?: OpcoesCascata
 ): Promise<RespostaProvider & { providerFinal: string; tentativas: string[] }> {
   const tentativas: string[] = []
   let redeConsecutivos = 0
@@ -57,7 +63,11 @@ export async function chamarComCascata(
     }
 
     try {
-      const r = await chamarProvider(cfg, mensagens, tools, signal)
+      const cfgEfetivo =
+        opcoes?.numPredictCap && cfg.numPredict > opcoes.numPredictCap
+          ? { ...cfg, numPredict: opcoes.numPredictCap }
+          : cfg
+      const r = await chamarProvider(cfgEfetivo, mensagens, tools, signal)
       // Grava no cache para reuso futuro
       gravarRespostaCache(cfg.modelo, mensagens, r.content, tools)
       // Rastreia custo para teto diario
@@ -121,9 +131,10 @@ export async function chamarComCascataSharp(
   tarefa: Tarefa,
   mensagens: Message[],
   tools?: ToolDef[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  opcoes?: OpcoesCascata
 ): Promise<RespostaProvider & { providerFinal: string; tentativas: string[] }> {
-  const r = await chamarComCascata(tarefa, mensagens, tools, signal)
+  const r = await chamarComCascata(tarefa, mensagens, tools, signal, opcoes)
   dglog('[cascata] sharp id=' + r.providerFinal + ' tentativas=' + r.tentativas.join(','))
   return r
 }

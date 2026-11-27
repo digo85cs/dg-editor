@@ -702,7 +702,8 @@ async function responderRodada(
   mensagens: Message[],
   toolsAgora: ToolDef[] | undefined,
   emit: (ev: EventoAgente) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  numPredictCap?: number
 ): Promise<RespostaProvider> {
   if (signal?.aborted) throw new Error('cancelado')
   const podeStream = !toolsAgora && (cfg.formato === 'ollama' || cfg.formato === 'openai')
@@ -737,12 +738,32 @@ async function responderRodada(
       /* cai no pedido completo via cascata */
     }
   }
-  const r = await chamarComCascata(tarefa, mensagens, toolsAgora, signal)
+  const r = await chamarComCascata(tarefa, mensagens, toolsAgora, signal, {
+    numPredictCap
+  })
   dglog(
     '[agente] cascata provedor=' + r.providerFinal +
     ' tentativas=' + r.tentativas.join(',')
   )
+  // Cap de tool_call (num_predict baixo) so vale se a resposta coube: se o
+  // modelo escreveu texto longo sem tool_call e bateu no teto (done_reason
+  // 'length'), repete UMA vez sem cap para nao entregar resposta cortada.
+  if (numPredictCap && r.tool_calls.length === 0 && respostaTruncada(r.bruto)) {
+    dglog('[agente] resposta truncada no cap ' + numPredictCap + ' — retry sem cap')
+    const r2 = await chamarComCascata(tarefa, mensagens, toolsAgora, signal)
+    dglog(
+      '[agente] cascata retry provedor=' + r2.providerFinal +
+      ' tentativas=' + r2.tentativas.join(',')
+    )
+    return r2
+  }
   return r
+}
+
+/** done_reason/finish_reason 'length' = resposta cortada pelo num_predict. */
+function respostaTruncada(bruto: unknown): boolean {
+  const b = bruto as { done_reason?: string; choices?: Array<{ finish_reason?: string }> } | undefined
+  return b?.done_reason === 'length' || b?.choices?.[0]?.finish_reason === 'length'
 }
 
 async function rodarLoopComProvider(
@@ -931,7 +952,10 @@ async function rodarLoopComProvider(
     let r: Awaited<ReturnType<typeof responderRodada>>
     const tProv0 = TIMING ? Date.now() : 0
     try {
-      r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal)
+      // FASE 3: iteracao com tools espera tool_call (curto) — num_predict 400.
+      // Na rodada de resumo (resposta final em texto) vai o valor cheio.
+      const capRodada = toolsAgora && !horaDeResumir ? 400 : undefined
+      r = await responderRodada(tarefa, cfg, mensagens, toolsAgora, emit, opts?.signal, capRodada)
     } finally {
       clearInterval(hb)
     }
